@@ -47,7 +47,7 @@ echo "[+] Step 4/5: Creating Systemd Services for 24/7 Autopilot..."
 
 sudo bash -c "cat <<EOF > /etc/systemd/system/tg-forwarder.service
 [Unit]
-Description=Telegram Forwarder Engine (Kind Doctor)
+Description=TG KindSync Pro Forwarder Engine
 After=network.target
 
 [Service]
@@ -64,41 +64,63 @@ StandardError=append:${CURRENT_DIR}/logs/forwarder_service.log
 WantedBy=multi-user.target
 EOF"
 
-sudo bash -c "cat <<EOF > /etc/systemd/system/tg-teacher.service
+sudo bash -c "cat <<EOF > /etc/systemd/system/tg-kinddoc-bot.service
 [Unit]
-Description=Telegram Sentinel AI Teacher & Remote Command Center
+Description=Kind Doctor Telegram Operator Bot (@KindDoc_bot)
 After=network.target
 
 [Service]
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${CURRENT_DIR}
-ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/sentinel_observer.py
+ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/devi/operator/telegram_bot.py
 Restart=always
 RestartSec=5
-StandardOutput=append:${CURRENT_DIR}/logs/teacher_service.log
-StandardError=append:${CURRENT_DIR}/logs/teacher_service.log
+StandardOutput=append:${CURRENT_DIR}/logs/bot_service.log
+StandardError=append:${CURRENT_DIR}/logs/bot_service.log
+
+[Install]
+WantedBy=multi-user.target
+EOF"
+
+sudo bash -c "cat <<EOF > /etc/systemd/system/tg-dashboard.service
+[Unit]
+Description=DEVI Web Dashboard (Port 8080)
+After=network.target
+
+[Service]
+Type=simple
+User=${CURRENT_USER}
+WorkingDirectory=${CURRENT_DIR}
+ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/web_dashboard.py
+Restart=always
+RestartSec=5
+StandardOutput=append:${CURRENT_DIR}/logs/dashboard_service.log
+StandardError=append:${CURRENT_DIR}/logs/dashboard_service.log
 
 [Install]
 WantedBy=multi-user.target
 EOF"
 
 sudo systemctl daemon-reload
-echo "[+] Step 4/4: Systemd Services Installed Successfully!"
+chmod +x deploy/update_oracle.sh
+echo "[+] Step 4/5: Systemd Services Installed Successfully!"
 echo ""
 echo "============================================================"
 echo "  🎉 DEPLOYMENT COMPLETE!"
 echo "============================================================"
 echo ""
-echo "  To start both services in the background:"
-echo "    sudo systemctl start tg-forwarder"
-echo "    sudo systemctl start tg-teacher"
+echo "  To start all services in the background:"
+echo "    sudo systemctl start tg-forwarder tg-kinddoc-bot tg-dashboard"
 echo ""
 echo "  To enable auto-start on VPS boot:"
-echo "    sudo systemctl enable tg-forwarder"
-echo "    sudo systemctl enable tg-teacher"
+echo "    sudo systemctl enable tg-forwarder tg-kinddoc-bot tg-dashboard"
 echo ""
 echo "  To check live status:"
 echo "    sudo systemctl status tg-forwarder"
-echo "    tail -f logs/forwarder_service.log"
+echo "    sudo systemctl status tg-kinddoc-bot"
+echo "    sudo systemctl status tg-dashboard"
+echo ""
+echo "  To update code anytime with 1-click:"
+echo "    ./deploy/update_oracle.sh"
 echo "============================================================"
