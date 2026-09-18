@@ -989,12 +989,19 @@ class DeviTelegramBot:
                 {"command": "index", "description": "Topic Table of Contents & Lecture Index"},
                 {"command": "mainindex", "description": "Master Topic Directory (#A to #Z)"},
                 {"command": "find", "description": "Search lectures, notes & topics"},
+                {"command": "clone", "description": "1-Click Instant Message Cloner"},
+                {"command": "batchclone", "description": "Batch Clone continuous message ranges"},
                 {"command": "userinfo", "description": "SangMata & Rose style user dossier"},
+                {"command": "cleanwelcome", "description": "Auto-purge welcome & service alerts"},
+                {"command": "cleandeleted", "description": "Purge deleted ghost accounts from group"},
+                {"command": "broadcast", "description": "Broadcast announcement to study groups"},
+                {"command": "status", "description": "Live transmission speed & health telemetry"},
+                {"command": "backup", "description": "Instant SQLite database backup snapshot"},
                 {"command": "manual", "description": "Official 3-Part Command Manual"},
                 {"command": "rules", "description": "View group study guidelines"},
                 {"command": "support", "description": "Confidential Line to Kind Doctor Desk"},
-                {"command": "id", "description": "View Telegram User ID safely"},
-                {"command": "botinfo", "description": "Bot specifications & admin credentials"}
+                {"command": "botinfo", "description": "Bot specifications & credentials"},
+                {"command": "id", "description": "View Telegram User ID safely"}
             ]
             await session.post(
                 f"https://api.telegram.org/bot{self.token}/setMyCommands",
