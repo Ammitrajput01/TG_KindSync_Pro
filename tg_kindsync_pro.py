@@ -2630,19 +2630,9 @@ class PipelineProcessor:
         except Exception:
             pass
 
-        group_display = str(target_group_title).strip() if target_group_title else "STUDY HELP 🙃"
-
         welcome_card = (
-            "✨ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🩺 **WELCOME TO {group_display}** 🤍\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📂 **Module / Topic:** **{topic_clean}**\n"
-            "🚀 **Sync Engine:** `TG KindSync Pro • High-Speed Streamer`\n"
-            "📌 *Lectures, clinical notes & media will be delivered in strict sequence below.*\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🌟 **CLINICAL INSPIRATION:**\n"
-            "❝ *The good physician treats the disease; the great physician treats the patient who has the disease.* ❞ 🩺💫\n\n"
-            f"👨‍⚕️ **{TELEGRAM_BRAND}** 🤍 • *Aapka Trusted Medical Study Saathi* 🩺"
+            f"👨‍⚕️ **{TELEGRAM_BRAND}** 🤍"
         )
 
         try:
