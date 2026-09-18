@@ -1,0 +1,49 @@
+================================================================================
+🚀 TG KINDSYNC PRO 🩺 V14.5 (ENTERPRISE EDITION) - 1-CLICK GUIDE
+================================================================================
+
+Bhai, apne friend ko ye guide bhej sakte ho. Ab system 100% self-healing hai!
+Kisi bhi naye computer par bas 1-Click me bina kisi error ke chalega.
+
+--------------------------------------------------------------------------------
+⭐ SABSE AASAAN TARIQA (1-CLICK RUN):
+--------------------------------------------------------------------------------
+1. Python install hona chahiye (https://www.python.org/downloads/)
+   ⚠️ IMPORTANT: Install karte waqt "Add python.exe to PATH" checkbox TICK zaroor karna!
+
+2. Agar pehli baar setup karna hai:
+   👉 "EASY_SETUP.bat" par double-click karo!
+   - Ye automatic sab libraries verify karega.
+   - Screen par aapse API_ID, API_HASH, Source Chat aur Target Chat mangega.
+   - Sab settings save karke platform ready kar dega!
+
+3. Sabhi Programs Ek Saath Chalane Ke Liye (Recommended):
+   👉 Bas "1_START_ALL.bat" par double-click karo!
+   - Engine + Kind Doctor Bot + Web Dashboard sab ek saath auto-start honge.
+   - Google Chrome jaisa single window tabbed interface (START_TABBED.bat)
+     ya bilkul silent background mode (START_MINIMIZED.bat) me chalega!
+
+4. Standalone Engine Chalane Ke Liye:
+   👉 "START_KINDSYNC.bat" (ya "START_BOT.bat") par double-click karo.
+
+5. 1-Click Code Update Ke Liye:
+   👉 "UPDATE_KINDSYNC.bat" par double-click karo!
+
+--------------------------------------------------------------------------------
+💡 FRIEND KO FOLDER BHEJTE WAQT BEST PRACTICE:
+--------------------------------------------------------------------------------
+- "TG_KindSync_Pro_v14.5_CLEAN_RELEASE.zip" (2.14 MB) direct friend ko bhej sakte ho!
+- Isme zero personal credentials, zero databases aur zero session files hoti hain.
+- Friend ke PC par jab wo chalayega, toh script automatically fresh setup karegi!
+
+--------------------------------------------------------------------------------
+🔑 TELEGRAM CREDENTIALS KAHA SE LAAYEIN:
+--------------------------------------------------------------------------------
+1. https://my.telegram.org par jao.
+2. Apna mobile number daalo aur Telegram app me aaya code enter karo.
+3. "API development tools" par click karo.
+4. App title & short name kuch bhi likh do (e.g. KindSync).
+5. Aapko API_ID (numbers) aur API_HASH mil jayega.
+
+Bas itna hi! Enjoy! 🩺🚀
+================================================================================

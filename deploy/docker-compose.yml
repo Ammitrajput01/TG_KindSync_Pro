@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # 🚀 Core Forwarding Engine
+  tg-forwarder:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: tg_forwarder_engine
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    env_file:
+      - ../.env
+    volumes:
+      - ../history_core.sqlite:/app/history_core.sqlite
+      - ../session_forwarder.session:/app/session_forwarder.session
+      - ../dead_letter.jsonl:/app/dead_letter.jsonl
+      - ../logs:/app/logs
+      - ../db_backups:/app/db_backups
+      - ../.env:/app/.env
+
+  # 🎓 Sentinel AI Teacher & Mobile Command Center Sidecar
+  tg-sentinel-teacher:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: tg_sentinel_teacher
+    restart: unless-stopped
+    command: ["python", "sentinel_observer.py"]
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env
+    volumes:
+      - ../history_core.sqlite:/app/history_core.sqlite
+      - ../session_forwarder.session:/app/session_forwarder.session
+      - ../dead_letter.jsonl:/app/dead_letter.jsonl
+      - ../logs:/app/logs
+      - ../.env:/app/.env
+    depends_on:
+      - tg-forwarder

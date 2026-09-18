@@ -1,0 +1,62 @@
+Below is a **research‑driven “must‑have” roadmap** for the next generation of **@KindDoc_bot**.  
+Each feature is ranked by *impact* (how much it will raise the bot from “nice‑to‑have” to **indispensable**) and by *universality* (it works for any medical‑study group **and** for any group admin worldwide).  
+
+The table that follows gives you a **quick‑look**; the deeper dive after it explains the *why*, the *exact command/trigger*, and the *technical implementation* that stays inside Telegram’s limits (no “spam‑my‑bot”, no illegal scraping, no storage of copyrighted material without consent).
+
+---
+
+## QUICK‑LOOK TABLE – TOP 7 FEATURES
+
+| # | Feature (emoji) | Core Benefit (one‑liner) |
+|---|-----------------|--------------------------|
+| **1** | 📅 **Smart Study Scheduler & Spaced‑Repetition Reminders** | Auto‑creates personalized study calendars, pushes timed “review‑now” alerts, and tracks completion rates for every member. |
+| **2** | 🤖 **AI‑Powered Adaptive Quiz Engine** | Generates on‑the‑fly MCQs from uploaded PDFs/notes, adapts difficulty to each student, and displays live leader‑boards. |
+| **3** | 📚 **Group Knowledge Base + Smart Search** | All shared resources (notes, links, images) are indexed, searchable with fuzzy matching, and can be exported as a clean PDF/HTML “Study‑Pack”. |
+| **4** | 🛡️ **Copyright‑Safe Content Guard** | Detects copyrighted text/images on‑the‑fly, tags them with a hidden fingerprint, warns the sender, and auto‑quarantines the message. |
+| **5** | 📊 **Live Poll/Quiz & Gamified Leaderboard** | One‑click polls/quick‑quizzes with instant scoring, streaks, badges, and optional “team‑mode” for group challenges. |
+| **6** | 🔒 **Secure Self‑Destruct Vault & One‑Time Share Links** | Encrypted, time‑limited storage for sensitive PDFs/answers; links auto‑expire and are logged for audit. |
+| **7** | 🌐 **Multi‑Language Translator + Medical‑Term Glossary** | Instant translation of any message (incl. Latin/Greek terms) with a built‑in, admin‑curated glossary that can be expanded on‑the‑fly. |
+
+Below each feature you’ll find **four columns**:  
+
+1. **Why it is a game‑changer** – the problem it solves & the value it creates.  
+2. **Exact command / trigger** – the text the user or admin types, plus any inline‑keyboard shortcuts.  
+3. **How it works technically** – the architecture, API calls, data‑flows, and Telegram‑compliant safeguards.  
+4. **Safety / anti‑copyright notes** – why the feature does **not** violate Telegram rules or copyright law.
+
+---
+
+## 1️⃣ 📅 Smart Study Scheduler & Spaced‑Repetition Reminders  
+
+| **Why it is a game‑changer** |
+|------------------------------|
+| • Medical exams demand *consistent* revision. <br>• Most study groups already share calendars in Google/Excel, but those are external, noisy, and not tied to the chat. <br>• A bot‑driven scheduler lives *inside* the group, pushes reminders at the exact moment a student is likely to be online, and records completion for accountability. <br>• Works for any exam (NEET PG, USMLE, MBBS, NEXT) and for any admin who wants to keep members on track. |
+
+| **Command / Trigger** |
+|------------------------|
+| **/schedule** – opens a wizard (inline keyboards) to create a new study‑session: <br>1️⃣ Choose *subject* (dropdown from pre‑saved list). <br>2️⃣ Pick *date & time* (Telegram’s native calendar picker). <br>3️⃣ Set *repetition pattern* – “Daily”, “Every 2 days”, “Custom (X days)”. <br>4️⃣ Optional **/remindme** for personal private‑reminders. |
+| **/mytasks** – private list of upcoming reviews. |
+| **/progress** – admin‑only chart of group‑wide completion rates (pie/bar). |
+
+| **Technical implementation** |
+|------------------------------|
+| 1. **Database** – PostgreSQL table `study_sessions(id, chat_id, subject, start_ts, repeat_interval, creator_id, message_id)`. <br>2. **Scheduler** – use **`python‑telegram‑bot`’s JobQueue** (or `aiogram`’s built‑in scheduler) to enqueue a job for each session. Jobs are persisted in DB; on bot restart they are re‑loaded. <br>3. **Reminder message** – send with `sendMessage` + `reply_markup` containing two inline buttons: ✅ “Done” (records completion) and ⏰ “Snooze 10 min”. <br>4. **User‑level tracking** – a lightweight `user_progress(chat_id, user_id, session_id, status)` table. <br>5. **Rate‑limit safety** – reminders are throttled to **≤ 1 per user per hour** (Telegram limit: 30 messages/second per bot, 1 message per second per chat). |
+| **No violation** – all data stays **inside the bot’s own DB**; no external calendar APIs are required (optional Google‑Calendar sync can be added later via OAuth with user consent). |
+
+---
+
+## 2️⃣ 🤖 AI‑Powered Adaptive Quiz Engine  
+
+| **Why it is a game‑changer** |
+|------------------------------|
+| • Exam prep is all about *testing* knowledge, not just reading. <br>• Existing bots only serve static question banks; they don’t adapt to each learner’s weak spots. <br>• By feeding the bot a PDF/Docx of lecture notes, the AI extracts key concepts, auto‑generates MCQs, and then *personalises* difficulty based on each user’s previous answers. <br>• Instant leader‑boards spark healthy competition – a proven motivator in study groups. |
+
+| **Command / Trigger** |
+|------------------------|
+| **/quiz** – starts a session. <br>• If the group has no quiz bank, the bot replies: “Upload a PDF/Docx of your notes (max 10 MB) and I’ll build a quiz for you.” <br>• Once a bank exists, the bot sends the first question as an **inline keyboard** (A‑D). <br>• After each answer, the bot replies with ✅/❌, shows the correct explanation, and updates the user’s *difficulty score* (Elo‑style). |
+| **/quizstats** – admin command to view overall group performance, most‑missed topics, etc. |
+| **/quizreset** – clears a user’s personal score (privacy‑first). |
+
+| **Technical implementation** |
+|------------------------------|
+| 1. **Content ingestion** – when a PDF/Docx is uploaded, the bot stores the file ID, downloads it via `getFile`, extracts text with `pdfminer`/`docx2txt`. <br>2. **Chunking & embedding** – split text into ~200‑word chunks, embed via **OpenAI’s `text-embedding-ada-002`** (or a self‑hosted sentence‑transformers model). Store embeddings in a vector DB (e.g., **Pinecone**, **Qdrant**, or a local **FAISS** index). <br>3. **Question generation** – call OpenAI’s `gpt‑4o-mini` with a prompt: “Create a 4‑option MCQ about the following paragraph; mark the correct answer and provide a 30‑word explanation.” <br>4. **Adaptive difficulty** – each user has a `user_quiz_state` row: `elo_score`, `last_question_id`, `streak`. After each answer, update Elo

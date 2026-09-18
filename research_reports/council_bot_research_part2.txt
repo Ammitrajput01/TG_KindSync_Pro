@@ -1,0 +1,46 @@
+Below is the **expanded research dossier** for @KindDoc_bot covering **features 3‑7** in the same deep‑dive format used for the earlier sections, followed by a **“UNIVERSAL ADMIN SUITE”** that explains why *any* group admin will instantly want to add the bot to their chat.
+
+---
+
+## 3️⃣ Group Knowledge Base + Smart Search  
+**Command:** `/search <term>` – fuzzy matching across topics, uploaded files, recorded lectures, and community‑generated Q&A.
+
+| Aspect | Details |
+|--------|---------|
+| **Goal** | Turn every group into a living, searchable medical encyclopedia that works offline (cached) and online (cloud). |
+| **User Flow** | 1️⃣ User types `/search covid‑19` (or just a fragment).<br>2️⃣ Bot replies with a **compact list** (max 5 items) – each entry shows a title, source type (lecture, PDF, article, Q&A), confidence score, and a **preview snippet**.<br>3️⃣ Inline buttons: **Open**, **Save to Vault**, **Add to Quiz**, **Report**.<br>4️⃣ If more than 5 results → “Show more” button loads next page via callback query. |
+| **Data Sources** | • **Uploaded files** (PDF, DOCX, PPT) – parsed on‑the‑fly with OCR (Tesseract) + language‑model summarizer.<br>• **Recorded lectures** – audio → Whisper transcription → indexed as time‑coded text.<br>• **Community Q&A** – every `/ask` answer is stored as a “knowledge node”.<br>• **External vetted APIs** (e.g., PubMed, WHO) – cached nightly. |
+| **Indexing Engine** | • Primary: **Elasticsearch 8.x** (or OpenSearch) with custom analyzers for medical terminology (Synonym filter: “myocardial infarction” ⇔ “heart attack”).<br>• Fallback: **SQLite‑FTS5** for groups with < 100 KB of data (no external server needed). |
+| **Fuzzy Matching** | • Levenshtein distance ≤ 2 for short terms, ≤ 3 for longer phrases.<br>• Phonetic matching (Metaphone) for user typos.<br>• Semantic similarity using **SBERT** embeddings (stored as dense vectors in Elasticsearch). |
+| **Performance** | • First‑page results ≤ 800 ms for groups < 10 k docs.<br>• Cache recent queries (Redis LRU, 5 min TTL). |
+| **Privacy & Compliance** | • All user‑uploaded content is **encrypted at rest** (AES‑256) and **scoped to the group** (no cross‑group leakage).<br>• No personal health information (PHI) is stored unless the uploader explicitly tags it; such items are auto‑quarantined and require admin approval before indexing. |
+| **Edge Cases** | • **Large PDFs (> 50 MB)** – split into 10‑page chunks before indexing to stay under Telegram’s file‑size limits.<br>• **Audio‑only lectures** – store only transcription + a 30‑second preview clip (generated via ffmpeg). |
+| **Implementation Steps** | 1️⃣ Set up an **Elasticsearch cluster** (managed service or Docker Swarm).<br>2️⃣ Write a **File‑Processor micro‑service** (Python FastAPI) that receives a file via Bot API, extracts text, creates embeddings, pushes to ES.<br>3️⃣ Create a **Search Handler** (Node.js) that receives `/search` commands, builds a multi‑field query (title, body, tags, embeddings) and returns formatted results.<br>4️⃣ Add **admin moderation endpoints** (`/kbadmin add`, `/kbadmin remove`). |
+| **KPIs** | • Avg. search latency.<br>• % of queries that return ≥ 1 result.<br>• Number of “saved to vault” actions (indicates relevance). |
+
+---
+
+## 4️⃣ Copyright‑Safe Content Shield & Anti‑Forward Watermarking  
+**Core Idea:** Protect copyrighted medical material (slides, articles, videos) from unauthorized forwarding while still being usable inside the group.
+
+| Aspect | Details |
+|--------|---------|
+| **Key Features** | 1️⃣ **Stealth Watermarking** – invisible pixel‑level watermark (using LSB steganography) embedded in every image/PDF sent by the bot.<br>2️⃣ **Forward‑Lock** – Telegram’s `protect_content` flag (available for bot‑sent messages) disables forwarding and screenshotting in the mobile client.<br>3️⃣ **Crawler Honeypot** – a hidden “decoy” file that, if accessed, automatically alerts admins and logs the requesting user/IP. |
+| **User Flow** | • Admin uploads a copyrighted PDF via `/upload_protected`.<br>• Bot processes the file, embeds a **unique identifier** (group‑ID + uploader‑ID) as a watermark, then re‑uploads with `protect_content=True`.<br>• Any attempt to forward triggers Telegram’s native block and a **bot‑generated warning** (`⚠️ Forwarding disabled by copyright policy`). |
+| **Technical Stack** | • **Python Pillow** + **PyPDF2** for image/PDF watermarking.<br>• **Telegram Bot API** `sendDocument` with `protect_content=True` (v6.0+).<br>• **Redis** for temporary storage of watermark keys (TTL = 30 days). |
+| **Stealth Watermark Mechanics** | 1. Generate a **UUID** for the file (e.g., `groupID_uploaderID_timestamp`).<br>2. Encode the UUID into a **binary pattern**.<br>3. For PDFs: convert each page to an image, embed the pattern in the least‑significant bits of the **blue channel** of a few random pixels (spread across pages).<br>4. Re‑assemble PDF (pdf2image → PIL → PyPDF2).<br>5. Store mapping `hash(file) → UUID` in a secure DB for later forensic lookup. |
+| **Anti‑Forward Detection** | • Telegram already blocks forwarding when `protect_content` is set. <br>• For older clients that ignore the flag, the bot monitors **message edit events** – if a forward is detected (via `message.forward_from_chat`), the bot auto‑deletes the forwarded copy and sends a warning. |
+| **Honeypot Design** | • Create a **zero‑size PDF** named `©_DoNotOpen.pdf` that contains a hidden link (`http://kinddoc.bot/honeypot?uid=XYZ`).<br>• If any external crawler follows the link, the server logs the IP, user‑agent, and timestamps, then notifies group admins via `/honeypot_alert`. |
+| **Legal Compliance** | • Bot never stores the *original* copyrighted file – only the watermarked copy (which is considered a derivative work).<br>• Admins must explicitly confirm they have the right to share the material (`/confirm_copyright`). |
+| **Edge Cases** | • **Large video files** (> 20 MB) – split into 2‑minute segments, each watermarked separately.<br>• **Low‑resolution PDFs** – watermark may be perceptible; fallback to **visible watermark** (“© KindDoc”) if quality < 150 dpi. |
+| **Implementation Steps** | 1️⃣ Build a **Watermark Service** (FastAPI) exposing `/watermark` endpoint.<br>2️⃣ Add a **Telegram webhook** that intercepts `document` messages from admins, forwards to the service, receives the protected version, and sends back with `protect_content=True`.<br>3️⃣ Deploy a **Honeypot Listener** (Node.js) behind a CDN to capture crawler traffic. |
+| **KPIs** | • % of protected files successfully blocked from forwarding.<br>• Number of honeypot hits (early warning of content scraping).<br>• Admin satisfaction score (via occasional poll). |
+
+---
+
+## 5️⃣ Live Medical Poll / Daily MCQ & Leaderboard  
+**Commands:** `/dailyquiz`, `/poll`, `/streak` – gamified learning with persistent leaderboards.
+
+| Aspect | Details |
+|--------|---------|
+| **Game Loop** | 1️⃣ Bot posts a **daily MCQ** (multiple‑choice) at a configurable time (default 09:00 UTC).<br>2️⃣ Users answer via **inline keyboard** (A‑D).<br>3️⃣ Bot records the answer, instantly shows if it’s correct, and awards **XP** (experience points).<br>4️⃣ A **weekly poll

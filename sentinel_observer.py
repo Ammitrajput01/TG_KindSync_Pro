@@ -1,0 +1,688 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+================================================================================
+🎓 DEVI — AI TEACHER & LIVE SENTINEL OPERATOR (UNIFIED SIDECAR)
+================================================================================
+Developer: Dr. Amit Singh (Kind Doctor) & Antigravity AI
+Architecture:
+  - Unified System: DEVI Brain + Live Telemetry & Sentinel Watchdog.
+  - 100% Isolated non-invasive background observer (Zero risk to Main Forwarder).
+  - Read-Only log tailing & SQLite WAL telemetry (Zero lock contention).
+  - Mobile Telegram Saved Messages AI Remote Center (Slash commands + Natural Language).
+  - 24h Daily Performance Digests & Automated Cloud SQLite Backups.
+  - Web Dashboard on Port 8080.
+================================================================================
+"""
+
+import os
+import sys
+import re
+import time
+import json
+import sqlite3
+import asyncio
+from pathlib import Path
+from datetime import datetime, timezone
+from contextlib import suppress
+
+# Fix Windows console UTF-8 & cp1252 character map issues
+if hasattr(sys.stdout, "reconfigure"):
+    with suppress(Exception):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    with suppress(Exception):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+# Third-party imports
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+    from rich.live import Live
+    from rich.markup import escape
+    from rich import box
+except ImportError:
+    print("[!] 'rich' library is required. Install via: pip install rich")
+    sys.exit(1)
+
+try:
+    from telethon import TelegramClient
+    from telethon.errors import RPCError
+except ImportError:
+    print("[!] 'telethon' library is required. Install via: pip install telethon")
+    sys.exit(1)
+
+from dotenv import load_dotenv
+from web_dashboard import DashboardServer, get_local_lan_ip
+
+# DEVI Unified Architecture Imports
+from devi.config import DEVI_NAME, DEVI_TITLE, CURRENT_AUTONOMY_LEVEL
+from devi.sentinel.telemetry_bridge import (
+    ObserverState,
+    SentinelTelemetryBridge,
+    read_db_metrics,
+    create_db_snapshot,
+    MB,
+    GB
+)
+from devi.sentinel.ai_advisor import SentinelAIAdvisor
+from devi.brain.model_router import ModelRouter
+from devi.brain.intent_engine import IntentEngine
+from devi.research.research_agent import ResearchAgent
+
+# Initialize Rich Console
+console = Console(force_terminal=True, legacy_windows=False)
+
+# File Paths
+BASE_DIR = Path(__file__).resolve().parent
+ENV_FILE = BASE_DIR / ".env"
+DB_FILE = BASE_DIR / "history_core.sqlite"
+LOG_FILE = BASE_DIR / "logs" / "tg_kind_mode_v14.log"
+DLQ_FILE = BASE_DIR / "dead_letter.jsonl"
+REPORT_DIR = BASE_DIR / "observer_reports"
+
+# Global Instances
+STATE = ObserverState()
+BRIDGE = SentinelTelemetryBridge(STATE, LOG_FILE)
+MODEL_ROUTER = ModelRouter()
+INTENT_ENGINE = IntentEngine()
+ADVISOR = SentinelAIAdvisor(MODEL_ROUTER)
+RESEARCHER = ResearchAgent(MODEL_ROUTER)
+
+
+# ==============================================================================
+# TELEGRAM DISPATCHER & AI CONVERSATION BRIDGE (SAVED MESSAGES)
+# ==============================================================================
+class TelegramReporter:
+    def __init__(self, api_id, api_hash):
+        self.api_id = api_id
+        self.api_hash = api_hash
+        self.client = None
+        self.target_peer = "me"  # Defaults to Saved Messages
+
+    async def start(self):
+        # Isolate session into observer_reports to eliminate SQLite lock conflicts
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        main_sess = BASE_DIR / "session_forwarder.session"
+        obs_sess = REPORT_DIR / "observer_session.session"
+
+        if main_sess.exists():
+            if not obs_sess.exists() or (main_sess.stat().st_mtime > obs_sess.stat().st_mtime):
+                import shutil
+                with suppress(Exception):
+                    shutil.copy2(main_sess, obs_sess)
+
+        session_target = str(REPORT_DIR / "observer_session") if obs_sess.exists() else str(BASE_DIR / "session_forwarder")
+        self.client = TelegramClient(session_target, self.api_id, self.api_hash)
+        await self.client.connect()
+
+        # ==============================================================================
+        # 📱 SAVED MESSAGES DEVI COMMAND & AI CONVERSATION CENTER
+        # ==============================================================================
+        from telethon import events
+
+        @self.client.on(events.NewMessage(chats="me"))
+        async def handle_remote_message(event):
+            txt = str(event.raw_text or "").strip()
+            if not txt:
+                return
+
+            # Check if it's a Slash Command or Natural Language to DEVI
+            if txt.startswith("/"):
+                await self._handle_slash_command(event, txt)
+            else:
+                await self._handle_conversational_query(event, txt)
+
+    async def _handle_slash_command(self, event, txt: str):
+        cmd_parts = txt.split(maxsplit=1)
+        cmd = cmd_parts[0].lower()
+        arg = cmd_parts[1].strip() if len(cmd_parts) > 1 else ""
+
+        STATE.add_event(f"[bold cyan]📱 Command Received:[/] [yellow]{cmd}[/]")
+
+        if cmd in ("/start", "/help"):
+            providers = [k for k, v in MODEL_ROUTER.available_providers.items() if v]
+            p_str = ", ".join(providers) if providers else "Local Offline Engine"
+            help_card = (
+                f"🎓 **{DEVI_NAME} — AI TEACHER & SENTINEL COMMAND CENTER**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Autonomy Level**: `Level {CURRENT_AUTONOMY_LEVEL}/9`\n"
+                f"• **Active AI Brain**: `{p_str}`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💬 `/status`   · Live Transmission Velocity & Telemetry\n"
+                f"💬 `/report`   · Instant 24h AI Performance Digest\n"
+                f"💬 `/backup`   · 1-Click Cloud SQLite Database Backup\n"
+                f"💬 `/errors`   · Inspect Last 5 Failed Transmissions & Reasons\n"
+                f"💬 `/dlq`      · Dead Letter Queue Count & Status\n"
+                f"💬 `/tips`     · Real-Time Recommendations (Sorted: Latest #N First)\n"
+                f"💬 `/research` · View Active AI Research Queue (Sorted: Latest #N First)\n"
+                f"💬 `/research <topic>` · Trigger Autonomous Technical Research\n"
+                f"💬 `/help`     · Display this Mobile Command Manual\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 **Pro-Tip**: You can also ask me anything directly! E.g.:\n"
+                f"*\"Devi, what is current upload speed?\"* or *\"Devi, check errors\"*"
+            )
+            await event.reply(help_card, parse_mode="md")
+
+        elif cmd in ("/status", "/stats"):
+            db_stats = read_db_metrics()
+            cur_mb = STATE.bytes_transferred / MB
+            data_str = f"{cur_mb:.2f} MB" if cur_mb < 1024 else f"{cur_mb/1024:.2f} GB"
+            uptime_sec = int(time.monotonic() - STATE.start_time)
+            hours, rem = divmod(uptime_sec, 3600)
+            mins, _ = divmod(rem, 60)
+            status_card = (
+                f"📊 **[{DEVI_NAME} LIVE ENGINE TELEMETRY]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Session Delivered**: `{STATE.total_transfers}` items\n"
+                f"• **Media Breakdown**: `{STATE.videos_sent}` 🎥 · `{STATE.docs_sent}` 📄 · `{STATE.photos_sent}` 🖼️\n"
+                f"• **Data Streamed**: `{data_str}` (Peak `{STATE.peak_speed_mb:.2f} MB/s`)\n"
+                f"• **Active Subject**: `{STATE.current_subject}`\n"
+                f"• **Total DB Records**: `{db_stats['total_forwarded']:,}` msgs tracked\n"
+                f"• **FloodWaits**: `{STATE.flood_waits_detected}` ({STATE.flood_wait_seconds_total:.1f}s delay)\n"
+                f"• **Engine Uptime**: `{hours}h {mins}m`\n"
+                f"• **Web Dashboard**: `http://{STATE.lan_ip}:{STATE.web_port}`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🟢 *Status: Protected & Monitored by {DEVI_NAME}*"
+            )
+            await event.reply(status_card, parse_mode="md")
+
+        elif cmd in ("/report", "/digest"):
+            db_stats = read_db_metrics()
+            report_card = ADVISOR.build_daily_digest(STATE, db_stats)
+            await event.reply(report_card, parse_mode="md")
+
+        elif cmd == "/dlq":
+            count = 0
+            if DLQ_FILE.exists():
+                try:
+                    with open(DLQ_FILE, "r", encoding="utf-8") as f:
+                        count = sum(1 for line in f if line.strip())
+                except Exception:
+                    pass
+            dlq_card = (
+                f"🔄 **[{DEVI_NAME} DLQ QUEUE STATUS]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Pending Dead Letter Tasks**: `{count}` items\n"
+                f"• **Auto-Retry Daemon**: `Active (Self-Healing in 60s)`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 *Send `/errors` to view details of the latest failures.*"
+            )
+            await event.reply(dlq_card, parse_mode="md")
+
+        elif cmd in ("/errors", "/error"):
+            if not DLQ_FILE.exists() or DLQ_FILE.stat().st_size == 0:
+                await event.reply("✅ **[ZERO TRANSMISSION ERRORS]**\n\n• Dead letter queue is completely empty.\n• 100% of messages forwarded successfully!", parse_mode="md")
+            else:
+                lines = []
+                try:
+                    with open(DLQ_FILE, "r", encoding="utf-8") as f:
+                        lines = [line.strip() for line in f if line.strip()]
+                except Exception as e:
+                    await event.reply(f"⚠️ Error reading DLQ log: {e}")
+                    return
+
+                if not lines:
+                    await event.reply("✅ **[ZERO TRANSMISSION ERRORS]**\n\n• Dead letter queue is empty!", parse_mode="md")
+                    return
+
+                last_entries = lines[-5:]
+                err_blocks = []
+                for i, entry_str in enumerate(reversed(last_entries), 1):
+                    try:
+                        d = json.loads(entry_str)
+                        ts = d.get("ts", "")[:19].replace("T", " ")
+                        msg_id = d.get("msg", "N/A")
+                        c_id = d.get("chat", "N/A")
+                        t_topic = d.get("target_topic", "N/A")
+                        raw_err = str(d.get("error", "Unknown error"))
+                        clean_err = raw_err[:90] + ("..." if len(raw_err) > 90 else "")
+                        err_blocks.append(
+                            f"🔴 **#{i}. Msg ID `{msg_id}`** (Chat: `{c_id}`)\n"
+                            f"   • **Error**: `{clean_err}`\n"
+                            f"   • **Target Topic**: `{t_topic}`  ·  **Time**: `{ts}`"
+                        )
+                    except Exception:
+                        continue
+
+                res_card = (
+                    f"⚠️ **[RECENT FAILED TRANSMISSIONS — LAST {len(err_blocks)}]**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    + "\n\n".join(err_blocks) +
+                    f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💡 *Tip: {DEVI_NAME} auto-retries expired references and self-heals in the background.*"
+                )
+                await event.reply(res_card, parse_mode="md")
+
+        elif cmd in ("/backup", "/db"):
+            await self.send_database_backup(event)
+
+        elif cmd == "/tips":
+            tips = ADVISOR.generate_dynamic_recommendations(STATE)
+            total = len(tips)
+            tips_lines = [
+                f"💡 **[{DEVI_NAME.upper()} AI ADVICE & TIPS — {total} ACTIVE]**",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"*(Sorted by newest first — #{total} is latest)*\n"
+            ]
+            for i, t in enumerate(reversed(tips)):
+                num = total - i
+                badge = f"🔥 **[LATEST #{num}]**" if i == 0 else f"📌 **[#{num}]**"
+                tips_lines.append(f"{badge} {t}")
+            tips_lines.append(f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👑 *Kind Doctor & Team*")
+            await event.reply("\n".join(tips_lines), parse_mode="md")
+
+        elif cmd in ("/research", "/insights"):
+            insights_file = BASE_DIR / "research_reports" / "improvement_queue.json"
+            insights = []
+            if insights_file.exists():
+                with suppress(Exception):
+                    with open(insights_file, "r", encoding="utf-8") as f:
+                        insights = json.load(f).get("insights", [])
+
+            if not arg:
+                if not insights:
+                    await event.reply(f"🔬 **{DEVI_NAME} Research**: Abhi koi research reports available nahi hain. Research initiate karne ke liye `/research <topic>` bhejein.", parse_mode="md")
+                    return
+
+                total = len(insights)
+                lines = [
+                    f"🧠 **[{DEVI_NAME} AI RESEARCH QUEUE — {total} UPDATES]**",
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                    f"*(Sorted by newest update first — #{total} is latest)*\n"
+                ]
+                for i, item in enumerate(reversed(insights)):
+                    num = total - i
+                    is_latest = (i == 0)
+                    tag = f"🔥 **[#{num} LATEST UPDATE]**" if is_latest else f"📌 **[#{num}]**"
+                    r_id = item.get("id", "RES")
+                    r_title = item.get("title", "")
+                    lines.append(f"{tag} `{r_id}`: **{r_title}**")
+
+                lines.append(f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                lines.append(f"💡 *Details padhne ke liye:* `/research <ID>` (e.g. `/research {insights[-1].get('id', 'RES')}`) ya Web Dashboard dekhein.")
+                await event.reply("\n".join(lines), parse_mode="md")
+                return
+
+            # Check if arg matches an existing research report ID or title
+            matched_item = None
+            for item in insights:
+                if item.get("id", "").lower() == arg.lower() or arg.lower() in item.get("title", "").lower():
+                    matched_item = item
+                    break
+
+            if matched_item:
+                prio = matched_item.get("priority", "MEDIUM")
+                reply_txt = (
+                    f"🔬 **[{matched_item.get('id', 'RES')} — {matched_item.get('title', '')}]**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• **Category**: `{matched_item.get('category', 'Core')}`\n"
+                    f"• **Priority**: `{prio}`\n"
+                    f"• **Affects**: `{matched_item.get('affects_part', 'System')}`\n\n"
+                    f"💡 **Why It Matters**:\n{matched_item.get('why_it_matters', matched_item.get('description', ''))}\n\n"
+                    f"✨ **Potential Benefits**:\n{matched_item.get('potential_benefits', matched_item.get('benefits', ''))}\n\n"
+                    f"⚠️ **Potential Risks**:\n{matched_item.get('potential_risks', matched_item.get('risk', ''))}\n\n"
+                    f"🛠️ **Suggested Approach**:\n{matched_item.get('suggested_implementation_approach', 'Safe lab testing recommended.')}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+                await event.reply(reply_txt, parse_mode="md")
+                return
+
+            # Otherwise initiate deep research
+            await event.reply(f"🔍 *{DEVI_NAME} is initiating autonomous research on:* `{arg}`...", parse_mode="md")
+            res = await RESEARCHER.research_topic(arg)
+            summary = res.get("summary", "No findings returned.")
+            reply_txt = (
+                f"🧠 **[{DEVI_NAME} RESEARCH REPORT: {arg.upper()}]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"{summary}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🔬 *Report saved to DEVI knowledge base.*"
+            )
+            await event.reply(reply_txt, parse_mode="md")
+
+    async def _handle_conversational_query(self, event, text: str):
+        """Processes natural language user requests addressed to DEVI in Saved Messages."""
+        STATE.add_event(f"[bold magenta]💬 Conversational Query:[/] {text[:35]}")
+        try:
+            parsed = INTENT_ENGINE.parse_intent(text)
+            intent = parsed["intent"]
+            clean_text = text.strip().lower()
+            is_simple_greeting = clean_text in ["hello", "hi", "hey", "namaste", "pranam", "hola", "hello devi", "hi devi", "hey devi"]
+
+            if intent == "GREETING" or is_simple_greeting:
+                await event.reply(
+                    f"👋 **Namaste! I am {DEVI_NAME}**, your AI Teacher & Personal Operator.\n\n"
+                    f"• Forwarder Status: `Online & Watching`\n"
+                    f"• Items Delivered: `{STATE.total_transfers}` files\n"
+                    f"• Active Subject: `{STATE.current_subject}`\n\n"
+                    f"Aap mujhse live speed, health check, errors ya koi bhi sawaal pooch sakte hain! 😊\n"
+                    f"Commands dekhne ke liye `/help` bhejein.",
+                    parse_mode="md"
+                )
+            elif intent == "INSPECT_LOGS":
+                if not DLQ_FILE.exists() or DLQ_FILE.stat().st_size == 0:
+                    await event.reply(
+                        f"✅ **{DEVI_NAME} Error Report**:\n\n"
+                        f"• Dead letter queue bilkul empty hai!\n"
+                        f"• Zero transmission errors. Sabhi messages 100% successfully forward ho rahe hain! 🚀",
+                        parse_mode="md"
+                    )
+                else:
+                    lines = []
+                    with suppress(Exception):
+                        with open(DLQ_FILE, "r", encoding="utf-8") as f:
+                            lines = [line.strip() for line in f if line.strip()]
+                    if not lines:
+                        await event.reply(f"✅ **{DEVI_NAME}**: Dead letter queue empty hai! Zero errors.", parse_mode="md")
+                    else:
+                        last_err = lines[-1]
+                        err_msg = "Unknown"
+                        t_topic = "N/A"
+                        with suppress(Exception):
+                            d = json.loads(last_err)
+                            err_msg = d.get("error", "Unknown")[:120]
+                            t_topic = d.get("target_topic", "N/A")
+
+                        await event.reply(
+                            f"⚠️ **{DEVI_NAME} Error Inspection**:\n"
+                            f"• Total DLQ Errors: `{len(lines)}` items\n"
+                            f"• Latest Error: `{err_msg}`\n"
+                            f"• Target Topic: `{t_topic}`\n\n"
+                            f"💡 Sabhi errors detail me dekhne ke liye `/errors` bhejein.",
+                            parse_mode="md"
+                        )
+            elif intent == "SHOW_STATUS":
+                db_stats = read_db_metrics()
+                cur_mb = STATE.bytes_transferred / MB
+                data_str = f"{cur_mb:.2f} MB" if cur_mb < 1024 else f"{cur_mb/1024:.2f} GB"
+                await event.reply(
+                    f"🤖 **{DEVI_NAME} Live Status**:\n\n"
+                    f"• Delivered: `{STATE.total_transfers}` items (`{STATE.videos_sent}` 🎥 | `{STATE.docs_sent}` 📄 | `{STATE.photos_sent}` 🖼️)\n"
+                    f"• Volume Streamed: `{data_str}` (Peak: `{STATE.peak_speed_mb:.2f} MB/s`)\n"
+                    f"• Active Subject: `{STATE.current_subject}`\n"
+                    f"• FloodWaits: `{STATE.flood_waits_detected}` ({STATE.flood_wait_seconds_total:.1f}s total delay)\n"
+                    f"• DB Total Tracked: `{db_stats.get('total_forwarded', 0):,}` messages\n\n"
+                    f"🟢 *All systems healthy and streaming!*",
+                    parse_mode="md"
+                )
+            elif intent == "CHECK_HEALTH":
+                from devi.tools.system_tools import SystemTools
+                health = SystemTools.get_system_health()
+                await event.reply(
+                    f"🩺 **{DEVI_NAME} System Diagnostics**:\n\n"
+                    f"• System Status: `{health['status']}`\n"
+                    f"• CPU Load: `{health['cpu_usage_pct']}%`\n"
+                    f"• Free RAM: `{health['available_ram_gb']} GB` of `{health['total_ram_gb']} GB`\n"
+                    f"• Protection Barrier: `Active (Zero session risk)`",
+                    parse_mode="md"
+                )
+            elif intent == "RESEARCH_TOPIC":
+                topic = parsed.get("topic", text)
+                await event.reply(f"🔍 *{DEVI_NAME} researching topic:* `{topic}`...", parse_mode="md")
+                res = await RESEARCHER.research_topic(topic)
+                await event.reply(f"🧠 **{DEVI_NAME} Research Summary**:\n\n{res.get('summary', '')}", parse_mode="md")
+            else:
+                system_prompt = (
+                    f"You are {DEVI_NAME}, the user's continuously evolving AI Teacher and Telegram Forwarder Operator. "
+                    f"Answer warmly, clearly, concisely, and supportively in Hinglish or English as the user speaks. "
+                    f"Current status: {STATE.total_transfers} items delivered, active subject: {STATE.current_subject}, "
+                    f"flood waits: {STATE.flood_waits_detected}."
+                )
+                response = await MODEL_ROUTER.generate_response(
+                    system_prompt=system_prompt,
+                    user_prompt=text
+                )
+                reply_text = response.get("content") or response.get("text") or "I am watching over the forwarder engine and keeping everything optimal!"
+                await event.reply(f"🤖 **{DEVI_NAME}**:\n\n{reply_text}", parse_mode="md")
+
+        except Exception as e:
+            STATE.add_event(f"[yellow]Conversational query note: {str(e)[:35]}[/]")
+            with suppress(Exception):
+                await event.reply(
+                    f"🤖 **{DEVI_NAME}**: Main online hu! Telemetry status: `{STATE.total_transfers}` items delivered, subject: `{STATE.current_subject}`. Commands ke liye `/help` bhejein.",
+                    parse_mode="md"
+                )
+
+    async def send_report(self, message_text: str):
+        if not self.client or not await self.client.is_user_authorized():
+            return False
+        try:
+            await self.client.send_message(
+                self.target_peer,
+                message_text,
+                parse_mode="md",
+                link_preview=False
+            )
+            return True
+        except Exception:
+            try:
+                await self.client.send_message(
+                    self.target_peer,
+                    message_text,
+                    parse_mode=None,
+                    link_preview=False
+                )
+                return True
+            except Exception as e:
+                STATE.add_event(f"[yellow]Reporter send error: {str(e)[:40]}[/]")
+                return False
+
+    async def send_database_backup(self, reply_event=None):
+        if not self.client or not await self.client.is_user_authorized():
+            return False
+        if not DB_FILE.exists():
+            if reply_event:
+                await reply_event.reply("⚠️ Database file `history_core.sqlite` not found.")
+            return False
+
+        try:
+            if reply_event:
+                await reply_event.reply("⏳ *Creating live SQLite database snapshot...*", parse_mode="md")
+
+            snap_path = create_db_snapshot()
+            db_stats = read_db_metrics()
+            size_kb = snap_path.stat().st_size / 1024
+            # Format: Sunday, 13 September 2026 | 05:22 AM
+            date_str = datetime.now().strftime("%A, %d %B %Y | %I:%M %p")
+
+            caption_card = (
+                f"📦 **[{DEVI_NAME.upper()} CLOUD DATABASE BACKUP]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Date & Time**: `{date_str}`\n"
+                f"• **Tracked Records**: `{db_stats['total_forwarded']:,}` messages\n"
+                f"• **Tracked Channels**: `{db_stats['tracked_channels']}` channels/topics\n"
+                f"• **Snapshot Size**: `{size_kb:.1f} KB`\n"
+                f"• **Integrity**: `100% Consistent (Online Read-Only Backup)`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🛡️ *Managed by {DEVI_NAME}. It stores your complete forwarding history!*"
+            )
+
+            await self.client.send_file(
+                self.target_peer,
+                str(snap_path),
+                caption=caption_card,
+                parse_mode="md"
+            )
+
+            with suppress(Exception):
+                snap_path.unlink()
+
+            STATE.add_event("[bold green]📦 Cloud DB Backup dispatched to Saved Messages![/]")
+            return True
+        except Exception as e:
+            err_msg = f"[yellow]DB Backup send error: {str(e)[:40]}[/]"
+            STATE.add_event(err_msg)
+            if reply_event:
+                with suppress(Exception):
+                    await reply_event.reply(f"❌ Failed to backup database: {e}")
+            return False
+
+    async def close(self):
+        if self.client:
+            with suppress(Exception):
+                await self.client.disconnect()
+
+
+# ==============================================================================
+# TERMINAL HUD DASHBOARD
+# ==============================================================================
+def safe_markup(text: str, default_style: str = "") -> Text:
+    try:
+        return Text.from_markup(text)
+    except Exception:
+        return Text(text, style=default_style)
+
+
+def render_observer_hud(state: ObserverState, db_stats: dict):
+    uptime_sec = int(time.monotonic() - state.start_time)
+    hours, rem = divmod(uptime_sec, 3600)
+    mins, secs = divmod(rem, 60)
+    uptime_str = f"{hours:02d}h {mins:02d}m {secs:02d}s"
+
+    providers = [k for k, v in MODEL_ROUTER.available_providers.items() if v]
+    p_str = ", ".join(providers) if providers else "Local Offline Engine"
+
+    header_panel = Panel(
+        safe_markup(
+            f"[bold cyan]🎓 {DEVI_NAME} — AI TEACHER & SENTINEL OPERATOR[/] [yellow]• Dr. Amit Singh[/] [dim](100% Decoupled)[/]\n"
+            f"[dim]• Autonomy: [/][bold yellow]Level {CURRENT_AUTONOMY_LEVEL}/9[/]  [dim]• Brain: [/][bold white]{p_str}[/]  "
+            f"[dim]• Uptime: [/][yellow]{uptime_str}[/]  [dim]• Web UI: [/][bold cyan]http://{state.lan_ip}:{state.web_port}[/]"
+        ),
+        border_style="cyan", box=box.ROUNDED, padding=(0, 2)
+    )
+
+    cur_mb = state.bytes_transferred / MB
+    data_str = f"{cur_mb:.2f} MB" if cur_mb < 1024 else f"{cur_mb/1024:.2f} GB"
+
+    safe_subject = escape(state.current_subject)
+    metrics_panel = Panel(
+        safe_markup(
+            f"[bold cyan]📊 LIVE ENGINE TELEMETRY[/]\n"
+            f"─────────────────────────────────────────────────────\n"
+            f"Delivered Today  : [bold green]{state.total_transfers}[/] files ([green]{state.videos_sent} 🎥[/] | [yellow]{state.docs_sent} 📄[/] | [cyan]{state.photos_sent} 🖼️[/])\n"
+            f"Database Records : [bold cyan]{db_stats.get('total_forwarded', 0):,}[/] tracked messages\n"
+            f"Active Subject   : [bold yellow]{safe_subject}[/]\n"
+            f"Peak Velocity    : [bold magenta]{state.peak_speed_mb:.2f} MB/s[/]\n"
+            f"FloodWait Status : [{'bold green' if state.flood_waits_detected == 0 else 'bold yellow'}]{state.flood_waits_detected} events[/] ({state.flood_wait_seconds_total:.1f}s handled)"
+        ),
+        border_style="green", box=box.ROUNDED, padding=(1, 2)
+    )
+
+    tips = ADVISOR.generate_dynamic_recommendations(state)
+    tips_text = "\n".join(f"[bold yellow]💡[/] {escape(t)}" for t in tips[:3])
+    tips_panel = Panel(
+        safe_markup(
+            f"[bold cyan]🧠 {DEVI_NAME.upper()} AI INSIGHTS & REAL-TIME ADVICE[/]\n"
+            f"─────────────────────────────────────────────────────\n"
+            f"{tips_text}"
+        ),
+        border_style="yellow", box=box.ROUNDED, padding=(1, 2)
+    )
+
+    logs_text = "\n".join(state.recent_events[-6:]) if state.recent_events else "[dim]Waiting for main forwarder events...[/]"
+    logs_panel = Panel(
+        safe_markup(
+            f"[bold cyan]📜 SENTINEL TELEMETRY STREAM[/]\n"
+            f"────────────────────────────────────────────────────────────────────────────────\n"
+            f"{logs_text}"
+        ),
+        border_style="blue", box=box.ROUNDED, padding=(0, 2)
+    )
+
+    grid = Table.grid(expand=True)
+    grid.add_column(ratio=1)
+    grid.add_column(ratio=1)
+    grid.add_row(metrics_panel, tips_panel)
+
+    main_grid = Table.grid(expand=True)
+    main_grid.add_row(header_panel)
+    main_grid.add_row(grid)
+    main_grid.add_row(logs_panel)
+
+    return Panel(main_grid, border_style="dim", box=box.ROUNDED)
+
+
+# ==============================================================================
+# MAIN ASYNC DAEMON ENTRYPOINT
+# ==============================================================================
+async def main():
+    load_dotenv(ENV_FILE, override=True)
+    api_id = int(os.getenv("API_ID", 0) or 0)
+    api_hash = os.getenv("API_HASH", "").strip()
+
+    if not api_id or not api_hash:
+        console.print(f"[bold red]❌ Error: API_ID and API_HASH are required in .env for {DEVI_NAME} Sentinel.[/]")
+        return
+
+    reporter = TelegramReporter(api_id, api_hash)
+    try:
+        await reporter.start()
+        STATE.add_event(f"[bold green]Connected to Telegram. {DEVI_NAME} AI Active.[/]")
+        await reporter.send_report(
+            f"🎓 **[{DEVI_NAME.upper()} INITIALIZED & ONLINE]**\n\n"
+            f"• **Role**: `AI Teacher & Sentinel Operator`\n"
+            f"• **Status**: `Active & Watching 24/7`\n"
+            f"• **Coupling**: `0% (Zero Risk to Main Forwarder Engine)`\n"
+            f"• **Web Dashboard**: `http://{STATE.lan_ip}:{STATE.web_port}`\n"
+            f"• **Daily Digest**: `Scheduled every 24 Hours`\n\n"
+            f"💡 *Send `/help` or ask any questions directly here to interact with {DEVI_NAME}!*"
+        )
+    except Exception as e:
+        STATE.add_event(f"[yellow]Telegram Reporter init warning: {e}[/]")
+
+    # Start Local Web Dashboard on Port 8080 (Accessible via Mobile Wi-Fi)
+    STATE.lan_ip = get_local_lan_ip()
+    dashboard = DashboardServer(STATE, reporter, port=8080)
+    try:
+        await dashboard.start()
+        STATE.web_port = dashboard.port
+        STATE.add_event(f"[bold cyan]🌐 Web Dashboard live at: http://{STATE.lan_ip}:{STATE.web_port}[/]")
+    except Exception as e:
+        STATE.add_event(f"[yellow]Web Dashboard startup note: {e}[/]")
+
+    DAILY_INTERVAL_SEC = 24 * 3600  # 24 Hours
+
+    with Live(render_observer_hud(STATE, {"total_forwarded": 0}), console=console, refresh_per_second=1, screen=True) as live:
+        try:
+            while True:
+                events = BRIDGE.poll_logs()
+                for ev in events:
+                    if ev["type"] == "FLOOD_WAIT":
+                        asyncio.create_task(reporter.send_report(ADVISOR.build_smart_alert(
+                            "FloodWait Encountered",
+                            f"Telegram requested a `{ev['seconds']}s` cooldown on chunk uploads.",
+                            "Main engine auto-paced smoothly. Balanced Mode (12 workers) is optimal."
+                        )))
+
+                db_stats = read_db_metrics()
+                STATE.db_forwarded_count = db_stats.get("total_forwarded", 0)
+
+                # Check if 24 hours elapsed for Daily Digest & Automated Cloud Backup
+                now = time.monotonic()
+                if now - STATE.last_daily_report >= DAILY_INTERVAL_SEC:
+                    STATE.last_daily_report = now
+                    digest_card = ADVISOR.build_daily_digest(STATE, db_stats)
+                    asyncio.create_task(reporter.send_report(digest_card))
+                    asyncio.create_task(reporter.send_database_backup())
+                    STATE.add_event("[bold green]📢 24h Daily Digest & Cloud DB Backup dispatched![/]")
+
+                try:
+                    live.update(render_observer_hud(STATE, db_stats))
+                except Exception:
+                    pass
+                await asyncio.sleep(2.0)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            pass
+        finally:
+            await dashboard.stop()
+            await reporter.close()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        console.print(f"\n[yellow]{DEVI_NAME} Sentinel stopped safely.[/]")

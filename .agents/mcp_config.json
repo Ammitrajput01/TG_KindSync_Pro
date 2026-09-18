@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "universal-free-ai-hub": {
+      "command": "python",
+      "args": [
+        "-m",
+        "free_ai_hub.mcp_server"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": ".agents"
+      }
+    }
+  }
+}

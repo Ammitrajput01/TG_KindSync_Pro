@@ -1,0 +1,36 @@
+# ==============================================================================
+# 🛡️ TELEGRAM FORWARDER PRO — PERMANENT CLEAN / REMOVE WORDS LIST
+# ==============================================================================
+# Ye file aapki permanent memory hai! Yahan jo bhi words/tags likhenge wo:
+# 1. Sabhi Files ke Name (PDF, Video, Docs) se automatically clean ho jayenge.
+# 2. Messages & Captions se automatically remove ho jayenge.
+# 3. Index List (Batch Table) se bhi automatically clean ho jayenge.
+#
+# 📝 KAISE USE KAREIN:
+# 1. Naya word hatane ke liye: Nayi line pe word likhein (e.g. kirmada rockstar)
+# 2. Word REPLACE karne ke liye: OldWord => NewWord (ya Old:New) likhein.
+# 3. '#' se shuru hone wali lines comment/notes hoti hain.
+# ==============================================================================
+
+# --- [User Specific Watermarks & Brands] ---
+Shimperd @ AnandxBotss
+Shimperd @AnandxBotss
+Shimperd
+@AnandxBotss
+kirmada rockstar
+kirmada
+
+# --- [Spam Bots & Usernames] ---
+@Yourwishhere_bot
+Yourwishhere_bot
+
+# --- [Spam / Watermark Emojis] ---
+☠️
+☠
+💀
+
+# --- [Promotional Links & Text] ---
+Join [Medical Verse](https://t.me/verse_medical) For more
+https://t.me/verse_medical
+medicalverse.in
+verse_medical

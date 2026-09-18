@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEVI — Autonomous Evolution & Personal Operator Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #050814;
+            --bg-card: rgba(17, 26, 48, 0.7);
+            --bg-card-hover: rgba(24, 37, 68, 0.85);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-glow: rgba(56, 189, 248, 0.35);
+            
+            --accent-cyan: #38bdf8;
+            --accent-emerald: #10b981;
+            --accent-purple: #a855f7;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            
+            --font-display: 'Outfit', -apple-system, sans-serif;
+            --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.3); border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.6); }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 90% 15%, rgba(168, 85, 247, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 1.75rem 1.5rem 3.5rem;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1360px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            padding: 1.35rem 1.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 1.25rem;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 12px 35px -10px rgba(0, 0, 0, 0.65);
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, #38bdf8, #a855f7, #10b981);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 1rem;
+            background: linear-gradient(135deg, #38bdf8, #a855f7);
+            display: grid;
+            place-items: center;
+            font-size: 1.5rem;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.4);
+        }
+        .logo-area h1 {
+            font-family: var(--font-display);
+            font-size: 1.45rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #38bdf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+        .logo-area p {
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            margin-top: 0.15rem;
+        }
+
+        .badge-pill {
+            background: rgba(16, 185, 129, 0.14);
+            color: #34d399;
+            padding: 0.45rem 1.1rem;
+            border-radius: 9999px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+        }
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+            animation: pulse 1.8s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* GRID CARDS */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 1.25rem;
+            padding: 1.35rem 1.5rem;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 12px 35px -10px rgba(0, 0, 0, 0.65);
+            transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .card:hover {
+            border-color: var(--border-glow);
+            transform: translateY(-2px);
+            box-shadow: 0 16px 40px -8px rgba(56, 189, 248, 0.15);
+        }
+
+        .card h3 {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+            margin-bottom: 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .metric-value {
+            font-family: var(--font-display);
+            font-size: 2.1rem;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.03em;
+        }
+
+        .metric-sub {
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            margin-top: 0.4rem;
+            font-family: var(--font-mono);
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            color: var(--text-dim);
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: #cbd5e1;
+        }
+
+        .badge {
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-cyan);
+            padding: 0.2rem 0.55rem;
+            border-radius: 0.45rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #38bdf8, #00f2fe);
+            color: #060911;
+            border: none;
+            padding: 0.4rem 0.85rem;
+            border-radius: 0.6rem;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.78rem;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-1.5px);
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+        .btn-danger:hover {
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="logo-area">
+                <div class="logo-icon">🧬</div>
+                <div>
+                    <h1>DEVI EVOLUTION DASHBOARD</h1>
+                    <p>The Continuously Evolving AI Teacher & Personal Operator | Autonomy Level {{ status.autonomy_level }}/9</p>
+                </div>
+            </div>
+            <div class="badge-pill">
+                <div class="pulse-dot"></div>
+                <span>OPERATIONAL (PHASE 4)</span>
+            </div>
+        </div>
+
+        <!-- METRICS GRID -->
+        <div class="grid">
+            <div class="card">
+                <h3>System Status <span>🟢</span></h3>
+                <div class="metric-value" style="color: var(--accent-emerald);">{{ health.status }}</div>
+                <div class="metric-sub">{{ health.os }} | 16GB Profile</div>
+            </div>
+
+            <div class="card">
+                <h3>RAM Consumption <span>💾</span></h3>
+                <div class="metric-value" style="color: var(--accent-cyan);">{{ health.used_ram_pct }}%</div>
+                <div class="metric-sub">{{ health.available_ram_gb }} GB free / {{ health.total_ram_gb }} GB</div>
+            </div>
+
+            <div class="card">
+                <h3>CPU Load <span>⚡</span></h3>
+                <div class="metric-value" style="color: var(--accent-purple);">{{ health.cpu_usage_pct }}%</div>
+                <div class="metric-sub">Active Python Tasks: {{ health.active_python_processes }}</div>
+            </div>
+
+            <div class="card">
+                <h3>Latest Benchmark <span>🎯</span></h3>
+                <div class="metric-value" style="color: var(--accent-amber);">{{ latest_benchmark.score }}/{{ latest_benchmark.max_score }}</div>
+                <div class="metric-sub">{{ latest_benchmark.benchmark_name }}</div>
+            </div>
+        </div>
+
+        <!-- REGISTRY & PROPOSALS -->
+        <div class="grid" style="grid-template-columns: 1.5fr 1fr;">
+            <div class="card">
+                <h2 class="section-title">Verified Skills Registry (Active)</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Skill Name</th>
+                            <th>Purpose</th>
+                            <th>Risk</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for skill in skills %}
+                        <tr>
+                            <td style="font-weight: 700; color: var(--accent-cyan);">{{ skill.name }}</td>
+                            <td>{{ skill.purpose }}</td>
+                            <td><span style="color: #10b981;">{{ skill.risk_level }}</span></td>
+                            <td><span class="badge">{{ skill.status }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2 class="section-title">Pending Upgrade Proposals</h2>
+                {% if proposals %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in proposals %}
+                            <tr>
+                                <td>{{ p.title }}</td>
+                                <td style="display:flex; gap:0.4rem;">
+                                    <a href="/api/proposal/{{ p.id }}/approve" class="btn">Approve</a>
+                                    <a href="/api/proposal/{{ p.id }}/reject" class="btn btn-danger">Reject</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="color: var(--text-muted); font-size: 0.84rem; margin-top: 0.5rem; background: rgba(255,255,255,0.02); padding: 1.25rem; border-radius: 0.75rem; border: 1px solid var(--border-subtle); text-align: center;">
+                        ✨ No pending self-upgrades. DEVI is running on approved baseline.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "app_name": "TG KindSync Pro",
+  "version": "14.5.0",
+  "release_tag": "v14.5",
+  "release_date": "2026-09-13",
+  "developer": "Dr. Amit Singh (Kind Doctor)",
+  "telegram_channels": ["@Kinddoctor4u", "@Ammitrajput1"],
+  "changelog": [
+    "Official Rebranding to TG KindSync Pro v14.5 Enterprise Masterpiece",
+    "Real-time Cloud Forwarder with Zero Forward Tags (copyMessage API, No PC needed for other admins)",
+    "Topic-to-Topic forwarding routes (/settopicroute) & Media Filtering (/routefilter)",
+    "Deep SangMata & Rose style User Intelligence Inspector (/userinfo, /whois, /info)",
+    "UserInfoBot Forwarded Message Inspection & Telegram Data Center (DC) Detection",
+    "Cross-Group Member Scraper, CSV Backups & Safe-Adder with flood protection",
+    "On-Demand Welcome Card Purge (/cleanwelcome) & Ghost Cleaner (/cleandeleted)",
+    "Official 3-Part Command Manual (/manual & /fullhelp)",
+    "1-Click Auto-Updater & Multi-Friend Code Sync Engine"
+  ]
+}
