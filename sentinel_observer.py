@@ -767,56 +767,58 @@ async def main():
         STATE.add_event(f"[yellow]Web Dashboard startup note: {e}[/]")
 
     TWELVE_HOURS_SEC = 12 * 3600  # 12-Hour Briefing & Self-Evolution Cycle
+    is_interactive = sys.stdout.isatty() and "--daemon" not in sys.argv
 
-    with Live(render_observer_hud(STATE, {"total_forwarded": 0}), console=console, refresh_per_second=1, screen=True) as live:
-        try:
-            while True:
-                events = BRIDGE.poll_logs()
-                for ev in events:
-                    if ev["type"] == "FLOOD_WAIT":
-                        asyncio.create_task(reporter.send_report(ADVISOR.build_smart_alert(
-                            "FloodWait Encountered",
-                            f"Telegram requested a `{ev['seconds']}s` cooldown on chunk uploads.",
-                            "Main engine auto-paced smoothly. Balanced Mode (12 workers) is optimal."
-                        )))
+    async def _periodic_observer_loop(live_ctx=None):
+        while True:
+            events = BRIDGE.poll_logs()
+            for ev in events:
+                if ev["type"] == "FLOOD_WAIT":
+                    asyncio.create_task(reporter.send_report(ADVISOR.build_smart_alert(
+                        "FloodWait Encountered",
+                        f"Telegram requested a `{ev['seconds']}s` cooldown on chunk uploads.",
+                        "Main engine auto-paced smoothly. Balanced Mode (12 workers) is optimal."
+                    )))
 
-                db_stats = read_db_metrics()
-                STATE.db_forwarded_count = db_stats.get("total_forwarded", 0)
+            db_stats = read_db_metrics()
+            STATE.db_forwarded_count = db_stats.get("total_forwarded", 0)
 
-                # Check if 12 hours elapsed for Autonomous Evolution Digest & Cloud Backup
-                now = time.monotonic()
-                if now - STATE.last_daily_report >= TWELVE_HOURS_SEC:
-                    STATE.last_daily_report = now
-                    
-                    async def _dispatch_12h_cycle():
-                        try:
-                            # 1. Trigger DEVI autonomous study & synthesis
-                            study_res = await RESEARCHER.research_topic("Clinical Medicine Pearls, High-Yield Pharmacology & Streaming Optimization")
-                            study_topic = study_res.get("topic") or "Clinical Pharmacology: SGLT2i Cardioprotective Mechanisms in Heart Failure"
-                            study_summary = study_res.get("summary") or "• SGLT2i enhances myocardial energetics and reduces preload/afterload.\n• GDMT 4-pillar foundational therapy."
-                            
-                            # 2. Build and dispatch 12h Evolution Digest
-                            digest_card = ADVISOR.build_12h_evolution_digest(STATE, db_stats, study_topic, study_summary)
-                            await reporter.send_report(digest_card)
-                            
-                            # 3. Dispatch automated database backup snapshot
-                            await reporter.send_database_backup()
-                            STATE.add_event("[bold green]📢 12h Autonomous Evolution Digest & Cloud DB Backup dispatched![/]")
-                        except Exception as cycle_err:
-                            STATE.add_event(f"[yellow]12h dispatch note: {cycle_err}[/]")
+            # Check if 12 hours elapsed for Autonomous Evolution Digest & Cloud Backup
+            now = time.monotonic()
+            if now - STATE.last_daily_report >= TWELVE_HOURS_SEC:
+                STATE.last_daily_report = now
+                
+                async def _dispatch_12h_cycle():
+                    try:
+                        study_res = await RESEARCHER.research_topic("Clinical Medicine Pearls, High-Yield Pharmacology & Streaming Optimization")
+                        study_topic = study_res.get("topic") or "Clinical Pharmacology: SGLT2i Cardioprotective Mechanisms in Heart Failure"
+                        study_summary = study_res.get("summary") or "• SGLT2i enhances myocardial energetics and reduces preload/afterload.\n• GDMT 4-pillar foundational therapy."
+                        
+                        digest_card = ADVISOR.build_12h_evolution_digest(STATE, db_stats, study_topic, study_summary)
+                        await reporter.send_report(digest_card)
+                        await reporter.send_database_backup()
+                        STATE.add_event("[bold green]📢 12h Autonomous Evolution Digest & Cloud DB Backup dispatched![/]")
+                    except Exception as cycle_err:
+                        STATE.add_event(f"[yellow]12h dispatch note: {cycle_err}[/]")
 
-                    asyncio.create_task(_dispatch_12h_cycle())
+                asyncio.create_task(_dispatch_12h_cycle())
 
-                try:
-                    live.update(render_observer_hud(STATE, db_stats))
-                except Exception:
-                    pass
-                await asyncio.sleep(2.0)
-        except (KeyboardInterrupt, asyncio.CancelledError):
-            pass
-        finally:
-            await dashboard.stop()
-            await reporter.close()
+            if live_ctx:
+                with suppress(Exception):
+                    live_ctx.update(render_observer_hud(STATE, db_stats))
+            await asyncio.sleep(2.0)
+
+    try:
+        if is_interactive:
+            with Live(render_observer_hud(STATE, {"total_forwarded": 0}), console=console, refresh_per_second=1, screen=True) as live:
+                await _periodic_observer_loop(live)
+        else:
+            await _periodic_observer_loop(None)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
+    finally:
+        await dashboard.stop()
+        await reporter.close()
 
 if __name__ == "__main__":
     try:
