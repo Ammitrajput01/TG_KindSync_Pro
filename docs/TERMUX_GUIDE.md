@@ -1,4 +1,4 @@
-# 📱 TGForwarder Android Tablet (Termux) Complete Setup Guide 🩺
+# 📱 TG KindSync Pro Android Tablet (Termux) Complete Setup Guide 🩺
 
 > **Target Device:** Android Tablet / Smartphone with Termux App  
 > **Python Version:** 3.10 / 3.11 / 3.12 (Termux Native)  
@@ -21,16 +21,16 @@ Android Termux par standard `requirements.txt` run karne par do packages crash k
 - F-Droid ya GitHub se official **Termux** install karein (Google Play Store wala version purana hai).
 
 ### Step 2: Transfer & Extract Zip
-1. `TGForwarder_TERMUX_ANDROID_LATEST.zip` ko apne Tablet me transfer karein (e.g. `Downloads` folder me).
+1. `TG_KindSync_Pro_TERMUX_ANDROID_LATEST.zip` ko apne Tablet me transfer karein (e.g. `Downloads` folder me).
 2. Termux open karein aur type karein:
 ```bash
 termux-setup-storage
 cd ~/storage/downloads
-cp TGForwarder_TERMUX_ANDROID_LATEST.zip ~/
+cp TG_KindSync_Pro_TERMUX_ANDROID_LATEST.zip ~/
 cd ~
 pkg install -y unzip
-unzip TGForwarder_TERMUX_ANDROID_LATEST.zip -d TGForwarder
-cd TGForwarder
+unzip TG_KindSync_Pro_TERMUX_ANDROID_LATEST.zip -d TG_KindSync_Pro
+cd TG_KindSync_Pro
 ```
 
 ### Step 3: Run 1-Click Setup

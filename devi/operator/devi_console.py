@@ -72,7 +72,7 @@ class DeviConsole:
             f"[bold yellow]{DEVI_NAME}[/bold yellow] - [bold white]{DEVI_TITLE}[/bold white]\n"
             f"[dim]Autonomy Level: {CURRENT_AUTONOMY_LEVEL}/9 (Personal AI Operator & Task Execution)[/dim]\n"
             f"[dim]Active Models / Providers: {provider_str}[/dim]\n"
-            f"[dim]Safe Sandbox: Enabled | TGForwarder Isolated & Protected[/dim]\n\n"
+            f"[dim]Safe Sandbox: Enabled | TG KindSync Pro Isolated & Protected[/dim]\n\n"
             f"[cyan]Quick Commands:[/cyan] 'health', 'find <pattern>', 'logs', 'research <topic>', 'discover skills', 'benchmark', 'status', 'exit'"
         )
         console.print(Panel(content, title="[bold green]DEVI AI SYSTEM[/bold green]", border_style="cyan"))

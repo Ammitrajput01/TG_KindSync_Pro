@@ -67,7 +67,7 @@ Built-in zero-cost multi-model router with smart auto-failover and Model Context
 
 ## 🤖 DEVI — The Continuously Evolving AI Teacher & Operator
 
-TGForwarder features **DEVI**, your unified autonomous AI Teacher, Sentinel Watchdog, and Personal Operator. DEVI lives in an isolated architecture with zero risk to the main Telegram forwarder.
+TG KindSync Pro features **DEVI**, your unified autonomous AI Teacher, Sentinel Watchdog, and Personal Operator. DEVI lives in an isolated architecture with zero risk to the main Telegram forwarder.
 
 ### Quick Launchers:
 - **`START_ALL.bat`**: 1-Click launcher running both Master Engine & DEVI AI Teacher.

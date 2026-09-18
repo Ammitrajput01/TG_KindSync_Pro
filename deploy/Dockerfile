@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🚀 TGFORWARDER - ENTERPRISE PRODUCTION DOCKER ENGINE
+# 🚀 TG KINDSYNC PRO - ENTERPRISE PRODUCTION DOCKER ENGINE
 # ==============================================================================
 FROM python:3.12-slim
 

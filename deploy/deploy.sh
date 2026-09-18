@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# 🚀 TGFORWARDER - 1-CLICK LINUX VPS DEPLOYMENT & SYSTEMD SETUP
+# 🚀 TG KINDSYNC PRO - 1-CLICK LINUX VPS DEPLOYMENT & SYSTEMD SETUP
 # ==============================================================================
 
 set -e
 
 echo "============================================================"
-echo "  🚀 TGFORWARDER CLOUD PRODUCTION INSTALLER"
+echo "  🚀 TG KINDSYNC PRO CLOUD PRODUCTION INSTALLER"
 echo "  - Kind Doctor & Team Enterprise Suite"
 echo "============================================================"
 echo ""

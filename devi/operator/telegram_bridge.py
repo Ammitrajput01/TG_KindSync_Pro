@@ -1,7 +1,7 @@
 """
 DEVI Telegram Bridge Readiness Layer
 Architectural adapter to support conversational control over a dedicated Telegram bot or channel.
-Ensures zero interference with existing TGForwarder sessions.
+Ensures zero interference with existing TG KindSync Pro sessions.
 """
 
 from typing import Dict, Any

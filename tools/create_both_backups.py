@@ -12,8 +12,8 @@ if hasattr(sys.stdout, "reconfigure"):
 BASE_DIR = Path(__file__).resolve().parent
 
 # Names of the two distinct backup packages
-FRIEND_ZIP_NAME = "TG_Forwarder_Pro_v14_FOR_FRIEND.zip"
-OWNER_ZIP_NAME = "TG_Forwarder_Pro_v14_OWNER_FULL_BACKUP.zip"
+FRIEND_ZIP_NAME = "TG_KindSync_Pro_v14.5_FOR_FRIEND.zip"
+OWNER_ZIP_NAME = "TG_KindSync_Pro_v14.5_OWNER_FULL_BACKUP.zip"
 
 FRIEND_ZIP_PATH = BASE_DIR / FRIEND_ZIP_NAME
 OWNER_ZIP_PATH = BASE_DIR / OWNER_ZIP_NAME
@@ -140,7 +140,7 @@ def make_owner_backup():
 def sync_backups():
     import shutil
     sync_targets = [
-        Path(r"C:\TGForwarder_Backups"),
+        Path(r"C:\TG_KindSync_Pro_Backups"),
         Path(r"C:\Users\Ammit\Desktop")
     ]
     for target in sync_targets:

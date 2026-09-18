@@ -3,7 +3,7 @@
 
 """
 ================================================================================
-🌐 TGFORWARDER V14.0 PRO — SENTINEL AI COMMAND CENTER & WEB DASHBOARD
+🌐 TG KINDSYNC PRO V14.5 — SENTINEL AI COMMAND CENTER & WEB DASHBOARD
 ================================================================================
 Ultra-responsive, luxury dark-mode web dashboard for real-time telemetry,
 interactive cloud backups, DLQ inspection, and remote controls over local Wi-Fi.
@@ -431,7 +431,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TGForwarder V14.0 PRO — Sentinel AI Live Command Center</title>
+  <title>TG KindSync Pro V14.5 — Sentinel AI Live Command Center</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1731,7 +1731,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="logo-badge">🩺</div>
         <div>
           <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.25rem;">
-            <div class="brand-title">TGFORWARDER <span>V14.0 PRO</span></div>
+            <div class="brand-title">TG KINDSYNC <span>PRO V14.5</span></div>
             <div class="chief-doctor-pill">
               <span class="crown">👑</span> Dr. Amit Singh (Kind Doctor) • Lead Visionary & Architect
             </div>
@@ -4712,7 +4712,7 @@ class DashboardServer:
         lan_ip = get_local_lan_ip()
         print(r"""
  ╭──────────────────────────────────────────────────────────────────────────╮
- │  🌐 TGFORWARDER V14.0 PRO — SENTINEL AI COMMAND CENTER                   │
+ │  🌐 TG KINDSYNC PRO V14.5 — SENTINEL AI COMMAND CENTER                   │
  │  Owner: Dr. Amit Singh (Kind Doctor) | Multi-User RBAC & Live Telemetry  │
  ╰──────────────────────────────────────────────────────────────────────────╯
 """)

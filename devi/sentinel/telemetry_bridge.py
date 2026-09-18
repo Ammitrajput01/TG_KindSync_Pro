@@ -1,6 +1,6 @@
 """
 DEVI Sentinel Telemetry Bridge
-Safely connects DEVI to the live TGForwarder engine logs and SQLite WAL database.
+Safely connects DEVI to the live TG KindSync Pro engine logs and SQLite WAL database.
 100% read-only, non-invasive, zero lock contention.
 """
 
@@ -23,7 +23,7 @@ REPORT_DIR = BASE_DIR / "observer_reports"
 
 
 class ObserverState:
-    """Live telemetry state tracking for TGForwarder engine."""
+    """Live telemetry state tracking for TG KindSync Pro engine."""
     def __init__(self):
         self.start_time = time.monotonic()
         self.start_datetime = datetime.now()

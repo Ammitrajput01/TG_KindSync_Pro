@@ -1,6 +1,6 @@
-# 🌐 TGForwarder — Oracle Cloud Always Free Tier (₹0 Forever) 24/7 Setup Guide
+# 🌐 TG KindSync Pro — Oracle Cloud Always Free Tier (₹0 Forever) 24/7 Setup Guide
 
-This guide explains how to host your **TGForwarder & Sentinel AI Teacher** online on **Oracle Cloud's Always Free Tier** so it runs **24/7 non-stop with Gigabit cloud speeds (1000 Mbps)** at **₹0 cost forever**, without needing your PC to stay turned on!
+This guide explains how to host your **TG KindSync Pro & Sentinel AI Teacher** online on **Oracle Cloud's Always Free Tier** so it runs **24/7 non-stop with Gigabit cloud speeds (1000 Mbps)** at **₹0 cost forever**, without needing your PC to stay turned on!
 
 ---
 
@@ -32,7 +32,7 @@ ssh -i "path\to\oracle_key.key" ubuntu@YOUR_ORACLE_PUBLIC_IP
 ## 🚀 Step 3: Upload Your Project to Oracle Cloud
 From your PC's PowerShell, upload this folder directly to your Oracle VPS:
 ```bash
-scp -i "path\to\oracle_key.key" -r "c:\TGForwarder-New" ubuntu@YOUR_ORACLE_PUBLIC_IP:/home/ubuntu/TGForwarder
+scp -i "path\to\oracle_key.key" -r "c:\TG_KindSync_Pro" ubuntu@YOUR_ORACLE_PUBLIC_IP:/home/ubuntu/TG_KindSync_Pro
 ```
 
 ---
@@ -40,7 +40,7 @@ scp -i "path\to\oracle_key.key" -r "c:\TGForwarder-New" ubuntu@YOUR_ORACLE_PUBLI
 ## 🚀 Step 4: Run the 1-Click Installer
 On your Oracle VPS terminal, navigate to the folder and run:
 ```bash
-cd /home/ubuntu/TGForwarder
+cd /home/ubuntu/TG_KindSync_Pro
 chmod +x deploy/deploy.sh
 ./deploy/deploy.sh
 ```
@@ -100,7 +100,7 @@ When hosted on Oracle Cloud, you can open your live Web Dashboard on your phone'
    - **Source CIDR**: `0.0.0.0/0`
    - **IP Protocol**: `TCP`
    - **Destination Port Range**: `8080`
-   - **Description**: `TGForwarder Web Dashboard`
+   - **Description**: `TG KindSync Pro Web Dashboard`
 5. Click **Add Ingress Rules**.
 
 ### 2. Open on Phone:

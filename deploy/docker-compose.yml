@@ -6,7 +6,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    container_name: tg_forwarder_engine
+    container_name: tg_kindsync_engine
     restart: unless-stopped
     stdin_open: true
     tty: true

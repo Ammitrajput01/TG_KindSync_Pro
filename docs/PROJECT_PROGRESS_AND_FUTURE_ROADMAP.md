@@ -317,4 +317,4 @@ python -m free_ai_hub.cli council "Explain optimal chunk size for Telegram 2GB s
 
 ---
 
-> **Note**: Yeh file aapke computer par `c:\TGForwarder-New\PROJECT_PROGRESS_AND_FUTURE_ROADMAP.md` location par permanently saved hai. Aap ise kabhi bhi VS Code, Notepad, ya kisi bhi Markdown viewer me directly open kar sakte hain.
+> **Note**: Yeh file aapke computer par `c:\TG_KindSync_Pro\docs\PROJECT_PROGRESS_AND_FUTURE_ROADMAP.md` location par permanently saved hai. Aap ise kabhi bhi VS Code, Notepad, ya kisi bhi Markdown viewer me directly open kar sakte hain.

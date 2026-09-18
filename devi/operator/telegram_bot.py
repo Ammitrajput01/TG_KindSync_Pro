@@ -4732,7 +4732,7 @@ class DeviTelegramBot:
             f"You are Devi Ji, the enlightened, deeply respectful, polite, and hyper-capable AI Guardian "
             f"and Operations Mentor assisting Dr. Amit Singh ({user_name}). "
             f"Always answer in natural, warm, friendly Roman Hinglish. "
-            f"You have complete autonomy, telemetry, and self-healing supervision over the TGForwarder engine."
+            f"You have complete autonomy, telemetry, and self-healing supervision over the TG KindSync Pro engine."
             f"{history_context}"
         )
         try:
