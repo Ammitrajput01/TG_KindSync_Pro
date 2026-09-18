@@ -7175,6 +7175,94 @@ async def run_diagnostics():
         
     await safe_input("\nPress Enter to return", allow_cancel=False)
 
+async def run_account_switcher_tool(session_mgr):
+    while True:
+        clear_screen()
+        console.print(get_persistent_header())
+        
+        status_list = await session_mgr.get_sessions_status()
+        
+        table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan", expand=True)
+        table.add_column("#", style="dim", width=4)
+        table.add_column("Session File", style="bold white")
+        table.add_column("Account Name", style="bold green")
+        table.add_column("Username", style="yellow")
+        table.add_column("User ID", style="cyan")
+        table.add_column("Status", style="bold")
+        
+        for idx, s in enumerate(status_list, 1):
+            is_act = s["is_active"]
+            act_badge = "[bold green]🟢 ACTIVE (Default)[/]" if is_act else "[dim]⚪ Inactive[/]"
+            u = s.get("user") or {}
+            uname = f"@{u.get('username')}" if u.get('username') else "[dim]None[/]"
+            fname = u.get("first_name") or "Unknown"
+            uid = str(u.get("id") or "N/A")
+            table.add_row(str(idx), s["name"], fname, uname, uid, act_badge)
+            
+        console.print(Panel(
+            "[bold cyan]👥 TELEGRAM MULTI-ACCOUNT & SESSION SWITCHER[/]\n"
+            "[dim]Manage your accounts or add your friend's account seamlessly on this machine.[/]",
+            border_style="cyan", box=box.ROUNDED
+        ))
+        console.print(table)
+        
+        console.print(Panel(
+            " [bold green][1..N][/] Switch Active Account (Set Default)\n"
+            " [bold cyan][A][/] ➕ Add / Login New Telegram Account\n"
+            " [bold red][D][/] 🗑️ Delete / Disconnect a Session File\n"
+            " [dim][0] Return to Main Menu[/]",
+            border_style="dim", box=box.ROUNDED
+        ))
+        
+        choice = await safe_input("Choose Option (1..N / A / D / 0)", allow_cancel=True, default_val="0")
+        if not choice or choice == "0":
+            break
+            
+        if choice.isdigit() and 1 <= int(choice) <= len(status_list):
+            sel_idx = int(choice) - 1
+            session_mgr.set_active_session(sel_idx)
+            env_p = Path(".env")
+            if env_p.exists():
+                set_key(".env", "ACTIVE_SESSION_INDEX", str(sel_idx))
+            console.print(f"\n[bold green]✔ Active account switched to:[/] [cyan]{status_list[sel_idx]['name']}[/]")
+            await asyncio.sleep(1.2)
+            continue
+            
+        elif choice.upper() == "A":
+            s_name = await safe_input("Enter a custom session nickname (e.g., session_friend or session_primary)", default_val=f"session_user_{len(status_list)+1}")
+            if not s_name: continue
+            clean_sname = str(Path(s_name).stem)
+            client = session_mgr.add_session(clean_sname)
+            console.print(f"\n[bold yellow]Starting login flow for '{clean_sname}'...[/]")
+            try:
+                await client.start()
+                me = await client.get_me()
+                if me:
+                    console.print(f"[bold green]✔ Successfully logged in as:[/] [bold cyan]{me.first_name} (@{me.username or 'No Username'}) [ID: {me.id}][/]")
+                    session_mgr._discover_sessions()
+                    session_mgr.set_active_session(clean_sname)
+                    env_p = Path(".env")
+                    if env_p.exists():
+                        set_key(".env", "ACTIVE_SESSION_INDEX", str(session_mgr.active_index))
+            except Exception as e:
+                console.print(f"[bold red]❌ Login failed:[/] {e}")
+            await safe_input("\nPress Enter to continue", allow_cancel=False)
+            continue
+            
+        elif choice.upper() == "D":
+            del_choice = await safe_input(f"Enter session number to delete (1..{len(status_list)})", allow_cancel=True)
+            if del_choice and del_choice.isdigit() and 1 <= int(del_choice) <= len(status_list):
+                target_s = status_list[int(del_choice)-1]["name"]
+                s_file = f"{target_s}.session"
+                if os.path.exists(s_file):
+                    with suppress(Exception): os.remove(s_file)
+                    console.print(f"[bold green]✔ Removed {s_file} safely.[/]")
+                    session_mgr._discover_sessions()
+                else:
+                    console.print(f"[yellow]File {s_file} not found on disk.[/]")
+                await asyncio.sleep(1.2)
+            continue
+
 async def run_menu(session_mgr):
     while True:
         clear_screen()
@@ -7228,10 +7316,11 @@ async def run_menu(session_mgr):
             padding=(0, 1)
         )
 
-        # ── Card 4: System Health ──────────────────────────────────────────
+        # ── Card 4: System Health & Accounts ───────────────────────────────
         card4_system = Panel(
-            "[bold green]🩺  SYSTEM HEALTH & MAINTENANCE[/]\n"
+            "[bold green]🩺  SYSTEM HEALTH & ACCOUNTS[/]\n"
             "[dim]─────────────────────────────────────────────────[/]\n"
+            f" [bold cyan]{LB}19][/] 👥 [bold white]Account Switcher & Login[/] [bold yellow]⭐[/] [dim]· Add/Switch TG Accounts[/]\n"
             f" [bold yellow]{LB}13][/] 🩺 [bold white]System Diagnostics[/] [dim]· Latency & Integrity[/]\n"
             f" [bold green]{LB}14][/] ♻️ [bold white]Reset History & DB[/] [dim]· Fresh Re-Scan #1[/]\n"
             f" [bold cyan]{LB}15][/] 🧹 [bold white]Deep Cleaner & Purge[/] [dim]· Sessions & Logs[/]\n"
@@ -7262,12 +7351,12 @@ async def run_menu(session_mgr):
 
         # ── Prompt bar ─────────────────────────────────────────────────────────
         console.print(Panel(
-            "  [dim]Enter[/] [bold cyan]1–18[/] [dim]to select a tool  ·  [/][bold yellow]2[/][dim] = Balanced Mode (Recommended Default)[/]",
+            "  [dim]Enter[/] [bold cyan]1–19[/] [dim]to select a tool  ·  [/][bold yellow]2[/][dim] = Balanced Mode (Recommended Default)[/]",
             border_style="dim",
             box=box.ROUNDED,
             padding=(0, 1)
         ))
-        ch = await safe_input("Choice", valid_options=[str(i) for i in range(1, 19)], allow_cancel=False, default_val="2")
+        ch = await safe_input("Choice", valid_options=[str(i) for i in range(1, 20)], allow_cancel=False, default_val="2")
         
         # 1-4: Transmission Modes
         if ch in ["1", "2", "3", "4"]:
@@ -7379,6 +7468,9 @@ async def run_menu(session_mgr):
             from tools.updater import run_update
             run_update()
             await safe_input("\nPress Enter to return to main menu", allow_cancel=False)
+            continue
+        elif ch == "19":
+            await run_account_switcher_tool(session_mgr)
             continue
         elif ch == "16":
             AdminTelemetry.dispatch(session_mgr.get_client(), "🔴 [MONITOR] Program Closed / Exit", {
