@@ -6,5 +6,15 @@ echo    CONNECTING TO TG KINDSYNC PRO ORACLE CLOUD SERVER (24/7)
 echo    IP: 130.210.1.32 (ap-mumbai-1)
 echo ======================================================================
 echo.
-ssh -i "%~dp0oracle_key_latest.key" ubuntu@130.210.1.32
+
+set KEY_PATH="C:\Users\Ammit\Downloads\oracle_key_latest.key"
+if not exist %KEY_PATH% (
+    set KEY_PATH="%~dp0oracle_key_latest.key"
+)
+
+echo [*] Using Private Key: %KEY_PATH%
+echo [*] Connecting to ubuntu@130.210.1.32...
+echo.
+
+ssh -o StrictHostKeyChecking=no -i %KEY_PATH% ubuntu@130.210.1.32
 pause
