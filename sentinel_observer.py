@@ -257,6 +257,128 @@ class TelegramReporter:
                 )
                 await event.reply(res_card, parse_mode="md")
 
+        elif cmd in ("/pause", "/stop_forwarding"):
+            ctrl_p = BASE_DIR / "engine_control.json"
+            try:
+                with open(ctrl_p, "w", encoding="utf-8") as cf:
+                    json.dump({"paused": True, "ts": time.time(), "source": "saved_messages"}, cf)
+                await event.reply("⏸️ **[STREAMING PAUSED]**\n\nForwarder engine ko temporarily pause kar diya gaya hai.\nQueue resume karne ke liye `/resume` bhejein.", parse_mode="md")
+            except Exception as ex:
+                await event.reply(f"⚠️ Error pausing engine: {ex}")
+
+        elif cmd in ("/resume", "/unpause", "/start_forwarding"):
+            ctrl_p = BASE_DIR / "engine_control.json"
+            try:
+                with open(ctrl_p, "w", encoding="utf-8") as cf:
+                    json.dump({"paused": False, "ts": time.time(), "source": "saved_messages"}, cf)
+                await event.reply("▶️ **[STREAMING RESUMED]**\n\nQueue re-activated! Pending lectures instantly stream hona shuru ho gaye hain.", parse_mode="md")
+            except Exception as ex:
+                await event.reply(f"⚠️ Error resuming engine: {ex}")
+
+        elif cmd in ("/speed", "/pacing"):
+            mode = arg.lower() if arg else "turbo"
+            ctrl_p = BASE_DIR / "engine_control.json"
+            valid_modes = {"turbo": 0.5, "ultra": 0.2, "normal": 1.5, "safe": 3.0}
+            delay_val = valid_modes.get(mode, 0.5)
+            try:
+                cur_data = {}
+                if ctrl_p.exists():
+                    with suppress(Exception):
+                        with open(ctrl_p, "r", encoding="utf-8") as cf:
+                            cur_data = json.load(cf)
+                cur_data.update({"speed_mode": mode, "media_delay": delay_val, "ts": time.time()})
+                with open(ctrl_p, "w", encoding="utf-8") as cf:
+                    json.dump(cur_data, cf)
+                speed_card = (
+                    f"⚡ **[PACING VELOCITY UPDATED: {mode.upper()}]**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• **Speed Mode**        : `{mode.upper()}`\n"
+                    f"• **Inter-Media Delay** : `{delay_val}s`\n"
+                    f"• **Shield Pacing**     : `Adaptive Flood Shield Active`\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🚀 *Engine will now stream at `{mode}` pacing!*"
+                )
+                await event.reply(speed_card, parse_mode="md")
+            except Exception as ex:
+                await event.reply(f"⚠️ Error updating speed: {ex}")
+
+        elif cmd in ("/system", "/vitals", "/server"):
+            import psutil
+            cpu_pct = psutil.cpu_percent(interval=0.2)
+            ram = psutil.virtual_memory()
+            disk = psutil.disk_usage(str(BASE_DIR))
+            uptime_sec = int(time.monotonic() - STATE.start_time)
+            hours, rem = divmod(uptime_sec, 3600)
+            mins, _ = divmod(rem, 60)
+            now_dt = datetime.now()
+            date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
+            sys_card = (
+                f"🖥️ **[TG KINDSYNC PRO — SYSTEM VITALS]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📅 `{date_str}`\n\n"
+                f"⚡ **CPU Usage**      : `{cpu_pct}%`\n"
+                f"🧠 **RAM Memory**     : `{ram.used/(1024**3):.2f} GB` / `{ram.total/(1024**3):.2f} GB` ({ram.percent}% used)\n"
+                f"💾 **Storage Space**  : `{disk.used/(1024**3):.1f} GB` / `{disk.total/(1024**3):.1f} GB` ({disk.free/(1024**3):.1f} GB free)\n"
+                f"⏱️ **Server Uptime**  : `{hours}h {mins}m` (Observer active)\n"
+                f"🔥 **Engine State**   : `🟢 ACTIVE & MONITORING`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🛡️ *Host: {platform.node() or 'Cloud VPS'} • {platform.system()}*"
+            )
+            await event.reply(sys_card, parse_mode="md")
+
+        elif cmd in ("/logs", "/log"):
+            n_lines = 15
+            if arg and arg.isdigit():
+                n_lines = min(int(arg), 40)
+            log_p = BASE_DIR / "logs" / "forwarder_service.log"
+            if not log_p.exists():
+                log_p = BASE_DIR / "logs" / "engine.log"
+            recent_logs = []
+            if log_p.exists():
+                try:
+                    with open(log_p, "r", encoding="utf-8", errors="replace") as lf:
+                        all_lines = lf.readlines()
+                        recent_logs = [ln.strip() for ln in all_lines[-n_lines:] if ln.strip()]
+                except Exception as le:
+                    recent_logs = [f"Error reading log file: {le}"]
+            else:
+                recent_logs = list(STATE.events)[-n_lines:]
+            
+            clean_log_text = "\n".join(recent_logs) if recent_logs else "No recent log entries."
+            if len(clean_log_text) > 3500:
+                clean_log_text = clean_log_text[-3500:]
+            await event.reply(f"📜 **[LIVE ENGINE LOGS — LAST {len(recent_logs)} EVENTS]**\n```\n{clean_log_text}\n```", parse_mode="md")
+
+        elif cmd in ("/clear_dlq", "/purge_dlq"):
+            if DLQ_FILE.exists():
+                try:
+                    DLQ_FILE.write_text("", encoding="utf-8")
+                    await event.reply("✅ **[DLQ PURGED]**\nDead letter error queue has been successfully cleared.", parse_mode="md")
+                except Exception as ce:
+                    await event.reply(f"⚠️ Failed to purge DLQ: {ce}")
+            else:
+                await event.reply("✅ DLQ is already empty.", parse_mode="md")
+
+        elif cmd in ("/ask", "/ai"):
+            if not arg:
+                await event.reply("💡 Please provide a query e.g. `/ask What is GDMT therapy in Heart Failure?`", parse_mode="md")
+                return
+            await event.reply(f"🩺 *{DEVI_NAME} is synthesizing answer via AI Hub...*", parse_mode="md")
+            res = await MODEL_ROUTER.generate_response(
+                "You are DEVI, an expert AI Clinical Advisor and System Specialist for TG KindSync Pro.",
+                arg
+            )
+            ans = res.get("text", "No response generated.")
+            provider = res.get("provider", "local")
+            reply_card = (
+                f"🩺 **[{DEVI_NAME.upper()} AI ADVISOR]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"{ans}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🧠 *Synthesized via {provider.upper()} • Kind Doctor Clinical Suite*"
+            )
+            await event.reply(reply_card, parse_mode="md")
+
         elif cmd in ("/backup", "/db"):
             await self.send_database_backup(event)
 
@@ -644,7 +766,7 @@ async def main():
     except Exception as e:
         STATE.add_event(f"[yellow]Web Dashboard startup note: {e}[/]")
 
-    DAILY_INTERVAL_SEC = 24 * 3600  # 24 Hours
+    TWELVE_HOURS_SEC = 12 * 3600  # 12-Hour Briefing & Self-Evolution Cycle
 
     with Live(render_observer_hud(STATE, {"total_forwarded": 0}), console=console, refresh_per_second=1, screen=True) as live:
         try:
@@ -661,14 +783,29 @@ async def main():
                 db_stats = read_db_metrics()
                 STATE.db_forwarded_count = db_stats.get("total_forwarded", 0)
 
-                # Check if 24 hours elapsed for Daily Digest & Automated Cloud Backup
+                # Check if 12 hours elapsed for Autonomous Evolution Digest & Cloud Backup
                 now = time.monotonic()
-                if now - STATE.last_daily_report >= DAILY_INTERVAL_SEC:
+                if now - STATE.last_daily_report >= TWELVE_HOURS_SEC:
                     STATE.last_daily_report = now
-                    digest_card = ADVISOR.build_daily_digest(STATE, db_stats)
-                    asyncio.create_task(reporter.send_report(digest_card))
-                    asyncio.create_task(reporter.send_database_backup())
-                    STATE.add_event("[bold green]📢 24h Daily Digest & Cloud DB Backup dispatched![/]")
+                    
+                    async def _dispatch_12h_cycle():
+                        try:
+                            # 1. Trigger DEVI autonomous study & synthesis
+                            study_res = await RESEARCHER.research_topic("Clinical Medicine Pearls, High-Yield Pharmacology & Streaming Optimization")
+                            study_topic = study_res.get("topic") or "Clinical Pharmacology: SGLT2i Cardioprotective Mechanisms in Heart Failure"
+                            study_summary = study_res.get("summary") or "• SGLT2i enhances myocardial energetics and reduces preload/afterload.\n• GDMT 4-pillar foundational therapy."
+                            
+                            # 2. Build and dispatch 12h Evolution Digest
+                            digest_card = ADVISOR.build_12h_evolution_digest(STATE, db_stats, study_topic, study_summary)
+                            await reporter.send_report(digest_card)
+                            
+                            # 3. Dispatch automated database backup snapshot
+                            await reporter.send_database_backup()
+                            STATE.add_event("[bold green]📢 12h Autonomous Evolution Digest & Cloud DB Backup dispatched![/]")
+                        except Exception as cycle_err:
+                            STATE.add_event(f"[yellow]12h dispatch note: {cycle_err}[/]")
+
+                    asyncio.create_task(_dispatch_12h_cycle())
 
                 try:
                     live.update(render_observer_hud(STATE, db_stats))

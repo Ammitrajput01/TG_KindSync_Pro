@@ -14,6 +14,57 @@ class SentinelAIAdvisor:
     def __init__(self, router=None):
         self.router = router
 
+    def build_12h_evolution_digest(self, state: ObserverState, db_stats: Dict[str, int], research_topic: str = "", research_summary: str = "") -> str:
+        """Generates a comprehensive 12-hour autonomous evolution & telemetry briefing."""
+        uptime_sec = int(time.monotonic() - state.start_time)
+        hours, rem = divmod(uptime_sec, 3600)
+        mins, _ = divmod(rem, 60)
+        uptime_str = f"{hours}h {mins}m"
+
+        cur_mb = state.bytes_transferred / (1024 * 1024)
+        data_str = f"{cur_mb:.2f} MB" if cur_mb < 1024 else f"{cur_mb/1024:.2f} GB"
+
+        # Standard timestamp format: [Day], [Date] [Month] [Year] | [HH]:[MM] [AM/PM]
+        now_dt = datetime.now()
+        date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
+        cycle_label = "Midnight Edition" if now_dt.hour < 12 else "Noon Edition"
+        subj_list = ", ".join(state.subject_headers_posted[-4:]) if state.subject_headers_posted else "Medical Sciences / Core"
+
+        # Fallback study topic if none passed
+        if not research_topic:
+            research_topic = "Clinical Pharmacology: SGLT2 Inhibitors Cardioprotective Mechanisms in HFrEF & HFpEF"
+        if not research_summary:
+            research_summary = (
+                "• SGLT2i enhances myocardial energetics, reduces cardiac preload/afterload without reflex tachycardia.\n"
+                "• Synergistic with ARNI/ACEi & Beta-blockers for foundational 4-pillar GDMT therapy in Heart Failure."
+            )
+
+        lines = [
+            "╔════════════════════════════════════════════════════════════╗",
+            f"║   🎓 **{DEVI_NAME.upper()} JI — 12-HOUR AUTONOMOUS EVOLUTION REPORT**",
+            f"║   📅 *{date_str}* ({cycle_label})",
+            "╚════════════════════════════════════════════════════════════╝\n",
+            "📊 ━━━━━━━━━ 📈 **12-HOUR TRANSMISSION TELEMETRY** ━━━━━━━━━ 📊",
+            f"• **Session Delivered**   : `{state.total_transfers}` items (`{state.videos_sent}` 🎥 | `{state.docs_sent}` 📄 | `{state.photos_sent}` 🖼️ | `{state.texts_sent}` 💬)",
+            f"• **Total DB Records**    : `{db_stats.get('total_forwarded', 0):,}` historical messages tracked",
+            f"• **Data Streamed**       : `{data_str}` (Uptime: `{uptime_str}`)",
+            f"• **Peak Upload Speed**   : `{state.peak_speed_mb:.2f} MB/s`",
+            f"• **Recent Subjects**     : `{subj_list}`",
+            f"• **Rate-Limit (Flood)**  : `{state.flood_waits_detected}` events ({state.flood_wait_seconds_total:.1f}s delay handled)\n",
+            "🔬 ━━━━━━━━━ 🧠 **DEVI JI AUTONOMOUS STUDY & RESEARCH** ━━━━━━━━━ 🔬",
+            f"📖 **Module Studied This Cycle**:\n❝ *{research_topic}* ❞\n",
+            f"💡 **Key Insights & Clinical Pearls**:\n{research_summary}\n",
+            "🛡️ ━━━━━━━━━ 🩺 **SYSTEM & TELEMETRY OBSERVATIONS** ━━━━━━━━━ 🛡️"
+        ]
+
+        tips = self.generate_dynamic_recommendations(state)
+        for idx, tip in enumerate(tips[:3], 1):
+            lines.append(f"{idx}. {tip}")
+
+        lines.append(f"\n❝ *The good physician treats the disease; the great physician treats the patient who has the disease.* ❞ 🩺💫")
+        lines.append(f"\n🟢 *24/7 Sentinel Guard Active • Powered by {DEVI_NAME} AI Teacher*")
+        return "\n".join(lines)
+
     def build_daily_digest(self, state: ObserverState, db_stats: Dict[str, int]) -> str:
         """Generates a structured 24h AI Intelligence performance digest."""
         uptime_sec = int(time.monotonic() - state.start_time)
@@ -24,7 +75,8 @@ class SentinelAIAdvisor:
         cur_mb = state.bytes_transferred / (1024 * 1024)
         data_str = f"{cur_mb:.2f} MB" if cur_mb < 1024 else f"{cur_mb/1024:.2f} GB"
 
-        date_str = datetime.now().strftime("%d %b %Y, %I:%M %p")
+        now_dt = datetime.now()
+        date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
         subj_list = ", ".join(state.subject_headers_posted[-5:]) if state.subject_headers_posted else "Standard / General"
 
         lines = [

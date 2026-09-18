@@ -136,14 +136,14 @@ DEVI (*Dedicated Evolutionary Virtual Intelligence*) ek fully isolated, autonomo
 
 ---
 
-### E. Web Dashboard, Ayugram Glass HUD & Companion
-*Files: `web_dashboard.py`, `ayugram_glass_hud.py`, `ayugram_turbo_companion.py`*
+### E. Sentinel Web Dashboard & Telemetry HUD
+*Files: `web_dashboard.py`, `tools/login_panel.py`*
 
-1. **Luxury Dark-Mode Live HUD**:
+1. **Luxury Obsidian Dark-Mode Live HUD**:
    - Accessible at `http://localhost:8080`.
    - Live speedometers, active tasks, real-time log stream, and channel progress.
-2. **Ayugram Turbo Companion**:
-   - Glass HUD overlay specifically tuned for desktop Ayugram power users.
+2. **Dual Login & String Session Manager**:
+   - Integrated QR Code login, OTP verification, and Telethon/Pyrogram String Session import.
 
 ---
 

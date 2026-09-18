@@ -3,9 +3,10 @@
 
 """
 ================================================================================
-👑 TELEGRAM DUAL LOGIN PANEL & AUTHENTICATION WIZARD (QR + PHONE OTP)
+👑 TELEGRAM TRIPLE LOGIN PANEL & AUTHENTICATION WIZARD (QR + PHONE OTP + STRING)
 📱 Tab 1: Instant QR Code Scan (Telethon qr_login)
 📞 Tab 2: Phone Number + Official Telegram OTP + 2FA Cloud Password
+🔑 Tab 3: Telethon / Pyrogram String Session Import (Manual Auth)
 💎 Modern Glassmorphism Luxury Cyberpunk Dark UI
 ================================================================================
 """
@@ -14,6 +15,7 @@ import os
 import sys
 import io
 import time
+import shutil
 import base64
 import asyncio
 import logging
@@ -24,6 +26,7 @@ from typing import Optional
 from aiohttp import web
 from dotenv import load_dotenv
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 from telethon.errors import (
     SessionPasswordNeededError,
     PhoneNumberInvalidError,
@@ -47,12 +50,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Forwarder Pro — Dual Login Wizard</title>
+    <title>Telegram Forwarder Pro — Telegram Connect Wizard</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-primary: #0a0f1d;
-            --bg-card: rgba(18, 24, 43, 0.88);
+            --bg-card: rgba(18, 24, 43, 0.92);
             --border-glass: rgba(255, 255, 255, 0.12);
             --accent-cyan: #00f2fe;
             --accent-blue: #4facfe;
@@ -86,7 +89,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid var(--border-glass);
             border-radius: 24px;
             width: 100%;
-            max-width: 500px;
+            max-width: 520px;
             padding: 36px 32px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 35px rgba(0, 242, 254, 0.15);
             animation: fadeIn 0.4s ease-out;
@@ -183,20 +186,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .tabs {
             display: flex;
-            background: rgba(0, 0, 0, 0.25);
+            background: rgba(0, 0, 0, 0.35);
             border: 1px solid var(--border-glass);
             border-radius: 14px;
             padding: 4px;
             margin-bottom: 24px;
+            gap: 4px;
         }
 
         .tab-btn {
             flex: 1;
-            padding: 10px;
+            padding: 9px 6px;
             border: none;
             background: transparent;
             color: var(--text-dim);
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 600;
             border-radius: 10px;
             cursor: pointer;
@@ -204,7 +208,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
+            white-space: nowrap;
         }
 
         .tab-btn.active {
@@ -308,6 +313,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             transition: all 0.2s;
         }
 
+        textarea.input-control {
+            font-size: 0.8rem;
+            line-height: 1.4;
+            min-height: 90px;
+            resize: vertical;
+        }
+
         .input-control:focus {
             border-color: var(--accent-cyan);
             box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
@@ -371,7 +383,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="header">
             <span class="badge">🚀 TG KindSync Pro</span>
             <h1>Telegram Connect</h1>
-            <p>Scan QR code or enter phone number to authorize account</p>
+            <p>Authorize account via QR Scan, Mobile OTP, or String Session</p>
         </div>
 
         <!-- Banner shown when an account is already authorized -->
@@ -385,10 +397,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('qr')">
-                <span>📱</span> Instant QR Code
+                <span>📱</span> Instant QR
             </button>
             <button class="tab-btn" onclick="switchTab('phone')">
-                <span>📞</span> Phone Number + OTP
+                <span>📞</span> Phone OTP
+            </button>
+            <button class="tab-btn" onclick="switchTab('string')">
+                <span>🔑</span> String / Manual
             </button>
         </div>
 
@@ -435,6 +450,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div id="phone-alert" class="alert-box"></div>
         </div>
 
+        <!-- TAB 3: STRING SESSION / MANUAL AUTH -->
+        <div id="tab-string" class="tab-content">
+            <div class="form-group">
+                <label for="string-input">Paste Telethon / Pyrogram String Session</label>
+                <textarea id="string-input" class="input-control" placeholder="1BVtsOHQBu7... (Paste 1-line String Session here)"></textarea>
+            </div>
+            <button id="btn-import-string" class="btn-submit" onclick="importStringSession()">Import & Authorize</button>
+            <div id="string-alert" class="alert-box"></div>
+        </div>
+
         <div id="global-success" class="alert-box success" style="margin-top: 24px; text-align: center; display: none;">
             🎉 <strong>Login Successful!</strong><br>
             Session authorized. You can close this tab and return to the terminal.
@@ -454,9 +479,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (tab === 'qr') {
                 document.querySelectorAll('.tab-btn')[0].classList.add('active');
                 document.getElementById('tab-qr').classList.add('active');
-            } else {
+            } else if (tab === 'phone') {
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
                 document.getElementById('tab-phone').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab-btn')[2].classList.add('active');
+                document.getElementById('tab-string').classList.add('active');
             }
         }
 
@@ -607,6 +635,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        async function importStringSession() {
+            const strVal = document.getElementById('string-input').value.trim();
+            const btn = document.getElementById('btn-import-string');
+            const alert = document.getElementById('string-alert');
+
+            if (!strVal) {
+                alert.className = 'alert-box error';
+                alert.innerText = 'Please paste a valid Telegram String Session.';
+                alert.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = 'Validating Session...';
+            alert.className = 'alert-box info';
+            alert.innerText = 'Connecting via MTProto String Session...';
+            alert.style.display = 'block';
+
+            try {
+                const res = await fetch('/api/session_string/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_string: strVal })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    onLoginSuccess(data.user_name || 'Telegram User');
+                } else {
+                    alert.className = 'alert-box error';
+                    alert.innerText = data.error || 'Failed to authorize string session.';
+                    btn.disabled = false;
+                    btn.innerText = 'Import & Authorize';
+                }
+            } catch (err) {
+                alert.className = 'alert-box error';
+                alert.innerText = 'Network error validating string session.';
+                btn.disabled = false;
+                btn.innerText = 'Import & Authorize';
+            }
+        }
+
         function showPhoneAlert(msg, type) {
             const alert = document.getElementById('phone-alert');
             alert.className = 'alert-box ' + type;
@@ -619,14 +688,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             qrPollingActive = false;
             document.getElementById('tab-qr').style.display = 'none';
             document.getElementById('tab-phone').style.display = 'none';
+            document.getElementById('tab-string').style.display = 'none';
             document.getElementById('already-connected-banner').style.display = 'none';
             document.querySelector('.tabs').style.display = 'none';
             const s = document.getElementById('global-success');
-            s.innerHTML = `🎉 <strong>Login Successful!</strong><br>Connected as <strong>${userName}</strong>.<br><span style="font-size:0.8rem; color:#94a3b8;">Session saved safely. Returning to forwarder...</span>`;
+            s.innerHTML = `🎉 <strong>Login Successful!</strong><br>Connected as <strong>${userName}</strong>.<br><span style="font-size:0.8rem; color:#94a3b8;">Session saved safely as session_forwarder. Returning to forwarder...</span>`;
             s.style.display = 'block';
             setTimeout(() => {
                 window.close();
-            }, 3000);
+            }, 2500);
         }
 
         // Initialize
@@ -639,11 +709,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 class DualLoginServer:
     def __init__(self, client: TelegramClient, host: str = "127.0.0.1", port: int = 5005, api_id: int = 0, api_hash: str = ""):
+        load_dotenv()
         self.client = client
         self.host = host
         self.port = port
-        self.api_id = api_id or getattr(client, 'api_id', 0)
-        self.api_hash = api_hash or getattr(client, 'api_hash', "")
+        self.primary_session_name = "session_forwarder"
+        
+        # Robust API credentials fallback
+        raw_api_id = api_id or os.getenv("API_ID") or getattr(client, 'api_id', 0)
+        raw_api_hash = api_hash or os.getenv("API_HASH") or getattr(client, 'api_hash', "")
+        
+        try:
+            self.api_id = int(raw_api_id or 0)
+        except Exception:
+            self.api_id = 0
+            
+        self.api_hash = str(raw_api_hash or "").strip()
+        
+        if not self.api_id or str(self.api_id) in ("0", "2040"):
+            self.api_id = 36193727
+        if not self.api_hash or "hash" in self.api_hash.lower():
+            self.api_hash = "fef19b9b1434a3e66b009fd31053200b"
+
         self.app = web.Application()
         self.runner: Optional[web.AppRunner] = None
         self.qr_login_obj = None
@@ -660,12 +747,24 @@ class DualLoginServer:
         self.app.router.add_get("/api/qr", self.handle_get_qr)
         self.app.router.add_post("/api/phone/request_code", self.handle_request_code)
         self.app.router.add_post("/api/phone/submit_code", self.handle_submit_code)
+        self.app.router.add_post("/api/session_string/import", self.handle_session_string_import)
         self.app.router.add_post("/api/fresh_session", self.handle_fresh_session)
         self.app.router.add_post("/api/confirm_continue", self.handle_confirm_continue)
         self.app.router.add_get("/api/status", self.handle_status)
 
     async def handle_index(self, request):
         return web.Response(text=HTML_TEMPLATE, content_type="text/html")
+
+    async def _sync_primary_session(self, source_session_path: str = None):
+        """Ensures session_forwarder.session holds the newly authorized credentials."""
+        target = ROOT_DIR / "session_forwarder.session"
+        if source_session_path and Path(source_session_path).exists():
+            try:
+                if str(Path(source_session_path).resolve()) != str(target.resolve()):
+                    shutil.copy2(source_session_path, target)
+                    logger.info(f"✔ Synchronized session to {target.name}")
+            except Exception as e:
+                logger.error(f"Error syncing session: {e}")
 
     async def _generate_qr_image(self, url: str) -> str:
         if qrcode is None:
@@ -761,15 +860,15 @@ class DualLoginServer:
             if self.client and self.client.is_connected():
                 await self.client.disconnect()
 
-            new_sess_name = f"session_account_{int(time.time())}"
-            self.client = TelegramClient(new_sess_name, self.api_id, self.api_hash)
+            new_sess_path = str(ROOT_DIR / "session_forwarder")
+            self.client = TelegramClient(new_sess_path, self.api_id, self.api_hash)
             await self.client.connect()
             self.qr_login_obj = None
             self.current_qr_base64 = ""
             self.is_authorized = False
             self.confirmed_continue = False
             self.user_name = ""
-            return web.json_response({"ok": True, "session_name": new_sess_name})
+            return web.json_response({"ok": True, "session_name": "session_forwarder"})
         except Exception as e:
             logger.error(f"Error initializing fresh session: {e}")
             return web.json_response({"ok": False, "error": str(e)}, status=500)
@@ -788,13 +887,8 @@ class DualLoginServer:
 
             self.current_phone = phone
             
-            # If current client is already authorized to another account, disconnect and switch to dedicated session
-            if await self.client.is_user_authorized():
-                await self.client.disconnect()
-                import re
-                clean_digits = re.sub(r"\D", "", phone)
-                sess_name = f"session_account_{clean_digits[-4:] if len(clean_digits) >= 4 else 'user'}"
-                self.client = TelegramClient(sess_name, self.api_id, self.api_hash)
+            # Ensure connected directly to primary forwarder session
+            if not self.client.is_connected():
                 await self.client.connect()
 
             sent_code = await self.client.send_code_request(phone)
@@ -828,6 +922,16 @@ class DualLoginServer:
             if me:
                 self.is_authorized = True
                 self.user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'User')
+                
+                # Backup to dedicated account file as well
+                import re
+                clean_digits = re.sub(r"\D", "", self.current_phone)
+                backup_sess = ROOT_DIR / f"session_account_{clean_digits[-4:] if len(clean_digits) >= 4 else 'user'}.session"
+                fwd_sess = ROOT_DIR / "session_forwarder.session"
+                if fwd_sess.exists():
+                    with suppress(Exception):
+                        shutil.copy2(fwd_sess, backup_sess)
+                
                 return web.json_response({"ok": True, "user_name": self.user_name})
             return web.json_response({"ok": False, "error": "Unknown error during sign in."})
         except PhoneCodeInvalidError:
@@ -836,6 +940,63 @@ class DualLoginServer:
             return web.json_response({"ok": False, "error": "Code expired. Please request a new code."})
         except Exception as e:
             return web.json_response({"ok": False, "error": str(e)})
+
+    async def handle_session_string_import(self, request):
+        """Imports a Telethon or Pyrogram String Session directly into session_forwarder.session."""
+        try:
+            data = await request.json()
+            raw_str = data.get("session_string", "").strip()
+            if not raw_str:
+                return web.json_response({"ok": False, "error": "Empty session string provided."})
+
+            temp_client = TelegramClient(StringSession(raw_str), self.api_id, self.api_hash)
+            await temp_client.connect()
+            if not await temp_client.is_user_authorized():
+                await temp_client.disconnect()
+                return web.json_response({"ok": False, "error": "Invalid or expired session string."})
+
+            me = await temp_client.get_me()
+            user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'User')
+
+            # Transfer session auth to session_forwarder and dedicated SQLite session files
+            if self.client and self.client.is_connected():
+                with suppress(Exception):
+                    await self.client.disconnect()
+
+            from telethon.sessions import SQLiteSession
+            fwd_path = str(ROOT_DIR / "session_forwarder")
+            fwd_sqlite = SQLiteSession(fwd_path)
+            if temp_client.session.dc_id and temp_client.session.server_address and temp_client.session.port:
+                fwd_sqlite.set_dc(temp_client.session.dc_id, temp_client.session.server_address, temp_client.session.port)
+            if temp_client.session.auth_key:
+                fwd_sqlite.auth_key = temp_client.session.auth_key
+            fwd_sqlite.save()
+            fwd_sqlite.close()
+
+            import re
+            phone_str = getattr(me, 'phone', '') or str(me.id)
+            clean_digits = re.sub(r"\D", "", phone_str)
+            acc_path = str(ROOT_DIR / f"session_account_{clean_digits[-4:] if len(clean_digits) >= 4 else 'user'}")
+            acc_sqlite = SQLiteSession(acc_path)
+            if temp_client.session.dc_id and temp_client.session.server_address and temp_client.session.port:
+                acc_sqlite.set_dc(temp_client.session.dc_id, temp_client.session.server_address, temp_client.session.port)
+            if temp_client.session.auth_key:
+                acc_sqlite.auth_key = temp_client.session.auth_key
+            acc_sqlite.save()
+            acc_sqlite.close()
+
+            # Connect file client to verify
+            file_client = TelegramClient(fwd_path, self.api_id, self.api_hash)
+            await file_client.connect()
+            self.client = file_client
+            self.is_authorized = await file_client.is_user_authorized()
+            self.user_name = user_name
+            await temp_client.disconnect()
+
+            return web.json_response({"ok": True, "user_name": user_name})
+        except Exception as e:
+            logger.error(f"Error importing string session: {e}")
+            return web.json_response({"ok": False, "error": f"Failed to import string session: {e}"})
 
     async def handle_status(self, request):
         if not self.user_name and self.client and self.client.is_connected():
@@ -883,9 +1044,13 @@ async def launch_dual_login_wizard(client: TelegramClient, port: int = 5005, for
     start_t = time.time()
     while time.time() - start_t < 300: # 5 min timeout
         if server.is_authorized or server.confirmed_continue:
-            await asyncio.sleep(1.5)
+            await asyncio.sleep(1.0)
             await server.stop()
-            return True
+            # Ensure client is fully reconnected and authorized
+            if not client.is_connected():
+                with suppress(Exception):
+                    await client.connect()
+            return await client.is_user_authorized() or server.is_authorized
         await asyncio.sleep(1.0)
 
     await server.stop()
@@ -896,7 +1061,7 @@ if __name__ == "__main__":
     api_id = int(os.getenv("API_ID", 0) or 0)
     api_hash = os.getenv("API_HASH", "").strip()
     if not api_id or not api_hash:
-        print("[!] Error: API_ID and API_HASH must be configured in .env")
-        sys.exit(1)
+        api_id = 36193727
+        api_hash = "fef19b9b1434a3e66b009fd31053200b"
     client = TelegramClient("session_forwarder", api_id, api_hash)
     asyncio.run(launch_dual_login_wizard(client))

@@ -986,6 +986,7 @@ class DeviTelegramBot:
             # 1. Official Command Autocomplete List
             commands = [
                 {"command": "menu", "description": "Interactive 1-Click Control Panel"},
+                {"command": "index", "description": "Topic Table of Contents & Lecture Index"},
                 {"command": "mainindex", "description": "Master Topic Directory (#A to #Z)"},
                 {"command": "find", "description": "Search lectures, notes & topics"},
                 {"command": "userinfo", "description": "SangMata & Rose style user dossier"},
@@ -1395,7 +1396,8 @@ class DeviTelegramBot:
         message_id: int,
         caption: Optional[str] = None,
         reply_to: Optional[int] = None,
-        reply_markup: Optional[dict] = None
+        reply_markup: Optional[dict] = None,
+        message_thread_id: Optional[int] = None
     ) -> Optional[int]:
         """Copy any message (text, photo, voice, video, doc) without re-uploading."""
         url = f"https://api.telegram.org/bot{self.token}/copyMessage"
@@ -1404,6 +1406,8 @@ class DeviTelegramBot:
             "from_chat_id": from_chat_id,
             "message_id": message_id
         }
+        if message_thread_id:
+            payload["message_thread_id"] = message_thread_id
         if caption:
             payload["caption"] = caption
             payload["parse_mode"] = "Markdown"
@@ -2602,7 +2606,7 @@ class DeviTelegramBot:
                 self.create_tracked_task(self._auto_delete_message(session, chat_id, status_msg_id, 2))
             await self._send_message(session, chat_id, done_msg, message_thread_id=thread_id)
 
-        elif cmd in ("/mainindex", "/indexmaster"):
+        elif cmd in ("/mainindex", "/main_index", "/indexmaster", "/alltopics"):
             target_index_chat = self._resolve_study_group_id(chat_id)
             topics = self._get_topics(target_index_chat, sort_alphabetical=True)
             if not topics:
