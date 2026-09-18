@@ -77,7 +77,8 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/support", "/contact", "/id", "/myid", "/info",
     "/stats", "/leaderboard", "/topmembers", "/history", "/rules",
     "/userinfo", "/whois", "/botinfo", "/about",
-    "/engine", "/status", "/backup", "/clean", "/cleanbot", "/sangmata"
+    "/engine", "/status", "/backup", "/clean", "/cleanbot", "/sangmata",
+    "/mcq", "/pearl", "/score", "/pomodoro", "/ask"
 )
 STUDENT_ALLOWED_COMMANDS = PUBLIC_ALLOWED_COMMANDS
 
@@ -991,6 +992,7 @@ class DeviTelegramBot:
                 {"command": "find", "description": "Search lectures, notes & topics"},
                 {"command": "clone", "description": "1-Click Instant Message Cloner"},
                 {"command": "batchclone", "description": "Batch Clone continuous message ranges"},
+                {"command": "forward", "description": "Forward & Route messages to Topics"},
                 {"command": "userinfo", "description": "SangMata & Rose style user dossier"},
                 {"command": "cleanwelcome", "description": "Auto-purge welcome & service alerts"},
                 {"command": "cleandeleted", "description": "Purge deleted ghost accounts from group"},
@@ -1003,11 +1005,20 @@ class DeviTelegramBot:
                 {"command": "botinfo", "description": "Bot specifications & credentials"},
                 {"command": "id", "description": "View Telegram User ID safely"}
             ]
-            await session.post(
-                f"https://api.telegram.org/bot{self.token}/setMyCommands",
-                json={"commands": commands},
-                timeout=8
-            )
+            # Register across all Telegram scopes (Default, Groups, Group Admins, Private)
+            scopes = [
+                {"type": "default"},
+                {"type": "all_private_chats"},
+                {"type": "all_group_chats"},
+                {"type": "all_chat_administrators"}
+            ]
+            for sc in scopes:
+                with suppress(Exception):
+                    await session.post(
+                        f"https://api.telegram.org/bot{self.token}/setMyCommands",
+                        json={"commands": commands, "scope": sc},
+                        timeout=8
+                    )
             # 2. Short Description (Displayed in Profile / About)
             short_desc = "👨‍⚕️ Kind Doctor 🤍 🩺 — Medical Study Companion, Topic Indexer, Cloud Forwarder & User Intelligence Suite."
             await session.post(

@@ -10,6 +10,10 @@ The user has explicitly instructed you to **autonomously use these models in the
 3. **For Difficult Architecture & Strategy Decisions**: Run **AI Council Debate** (`python -m free_ai_hub.cli council ...`) across multiple models (Groq + OpenRouter + Mistral + Gemini) to ensure bulletproof architectural decisions.
 4. **Hinglish Communication**: Always communicate with the user in natural, friendly Roman Hinglish.
 
+## Strict Deployment & Push Policy (MANDATORY RULE)
+- **NEVER automatically push commits to GitHub (`git push`) or deploy to Oracle Cloud VPS (`ssh/scp`) without explicit, direct user instructions (e.g., 'push karo', 'deploy karo', 'update deploy kar do').**
+- All fixes, code edits, and tests must be performed and verified **strictly locally first**. Only deploy/push when the user explicitly requests it.
+
 ## Permanent Admin Telegram Accounts
 The user has strictly and only two personal main Telegram accounts:
 - **Primary 1**: `@Kinddoctor4u` (ID: `1553619403`)
