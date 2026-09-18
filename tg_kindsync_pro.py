@@ -1699,6 +1699,57 @@ class RateBudgeter:
 
         self.history.append(now)
 
+class AdaptiveSpeedCruiseControl:
+    """
+    Adaptive Smart Speed & Emergency Cruise Control Engine.
+    - Full Throttle: Uncaps concurrent chunk uploads up to 40-48 streams (~20-50+ MB/s on gigabit VPS).
+    - Smart Brake: If Telegram congestion, FloodWait, or slow chunk ACK (>3.5s) is detected,
+      it instantly drops concurrency (down to 4-8) to prevent TCP packet loss, lag, or account flags.
+    - Smooth Acceleration: When transfers remain stable for consecutive chunks, it automatically
+      ramps concurrency back up (+2 per successful burst) with zero manual restarts.
+    """
+    def __init__(self, min_concurrency: int = 4, max_concurrency: int = 40, start_concurrency: int = 32):
+        self.min_concurrency = min_concurrency
+        self.max_concurrency = max_concurrency
+        self.current_concurrency = start_concurrency
+        self.consecutive_successes = 0
+        self.last_brake_time = 0.0
+
+    def get_concurrency(self) -> int:
+        env_override = os.getenv("UPLOAD_PARALLELISM")
+        if env_override and env_override.isdigit():
+            val = int(env_override)
+            if val > self.max_concurrency:
+                return val
+        return self.current_concurrency
+
+    def apply_brake(self, reason: str = "congestion", severity: float = 0.5):
+        """Immediately brake down speed on congestion or flood risk."""
+        old = self.current_concurrency
+        drop_target = max(self.min_concurrency, int(self.current_concurrency * (1.0 - severity)))
+        self.current_concurrency = drop_target
+        self.consecutive_successes = 0
+        self.last_brake_time = time.time()
+        logger.warning(f"🚨 [Smart Brake Activated] Reason: {reason} | Concurrency throttled: {old} -> {self.current_concurrency}")
+
+    def report_chunk_done(self, duration: float):
+        """Monitor chunk completion duration and smoothly accelerate if road is clear."""
+        now = time.time()
+        if duration > 3.5:
+            self.apply_brake(reason=f"Slow Socket ACK ({duration:.2f}s)", severity=0.35)
+            return
+
+        if now - self.last_brake_time < 2.5:
+            return
+
+        self.consecutive_successes += 1
+        if self.consecutive_successes >= 3 and self.current_concurrency < self.max_concurrency:
+            self.consecutive_successes = 0
+            self.current_concurrency = min(self.max_concurrency, self.current_concurrency + 2)
+            logger.info(f"⚡ [Smart Acceleration] High throughput verified | Concurrency boosted to: {self.current_concurrency}")
+
+GLOBAL_CRUISE_CONTROLLER = AdaptiveSpeedCruiseControl()
+
 GLOBAL_RATE_BUDGETER = RateBudgeter(max_per_minute=25)
 
 async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, **kwargs):
@@ -1708,6 +1759,7 @@ async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, *
         try:
             return await func(client, *args, **kwargs)
         except FloodWaitError as e:
+            GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"Telegram FloodWait ({e.seconds}s)", severity=0.7)
             GLOBAL_RATE_BUDGETER.record_flood_wait(e.seconds)
             wait_time = int(e.seconds) + 1
             logger.warning(f"Telegram FloodWait hit ({e.seconds}s). Auto-sleeping {wait_time}s before retry (Attempt {attempt})...")
@@ -1715,12 +1767,14 @@ async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, *
                 raise
             await asyncio.sleep(wait_time)
         except RPCError as e:
+            GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"RPCError ({type(e).__name__})", severity=0.3)
             if attempt >= max_retries:
                 raise
             delay = min(base_delay * (2 ** (attempt - 1)), 30.0)
             logger.warning(f"RPCError ({e}). Retrying in {delay:.1f}s (Attempt {attempt}/{max_retries})...")
             await asyncio.sleep(delay)
-        except (OSError, ConnectionError, asyncio.TimeoutError):
+        except (OSError, ConnectionError, asyncio.TimeoutError) as e:
+            GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"Socket/Timeout ({type(e).__name__})", severity=0.4)
             if attempt >= max_retries:
                 raise
             delay = min(base_delay * (2 ** (attempt - 1)), 20.0)
@@ -1911,8 +1965,8 @@ class MemoryStreamer:
         self.cfg = cfg
         self.metrics = metrics
         self.ui_callback = ui_callback
-        # Gigabit High-Throughput Semaphore (32 parallel DC socket streams)
-        self.tcp_sem = asyncio.Semaphore(32)
+        # Gigabit High-Throughput Semaphore (48 parallel DC socket streams for uncapped pipe)
+        self.tcp_sem = asyncio.Semaphore(48)
 
     async def _send_chunk(self, client, file_id, idx, total, payload, is_big):
         async with self.tcp_sem:
@@ -1920,7 +1974,17 @@ class MemoryStreamer:
                 req = SaveBigFilePartRequest(file_id=file_id, file_part=idx, file_total_parts=total, bytes=payload)
             else:
                 req = SaveFilePartRequest(file_id=file_id, file_part=idx, bytes=payload)
-            await self.rpc.execute_chunk(lambda c: c(req), timeout=120.0, client=client)
+            t0 = time.time()
+            try:
+                await self.rpc.execute_chunk(lambda c: c(req), timeout=120.0, client=client)
+                dur = time.time() - t0
+                GLOBAL_CRUISE_CONTROLLER.report_chunk_done(dur)
+            except FloodWaitError as e:
+                GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"FloodWait ({e.seconds}s)", severity=0.75)
+                raise
+            except Exception as e:
+                GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"Chunk Send Error ({type(e).__name__})", severity=0.35)
+                raise
 
     async def stream_media(self, msg, stop_event: asyncio.Event, client=None):
         client = client or self.rpc.session_mgr.get_client()
@@ -1987,10 +2051,11 @@ class MemoryStreamer:
                         task_sizes[t] = len(payload)
                         part_idx += 1
 
-                        # Uncapped dynamic parallelism (up to 24-32 concurrent chunk dispatches)
-                        concurrency = int(os.getenv("UPLOAD_PARALLELISM", "24"))
+                        # Dynamic Cruise Control Parallelism (starts high at 32-40, scales dynamically with smart brake)
+                        concurrency = GLOBAL_CRUISE_CONTROLLER.get_concurrency()
                         while len(in_flight) >= concurrency:
                             await drain_one(in_flight, task_sizes)
+                            concurrency = GLOBAL_CRUISE_CONTROLLER.get_concurrency()
                         await asyncio.sleep(0)
 
                 if buffer:
