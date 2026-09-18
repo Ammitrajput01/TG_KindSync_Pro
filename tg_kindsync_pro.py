@@ -2622,9 +2622,19 @@ class PipelineProcessor:
 
         topic_clean = str(topic_title).replace("&", "and").strip()
 
+        # Dynamically detect real target group name
+        target_group_title = None
+        try:
+            target_entity = await client.get_entity(_parse_chat_id(target_chat))
+            target_group_title = getattr(target_entity, "title", None)
+        except Exception:
+            pass
+
+        group_display = str(target_group_title).strip() if target_group_title else "STUDY HELP 🙃"
+
         welcome_card = (
             "✨ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🩺 **WELCOME TO SIGMA STUDY MASTERCLASS** 🤍\n"
+            f"🩺 **WELCOME TO {group_display}** 🤍\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📂 **Module / Topic:** **{topic_clean}**\n"
             "🚀 **Sync Engine:** `TG KindSync Pro • High-Speed Streamer`\n"
