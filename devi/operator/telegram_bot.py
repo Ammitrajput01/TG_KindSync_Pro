@@ -1565,6 +1565,8 @@ class DeviTelegramBot:
         if not sender_id:
             return
 
+        logger.info(f"📩 Telegram update from {sender_id} (@{sender.get('username')}) in {chat_id} [{chat_type}]: '{text}'")
+
         # ============================================================
         # 1. GROUP / SUPERGROUP SENTINEL SHIELD (SILENT GUARDIAN)
         # ============================================================
@@ -1968,6 +1970,9 @@ class DeviTelegramBot:
 
             clean_text = text.replace("@KindDoc_bot", "").replace("@kinddoc_bot", "").strip()
             first_word = clean_text.split()[0].lower().split("@")[0] if clean_text else ""
+            if not first_word.startswith("/") and first_word in ("index", "mainindex", "topics", "help", "menu", "stats", "manual", "find", "scan"):
+                first_word = f"/{first_word}"
+                clean_text = f"/{clean_text}"
 
             # Non-admins can use study and search tools (and view indexes)
             if not is_sender_admin:
@@ -2172,17 +2177,24 @@ class DeviTelegramBot:
             )
             await self._send_message(session, chat_id, add_guide)
 
-        # Check if message matches any Command or Custom Command
-        if text.startswith("/"):
-            custom_cmd_key = text.split()[0].lower().split("@")[0]
+        # Check if message matches any Command or Custom Command (with or without /)
+        clean_prompt = text.strip()
+        cmd_first = clean_prompt.split()[0].lower().split("@")[0] if clean_prompt else ""
+        if not cmd_first.startswith("/"):
+            if f"/{cmd_first}" in STUDENT_ALLOWED_COMMANDS or cmd_first in ("index", "mainindex", "topics", "help", "menu", "stats", "scan", "manual", "find"):
+                clean_prompt = f"/{clean_prompt}"
+                cmd_first = f"/{cmd_first}"
+
+        if clean_prompt.startswith("/"):
+            custom_cmd_key = cmd_first
             custom_output = self._get_custom_command(custom_cmd_key)
             if custom_output:
                 await self._send_message(session, chat_id, custom_output)
                 return
 
-            # Allow /help, /start, and all study commands in private DM for EVERYONE!
+            # Allow /help, /start, /index, and all study commands in private DM for EVERYONE!
             if custom_cmd_key in STUDENT_ALLOWED_COMMANDS:
-                await self._handle_admin_command(session, chat_id, sender_id, text, message=message)
+                await self._handle_admin_command(session, chat_id, sender_id, clean_prompt, message=message)
                 return
 
         # Build Rich Intel Dossier Banner for Admins
@@ -2641,12 +2653,16 @@ class DeviTelegramBot:
 
         elif cmd in ("/topicindex", "/subindex", "/index"):
             target_index_chat = self._resolve_study_group_id(chat_id)
+            clean_chat_id = str(target_index_chat).replace("-100", "").replace("-", "").lstrip("@")
             target_t_id = thread_id
             if len(parts) > 1 and parts[1].isdigit():
                 target_t_id = int(parts[1])
 
-            if target_t_id is None:
-                target_t_id = 0
+            # If user ran /index without specifying a topic in DM or General topic (t_id is None or 0)
+            # automatically show the Master Topic Directory!
+            if not target_t_id:
+                await self._handle_admin_command(session, chat_id, admin_id, "/mainindex", message=message)
+                return
 
             # Find topic title
             topics = self._get_topics(target_index_chat, sort_alphabetical=True)
