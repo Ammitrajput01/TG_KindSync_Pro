@@ -4731,6 +4731,121 @@ class DeviTelegramBot:
                 logger.error(f"Backup generation failed: {e}")
                 await self._send_message(session, chat_id, f"❌ **Backup generation failed:** {e}", message_thread_id=thread_id)
 
+        elif cmd in ("/kill", "/kill_all", "/killall", "/unlock_db"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+
+            import psutil
+            my_pid = os.getpid()
+            killed = []
+            freed_mb = 0.0
+
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'memory_info']):
+                try:
+                    p_pid = proc.info['pid']
+                    if p_pid == my_pid:
+                        continue
+                    p_name = (proc.info['name'] or "").lower()
+                    cmd_line = " ".join(proc.info['cmdline'] or []).lower()
+
+                    is_target = False
+                    if "python" in p_name:
+                        if any(t in cmd_line for t in ["tg_kindsync_pro", "quick_setup", "login_panel", "group_scanner"]):
+                            is_target = True
+                        elif "tg_kindsync" in cmd_line:
+                            is_target = True
+
+                    if is_target:
+                        if proc.info.get('memory_info'):
+                            freed_mb += proc.info['memory_info'].rss / (1024 * 1024)
+                        proc.kill()
+                        killed.append(p_pid)
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+
+            cleaned_locks = []
+            for pat in ["*.session-journal", "*.session-wal", "*.session-shm", "history_core.sqlite-journal", "engine.lock"]:
+                for f in BASE_PROJECT_DIR.glob(pat):
+                    try:
+                        f.unlink(missing_ok=True)
+                        cleaned_locks.append(f.name)
+                    except Exception:
+                        pass
+
+            pids_str = ", ".join(f"`PID {p}`" for p in killed) if killed else "None"
+            locks_str = ", ".join(f"`{f}`" for f in cleaned_locks) if cleaned_locks else "None"
+
+            await self._send_message(
+                session, chat_id,
+                f"🛑 **[ADMIN PROCESS TERMINATOR & DB UNLOCKED]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Killed Processes**: {pids_str}\n"
+                f"• **Freed Memory**: `~{freed_mb:.2f} MB`\n"
+                f"• **Cleaned Locks**: {locks_str}\n"
+                f"• **SQLite Database**: `100% Free & Unlocked`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✅ *All background locks cleared. Safe to launch!*",
+                message_thread_id=thread_id
+            )
+
+        elif cmd in ("/clean_history", "/clear_history", "/reset_history"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+
+            notify_id = await self._send_message(session, chat_id, "⏳ **Backing up database before history wipe...**", message_thread_id=thread_id)
+            try:
+                # 1. Take safety snapshot
+                now = datetime.now()
+                stamp = now.strftime("%A_%d-%B-%Y_%I-%M%p")
+                backup_filename = f"history_core_backup_{stamp}.sqlite"
+                backup_dir = BASE_PROJECT_DIR / "db_backups"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_path = backup_dir / backup_filename
+
+                with get_db_conn() as src_conn:
+                    with sqlite3.connect(backup_path) as dst_conn:
+                        src_conn.backup(dst_conn)
+
+                file_bytes = backup_path.read_bytes()
+                size_mb = len(file_bytes) / (1024 * 1024)
+                caption_time = now.strftime("%I:%M %p")
+                full_caption = (
+                    f"📦 **[PRE-WIPE SAFETY BACKUP]**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📅 **Date & Time:** `{now.strftime('%A, %d %B %Y')} | {caption_time}`\n"
+                    f"📦 **File Size:** `{size_mb:.2f} MB`\n"
+                    f"🛡️ *Automated safety backup dispatched before history wipe.*"
+                )
+                await self._send_document(
+                    session, chat_id, file_bytes, backup_filename, caption=full_caption, message_thread_id=thread_id
+                )
+
+                # 2. Wipe history
+                with get_db_conn() as conn:
+                    conn.execute("DELETE FROM forwarded")
+                    conn.execute("DELETE FROM source_watermarks")
+                    with suppress(Exception): conn.execute("DELETE FROM local_folder_uploads")
+                    conn.commit()
+                    with suppress(Exception): conn.execute("VACUUM")
+
+                if notify_id:
+                    self.create_tracked_task(self._auto_delete_message(session, chat_id, notify_id, 2))
+
+                await self._send_message(
+                    session, chat_id,
+                    "🧹 **[FORWARDING HISTORY CLEANED & RESET]**\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "• Previous history safely backed up above ⬆️\n"
+                    "• Forwarded records wiped & database compacted!\n"
+                    "• Future runs will forward fresh from scratch.",
+                    message_thread_id=thread_id
+                )
+            except Exception as e:
+                logger.error(f"Clean history failed: {e}")
+                await self._send_message(session, chat_id, f"❌ **Clean history failed:** {e}", message_thread_id=thread_id)
+
         elif cmd == "/clean":
             if not self.is_admin(admin_id):
                 await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
@@ -4753,6 +4868,7 @@ class DeviTelegramBot:
                 "Engine is 100% fresh and ready to launch! 🚀",
                 message_thread_id=thread_id
             )
+
 
         elif cmd == "/health":
             health = SystemTools.get_system_health()

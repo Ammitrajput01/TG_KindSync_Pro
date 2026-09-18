@@ -1582,6 +1582,21 @@ class MultiSessionManager:
         console.print("[bold green]✔ Telegram API credentials successfully saved into `.env`![/]\n")
         await asyncio.sleep(1.0)
 
+    async def _safe_connect(self, client: TelegramClient):
+        """Connects client with automatic self-healing for SQLite database locked errors."""
+        try:
+            await client.connect()
+        except Exception as e:
+            if "database is locked" in str(e).lower() or "sqlite3.operationalerror" in str(e).lower():
+                console.print(f"[bold yellow]⚠️ Session database lock detected. Auto-cleaning stale lock files & retrying...[/]")
+                for pat in ["*.session-journal", "*.session-wal", "*.session-shm"]:
+                    for f in Path(".").glob(pat):
+                        with suppress(Exception): f.unlink(missing_ok=True)
+                await asyncio.sleep(1.0)
+                await client.connect()
+            else:
+                raise
+
     async def start_all(self):
         if not self.api_id or not self.api_hash:
             await self._prompt_credentials()
@@ -1591,7 +1606,7 @@ class MultiSessionManager:
         # Connect clients without blindly prompting repeated logins for non-primary sessions
         for idx, client in enumerate(self.clients):
             if not client.is_connected():
-                await client.connect()
+                await self._safe_connect(client)
             # Only trigger interactive login on the primary active account
             if idx == self.active_index and not await client.is_user_authorized():
                 await interactive_telegram_login(client)
@@ -1610,10 +1625,11 @@ class MultiSessionManager:
         if not client:
             return None
         if not client.is_connected():
-            await client.connect()
+            await self._safe_connect(client)
         if not await client.is_user_authorized():
             await interactive_telegram_login(client)
         return client
+
 
     async def disconnect_all(self):
         for client in self.clients:
@@ -3500,12 +3516,113 @@ class TerminalPlatform:
                     await event.reply("⏸ **Forwarding Paused Remotely.** Bookmarks & history saved safely.", parse_mode="md")
                 self.stop_evt.set()
 
+            elif text in ("/kill", "/kill_all", "/killall", "/unlock_db", "/force_stop", "kill"):
+                self.log("[bold red]🛑 Remote Kill & Force Stop Triggered from Saved Messages[/]")
+                with suppress(Exception):
+                    await event.reply("🛑 **Emergency Force Stop Received!** Terminating engine and releasing all database locks...", parse_mode="md")
+                self.stop_evt.set()
+                # Clean stale lock files
+                for pat in ["*.session-journal", "*.session-wal", "*.session-shm", "history_core.sqlite-journal", "engine.lock"]:
+                    for f in Path(".").glob(pat):
+                        with suppress(Exception): f.unlink(missing_ok=True)
+                # Terminate
+                await asyncio.sleep(0.5)
+                os._exit(0)
+
+            elif text in ("/clean_history", "/clear_history", "/reset_history", "/wipe_history"):
+                self.log("[bold magenta]🧹 Remote Clean History Triggered from Saved Messages[/]")
+                try:
+                    # 1. Safety snapshot first adhering to timestamp rules
+                    now_dt = datetime.now()
+                    stamp = now_dt.strftime("%A_%d-%B-%Y_%I-%M-%S%p")
+                    snap_name = f"history_core_backup_{stamp}.sqlite"
+                    
+                    db_p = Path(DB_FILE)
+                    if db_p.exists():
+                        import sqlite3
+                        src = sqlite3.connect(f"file:{db_p.resolve()}?mode=ro", uri=True)
+                        dst = sqlite3.connect(snap_name)
+                        src.backup(dst)
+                        dst.close()
+                        src.close()
+                        
+                        date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
+                        caption_card = (
+                            f"📦 **[PRE-WIPE SAFETY BACKUP — FORWARDER ENGINE]**\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• **Date & Time**   : `{date_str}`\n"
+                            f"• **Safety Status** : `100% Preserved before Wipe`\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"🛡️ *Automatic safety backup dispatched before history wipe.*"
+                        )
+                        await client.send_file("me", snap_name, caption=caption_card, parse_mode="md")
+                        with suppress(Exception): Path(snap_name).unlink()
+
+                        # 2. Wipe history
+                        with sqlite3.connect(DB_FILE, timeout=15) as conn:
+                            conn.execute("DELETE FROM forwarded")
+                            conn.execute("DELETE FROM source_watermarks")
+                            with suppress(Exception): conn.execute("DELETE FROM local_folder_uploads")
+                            conn.commit()
+                            with suppress(Exception): conn.execute("VACUUM")
+
+                        self.metrics["messages_forwarded"] = 0
+                        self.metrics["bytes_uploaded"] = 0
+                        self.metrics["videos_sent"] = 0
+                        self.metrics["docs_sent"] = 0
+                        self.metrics["photos_sent"] = 0
+                        self.metrics["text_sent"] = 0
+
+                        await event.reply(
+                            "🧹 **[FORWARDING HISTORY CLEANED & RESET]**\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "• Previous history safely backed up above ⬆️\n"
+                            "• Database `history_core.sqlite` is now 100% clean!\n"
+                            "• Forwarder will re-forward files from scratch.",
+                            parse_mode="md"
+                        )
+                except Exception as ex:
+                    with suppress(Exception):
+                        await event.reply(f"❌ Failed to clean history: {ex}", parse_mode="md")
+
+            elif text in ("/backup", "/db", "backup"):
+                try:
+                    now_dt = datetime.now()
+                    stamp = now_dt.strftime("%A_%d-%B-%Y_%I-%M-%S%p")
+                    snap_name = f"history_core_backup_{stamp}.sqlite"
+                    db_p = Path(DB_FILE)
+                    if db_p.exists():
+                        import sqlite3
+                        src = sqlite3.connect(f"file:{db_p.resolve()}?mode=ro", uri=True)
+                        dst = sqlite3.connect(snap_name)
+                        src.backup(dst)
+                        dst.close()
+                        src.close()
+                        
+                        date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
+                        caption_card = (
+                            f"📦 **[CLOUD DATABASE BACKUP]**\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• **Date & Time**   : `{date_str}`\n"
+                            f"• **Database**      : `history_core.sqlite`\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"🛡️ *Online zero-downtime backup.*"
+                        )
+                        await client.send_file("me", snap_name, caption=caption_card, parse_mode="md")
+                        with suppress(Exception): Path(snap_name).unlink()
+                except Exception as ex:
+                    with suppress(Exception):
+                        await event.reply(f"❌ Backup failed: {ex}", parse_mode="md")
+
             elif text in ("/help", "help"):
                 help_card = (
                     "📱 **[REMOTE TELEGRAM COMMANDS]**\n"
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     "• `/status` - Live speed, progress & active file\n"
                     "• `/pause` or `/stop` - Safely pause forwarding\n"
+                    "• `/kill` - 🛑 Kill engine & force unlock SQLite database\n"
+                    "• `/clean_history` - 🧹 Wipe forwarding history (Auto-backup first)\n"
+                    "• `/backup` - 📦 1-Click instant database snapshot\n"
                     "• `/help` - Show this commands guide"
                 )
                 with suppress(Exception):

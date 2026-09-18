@@ -155,6 +155,8 @@ class TelegramReporter:
                 f"💬 `/status`   · Live Transmission Velocity & Telemetry\n"
                 f"💬 `/report`   · Instant 24h AI Performance Digest\n"
                 f"💬 `/backup`   · 1-Click Cloud SQLite Database Backup\n"
+                f"💬 `/kill`     · 🛑 Kill Stuck Processes & Unlock SQLite Database\n"
+                f"💬 `/clean_history` · 🧹 Wipe Forwarding History (Auto Safety Backup First)\n"
                 f"💬 `/errors`   · Inspect Last 5 Failed Transmissions & Reasons\n"
                 f"💬 `/dlq`      · Dead Letter Queue Count & Status\n"
                 f"💬 `/tips`     · Real-Time Recommendations (Sorted: Latest #N First)\n"
@@ -163,7 +165,7 @@ class TelegramReporter:
                 f"💬 `/help`     · Display this Mobile Command Manual\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💡 **Pro-Tip**: You can also ask me anything directly! E.g.:\n"
-                f"*\"Devi, what is current upload speed?\"* or *\"Devi, check errors\"*"
+                f"*\"Devi, kill processes\"*, *\"History clean karo\"*, or *\"Devi, check errors\"*"
             )
             await event.reply(help_card, parse_mode="md")
 
@@ -382,6 +384,12 @@ class TelegramReporter:
         elif cmd in ("/backup", "/db"):
             await self.send_database_backup(event)
 
+        elif cmd in ("/kill", "/kill_all", "/killall", "/unlock_db", "/unlock", "/force_stop", "/terminate"):
+            await self.kill_processes_and_unlock(event)
+
+        elif cmd in ("/clean_history", "/clear_history", "/reset_history", "/wipe_history", "/purge_history"):
+            await self.clean_database_history(event)
+
         elif cmd == "/tips":
             tips = ADVISOR.generate_dynamic_recommendations(STATE)
             total = len(tips)
@@ -542,6 +550,10 @@ class TelegramReporter:
                     f"• Protection Barrier: `Active (Zero session risk)`",
                     parse_mode="md"
                 )
+            elif intent == "KILL_PROCESSES":
+                await self.kill_processes_and_unlock(event)
+            elif intent == "CLEAN_HISTORY":
+                await self.clean_database_history(event)
             elif intent == "RESEARCH_TOPIC":
                 topic = parsed.get("topic", text)
                 await event.reply(f"🔍 *{DEVI_NAME} researching topic:* `{topic}`...", parse_mode="md")
@@ -643,10 +655,153 @@ class TelegramReporter:
                     await reply_event.reply(f"❌ Failed to backup database: {e}")
             return False
 
+    async def kill_processes_and_unlock(self, reply_event=None):
+        """Terminates stuck engine processes, clears SQLite lock/journal files, and frees resources."""
+        import psutil
+        my_pid = os.getpid()
+        killed = []
+        freed_mb = 0.0
+
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'memory_info']):
+            try:
+                p_pid = proc.info['pid']
+                if p_pid == my_pid:
+                    continue
+                p_name = (proc.info['name'] or "").lower()
+                cmd_line = " ".join(proc.info['cmdline'] or []).lower()
+
+                is_target = False
+                if "python" in p_name:
+                    if any(t in cmd_line for t in ["tg_kindsync_pro", "quick_setup", "login_panel", "group_scanner"]):
+                        is_target = True
+                    elif "tg_kindsync" in cmd_line:
+                        is_target = True
+
+                if is_target:
+                    if proc.info.get('memory_info'):
+                        freed_mb += proc.info['memory_info'].rss / (1024 * 1024)
+                    proc.kill()
+                    killed.append(p_pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+
+        cleaned_files = []
+        for pat in ["*.session-journal", "*.session-wal", "*.session-shm", "history_core.sqlite-journal", "engine.lock"]:
+            for f in BASE_DIR.glob(pat):
+                try:
+                    f.unlink(missing_ok=True)
+                    cleaned_files.append(f.name)
+                except Exception:
+                    pass
+
+        ctrl_p = BASE_DIR / "engine_control.json"
+        if ctrl_p.exists():
+            with suppress(Exception):
+                ctrl_p.unlink(missing_ok=True)
+
+        now_dt = datetime.now().strftime("%I:%M %p")
+        pids_str = ", ".join(f"`PID {p}`" for p in killed) if killed else "None (No stuck background processes found)"
+        locks_str = ", ".join(f"`{f}`" for f in cleaned_files) if cleaned_files else "Clean (No stale locks)"
+
+        res_card = (
+            f"🛑 **[{DEVI_NAME.upper()} — PROCESS TERMINATOR & DB UNLOCKED]**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏱️ **Executed At**     : `{now_dt}`\n"
+            f"🎯 **Killed Processes** : {pids_str}\n"
+            f"🧠 **Freed Memory**     : `~{freed_mb:.2f} MB`\n"
+            f"🔓 **Cleaned Locks**    : {locks_str}\n"
+            f"🛡️ **SQLite DB Status**  : `100% Free & Unlocked`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ *Sabhi background locks aur stuck processes kill kar diye gaye hain! Ab aap clean start kar sakte hain bina kisi database locked error ke.*"
+        )
+        STATE.add_event(f"[bold red]🛑 Process Terminator Executed:[/] Killed {len(killed)} PIDs")
+        if reply_event:
+            await reply_event.reply(res_card, parse_mode="md")
+        return killed
+
+    async def clean_database_history(self, reply_event=None):
+        """Dispatches an auto safety backup to Saved Messages and safely cleans forwarding records."""
+        if not self.client or not await self.client.is_user_authorized():
+            return False
+        if not DB_FILE.exists():
+            if reply_event:
+                await reply_event.reply("⚠️ Database file `history_core.sqlite` not found.", parse_mode="md")
+            return False
+
+        if reply_event:
+            await reply_event.reply("⏳ *Wiping se pehle full safety snapshot create kiya ja raha hai...*", parse_mode="md")
+
+        try:
+            # 1. First create and send safety backup adhering to timestamp naming standards
+            snap_path = create_db_snapshot()
+            db_stats = read_db_metrics()
+            prev_records = db_stats.get('total_forwarded', 0)
+            size_kb = snap_path.stat().st_size / 1024
+            now_dt = datetime.now()
+            date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
+
+            caption_card = (
+                f"📦 **[PRE-WIPE SAFETY BACKUP — {DEVI_NAME.upper()}]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Date & Time**       : `{date_str}`\n"
+                f"• **Archived Records**  : `{prev_records:,}` messages\n"
+                f"• **Tracked Channels**  : `{db_stats['tracked_channels']}`\n"
+                f"• **Backup Size**       : `{size_kb:.1f} KB`\n"
+                f"• **Safety Status**     : `100% Preserved before Wipe`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🛡️ *Automatic safety backup dispatched before history wipe.*"
+            )
+            await self.client.send_file(
+                self.target_peer,
+                str(snap_path),
+                caption=caption_card,
+                parse_mode="md"
+            )
+            with suppress(Exception):
+                snap_path.unlink()
+
+            # 2. Safely wipe forwarding tables in history_core.sqlite
+            import sqlite3
+            with sqlite3.connect(str(DB_FILE), timeout=15) as conn:
+                conn.execute("DELETE FROM forwarded")
+                conn.execute("DELETE FROM source_watermarks")
+                with suppress(Exception):
+                    conn.execute("DELETE FROM local_folder_uploads")
+                conn.commit()
+                with suppress(Exception):
+                    conn.execute("VACUUM")
+
+            # 3. Reset in-memory & STATE metrics
+            STATE.total_transfers = 0
+            STATE.bytes_transferred = 0
+            STATE.videos_sent = 0
+            STATE.docs_sent = 0
+            STATE.photos_sent = 0
+
+            confirm_card = (
+                f"🧹 **[{DEVI_NAME.upper()} — FORWARDING HISTORY CLEANED & RESET]**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Archived Records**  : `{prev_records:,}` msgs (Saved in Cloud Above ⬆️)\n"
+                f"• **Active DB History** : `0 records (100% Cleaned & Vacuumed)`\n"
+                f"• **Forwarding Queue**   : `Fresh Start Enabled`\n"
+                f"• **Database File**     : `history_core.sqlite`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✨ *Puraani history upar safe bhej di gayi hai aur database fresh start ke liye clean ho chuka hai!*"
+            )
+            STATE.add_event("[bold magenta]🧹 History cleaned & reset after safety backup![/]")
+            if reply_event:
+                await reply_event.reply(confirm_card, parse_mode="md")
+            return True
+        except Exception as ex:
+            if reply_event:
+                await reply_event.reply(f"❌ Failed to clean database history: {ex}", parse_mode="md")
+            return False
+
     async def close(self):
         if self.client:
             with suppress(Exception):
                 await self.client.disconnect()
+
 
 
 # ==============================================================================

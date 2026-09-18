@@ -63,9 +63,18 @@ class IntentEngine:
             except ValueError:
                 pass
 
+        # Check for kill processes / terminate / unlock database
+        if any(w in text for w in ["kill", "killall", "kill all", "kill python", "force stop", "stop all", "unlock db", "database lock", "database is locked", "db unlock", "kill karo", "band karo", "process kill", "stuck ho gya", "stuck ho gaya", "terminate"]):
+            return {"intent": "KILL_PROCESSES", "raw": user_input}
+
+        # Check for clean history / reset forwarding records
+        if any(w in text for w in ["clean history", "clear history", "reset history", "wipe history", "purge history", "delete history", "history clean", "history clear", "history delete", "history saaf", "history reset", "history mita", "history wipe", "saaf karo history"]):
+            return {"intent": "CLEAN_HISTORY", "raw": user_input}
+
         # Check for status / speed / progress / kya ho rha hai
         if any(w in text for w in ["status", "level", "autonomy", "speed", "velocity", "progress", "forwarding", "kya ho rha", "kya ho raha", "kya chal rha", "kya chal raha", "kaisa chal", "kaisi chal", "update", "kya update", "sab theek"]):
             return {"intent": "SHOW_STATUS", "raw": user_input}
 
         # Default is dialogue / chat
         return {"intent": "CONVERSATION", "raw": user_input}
+
