@@ -2467,7 +2467,8 @@ class PipelineProcessor:
         self.batch_index_records = []
 
     async def check_and_send_subject_header(self, active_messages, target_chat, resolved_topic, client, silent_mode):
-        if not getattr(self.cfg, "auto_subject_headers", True):
+        auto_subj = os.getenv("AUTO_SUBJECT_HEADERS", "false").strip().lower() in ("true", "1", "yes")
+        if not auto_subj or not getattr(self.cfg, "auto_subject_headers", False):
             return
         
         detected = None
@@ -2599,7 +2600,7 @@ class PipelineProcessor:
         return f"⚙️ Secure Media / Attachment{signature}"
 
     async def send_session_headers(self, source_chat, source_topic, target_chat, target_topic, client):
-        auto_topic_header = getattr(self.cfg, "auto_topic_headers", True)
+        auto_topic_header = os.getenv("AUTO_TOPIC_HEADERS", "false").strip().lower() in ("true", "1", "yes")
         if not auto_topic_header:
             return
 
@@ -4219,6 +4220,31 @@ async def prompt_routing_mode():
         if ch == "1": return 1
         elif ch == "2": return 2
         elif ch is None: return None
+
+async def prompt_sequence_mode():
+    while True:
+        clear_screen()
+        console.print(get_persistent_header())
+        console.print(Panel(
+            "[bold cyan]📋 CHOOSE FORWARDING SEQUENCE / ORDERING MODE[/]\n"
+            "[dim]Select how lectures, videos, and materials should be delivered in the target group.[/]\n\n"
+            " [bold green][1][/] 📋 [bold white]Original Source Sequence[/] [bold yellow]⭐ (Recommended)[/]\n"
+            "     [dim]Exact chronological sequence of original group (Lecture 01 ➔ Lecture 02 ➔ Lecture N). Zero disorder.[/]\n\n"
+            " [bold cyan][2][/] 📚 [bold white]Smart Subject-Wise Grouping[/]\n"
+            "     [dim]Auto-detect and group by subjects (Anatomy ➔ Physiology ➔ Biochemistry...)[/]",
+            border_style="cyan", box=box.ROUNDED
+        ))
+        ch = await safe_input("\nEnter Sequence Mode", valid_options=["1", "2"], allow_cancel=True, default_val="1")
+        if ch == "1":
+            os.environ["AUTO_SORT_SUBJECTS"] = "false"
+            set_key(".env", "AUTO_SORT_SUBJECTS", "false")
+            return False
+        elif ch == "2":
+            os.environ["AUTO_SORT_SUBJECTS"] = "true"
+            set_key(".env", "AUTO_SORT_SUBJECTS", "true")
+            return True
+        elif ch is None:
+            return None
 
 async def interactive_caption_and_filter_wizard():
     global GLOBAL_RUNTIME_FILTER
@@ -7362,6 +7388,9 @@ async def run_menu(session_mgr):
         if ch in ["1", "2", "3", "4"]:
             selected_routing = await prompt_routing_mode()
             if selected_routing is None: continue
+            
+            selected_seq = await prompt_sequence_mode()
+            if selected_seq is None: continue
             
             m_filter = await filter_menu()
             if m_filter == "back": continue
