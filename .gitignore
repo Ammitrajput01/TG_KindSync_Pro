@@ -178,3 +178,7 @@ devi/sandbox/workspace/
 devi/memory/*.sqlite-wal
 devi/memory/*.sqlite-shm
 
+# Security & Scratch Files
+*.key
+scratch/
+

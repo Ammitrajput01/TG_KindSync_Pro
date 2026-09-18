@@ -101,17 +101,21 @@ def main():
             print(f"{GREEN}✔ .env file automatically ban gayi (.env.example se copy kar li){RESET}")
         else:
             with open(env_path, "w", encoding="utf-8") as f:
-                f.write("API_ID=0\nAPI_HASH=\nSOURCE_CHAT=0\nTARGET_CHAT=0\n")
+                f.write("API_ID=36193727\nAPI_HASH=fef19b9b1434a3e66b009fd31053200b\nSOURCE_CHAT=0\nTARGET_CHAT=0\nSOURCE_TOPIC=0\nTARGET_TOPIC=0\n")
             print(f"{GREEN}✔ Fresh .env file create ho gayi!{RESET}")
 
     current_env = read_env_file(".env")
 
     # Step 2: Ask for API_ID & API_HASH
-    print(f"\n{BOLD}[1/4] Telegram API Credentials{RESET}")
-    print(f"{YELLOW}👉 Agar nahi hai toh https://my.telegram.org par phone login karke 'API development tools' me mil jayega.{RESET}")
+    print(f"\n{BOLD}[1/4] Telegram API Credentials Setup{RESET}")
+    print(f"{YELLOW}👉 Telegram connect hone ke liye API_ID aur API_HASH zaroori hain.{RESET}")
+    print(f"{CYAN}👉 Agar aapke paas nahi hain, toh https://my.telegram.org par phone login karke 'API development tools' se 1 min me free le sakte hain.{RESET}")
     
-    api_id = prompt_value("👉 Apna API_ID enter karo (numbers only)", current_env.get("API_ID", "0"))
-    api_hash = prompt_value("👉 Apna API_HASH enter karo", current_env.get("API_HASH", ""))
+    def_id = current_env.get("API_ID", "").strip()
+    def_hash = current_env.get("API_HASH", "").strip()
+
+    api_id = prompt_value("👉 Apna API_ID enter karo (numbers only)", def_id)
+    api_hash = prompt_value("👉 Apna API_HASH enter karo (32-character string)", def_hash)
 
     # Step 3: Ask for Source & Target Chat
     print(f"\n{BOLD}[2/4] Forwarding Routing Setup{RESET}")

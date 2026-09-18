@@ -73,7 +73,8 @@ After=network.target
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${CURRENT_DIR}
-ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/devi/operator/telegram_bot.py
+Environment="PYTHONPATH=${CURRENT_DIR}"
+ExecStart=${CURRENT_DIR}/.venv/bin/python -m devi.operator.telegram_bot
 Restart=always
 RestartSec=5
 StandardOutput=append:${CURRENT_DIR}/logs/bot_service.log

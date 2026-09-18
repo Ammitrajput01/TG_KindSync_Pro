@@ -6,7 +6,7 @@
 👑 TELEGRAM DUAL LOGIN PANEL & AUTHENTICATION WIZARD (QR + PHONE OTP)
 📱 Tab 1: Instant QR Code Scan (Telethon qr_login)
 📞 Tab 2: Phone Number + Official Telegram OTP + 2FA Cloud Password
-💎 Modern Glassmorphism Medical / Cyberpunk Dark UI
+💎 Modern Glassmorphism Luxury Cyberpunk Dark UI
 ================================================================================
 """
 
@@ -31,7 +31,10 @@ from telethon.errors import (
     PhoneCodeExpiredError,
     FloodWaitError
 )
-import qrcode
+try:
+    import qrcode
+except ImportError:
+    qrcode = None
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("LoginPanel")
@@ -49,7 +52,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <style>
         :root {
             --bg-primary: #0a0f1d;
-            --bg-card: rgba(18, 24, 43, 0.85);
+            --bg-card: rgba(18, 24, 43, 0.88);
             --border-glass: rgba(255, 255, 255, 0.12);
             --accent-cyan: #00f2fe;
             --accent-blue: #4facfe;
@@ -83,7 +86,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid var(--border-glass);
             border-radius: 24px;
             width: 100%;
-            max-width: 480px;
+            max-width: 500px;
             padding: 36px 32px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 35px rgba(0, 242, 254, 0.15);
             animation: fadeIn 0.4s ease-out;
@@ -96,58 +99,108 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .header {
             text-align: center;
-            margin-bottom: 28px;
-        }
-
-        .header .badge {
-            display: inline-block;
-            background: linear-gradient(135deg, rgba(79, 172, 254, 0.2), rgba(0, 242, 254, 0.2));
-            color: var(--accent-cyan);
-            border: 1px solid rgba(0, 242, 254, 0.3);
-            border-radius: 50px;
-            padding: 6px 16px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            letter-spacing: 0.05em;
-            margin-bottom: 12px;
-            text-transform: uppercase;
+            margin-bottom: 24px;
         }
 
         .header h1 {
-            font-size: 1.65rem;
+            font-size: 1.6rem;
             font-weight: 700;
-            letter-spacing: -0.02em;
-            background: linear-gradient(135deg, #ffffff 30%, var(--accent-cyan) 100%);
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, var(--accent-cyan) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 6px;
         }
 
         .header p {
-            font-size: 0.9rem;
             color: var(--text-dim);
+            font-size: 0.88rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            border-radius: 20px;
+            color: var(--accent-cyan);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .account-banner {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .account-banner strong {
+            color: #34d399;
+        }
+
+        .account-banner-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+            justify-content: center;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-continue {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-continue:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-switch {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-main);
+        }
+
+        .btn-switch:hover {
+            background: rgba(255, 255, 255, 0.18);
         }
 
         .tabs {
             display: flex;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border-glass);
             border-radius: 14px;
             padding: 4px;
-            margin-bottom: 28px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 24px;
         }
 
         .tab-btn {
             flex: 1;
-            padding: 10px 14px;
+            padding: 10px;
             border: none;
             background: transparent;
             color: var(--text-dim);
-            font-weight: 600;
             font-size: 0.88rem;
+            font-weight: 600;
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.25s ease;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -155,9 +208,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         .tab-btn.active {
-            background: linear-gradient(135deg, #3b82f6, #06b6d4);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.35);
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.25);
         }
 
         .tab-content {
@@ -166,159 +219,149 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .tab-content.active {
             display: block;
-            animation: fadeIn 0.3s ease-out;
         }
 
-        /* QR Code Tab */
         .qr-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            text-align: center;
+            gap: 16px;
         }
 
         .qr-box {
-            background: #ffffff;
-            padding: 16px;
+            background: white;
+            padding: 14px;
             border-radius: 18px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            margin-bottom: 20px;
-            display: inline-block;
-            position: relative;
-        }
-
-        .qr-box img {
-            display: block;
-            width: 220px;
-            height: 220px;
-            border-radius: 8px;
-        }
-
-        .qr-instruction {
-            font-size: 0.88rem;
-            color: var(--text-dim);
-            line-height: 1.5;
-            margin-bottom: 16px;
-        }
-
-        .qr-instruction strong {
-            color: var(--accent-cyan);
-        }
-
-        /* Phone Tab */
-        .form-group {
-            margin-bottom: 18px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-dim);
-        }
-
-        .input-control {
-            width: 100%;
-            padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 12px;
-            color: #ffffff;
-            font-size: 0.95rem;
-            font-family: 'JetBrains Mono', monospace;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .input-control:focus {
-            border-color: var(--accent-cyan);
-            box-shadow: 0 0 15px rgba(0, 242, 254, 0.25);
-        }
-
-        .btn-submit {
-            width: 100%;
-            padding: 13px;
-            background: linear-gradient(135deg, #00f2fe, #4facfe);
-            color: #04101e;
-            border: none;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 0.95rem;
-            letter-spacing: 0.02em;
-            cursor: pointer;
-            transition: transform 0.15s, box-shadow 0.15s;
-            margin-top: 8px;
-        }
-
-        .btn-submit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 242, 254, 0.4);
-        }
-
-        .btn-submit:active {
-            transform: translateY(0);
-        }
-
-        .btn-submit:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .alert-box {
-            margin-top: 18px;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            display: none;
-        }
-
-        .alert-box.error {
-            background: rgba(255, 71, 87, 0.15);
-            border: 1px solid var(--accent-red);
-            color: #ff7675;
-            display: block;
-        }
-
-        .alert-box.success {
-            background: rgba(0, 242, 169, 0.15);
-            border: 1px solid var(--accent-green);
-            color: var(--accent-green);
-            display: block;
-        }
-
-        .alert-box.info {
-            background: rgba(79, 172, 254, 0.15);
-            border: 1px solid var(--accent-blue);
-            color: var(--accent-cyan);
-            display: block;
-        }
-
-        .status-pill {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            min-width: 210px;
+            min-height: 210px;
+        }
+
+        .qr-box img {
+            width: 190px;
+            height: 190px;
+            display: block;
+        }
+
+        .qr-instruction {
             font-size: 0.82rem;
             color: var(--text-dim);
-            margin-top: 20px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .qr-instruction strong {
+            color: var(--text-main);
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            font-size: 0.78rem;
+            color: var(--text-dim);
         }
 
         .pulse-dot {
             width: 8px;
             height: 8px;
-            background: var(--accent-green);
+            background: var(--accent-cyan);
             border-radius: 50%;
-            box-shadow: 0 0 10px var(--accent-green);
-            animation: pulse 1.8s infinite;
+            animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.7; }
-            50% { transform: scale(1.3); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.7; }
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(0, 242, 254, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 254, 0); }
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .input-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            color: white;
+            font-size: 0.95rem;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .input-control:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 242, 254, 0.3);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert-box {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            line-height: 1.4;
+            display: none;
+        }
+
+        .alert-box.error {
+            background: rgba(255, 71, 87, 0.15);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            color: #ff6b81;
+        }
+
+        .alert-box.success {
+            background: rgba(0, 242, 169, 0.15);
+            border: 1px solid rgba(0, 242, 169, 0.3);
+            color: var(--accent-green);
+        }
+
+        .alert-box.info {
+            background: rgba(79, 172, 254, 0.15);
+            border: 1px solid rgba(79, 172, 254, 0.3);
+            color: #60a5fa;
         }
     </style>
 </head>
@@ -326,9 +369,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <div class="login-card">
         <div class="header">
-            <span class="badge">👨‍⚕️ Kind Doctor Suite</span>
+            <span class="badge">🚀 TG KindSync Pro</span>
             <h1>Telegram Connect</h1>
-            <p>Choose your preferred login method to authorize session</p>
+            <p>Scan QR code or enter phone number to authorize account</p>
+        </div>
+
+        <!-- Banner shown when an account is already authorized -->
+        <div id="already-connected-banner" class="account-banner" style="display: none;">
+            <div>🟢 <strong>Connected Account Detected:</strong> <span id="current-acc-name">User</span></div>
+            <div class="account-banner-btns">
+                <button class="btn-small btn-continue" onclick="continueExistingSession()">Use This Account</button>
+                <button class="btn-small btn-switch" onclick="startFreshSession()">➕ Log In Another Account</button>
+            </div>
         </div>
 
         <div class="tabs">
@@ -343,7 +395,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <!-- TAB 1: QR CODE -->
         <div id="tab-qr" class="tab-content active">
             <div class="qr-container">
-                <div class="qr-box">
+                <div class="qr-box" id="qr-box">
                     <img id="qr-img" src="" alt="Scan QR Code">
                 </div>
                 <div class="qr-instruction">
@@ -355,6 +407,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <span id="qr-status-text">Waiting for Telegram scan...</span>
                 </div>
             </div>
+            <div id="qr-alert" class="alert-box"></div>
         </div>
 
         <!-- TAB 2: PHONE NUMBER + OTP -->
@@ -391,6 +444,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <script>
         let currentTab = 'qr';
         let isAuthorized = false;
+        let qrPollingActive = true;
 
         function switchTab(tab) {
             currentTab = tab;
@@ -406,13 +460,67 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                if (data.authorized) {
+                    document.getElementById('already-connected-banner').style.display = 'block';
+                    document.getElementById('current-acc-name').innerText = data.user_name || 'Active Account';
+                }
+            } catch(e) {}
+        }
+
+        async function continueExistingSession() {
+            try {
+                await fetch('/api/confirm_continue', { method: 'POST' });
+                onLoginSuccess(document.getElementById('current-acc-name').innerText);
+            } catch(e) {
+                onLoginSuccess('Active Account');
+            }
+        }
+
+        async function startFreshSession() {
+            document.getElementById('already-connected-banner').style.display = 'none';
+            showPhoneAlert('Switching to clean new session login...', 'info');
+            try {
+                const res = await fetch('/api/fresh_session', { method: 'POST' });
+                const data = await res.json();
+                if (data.ok) {
+                    showPhoneAlert('Fresh session initialized. Enter your phone number below.', 'success');
+                    switchTab('phone');
+                    document.getElementById('step-phone').style.display = 'block';
+                    document.getElementById('step-otp').style.display = 'none';
+                }
+            } catch (err) {
+                switchTab('phone');
+            }
+        }
+
         async function pollQR() {
-            if (isAuthorized) return;
+            if (isAuthorized || !qrPollingActive) return;
             try {
                 const res = await fetch('/api/qr');
                 const data = await res.json();
+                
+                if (data.already_logged_in) {
+                    document.getElementById('already-connected-banner').style.display = 'block';
+                    document.getElementById('current-acc-name').innerText = data.user_name || 'Active Account';
+                }
+
+                if (data.qr_missing) {
+                    qrPollingActive = false;
+                    const alert = document.getElementById('qr-alert');
+                    alert.className = 'alert-box info';
+                    alert.innerText = 'ℹ️ ' + (data.error || 'QR generation unavailable. Switched to Phone Number tab.');
+                    alert.style.display = 'block';
+                    switchTab('phone');
+                    return;
+                }
+
                 if (data.qr_base64) {
                     document.getElementById('qr-img').src = data.qr_base64;
+                    document.getElementById('qr-box').style.display = 'flex';
                 }
                 if (data.authorized) {
                     onLoginSuccess(data.user_name || 'Telegram User');
@@ -427,16 +535,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         async function requestCode() {
             const phone = document.getElementById('phone-input').value.trim();
             const btn = document.getElementById('btn-request-code');
-            const alert = document.getElementById('phone-alert');
 
             if (!phone || phone.length < 8) {
-                showAlert('Please enter a valid phone number with country code.', 'error');
+                showPhoneAlert('Please enter a valid phone number with country code (e.g. +919876543210).', 'error');
                 return;
             }
 
             btn.disabled = true;
             btn.innerText = 'Requesting Code...';
-            showAlert('Contacting Telegram MTProto servers...', 'info');
+            showPhoneAlert('Contacting Telegram MTProto servers...', 'info');
 
             try {
                 const res = await fetch('/api/phone/request_code', {
@@ -448,14 +555,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (data.ok) {
                     document.getElementById('step-phone').style.display = 'none';
                     document.getElementById('step-otp').style.display = 'block';
-                    showAlert('Code sent! Check your official Telegram app inbox.', 'success');
+                    showPhoneAlert('Code sent! Check your official Telegram app inbox.', 'success');
                 } else {
-                    showAlert(data.error || 'Failed to send code.', 'error');
+                    showPhoneAlert(data.error || 'Failed to send code.', 'error');
                     btn.disabled = false;
                     btn.innerText = 'Send Official Code';
                 }
             } catch (err) {
-                showAlert('Network error connecting to login panel.', 'error');
+                showPhoneAlert('Network error connecting to login panel.', 'error');
                 btn.disabled = false;
                 btn.innerText = 'Send Official Code';
             }
@@ -467,7 +574,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const btn = document.getElementById('btn-submit-code');
 
             if (!code) {
-                showAlert('Please enter the 5-digit Telegram code.', 'error');
+                showPhoneAlert('Please enter the 5-digit Telegram code.', 'error');
                 return;
             }
 
@@ -485,22 +592,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     onLoginSuccess(data.user_name || 'Telegram User');
                 } else if (data.need_password) {
                     document.getElementById('group-2fa').style.display = 'block';
-                    showAlert('Two-Step Verification (2FA) is enabled. Please enter your cloud password.', 'info');
+                    showPhoneAlert('Two-Step Verification (2FA) is enabled. Please enter your cloud password.', 'info');
                     btn.disabled = false;
                     btn.innerText = 'Verify 2FA Password';
                 } else {
-                    showAlert(data.error || 'Verification failed. Check the code.', 'error');
+                    showPhoneAlert(data.error || 'Verification failed. Check the code.', 'error');
                     btn.disabled = false;
                     btn.innerText = 'Verify & Connect';
                 }
             } catch (err) {
-                showAlert('Network error validating code.', 'error');
+                showPhoneAlert('Network error validating code.', 'error');
                 btn.disabled = false;
                 btn.innerText = 'Verify & Connect';
             }
         }
 
-        function showAlert(msg, type) {
+        function showPhoneAlert(msg, type) {
             const alert = document.getElementById('phone-alert');
             alert.className = 'alert-box ' + type;
             alert.innerText = msg;
@@ -509,18 +616,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function onLoginSuccess(userName) {
             isAuthorized = true;
+            qrPollingActive = false;
             document.getElementById('tab-qr').style.display = 'none';
             document.getElementById('tab-phone').style.display = 'none';
+            document.getElementById('already-connected-banner').style.display = 'none';
             document.querySelector('.tabs').style.display = 'none';
             const s = document.getElementById('global-success');
-            s.innerHTML = `🎉 <strong>Login Successful!</strong><br>Welcome <strong>${userName}</strong>.<br><span style="font-size:0.8rem; color:#94a3b8;">Session saved safely. Returning to terminal...</span>`;
+            s.innerHTML = `🎉 <strong>Login Successful!</strong><br>Connected as <strong>${userName}</strong>.<br><span style="font-size:0.8rem; color:#94a3b8;">Session saved safely. Returning to forwarder...</span>`;
             s.style.display = 'block';
             setTimeout(() => {
                 window.close();
-            }, 3500);
+            }, 3000);
         }
 
-        // Start QR polling
+        // Initialize
+        checkStatus();
         pollQR();
     </script>
 </body>
@@ -528,10 +638,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 class DualLoginServer:
-    def __init__(self, client: TelegramClient, host: str = "127.0.0.1", port: int = 5005):
+    def __init__(self, client: TelegramClient, host: str = "127.0.0.1", port: int = 5005, api_id: int = 0, api_hash: str = ""):
         self.client = client
         self.host = host
         self.port = port
+        self.api_id = api_id or getattr(client, 'api_id', 0)
+        self.api_hash = api_hash or getattr(client, 'api_hash', "")
         self.app = web.Application()
         self.runner: Optional[web.AppRunner] = None
         self.qr_login_obj = None
@@ -540,6 +652,7 @@ class DualLoginServer:
         self.phone_code_hash = ""
         self.is_authorized = False
         self.user_name = ""
+        self.confirmed_continue = False
         self.setup_routes()
 
     def setup_routes(self):
@@ -547,12 +660,16 @@ class DualLoginServer:
         self.app.router.add_get("/api/qr", self.handle_get_qr)
         self.app.router.add_post("/api/phone/request_code", self.handle_request_code)
         self.app.router.add_post("/api/phone/submit_code", self.handle_submit_code)
+        self.app.router.add_post("/api/fresh_session", self.handle_fresh_session)
+        self.app.router.add_post("/api/confirm_continue", self.handle_confirm_continue)
         self.app.router.add_get("/api/status", self.handle_status)
 
     async def handle_index(self, request):
         return web.Response(text=HTML_TEMPLATE, content_type="text/html")
 
     async def _generate_qr_image(self, url: str) -> str:
+        if qrcode is None:
+            raise RuntimeError("qrcode library not installed. Please use Phone Number tab.")
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -568,26 +685,48 @@ class DualLoginServer:
         return f"data:image/png;base64,{b64}"
 
     async def handle_get_qr(self, request):
-        if self.is_authorized:
+        if self.confirmed_continue or self.is_authorized:
             return web.json_response({"authorized": True, "user_name": self.user_name})
 
         if not self.client.is_connected():
-            await self.client.connect()
+            try:
+                await self.client.connect()
+            except Exception as e:
+                logger.error(f"Could not connect client: {e}")
 
-        if await self.client.is_user_authorized():
-            self.is_authorized = True
-            me = await self.client.get_me()
-            self.user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'User')
-            return web.json_response({"authorized": True, "user_name": self.user_name})
+        # Check if already authorized
+        try:
+            if await self.client.is_user_authorized():
+                me = await self.client.get_me()
+                self.user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'User')
+                return web.json_response({
+                    "authorized": False,
+                    "already_logged_in": True,
+                    "user_name": self.user_name,
+                    "qr_base64": ""
+                })
+        except Exception:
+            pass
+
+        if qrcode is None:
+            return web.json_response({
+                "authorized": False,
+                "qr_missing": True,
+                "error": "QR code module not available. Please use Phone Number tab."
+            })
 
         if not self.qr_login_obj:
             try:
                 self.qr_login_obj = await self.client.qr_login()
                 self.current_qr_base64 = await self._generate_qr_image(self.qr_login_obj.url)
-                # Background listener for scan
                 asyncio.create_task(self._wait_for_qr_scan())
             except Exception as e:
                 logger.error(f"Error initiating QR login: {e}")
+                return web.json_response({
+                    "authorized": False,
+                    "qr_missing": True,
+                    "error": f"Telegram QR Login: {e}. Please use Phone Number tab."
+                })
         elif self.qr_login_obj and hasattr(self.qr_login_obj, "expires") and self.qr_login_obj.expires:
             if time.time() > self.qr_login_obj.expires.timestamp():
                 try:
@@ -616,6 +755,30 @@ class DualLoginServer:
         except Exception as e:
             logger.debug(f"QR wait timeout or recreate: {e}")
 
+    async def handle_fresh_session(self, request):
+        """Disconnects current client and starts a clean, fresh session client."""
+        try:
+            if self.client and self.client.is_connected():
+                await self.client.disconnect()
+
+            new_sess_name = f"session_account_{int(time.time())}"
+            self.client = TelegramClient(new_sess_name, self.api_id, self.api_hash)
+            await self.client.connect()
+            self.qr_login_obj = None
+            self.current_qr_base64 = ""
+            self.is_authorized = False
+            self.confirmed_continue = False
+            self.user_name = ""
+            return web.json_response({"ok": True, "session_name": new_sess_name})
+        except Exception as e:
+            logger.error(f"Error initializing fresh session: {e}")
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    async def handle_confirm_continue(self, request):
+        self.confirmed_continue = True
+        self.is_authorized = True
+        return web.json_response({"ok": True, "user_name": self.user_name})
+
     async def handle_request_code(self, request):
         try:
             data = await request.json()
@@ -624,11 +787,21 @@ class DualLoginServer:
                 phone = "+" + phone
 
             self.current_phone = phone
+            
+            # If current client is already authorized to another account, disconnect and switch to dedicated session
+            if await self.client.is_user_authorized():
+                await self.client.disconnect()
+                import re
+                clean_digits = re.sub(r"\D", "", phone)
+                sess_name = f"session_account_{clean_digits[-4:] if len(clean_digits) >= 4 else 'user'}"
+                self.client = TelegramClient(sess_name, self.api_id, self.api_hash)
+                await self.client.connect()
+
             sent_code = await self.client.send_code_request(phone)
             self.phone_code_hash = sent_code.phone_code_hash
             return web.json_response({"ok": True, "phone": phone})
         except PhoneNumberInvalidError:
-            return web.json_response({"ok": False, "error": "Invalid Phone Number. Include country code (e.g. +91)."})
+            return web.json_response({"ok": False, "error": "Invalid Phone Number. Include country code (e.g. +919876543210)."})
         except FloodWaitError as fe:
             return web.json_response({"ok": False, "error": f"Rate limited by Telegram. Wait {fe.seconds} seconds."})
         except Exception as e:
@@ -665,6 +838,13 @@ class DualLoginServer:
             return web.json_response({"ok": False, "error": str(e)})
 
     async def handle_status(self, request):
+        if not self.user_name and self.client and self.client.is_connected():
+            try:
+                if await self.client.is_user_authorized():
+                    me = await self.client.get_me()
+                    self.user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'User')
+            except Exception:
+                pass
         return web.json_response({"authorized": self.is_authorized, "user_name": self.user_name})
 
     async def start(self):
@@ -678,12 +858,12 @@ class DualLoginServer:
         if self.runner:
             await self.runner.cleanup()
 
-async def launch_dual_login_wizard(client: TelegramClient, port: int = 5005) -> bool:
+async def launch_dual_login_wizard(client: TelegramClient, port: int = 5005, force_prompt: bool = False) -> bool:
     """Launches the dual login web server and opens browser tab for 1-click onboarding."""
     if not client.is_connected():
         await client.connect()
 
-    if await client.is_user_authorized():
+    if not force_prompt and await client.is_user_authorized():
         return True
 
     server = DualLoginServer(client, port=port)
@@ -702,8 +882,8 @@ async def launch_dual_login_wizard(client: TelegramClient, port: int = 5005) -> 
     # Wait until authorized or interrupted
     start_t = time.time()
     while time.time() - start_t < 300: # 5 min timeout
-        if server.is_authorized or await client.is_user_authorized():
-            await asyncio.sleep(2.0)
+        if server.is_authorized or server.confirmed_continue:
+            await asyncio.sleep(1.5)
             await server.stop()
             return True
         await asyncio.sleep(1.0)
@@ -713,8 +893,10 @@ async def launch_dual_login_wizard(client: TelegramClient, port: int = 5005) -> 
 
 if __name__ == "__main__":
     load_dotenv()
-    api_id = int(os.getenv("API_ID", 0) or 0) or 2040
-    api_hash = os.getenv("API_HASH", "").strip() or "b18441a1ff607e10a989891a5462e627"
+    api_id = int(os.getenv("API_ID", 0) or 0)
+    api_hash = os.getenv("API_HASH", "").strip()
+    if not api_id or not api_hash:
+        print("[!] Error: API_ID and API_HASH must be configured in .env")
+        sys.exit(1)
     client = TelegramClient("session_forwarder", api_id, api_hash)
     asyncio.run(launch_dual_login_wizard(client))
-

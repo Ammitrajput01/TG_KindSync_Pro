@@ -73,7 +73,7 @@ python -m pip install --upgrade pip --quiet
 python -m pip install -r requirements.txt --upgrade
 if %ERRORLEVEL% neq 0 (
     echo [!] Fallback installing core libraries...
-    pip install telethon aiosqlite python-dotenv Pillow rich psutil
+    pip install telethon aiosqlite python-dotenv Pillow rich psutil qrcode[pil]
 )
 
 :: 4. Check Pillow binary integrity (C-extension _imaging fix)

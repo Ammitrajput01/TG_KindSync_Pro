@@ -65,7 +65,7 @@ if %NEED_SETUP% equ 1 (
     python -m pip install -r requirements.txt
     if %ERRORLEVEL% neq 0 (
         echo [!] Fallback installing core libraries...
-        pip install telethon aiosqlite python-dotenv Pillow rich psutil
+        pip install telethon aiosqlite python-dotenv Pillow rich psutil qrcode[pil]
     )
 )
 

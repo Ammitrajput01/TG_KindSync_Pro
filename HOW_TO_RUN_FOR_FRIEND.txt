@@ -1,49 +1,43 @@
 ================================================================================
-🚀 TG KINDSYNC PRO 🩺 V14.5 (ENTERPRISE EDITION) - 1-CLICK GUIDE
+🚀 TG KINDSYNC PRO 🩺 V14.5 (TELEGRAM FORWARDER - FRIEND EDITION)
 ================================================================================
 
-Bhai, apne friend ko ye guide bhej sakte ho. Ab system 100% self-healing hai!
-Kisi bhi naye computer par bas 1-Click me bina kisi error ke chalega.
+Bhai, ye package tumhare friend ke liye 100% clean aur ready banaya gaya hai.
+Isme koi bhi heavy AI modules nahi hain - pure high-speed Telegram forwarder hai!
+.env file me poora format aur settings line-by-line documented hain.
 
 --------------------------------------------------------------------------------
 ⭐ SABSE AASAAN TARIQA (1-CLICK RUN):
 --------------------------------------------------------------------------------
-1. Python install hona chahiye (https://www.python.org/downloads/)
-   ⚠️ IMPORTANT: Install karte waqt "Add python.exe to PATH" checkbox TICK zaroor karna!
+1. Python install hona chahiye (agar nahi hai toh automatically install karega):
+   - Link: https://www.python.org/downloads/
+   - ⚠️ IMPORTANT: Setup ke waqt "Add python.exe to PATH" tick zaroor karein!
 
-2. Agar pehli baar setup karna hai:
-   👉 "EASY_SETUP.bat" par double-click karo!
-   - Ye automatic sab libraries verify karega.
-   - Screen par aapse API_ID, API_HASH, Source Chat aur Target Chat mangega.
-   - Sab settings save karke platform ready kar dega!
+2. Bas "1_START_FORWARDER.bat" par double-click karo!
+   - Ye automatically virtual environment aur libraries setup kar lega.
+   - Agar pehli baar chala rahe ho, toh screen par aapse API_ID aur API_HASH
+     mangega (jo https://my.telegram.org par 1 minute me free milta hai).
+   - Ek baar daal doge toh hamesha ke liye `.env` me save ho jayega!
 
-3. Sabhi Programs Ek Saath Chalane Ke Liye (Recommended):
-   👉 Bas "1_START_ALL.bat" par double-click karo!
-   - Engine + Kind Doctor Bot + Web Dashboard sab ek saath auto-start honge.
-   - Google Chrome jaisa single window tabbed interface (START_TABBED.bat)
-     ya bilkul silent background mode (START_MINIMIZED.bat) me chalega!
+3. Telegram Login Wizard:
+   - Screen par visual QR Code ya Phone Number prompt aayega.
+   - QR code ko Telegram app se scan kar sakte ho:
+     (Telegram App ➔ Settings ➔ Devices ➔ Link Desktop Device)
+     YA
+   - Apna Mobile Number enter karo (+91...), Telegram par aane wala 5-digit code daalo!
 
-4. Standalone Engine Chalane Ke Liye:
-   👉 "START_KINDSYNC.bat" (ya "START_BOT.bat") par double-click karo.
-
-5. 1-Click Code Update Ke Liye:
-   👉 "UPDATE_KINDSYNC.bat" par double-click karo!
-
---------------------------------------------------------------------------------
-💡 FRIEND KO FOLDER BHEJTE WAQT BEST PRACTICE:
---------------------------------------------------------------------------------
-- "TG_KindSync_Pro_v14.5_CLEAN_RELEASE.zip" (2.14 MB) direct friend ko bhej sakte ho!
-- Isme zero personal credentials, zero databases aur zero session files hoti hain.
-- Friend ke PC par jab wo chalayega, toh script automatically fresh setup karegi!
+4. Forwarding Shuru Karo:
+   - Menu me SOURCE CHAT (jahan se message copy karne hain) aur TARGET CHAT
+     (jahan bhejne hain) enter karo.
+   - Option 1 (Live Forwarding) ya Option 2 (Range / Batch Copy) chala do!
 
 --------------------------------------------------------------------------------
-🔑 TELEGRAM CREDENTIALS KAHA SE LAAYEIN:
+💡 FRIEND KO BHEJTE WAQT:
 --------------------------------------------------------------------------------
-1. https://my.telegram.org par jao.
-2. Apna mobile number daalo aur Telegram app me aaya code enter karo.
-3. "API development tools" par click karo.
-4. App title & short name kuch bhi likh do (e.g. KindSync).
-5. Aapko API_ID (numbers) aur API_HASH mil jayega.
+- Zip file ko extract karke friend kisi bhi folder (e.g. Desktop ya C:\) me rakh sakta hai.
+- Is package me zero personal sessions aur zero personal databases hain.
+- 100% Clean & Safe!
 
-Bas itna hi! Enjoy! 🩺🚀
+Developer: Dr. Amit Singh (Kind Doctor)
+Contact  : @Kinddoctor4u · @Ammitrajput1
 ================================================================================

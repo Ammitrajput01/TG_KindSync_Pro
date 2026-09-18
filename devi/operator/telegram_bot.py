@@ -18,10 +18,12 @@ import os
 import sys
 import re
 import json
+import html
 import logging
 import sqlite3
 import csv
 import io
+import random
 import base64
 import struct
 from datetime import datetime, timedelta
@@ -1095,6 +1097,23 @@ class DeviTelegramBot:
                     logger.warning(f"Telegram polling error: {e}")
                     await asyncio.sleep(4)
 
+    def _format_clean_html(self, text: str) -> str:
+        """Converts Markdown formatting (**bold**, _italic_, `code`, [link](url)) to robust Telegram HTML so asterisks never show."""
+        if not text:
+            return ""
+        # If already predominantly HTML tags, return as-is
+        if "<b>" in text or "<code>" in text or "<a href=" in text:
+            return text
+        # Convert markdown links [title](url) to HTML <a href="url">title</a>
+        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', text)
+        # Convert **bold** to <b>bold</b>
+        text = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', text)
+        # Convert `code` to <code>code</code>
+        text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+        # Convert _italic_ to <i>italic</i> (when not part of a URL or word)
+        text = re.sub(r'(?<![<\w])_([^_]+)_(?![>\w])', r'<i>\1</i>', text)
+        return text
+
     async def _send_message(
         self, 
         session: aiohttp.ClientSession, 
@@ -1103,10 +1122,12 @@ class DeviTelegramBot:
         reply_to: Optional[int] = None,
         reply_markup: Optional[dict] = None,
         message_thread_id: Optional[int] = None,
-        disable_web_page_preview: bool = False
+        disable_web_page_preview: bool = False,
+        parse_mode: str = "HTML"
     ) -> Optional[int]:
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
-        payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+        formatted_text = self._format_clean_html(text) if parse_mode == "HTML" else text
+        payload = {"chat_id": chat_id, "text": formatted_text, "parse_mode": parse_mode}
         if reply_to:
             payload["reply_to_message_id"] = reply_to
         if reply_markup:
@@ -1132,6 +1153,16 @@ class DeviTelegramBot:
                         await asyncio.sleep(retry_after)
                         continue
                     else:
+                        err_txt = await resp.text()
+                        if "TOPIC_CLOSED" in err_txt and payload.get("message_thread_id"):
+                            logger.warning(f"Topic {payload.get('message_thread_id')} in {chat_id} is closed! Falling back to General topic...")
+                            payload.pop("message_thread_id", None)
+                            continue
+
+                        # Fallback: Strip HTML tags and markdown markers so clean readable text is sent without raw stars/taare
+                        clean_plain = re.sub(r'<[^>]+>', '', formatted_text)
+                        clean_plain = re.sub(r'[*_`]', '', clean_plain)
+                        payload["text"] = clean_plain
                         payload.pop("parse_mode", None)
                         async with session.post(url, json=payload, timeout=12) as r2:
                             if r2.status == 200:
@@ -1145,6 +1176,15 @@ class DeviTelegramBot:
                                     retry_after = 3
                                 await asyncio.sleep(retry_after)
                                 continue
+                            else:
+                                err_txt2 = await r2.text()
+                                if "TOPIC_CLOSED" in err_txt2 and payload.get("message_thread_id"):
+                                    payload.pop("message_thread_id", None)
+                                    async with session.post(url, json=payload, timeout=12) as r3:
+                                        if r3.status == 200:
+                                            d3 = await r3.json()
+                                            return d3.get("result", {}).get("message_id")
+                                logger.warning(f"Telegram API Send error to {chat_id} (status {r2.status}): {err_txt2}")
                         break
             except Exception as e:
                 logger.warning(f"Failed to send message to {chat_id} (attempt {attempt+1}): {e}")
@@ -1612,12 +1652,12 @@ class DeviTelegramBot:
                     nm_full = f"{nm_fn} {nm_ln}".strip() or "User"
                     nm_uname = new_member.get("username", "")
 
-                    # Clickable User Tag
+                    # Clickable User Tag in HTML
+                    safe_nm_full = html.escape(nm_full)
                     if nm_uname:
-                        nm_tag = f"@{nm_uname}"
+                        nm_tag = f"<b>@{html.escape(nm_uname)}</b>"
                     else:
-                        clean_fn = re.sub(r"[\[\]]", "", nm_full)
-                        nm_tag = f"[{clean_fn}](tg://user?id={nm_id})"
+                        nm_tag = f'<a href="tg://user?id={nm_id}"><b>{safe_nm_full}</b></a>'
 
                     # Check if inviter is Anonymous Admin (GroupAnonymousBot / Sender Chat)
                     sender_chat = message.get("sender_chat") or {}
@@ -1635,14 +1675,13 @@ class DeviTelegramBot:
 
                     if is_anonymous_admin:
                         if author_sig:
-                            admin_label = f"👑 **Admin Desk** ({author_sig})"
+                            admin_label = f"👑 <b>Admin Desk</b> ({html.escape(author_sig)})"
                         elif sender_chat_uname:
-                            admin_label = f"👑 **Admin Desk** ([@{sender_chat_uname}](https://t.me/{sender_chat_uname}))"
+                            admin_label = f'👑 <b>Admin Desk</b> (<a href="https://t.me/{sender_chat_uname}">@{html.escape(sender_chat_uname)}</a>)'
                         else:
-                            admin_label = f"👑 **Admin Desk** ({sender_chat_title})"
+                            admin_label = f"👑 <b>Admin Desk</b> ({html.escape(sender_chat_title)})"
                         source_info = f"Added by {admin_label}"
-                        added_by_text = f"🤝 **Welcomed & Added by:** {admin_label}"
-                        best_wishes_text = f"🌟 **Our Sincerest Best Wishes:**\nWishing {nm_tag} immense success, clinical excellence, and high yields in your medical journey & examinations! We are deeply honored to have you with us. 🙏✨"
+                        added_by_text = f"🤝 <b>Welcomed & Added by:</b> {admin_label}"
                     elif inviter_id and inviter_id != nm_id:
                         inv_fn = inviter.get("first_name", "")
                         inv_ln = inviter.get("last_name", "")
@@ -1651,17 +1690,15 @@ class DeviTelegramBot:
 
                         is_admin_inviter = (inviter_id in MASTER_ADMIN_IDS or self.is_admin(inviter_id))
                         if is_admin_inviter:
-                            inv_tag = f"👑 **Admin** @{inv_uname}" if inv_uname else f"👑 **Admin** [{inv_full}](tg://user?id={inviter_id})"
+                            inv_tag = f"👑 <b>Admin</b> @{html.escape(inv_uname)}" if inv_uname else f'👑 <b>Admin</b> <a href="tg://user?id={inviter_id}"><b>{html.escape(inv_full)}</b></a>'
                         else:
-                            inv_tag = f"@{inv_uname}" if inv_uname else f"[{inv_full}](tg://user?id={inviter_id})"
+                            inv_tag = f"@{html.escape(inv_uname)}" if inv_uname else f'<a href="tg://user?id={inviter_id}"><b>{html.escape(inv_full)}</b></a>'
 
-                        source_info = f"Added by {inv_tag} (`{inviter_id}`)"
-                        added_by_text = f"🤝 **Welcomed & Added by:** {inv_tag}"
-                        best_wishes_text = f"🌟 **Our Sincerest Best Wishes:**\nWishing {nm_tag} immense success, clinical excellence, and high yields in your medical journey & examinations! We are deeply honored to have you with us. 🙏✨"
+                        source_info = f"Added by {inv_tag} (<code>{inviter_id}</code>)"
+                        added_by_text = f"🤝 <b>Welcomed & Added by:</b> {inv_tag}"
                     else:
                         source_info = "Joined via Group Invite Link / Direct Join"
-                        added_by_text = "🤝 **Joined via:** Official Group Invite Link"
-                        best_wishes_text = f"🌟 **Our Sincerest Best Wishes:**\nWishing {nm_tag} immense success, clinical excellence, and high yields in your medical journey & examinations! We are deeply honored to have you with us. 🙏✨"
+                        added_by_text = "🤝 <b>Joined via:</b> 🔗 Official Study Group Link"
 
                     # Track dossier & record join in SQLite
                     dossier = self._track_user_dossier(new_member)
@@ -1679,37 +1716,60 @@ class DeviTelegramBot:
 
                     # 1. Group Side: Tagged Clean Welcome Card (Persistent; purged on-demand via /cleanbot)
                     if g_settings.get("welcome_enabled", 1):
-                        lang = g_settings.get("language", "en")
-                        custom_w = g_settings.get("welcome_text")
-                        bot_display = self.bot_name or "Kind Doctor 🩺"
-                        bot_uname = self.bot_username or "KindDoc_bot"
-                        bot_sig_en = f"👨‍⚕️ **{bot_display}** 🤍\n_[{bot_display}](https://t.me/{bot_uname}) • Your Medical Study Companion_"
-                        bot_sig_hi = f"👨‍⚕️ **{bot_display}** 🤍\n_[{bot_display}](https://t.me/{bot_uname}) • Aapka Medical Study Saathi_"
+                        quotes = [
+                            "❝ The good physician treats the disease; the great physician treats the patient who has the disease. ❞ 🩺💫",
+                            "❝ Wherever the art of Medicine is loved, there is also a love of Humanity. ❞ 🤍✨",
+                            "❝ To cure sometimes, to relieve often, to comfort always. ❞ 🩺💙",
+                            "❝ Medicine is a science of uncertainty and an art of probability. Learn relentlessly! ❞ 📚🔬",
+                            "❝ The secret of the care of the patient is in caring for the patient. ❞ 🩺✨",
+                            "❝ It is much more important to know what sort of a patient has a disease than what sort of a disease a patient has. ❞ 🌟🩺",
+                            "❝ Healing is a matter of time, but it is sometimes also a matter of opportunity. ❞ 💫🌱",
+                            "❝ In the sick room, ten cents' worth of human understanding equals ten dollars' worth of medical science. ❞ 🩺🤍",
+                            "❝ Wear the white coat with pride, carry your stethoscope with honor, and practice with pure compassion. ❞ 🥼✨",
+                            "❝ Success is not final, failure is not fatal: it is the courage to continue that counts. ❞ 🎯🔥",
+                            "❝ Dreams don't work unless you do. Every page you read today will save a life tomorrow. ❞ 📖💫",
+                            "❝ Let your stethoscope be an instrument of hope, and your knowledge a beacon of healing. ❞ 🩺🌟",
+                            "❝ The greatest medicine of all is to teach people how not to need it. ❞ 🤍🌿",
+                            "❝ Observation, Reason, Human Understanding, Courage: these make the physician. ❞ 🔬🩺",
+                            "❝ Stay curious, stay dedicated. One day, you will be the doctor you always needed. ❞ 🌟🥼",
+                            "❝ You don't just study medicine to pass exams; you study to prepare for the lives that will depend on you. ❞ 🩺🎯",
+                            "❝ Small daily improvements over time lead to stunning clinical mastery. ❞ 📈✨",
+                            "❝ Keep your eyes on the stars, your feet on the ground, and your heart in healing. ❞ 💫🩺",
+                            "❝ Hard work beats talent when talent doesn't work hard. Your stethoscope is waiting for you! ❞ 🥼🔥",
+                            "❝ When you touch one life, you heal the world in miniature. Believe in your journey! ❞ 🌍🤍"
+                        ]
+                        quote_choice = random.choice(quotes)
+                        safe_grp_title = html.escape(grp_title)
 
+                        custom_w = g_settings.get("welcome_text")
                         if custom_w:
-                            welcome_group_msg = custom_w.replace("{name}", nm_tag).replace("{group}", grp_title).replace("{rules}", g_settings.get("rules_text") or "Standard Guidelines")
-                        elif lang == "hi":
-                            welcome_group_msg = (
-                                f"✨ **WELCOME TO {grp_title}** 🩺🤍\n\n"
-                                f"👋 **Aapka Hardik Swagat Hai, {nm_tag}!**\n"
-                                f"{added_by_text}\n\n"
-                                f"{best_wishes_text}\n\n"
-                                f"{bot_sig_hi}"
-                            )
+                            welcome_group_msg = custom_w.replace("{name}", nm_tag).replace("{group}", safe_grp_title).replace("{rules}", g_settings.get("rules_text") or "Standard Guidelines")
                         else:
+                            lang = g_settings.get("language", "en")
+                            if lang == "hi":
+                                greeting_line = f"👋 <b>Namaste & Hardik Swagat Hai, {nm_tag}!</b> 🙏✨"
+                                footer_line = "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Aapka Trusted Medical Study Saathi</i> 🩺"
+                            else:
+                                greeting_line = f"👋 <b>Warm Greetings & Hearty Welcome, {nm_tag}!</b> 🙏✨"
+                                footer_line = "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Your Trusted Medical Study Companion</i> 🩺"
+
                             welcome_group_msg = (
-                                f"✨ **WELCOME TO {grp_title}** 🩺🤍\n\n"
-                                f"👋 **Warm Greetings & Hearty Welcome, {nm_tag}!**\n"
-                                f"{added_by_text}\n\n"
-                                f"{best_wishes_text}\n\n"
-                                f"{bot_sig_en}"
+                                f"✨ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"🩺 <b>WELCOME TO {safe_grp_title.upper()}</b> 🤍\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"{greeting_line}\n"
+                                f"{added_by_text}\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"<i>{quote_choice}</i>\n\n"
+                                f"{footer_line}"
                             )
 
                         sent_welcome_id = await self._send_message(
                             session, 
                             chat_id, 
                             welcome_group_msg,
-                            message_thread_id=thread_id
+                            message_thread_id=thread_id,
+                            parse_mode="HTML"
                         )
                         if sent_welcome_id:
                             self._log_welcome_message(chat_id, sent_welcome_id)
@@ -1963,10 +2023,11 @@ class DeviTelegramBot:
                                 return
                 return  # Stay completely silent!
 
-            # Group command auto-purge: Schedule auto-deletion of user's /command prompt after 45s to keep study group spotless
+            # Group command auto-purge: Only auto-delete if explicitly configured > 0
             if is_command and msg_id:
-                cmd_cleanup_delay = int(os.getenv("COMMAND_AUTO_DELETE_SECONDS", "45"))
-                self.create_tracked_task(self._auto_delete_message(session, chat_id, msg_id, cmd_cleanup_delay))
+                cmd_cleanup_delay = int(os.getenv("COMMAND_AUTO_DELETE_SECONDS", "0"))
+                if cmd_cleanup_delay > 0:
+                    self.create_tracked_task(self._auto_delete_message(session, chat_id, msg_id, cmd_cleanup_delay))
 
             clean_text = text.replace("@KindDoc_bot", "").replace("@kinddoc_bot", "").strip()
             first_word = clean_text.split()[0].lower().split("@")[0] if clean_text else ""
@@ -2392,7 +2453,7 @@ class DeviTelegramBot:
                 f"• `/members` — Audit group member history, join dates & identity shifts\n"
                 f"• `/exportmembers` — Export full member list as an Excel/CSV spreadsheet\n"
                 f"• `/userinfo <id|@user|reply>` — Comprehensive dossier (Account age, changes, stats)\n"
-                f"• `/setwelcome <text>` — Set custom welcome message (`{name}`, `{group}`, `{rules}`)\n"
+                f"• `/setwelcome <text>` — Set custom welcome message (`{{name}}`, `{{group}}`, `{{rules}}`)\n"
                 f"• `/welcometoggle [on/off]` — Enable or disable new member welcome greetings\n"
                 f"• `/jointrack [on/off]` — Toggle forensic member join tracking alerts\n"
                 f"• `/setrules <text>` — Set official group rules & study guidelines\n"
@@ -2577,10 +2638,10 @@ class DeviTelegramBot:
             clean_chat_id = str(target_index_chat).replace("-100", "").replace("-", "").lstrip("@")
             cards = []
             current_card_lines = [
-                "📑 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                "🏛️ **MASTER GROUP DIRECTORY (ALPHABETICAL A-Z)**",
+                "✨ <b>MASTER TOPIC DIRECTORY</b> 📑",
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                "Neeche kisi bhi topic par tap karke seedha us section me jayein:\n"
+                "🏛️ <i>Official Study Repository • A to Z Directory</i>",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ]
 
             current_letter = None
@@ -2590,30 +2651,30 @@ class DeviTelegramBot:
                 t_icon = top.get("topic_icon") or "📖"
                 link = f"https://t.me/c/{clean_chat_id}/{t_id}" if clean_chat_id.isdigit() else f"https://t.me/{clean_chat_id}/{t_id}"
                 
-                # Option B: Clean Hashtag Divider (#A, #B, #C)
                 sort_k = self._clean_sort_key(t_title)
                 first_char = sort_k[0].upper() if sort_k else "#"
                 if not first_char.isalpha():
                     first_char = "0-9"
                 if first_char != current_letter:
                     current_letter = first_char
-                    current_card_lines.append(f"\n#{current_letter}")
+                    current_card_lines.append(f"\n🏷️ <b>SECTION #{current_letter}</b>")
 
-                line = f"{t_icon} **[{idx:02d}]** • [{t_title}]({link})"
+                safe_title = html.escape(t_title.strip())
+                line = f"{t_icon} <code>[{idx:02d}]</code> <a href=\"{link}\">{safe_title}</a>"
                 if sum(len(l) for l in current_card_lines) + len(line) > 3400:
                     current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                     cards.append("\n".join(current_card_lines))
                     current_card_lines = [
-                        f"📑 **MASTER GROUP DIRECTORY (Cont. #{current_letter})**",
+                        f"📑 <b>MASTER TOPIC DIRECTORY (Cont. #{current_letter})</b>",
                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                     ]
                 current_card_lines.append(line)
 
             current_card_lines.extend([
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                f"✨ **Total Active Topics:** `{len(topics)}` (Alphabetical A-Z)",
-                f"📌 *Tip: Bookmark or pin this message for instant navigation.*",
-                f"🩺 Kind Doctor Study System"
+                f"📊 <b>Indexed Topics:</b> <code>{len(topics)}</code> (Alphabetical A–Z)",
+                "📌 <i>Tap any subject title above to open its study topic.</i>",
+                "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Medical Study Companion</i>"
             ])
             cards.append("\n".join(current_card_lines))
 
@@ -2636,19 +2697,19 @@ class DeviTelegramBot:
                 conf = await self._send_message(
                     session,
                     chat_id,
-                    f"✅ **Master Hub Index Published!** {pin_status}",
+                    f"✅ <b>Master Hub Index Published!</b> {pin_status}",
                     message_thread_id=thread_id
                 )
-                if conf:
+                if conf and os.getenv("ENABLE_AUTO_DELETE", "false").lower() == "true":
                     self.create_tracked_task(self._auto_delete_message(session, chat_id, conf, 15))
             elif first_msg_id:
                 conf = await self._send_message(
                     session,
                     chat_id,
-                    f"✅ **Master Hub Index Displayed!** (Target Study Group: `{target_index_chat}`)",
+                    f"✅ <b>Master Hub Index Displayed!</b> (Target Study Group: <code>{target_index_chat}</code>)",
                     message_thread_id=thread_id
                 )
-                if conf:
+                if conf and os.getenv("ENABLE_AUTO_DELETE", "false").lower() == "true":
                     self.create_tracked_task(self._auto_delete_message(session, chat_id, conf, 15))
 
         elif cmd in ("/topicindex", "/subindex", "/index"):
@@ -2696,7 +2757,7 @@ class DeviTelegramBot:
             if not items and target_t_id:
                 scan_notify = await self._send_message(
                     session, chat_id,
-                    f"🔍 **'{topic_title}' ke media files auto-scan kiye ja rahe hain...**",
+                    f"🔍 <b>'{html.escape(topic_title)}'</b> ke media files auto-scan kiye ja rahe hain...",
                     message_thread_id=thread_id
                 )
                 try:
@@ -2714,22 +2775,23 @@ class DeviTelegramBot:
 
             if not items:
                 help_msg = (
-                    f"⚠️ **Is Topic ('{topic_title}') ke liye koi items/lectures registered nahi hain.**\n\n"
-                    f"💡 **Index Items Add karne ke 2 Tareeqe:**\n"
-                    f"1️⃣ **Reply se Add Karein**: Kisi bhi lecture/file message par **Reply** karein aur likhein:\n"
-                    f"   `/additem Lecture 01 - Anatomy Basics`\n"
-                    f"2️⃣ **Link se Add Karein**:\n"
-                    f"   `/addlink Lecture 01 https://t.me/c/...`\n\n"
-                    f"Uske baad yahan `/topicindex` likhein, auto-card generate aur pin ho jayega! 🎯"
+                    f"⚠️ <b>Is Topic ('{html.escape(topic_title)}') ke liye koi items/lectures registered nahi hain.</b>\n\n"
+                    f"💡 <b>Index Items Add karne ke 2 Tareeqe:</b>\n"
+                    f"1️⃣ <b>Reply se Add Karein</b>: Kisi bhi lecture/file message par <b>Reply</b> karein aur likhein:\n"
+                    f"   <code>/additem Lecture 01 - Anatomy Basics</code>\n"
+                    f"2️⃣ <b>Link se Add Karein</b>:\n"
+                    f"   <code>/addlink Lecture 01 https://t.me/c/...</code>\n\n"
+                    f"Uske baad yahan <code>/topicindex</code> likhein, auto-card generate aur pin ho jayega! 🎯"
                 )
                 await self._send_message(session, chat_id, help_msg, message_thread_id=thread_id)
                 return
 
             cards = []
+            safe_topic_title = html.escape(topic_title)
             current_card_lines = [
-                "📑 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                "📚 **TOPIC INDEX & TABLE OF CONTENTS**",
-                f"🎯 **Subject:** {topic_title}",
+                "✨ <b>TOPIC STUDY INDEX &amp; TABLE OF CONTENTS</b> 📑",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📂 <b>Subject:</b> <b>{safe_topic_title}</b>",
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ]
 
@@ -2744,20 +2806,22 @@ class DeviTelegramBot:
                 else:
                     link = f"https://t.me/c/{clean_chat_id}/{target_t_id}"
 
-                line = f"{icon} **#{idx:02d}** • [{title}]({link})"
+                safe_title = html.escape(title.strip())
+                line = f"{icon} <code>[{idx:02d}]</code> <a href=\"{link}\">{safe_title}</a>"
                 if sum(len(l) for l in current_card_lines) + len(line) > 3400:
                     current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                     cards.append("\n".join(current_card_lines))
                     current_card_lines = [
-                        f"📑 **TOPIC INDEX (Part {len(cards)+1})**",
+                        f"📑 <b>TOPIC INDEX (Part {len(cards)+1})</b>",
                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                     ]
                 current_card_lines.append(line)
 
             current_card_lines.extend([
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                f"✨ **Total Delivered:** `{len(items)}` Files & Lectures",
-                f"📚 Kind Doctor | 💬 Kind Doctor"
+                f"📚 <b>Total Materials:</b> <code>{len(items)}</code> Lectures &amp; Notes",
+                "📌 <i>Tap any lecture title above to jump directly to the post.</i>",
+                "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Medical Study Companion</i>"
             ])
             cards.append("\n".join(current_card_lines))
 
@@ -2783,7 +2847,7 @@ class DeviTelegramBot:
                     f"✅ **Topic Index Card Posted!** {pin_status}",
                     message_thread_id=thread_id
                 )
-                if conf:
+                if conf and os.getenv("ENABLE_AUTO_DELETE", "false").lower() == "true":
                     self.create_tracked_task(self._auto_delete_message(session, chat_id, conf, 15))
 
         elif cmd == "/settopic":
@@ -2878,13 +2942,24 @@ class DeviTelegramBot:
             target_topics_chat = self._resolve_study_group_id(chat_id)
             topics = self._get_topics(target_topics_chat, sort_alphabetical=True)
             if not topics:
-                await self._send_message(session, chat_id, "Abhi is group me koi Topics registered nahi hain. `/settopic <title>` use karein.", message_thread_id=thread_id)
+                await self._send_message(session, chat_id, "Abhi is group me koi Topics registered nahi hain. <code>/settopic &lt;title&gt;</code> use karein.", message_thread_id=thread_id)
                 return
-            t_list = "\n".join(f"• `{t['topic_id']}`: {t.get('topic_icon','📖')} **{t['topic_title']}**" for t in topics)
+            t_list = "\n".join(f"• <code>[{idx:02d}]</code> {t.get('topic_icon','📖')} <b>{html.escape(t['topic_title'])}</b> (ID: <code>{t['topic_id']}</code>)" for idx, t in enumerate(topics, 1))
+            msg = (
+                f"📚 <b>REGISTERED STUDY TOPICS</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📊 <b>Total Subjects:</b> <code>{len(topics)}</code> (Alphabetical A–Z)\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"{t_list}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• Add Topic: <code>/settopic &lt;title&gt;</code>\n"
+                f"• Delete Topic: <code>/deltopic &lt;topic_id&gt;</code>\n"
+                f"• Publish Directory: <code>/mainindex</code>"
+            )
             await self._send_message(
                 session,
                 chat_id,
-                f"📚 **Registered Study Topics (Alphabetical A-Z, {len(topics)}):**\n\n{t_list}\n\n• Add Topic: `/settopic <title>`\n• Delete Topic: `/deltopic <topic_id>`\n• Publish Directory: `/mainindex`",
+                msg,
                 message_thread_id=thread_id
             )
 
@@ -3768,8 +3843,11 @@ class DeviTelegramBot:
                 )
                 return
 
+            clean_chat_id = str(chat_id).replace("-100", "").replace("-", "").lstrip("@")
             lines = [
-                f"🔍 **Search Results for:** `{query}` (Found {len(results)} items)\n",
+                "🔍 <b>STUDY REPOSITORY SEARCH</b>",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"🔎 <b>Query:</b> <code>{html.escape(query)}</code> (Found {len(results)} match{'es' if len(results) > 1 else ''})",
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ]
             for idx, r in enumerate(results, 1):
@@ -3783,12 +3861,12 @@ class DeviTelegramBot:
                 else:
                     link = f"https://t.me/c/{clean_chat_id}/{r.get('topic_id', 0)}"
 
-                lines.append(f"{icon} **#{idx:02d}** • [{title}]({link}) *(in {topic_name})*")
+                lines.append(f"{icon} <code>[{idx:02d}]</code> <a href=\"{link}\">{html.escape(title.strip())}</a>\n   └ <i>Topic:</i> <b>{html.escape(topic_name.strip())}</b>")
 
             lines.extend([
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                "📌 *Tip: Click on any blue link to jump directly to that lecture.*",
-                "🩺 Kind Doctor Study System"
+                "📌 <i>Tap any blue title above to jump directly to that lecture.</i>",
+                "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Medical Study Desk</i>"
             ])
             await self._send_message(
                 session,

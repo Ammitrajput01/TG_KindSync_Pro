@@ -403,10 +403,10 @@ class TelegramWebLoginManager:
 
             if not cached_user:
                 cached_user = {
-                    "first_name": "Kind Doctor & Team" if stem == "session_forwarder" else f"Account ({stem})",
-                    "username": "Kinddoctor4u" if stem == "session_forwarder" else "",
+                    "first_name": f"Account ({stem})",
+                    "username": "",
                     "phone": os.getenv("PHONE_NUMBER", "") if stem == "session_forwarder" else "",
-                    "id": 18274921 if stem == "session_forwarder" else None
+                    "id": None
                 }
 
             is_active = (stem == self.active_session_name)
@@ -429,3690 +429,2498 @@ class TelegramWebLoginManager:
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TG KindSync Pro V14.5 — Sentinel AI Live Command Center</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg-base: #050814;
-      --bg-surface: rgba(13, 20, 38, 0.78);
-      --bg-card: rgba(17, 26, 48, 0.65);
-      --bg-card-hover: rgba(23, 34, 62, 0.85);
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      --border-highlight: rgba(255, 255, 255, 0.16);
-      --border-glow: rgba(0, 242, 254, 0.35);
-      
-      --cyan-primary: #00f2fe;
-      --cyan-gradient: linear-gradient(135deg, #38bdf8 0%, #00f2fe 100%);
-      --purple-gradient: linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%);
-      --emerald-gradient: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-      --amber-gradient: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
-      --rose-gradient: linear-gradient(135deg, #f43f5e 0%, #fb7185 100%);
-      
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --text-dim: #64748b;
-      
-      --font-display: 'Outfit', -apple-system, sans-serif;
-      --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TG KindSync Pro — Mission Control</title>
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Palette Architecture - Midnight Obsidian */
+            --bg-canvas: #07090E;
+            --bg-surface: #0E121A;
+            --bg-surface-elevated: #141924;
+            --bg-surface-hover: #1B2130;
+            --bg-subtle: #10141E;
+            
+            /* Borders */
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-medium: rgba(255, 255, 255, 0.14);
+            --border-strong: rgba(255, 255, 255, 0.24);
+            --border-focus: rgba(99, 102, 241, 0.6);
+            
+            /* Typography Colors */
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-tertiary: #64748B;
+            --text-muted: #475569;
+            
+            /* Accents */
+            --accent-primary: #6366F1;
+            --accent-primary-hover: #4F46E5;
+            --accent-primary-light: rgba(99, 102, 241, 0.14);
+            --accent-success: #10B981;
+            --accent-success-light: rgba(16, 185, 129, 0.14);
+            --accent-warning: #F59E0B;
+            --accent-warning-light: rgba(245, 158, 11, 0.14);
+            --accent-danger: #EF4444;
+            --accent-danger-light: rgba(239, 68, 68, 0.14);
+            --accent-info: #38BDF8;
+            --accent-info-light: rgba(56, 189, 248, 0.14);
+            
+            /* Spacing Tokens */
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-5: 20px;
+            --space-6: 24px;
+            --space-8: 32px;
+            
+            /* Radii */
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-xl: 18px;
+            --radius-full: 9999px;
+            
+            /* Shadows & Ambient Glows */
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+            --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.65);
+            --shadow-glow: 0 0 24px rgba(99, 102, 241, 0.16);
+            --shadow-flyout: 0 20px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--border-medium);
+            
+            /* Emil Kowalski Motion Tokens */
+            --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+            --ease-spring: cubic-bezier(0.2, 0, 0, 1);
+            --duration-instant: 80ms;
+            --duration-micro: 140ms;
+            --duration-base: 240ms;
+            --duration-slow: 360ms;
+        }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
-    ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.3); border-radius: 999px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.6); }
+        /* Base Reset */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    body {
-      background-color: var(--bg-base);
-      background-image: 
-        radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.14) 0%, transparent 40%),
-        radial-gradient(circle at 90% 15%, rgba(168, 85, 247, 0.13) 0%, transparent 45%),
-        radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.10) 0%, transparent 50%);
-      background-attachment: fixed;
-      color: var(--text-main);
-      font-family: var(--font-body);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      line-height: 1.5;
-      overflow-x: hidden;
-    }
+        html, body {
+            height: 100%;
+            background-color: var(--bg-canvas);
+            color: var(--text-primary);
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow: hidden;
+        }
 
-    .container {
-      width: 100%;
-      max-width: 1360px;
-      margin: 0 auto;
-      padding: 1.5rem 1.25rem 3.5rem;
-    }
+        .tabular, code, pre, .mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
 
-    /* GLASS CARDS */
-    .glass-card {
-      background: var(--bg-card);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border: 1px solid var(--border-subtle);
-      border-radius: 1.25rem;
-      box-shadow: 0 12px 35px -10px rgba(0, 0, 0, 0.65);
-      transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .glass-card:hover {
-      border-color: var(--border-glow);
-      box-shadow: 0 16px 40px -8px rgba(0, 242, 254, 0.15);
-    }
+        /* App Shell */
+        .app-shell {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            background-color: var(--bg-canvas);
+            position: relative;
+        }
 
-    .model-pill-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border-subtle);
-      border-radius: 0.85rem;
-      padding: 0.75rem 0.95rem;
-      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .model-pill-card:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(56, 189, 248, 0.45);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px -5px rgba(56, 189, 248, 0.18);
-    }
+        /* Left Navigation Rail / Sidebar */
+        .sidebar {
+            width: 240px;
+            min-width: 240px;
+            height: 100%;
+            background-color: var(--bg-surface);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            z-index: 30;
+            transition: transform var(--duration-base) var(--ease-enter);
+        }
 
-    /* HEADER */
-    header {
+        .sidebar-brand {
+            height: 64px;
+            padding: 0 var(--space-5);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            border-bottom: 1px solid var(--border-subtle);
+            background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+        }
 
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1.25rem;
-      padding: 1.25rem 1.75rem;
-      margin-bottom: 1.25rem;
-      position: relative;
-      overflow: hidden;
-    }
-    header::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; height: 3px;
-      background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc, #34d399);
-    }
+        .brand-logo {
+            width: 34px;
+            height: 34px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, var(--accent-primary) 0%, #3B82F6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #FFFFFF;
+            font-weight: 800;
+            font-size: 15px;
+            letter-spacing: -0.5px;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+            position: relative;
+        }
 
-    .branding {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    .logo-badge {
-      width: 48px;
-      height: 48px;
-      background: var(--cyan-gradient);
-      border-radius: 1rem;
-      display: grid;
-      place-items: center;
-      font-size: 1.5rem;
-      box-shadow: 0 0 25px rgba(0, 242, 254, 0.4);
-      animation: float 4s ease-in-out infinite;
-    }
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-4px); }
-    }
+        .brand-logo::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            border: 1px solid rgba(255,255,255,0.25);
+            pointer-events: none;
+        }
 
-    .brand-title {
-      font-family: var(--font-display);
-      font-size: 1.45rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-    }
-    .brand-title span {
-      background: var(--cyan-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .tagline {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
+        .brand-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.2px;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
 
-    .header-badges {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.65rem;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      padding: 0.42rem 0.95rem;
-      border-radius: 9999px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      border: 1px solid var(--border-subtle);
-      background: rgba(255, 255, 255, 0.04);
-      transition: all 0.2s ease;
-    }
-    .pulse-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 10px #10b981;
-      animation: pulse 1.8s infinite;
-    }
-    @keyframes pulse {
-      0% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-      70% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-      100% { transform: scale(0.95); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-    }
+        .brand-subtitle {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-tertiary);
+        }
 
-    .chief-doctor-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.3));
-      border: 1px solid rgba(245, 158, 11, 0.55);
-      color: #fde68a;
-      padding: 0.4rem 1rem;
-      border-radius: 9999px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      box-shadow: 0 0 20px rgba(245, 158, 11, 0.25);
-    }
-    .chief-doctor-pill span.crown { font-size: 1.05rem; }
+        .sidebar-nav {
+            flex: 1;
+            padding: var(--space-4) var(--space-3);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
 
-    .wifi-pill {
-      cursor: pointer;
-      background: rgba(0, 242, 254, 0.09);
-      border-color: rgba(0, 242, 254, 0.35);
-      color: var(--cyan-primary);
-    }
-    .wifi-pill:hover { background: rgba(0, 242, 254, 0.22); transform: translateY(-1.5px); box-shadow: 0 4px 15px rgba(0,242,254,0.3); }
+        .nav-group-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0 var(--space-3) var(--space-2);
+        }
 
-    .user-pill {
-      cursor: pointer;
-      background: rgba(168, 85, 247, 0.14);
-      border-color: rgba(168, 85, 247, 0.4);
-      color: #d8b4fe;
-    }
-    .user-pill:hover { background: rgba(168, 85, 247, 0.25); transform: translateY(-1.5px); }
+        .nav-items {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
 
-    .logout-pill {
-      cursor: pointer;
-      background: rgba(244, 63, 94, 0.12);
-      border-color: rgba(244, 63, 94, 0.35);
-      color: #fda4af;
-    }
-    .logout-pill:hover { background: rgba(244, 63, 94, 0.25); transform: translateY(-1.5px); }
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: 9px var(--space-3);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color var(--duration-instant) ease, color var(--duration-instant) ease, transform var(--duration-micro) var(--ease-spring);
+            position: relative;
+            user-select: none;
+        }
 
-    .remote-pill {
-      cursor: pointer;
-      background: rgba(16, 185, 129, 0.12);
-      border-color: rgba(16, 185, 129, 0.35);
-      color: #6ee7b7;
-    }
-    .remote-pill:hover { background: rgba(16, 185, 129, 0.25); transform: translateY(-1.5px); }
+        .nav-link:hover {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+        }
 
-    .clock-pill {
-      background: rgba(245, 158, 11, 0.12);
-      border-color: rgba(245, 158, 11, 0.4);
-      color: #fbbf24;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-    }
-    .ping-pill {
-      background: rgba(56, 189, 248, 0.12);
-      border-color: rgba(56, 189, 248, 0.4);
-      color: #38bdf8;
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-    }
-    .sound-pill {
-      cursor: pointer;
-      background: rgba(236, 72, 153, 0.12);
-      border-color: rgba(236, 72, 153, 0.4);
-      color: #f472b6;
-      user-select: none;
-    }
-    .sound-pill:hover {
-      background: rgba(236, 72, 153, 0.25);
-      transform: translateY(-1.5px);
-    }
+        .nav-link:active {
+            transform: scale(0.98);
+        }
 
-    #ambient-canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-      z-index: -1;
-      opacity: 0.65;
-    }
+        .nav-link.active {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+            font-weight: 600;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+        }
 
-    /* FLOATING DEVI JI ASSISTANT BADGE */
-    #devi-floating-badge {
-      position: fixed;
-      bottom: 1.75rem;
-      right: 1.75rem;
-      z-index: 9998;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: rgba(15, 23, 42, 0.88);
-      border: 1px solid rgba(168, 85, 247, 0.5);
-      border-radius: 999px;
-      padding: 0.5rem 1.15rem 0.5rem 0.6rem;
-      backdrop-filter: blur(16px);
-      box-shadow: 0 10px 35px -5px rgba(168, 85, 247, 0.45);
-      cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      user-select: none;
-    }
-    #devi-floating-badge:hover {
-      transform: translateY(-3px) scale(1.03);
-      border-color: var(--cyan-primary);
-      box-shadow: 0 14px 45px -5px rgba(0, 242, 254, 0.55);
-    }
-    .devi-float-avatar {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #38bdf8, #a855f7);
-      display: grid;
-      place-items: center;
-      font-size: 1.25rem;
-      box-shadow: 0 0 15px rgba(168, 85, 247, 0.6);
-      animation: float 3s ease-in-out infinite;
-    }
-    .devi-float-name {
-      color: #fff;
-      font-family: var(--font-display);
-      font-weight: 800;
-      font-size: 0.86rem;
-      line-height: 1.2;
-    }
-    .devi-float-role {
-      color: #34d399;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-    .copy-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-      cursor: pointer;
-      padding: 0.15rem 0.45rem;
-      border-radius: 0.35rem;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--border-subtle);
-      font-size: 0.68rem;
-      color: var(--text-dim);
-      transition: all 0.2s;
-    }
-    .copy-chip:hover {
-      background: rgba(0, 242, 254, 0.15);
-      border-color: var(--cyan-primary);
-      color: #fff;
-    }
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 7px;
+            bottom: 7px;
+            width: 3px;
+            background-color: var(--accent-primary);
+            border-radius: 0 var(--radius-full) var(--radius-full) 0;
+            box-shadow: 0 0 8px var(--accent-primary);
+        }
 
-    /* THEME PRESETS */
-    body.theme-crimson {
-      --bg-base: #0f0508;
-      --cyan-primary: #f43f5e;
-      --cyan-gradient: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
-      --border-glow: rgba(244, 63, 94, 0.45);
-    }
-    body.theme-emerald {
-      --bg-base: #03120a;
-      --cyan-primary: #10b981;
-      --cyan-gradient: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-      --border-glow: rgba(16, 185, 129, 0.45);
-    }
-    body.theme-gold {
-      --bg-base: #120b02;
-      --cyan-primary: #fbbf24;
-      --cyan-gradient: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
-      --border-glow: rgba(245, 158, 11, 0.45);
-    }
+        .nav-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            color: currentColor;
+            opacity: 0.85;
+            transition: transform var(--duration-micro) ease;
+        }
 
-    /* TOP MISSION CRITICAL TICKER MARQUEE */
-    .mission-marquee-bar {
-      width: 100%;
-      background: rgba(10, 15, 30, 0.92);
-      border-bottom: 1px solid rgba(0, 242, 254, 0.25);
-      backdrop-filter: blur(16px);
-      padding: 0.42rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1.25rem;
-      font-size: 0.76rem;
-      position: sticky;
-      top: 0;
-      z-index: 999;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    }
-    .marquee-tag {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 800;
-      color: #f43f5e;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .marquee-content-wrapper {
-      flex: 1;
-      overflow: hidden;
-      white-space: nowrap;
-      position: relative;
-    }
-    .marquee-track {
-      display: inline-block;
-      white-space: nowrap;
-      color: #cbd5e1;
-      font-family: var(--font-mono);
-      animation: marquee-anim 40s linear infinite;
-    }
-    .marquee-track:hover { animation-play-state: paused; }
-    @keyframes marquee-anim {
-      0% { transform: translateX(20%); }
-      100% { transform: translateX(-100%); }
-    }
-    .marquee-right-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-shrink: 0;
-    }
-    .theme-switch-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-subtle);
-      border-radius: 999px;
-      color: var(--text-dim);
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.2rem 0.65rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .theme-switch-btn:hover {
-      background: rgba(0, 242, 254, 0.15);
-      border-color: var(--cyan-primary);
-      color: #fff;
-    }
+        .nav-link:hover .nav-icon {
+            transform: scale(1.05);
+        }
 
-    /* HARDWARE & ENGINE VITALS MATRIX */
-    .vitals-matrix-card {
-      margin-bottom: 1.5rem;
-      padding: 1.25rem 1.65rem;
-      background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(13, 20, 38, 0.9));
-      border: 1px solid rgba(56, 189, 248, 0.25);
-    }
-    .vitals-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-bottom: 1.15rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .vitals-status-tag {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.72rem;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      color: #34d399;
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.35);
-      padding: 0.25rem 0.65rem;
-      border-radius: 999px;
-    }
-    .vitals-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1.15rem;
-    }
-    .vital-item {
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid var(--border-subtle);
-      border-radius: 0.85rem;
-      padding: 0.85rem 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      transition: all 0.2s;
-    }
-    .vital-item:hover {
-      border-color: rgba(56, 189, 248, 0.4);
-      background: rgba(0, 0, 0, 0.5);
-    }
-    .vital-item-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-    }
-    .vital-bar-track {
-      width: 100%;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-    .vital-bar-fill {
-      height: 100%;
-      border-radius: 999px;
-      transition: width 0.5s ease;
-    }
-    .vital-meta {
-      font-size: 0.68rem;
-      color: var(--text-dim);
-      font-family: var(--font-mono);
-    }
+        .nav-badge {
+            margin-left: auto;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 1px 7px;
+            border-radius: var(--radius-full);
+            background-color: var(--bg-surface-hover);
+            color: var(--text-secondary);
+        }
 
-    /* CHANNEL BRIDGE PIPELINE VISUALIZER */
-    .pipeline-visualizer-card {
-      margin-bottom: 1.5rem;
-      padding: 1.25rem 1.65rem;
-      background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(11, 16, 32, 0.95));
-      border: 1px solid rgba(168, 85, 247, 0.25);
-    }
-    .pipeline-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-bottom: 1.25rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .pipeline-flow-container {
-      display: grid;
-      grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 1fr;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    @media (max-width: 960px) {
-      .pipeline-flow-container {
-        grid-template-columns: 1fr;
-        gap: 0.85rem;
-      }
-      .flow-pipe {
-        height: 20px !important;
-        width: 3px !important;
-        margin: 0 auto;
-      }
-    }
-    .flow-node {
-      background: rgba(0, 0, 0, 0.45);
-      border: 1px solid var(--border-subtle);
-      border-radius: 1rem;
-      padding: 0.85rem 0.65rem;
-      text-align: center;
-      position: relative;
-      transition: all 0.25s;
-    }
-    .flow-node:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px -5px rgba(0, 242, 254, 0.25);
-      border-color: var(--cyan-primary);
-    }
-    .flow-node-icon { font-size: 1.5rem; margin-bottom: 0.3rem; }
-    .flow-node-title { font-family: var(--font-display); font-size: 0.82rem; font-weight: 800; color: #fff; }
-    .flow-node-desc { font-size: 0.68rem; color: var(--text-dim); margin: 0.15rem 0 0.4rem; }
-    .flow-node-badge {
-      display: inline-block;
-      font-size: 0.62rem;
-      font-weight: 800;
-      padding: 0.12rem 0.45rem;
-      border-radius: 999px;
-      background: rgba(56, 189, 248, 0.15);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      color: #38bdf8;
-    }
-    .flow-pipe {
-      height: 3px;
-      background: rgba(255, 255, 255, 0.1);
-      position: relative;
-      overflow: hidden;
-      border-radius: 999px;
-    }
-    .flow-packet {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 24px;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, #00f2fe, #fff);
-      box-shadow: 0 0 8px #00f2fe;
-      border-radius: 999px;
-      animation: packet-move 2.2s infinite linear;
-    }
-    @keyframes packet-move {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(350%); }
-    }
+        .nav-badge.danger {
+            background-color: var(--accent-danger-light);
+            color: var(--accent-danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
 
-    /* TERMINAL LOG FILTERS */
-    .terminal-filter-bar {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.4rem 1.25rem;
-      background: rgba(0, 0, 0, 0.5);
-      border-bottom: 1px solid var(--border-subtle);
-      overflow-x: auto;
-    }
-    .t-filter-chip {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border-subtle);
-      border-radius: 0.4rem;
-      padding: 0.15rem 0.55rem;
-      font-size: 0.68rem;
-      font-weight: 700;
-      color: var(--text-dim);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .t-filter-chip.active {
-      background: rgba(0, 242, 254, 0.15);
-      border-color: var(--cyan-primary);
-      color: #fff;
-    }
+        .sidebar-footer {
+            padding: var(--space-4);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--bg-surface);
+            gap: var(--space-2);
+        }
 
-    /* CONNECTED TELEGRAM ACCOUNT BANNER */
-    .tg-account-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-      background: linear-gradient(135deg, rgba(0, 136, 204, 0.14), rgba(56, 189, 248, 0.06));
-      border: 1px solid rgba(0, 136, 204, 0.35);
-      border-radius: 1.25rem;
-      padding: 1rem 1.5rem;
-      margin-bottom: 1.5rem;
-      backdrop-filter: blur(16px);
-      box-shadow: 0 8px 30px rgba(0, 136, 204, 0.15);
-    }
-    .tg-acc-info {
-      display: flex;
-      align-items: center;
-      gap: 1.1rem;
-    }
-    .tg-acc-avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #0088cc, #00f2fe);
-      display: grid;
-      place-items: center;
-      font-size: 1.5rem;
-      box-shadow: 0 0 20px rgba(0, 136, 204, 0.45);
-    }
-    .tg-acc-name {
-      font-family: var(--font-display);
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: #fff;
-    }
-    .tg-acc-meta {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      font-size: 0.8rem;
-      color: var(--text-dim);
-      margin-top: 0.2rem;
-      flex-wrap: wrap;
-    }
+        .user-profile-widget {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            cursor: pointer;
+            padding: 5px 8px;
+            border-radius: var(--radius-md);
+            transition: background-color var(--duration-micro) ease;
+            text-decoration: none;
+            flex: 1;
+            overflow: hidden;
+        }
 
-    /* HERO SECTION */
-    .hero-grid {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-    @media (max-width: 1024px) {
-      .hero-grid { grid-template-columns: 1fr; }
-    }
+        .user-profile-widget:hover {
+            background-color: var(--bg-surface-elevated);
+        }
 
-    /* SPEEDOMETER */
-    .speedo-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 1.75rem 1.5rem;
-      text-align: center;
-      position: relative;
-    }
-    .speedo-circle {
-      position: relative;
-      width: 190px;
-      height: 190px;
-      margin: 0.5rem 0;
-    }
-    .speedo-svg {
-      width: 100%;
-      height: 100%;
-      transform: rotate(-90deg);
-    }
-    .speedo-bg {
-      fill: none;
-      stroke: rgba(255, 255, 255, 0.06);
-      stroke-width: 14;
-    }
-    .speedo-bar {
-      fill: none;
-      stroke: url(#cyan-glow);
-      stroke-width: 14;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-      filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.6));
-    }
-    .speedo-content {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .speed-val {
-      font-family: var(--font-display);
-      font-size: 2.3rem;
-      font-weight: 800;
-      letter-spacing: -0.04em;
-      color: #fff;
-    }
-    .speed-unit {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--cyan-primary);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-top: -3px;
-    }
-    .speed-peak-tag {
-      font-size: 0.78rem;
-      color: var(--text-dim);
-      margin-top: 0.5rem;
-      font-family: var(--font-mono);
-      background: rgba(0, 0, 0, 0.3);
-      padding: 0.3rem 0.8rem;
-      border-radius: 999px;
-      border: 1px solid var(--border-subtle);
-    }
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+            border: 1px solid var(--border-medium);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
 
-    /* METRICS CONTAINER */
-    .metrics-container {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-    .subject-banner {
-      padding: 1.1rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(17, 26, 48, 0.7));
-      border-color: rgba(245, 158, 11, 0.3);
-    }
-    .subject-info h4 {
-      font-size: 0.72rem;
-      letter-spacing: 0.08em;
-      color: #fbbf24;
-      font-weight: 800;
-    }
-    .subject-name {
-      font-family: var(--font-display);
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: #fff;
-      margin-top: 0.2rem;
-    }
+        .user-details {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+            overflow: hidden;
+        }
 
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1.25rem;
-    }
-    .stat-card {
-      padding: 1.35rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-    }
-    .stat-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-    }
-    .stat-value {
-      font-family: var(--font-display);
-      font-size: 2rem;
-      font-weight: 800;
-      margin: 0.5rem 0 0.4rem;
-      letter-spacing: -0.03em;
-    }
-    .stat-breakdown {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      margin-top: 0.2rem;
-    }
-    .sub-pill {
-      font-size: 0.72rem;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-subtle);
-      padding: 0.2rem 0.55rem;
-      border-radius: 0.45rem;
-      color: var(--text-dim);
-      font-weight: 600;
-    }
+        .user-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-    /* ACTION BAR */
-    .action-bar {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.85rem;
-      margin-bottom: 1.5rem;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55rem;
-      padding: 0.65rem 1.25rem;
-      border-radius: 0.85rem;
-      font-size: 0.86rem;
-      font-weight: 700;
-      cursor: pointer;
-      border: none;
-      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-      text-decoration: none;
-      user-select: none;
-    }
-    .btn-primary {
-      background: var(--cyan-gradient);
-      color: #060911;
-      box-shadow: 0 4px 20px rgba(0, 242, 254, 0.3);
-    }
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(0, 242, 254, 0.5);
-    }
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text-main);
-      border: 1px solid var(--border-subtle);
-    }
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: var(--border-highlight);
-      transform: translateY(-2px);
-    }
-    .badge-notify {
-      background: #ef4444;
-      color: #fff;
-      font-size: 0.68rem;
-      font-weight: 800;
-      padding: 0.15rem 0.5rem;
-      border-radius: 999px;
-      margin-left: 0.35rem;
-      animation: pulse-red 2s infinite;
-    }
-    @keyframes pulse-red {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
-      50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-    }
+        .user-role {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
 
-    /* STREAM GRID */
-    .stream-grid {
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-    @media (max-width: 1024px) {
-      .stream-grid { grid-template-columns: 1fr; }
-    }
+        .audio-ctrl-btn {
+            padding: 7px;
+            border-radius: var(--radius-md);
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--duration-instant) ease;
+        }
 
-    /* TERMINAL */
-    .terminal-card {
-      display: flex;
-      flex-direction: column;
-      height: 380px;
-      overflow: hidden;
-    }
-    .terminal-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.85rem 1.25rem;
-      background: rgba(0, 0, 0, 0.35);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .terminal-dots {
-      display: flex;
-      gap: 6px;
-    }
-    .t-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-    .t-red { background: #ef4444; }
-    .t-yellow { background: #f59e0b; }
-    .t-green { background: #10b981; }
-    
-    .terminal-body {
-      flex: 1;
-      padding: 1rem 1.25rem;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      background: rgba(5, 8, 20, 0.7);
-    }
-    .log-line {
-      display: flex;
-      gap: 0.6rem;
-      word-break: break-all;
-    }
-    .log-time { color: var(--text-dim); }
-    .log-text { color: #cbd5e1; }
+        .audio-ctrl-btn:hover {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+            border-color: var(--border-subtle);
+        }
 
-    /* TEACHER RECOMMENDATIONS */
-    .insights-card {
-      padding: 1.25rem 1.5rem;
-      display: flex;
-      flex-direction: column;
-      height: 380px;
-      overflow-y: auto;
-    }
-    .insights-head {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-family: var(--font-display);
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .tip-item {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border-subtle);
-      border-radius: 0.75rem;
-      padding: 0.85rem 1rem;
-      font-size: 0.82rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 0.6rem;
-      line-height: 1.5;
-      transition: all 0.2s;
-    }
-    .tip-item:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: var(--border-highlight);
-    }
-    .tip-item-latest {
-      border-color: rgba(239, 68, 68, 0.45);
-      background: rgba(239, 68, 68, 0.06);
-    }
-    .badge-tip-latest {
-      background: rgba(239, 68, 68, 0.2);
-      border: 1px solid #ef4444;
-      color: #f87171;
-      font-size: 0.68rem;
-      font-weight: 800;
-      padding: 0.15rem 0.45rem;
-      border-radius: 0.35rem;
-      white-space: nowrap;
-    }
-    .badge-tip-num {
-      background: rgba(56, 189, 248, 0.15);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      color: #38bdf8;
-      font-size: 0.68rem;
-      font-weight: 800;
-      padding: 0.15rem 0.45rem;
-      border-radius: 0.35rem;
-      white-space: nowrap;
-    }
+        /* Main Viewport */
+        .main-viewport {
+            flex: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: var(--bg-canvas);
+        }
 
-    /* CREATOR SHOWCASE SECTION */
-    .creator-section {
-      margin-top: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-    .creator-header-card {
-      background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(15, 23, 42, 0.8));
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      border-radius: 1.25rem;
-      padding: 1.25rem 1.75rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    .creator-profile {
-      display: flex;
-      align-items: center;
-      gap: 1.25rem;
-    }
-    .creator-avatar {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      display: grid;
-      place-items: center;
-      font-size: 1.6rem;
-      box-shadow: 0 0 25px rgba(245, 158, 11, 0.4);
-    }
-    .creator-title-row {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-    }
-    .creator-name {
-      font-family: var(--font-display);
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: #fff;
-    }
-    .creator-badge {
-      font-size: 0.68rem;
-      font-weight: 800;
-      padding: 0.2rem 0.55rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      color: #cbd5e1;
-      border: 1px solid var(--border-subtle);
-      text-transform: uppercase;
-    }
-    .creator-badge.kind {
-      background: rgba(245, 158, 11, 0.2);
-      border-color: rgba(245, 158, 11, 0.5);
-      color: #fbbf24;
-    }
-    .creator-role {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      margin-top: 0.15rem;
-    }
+        /* Top Application Header */
+        .app-header {
+            height: 64px;
+            border-bottom: 1px solid var(--border-subtle);
+            background-color: var(--bg-surface);
+            padding: 0 var(--space-8);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 20;
+            background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+        }
 
-    .contact-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
-    }
-    .contact-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 1rem;
-      padding: 1rem 1.15rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      text-decoration: none;
-      color: inherit;
-      min-width: 0;
-      position: relative;
-      overflow: hidden;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .contact-card:hover {
-      transform: translateY(-3px);
-      border-color: var(--card-glow, var(--cyan-primary));
-      box-shadow: 0 8px 25px -5px var(--card-glow, rgba(0, 242, 254, 0.3));
-    }
-    .contact-card-left {
-      display: flex;
-      align-items: center;
-      gap: 0.85rem;
-      min-width: 0;
-      flex: 1;
-      overflow: hidden;
-    }
-    .contact-text {
-      min-width: 0;
-      flex: 1;
-      overflow: hidden;
-    }
-    .contact-icon-box {
-      width: 40px;
-      height: 40px;
-      flex-shrink: 0;
-      border-radius: 0.75rem;
-      background: var(--icon-bg, rgba(255, 255, 255, 0.05));
-      border: 1px solid var(--icon-border, var(--border-subtle));
-      display: grid;
-      place-items: center;
-      font-size: 1.25rem;
-    }
-    .contact-label {
-      font-size: 0.72rem;
-      color: var(--text-dim);
-      font-weight: 700;
-      text-transform: uppercase;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .contact-handle {
-      font-size: 0.86rem;
-      font-weight: 700;
-      color: #fff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-top: 0.1rem;
-    }
-    .contact-action-btn {
-      font-size: 1.1rem;
-      color: var(--text-dim);
-      font-weight: 700;
-      flex-shrink: 0;
-      margin-left: 0.5rem;
-    }
+        .header-breadcrumbs {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: 13px;
+        }
 
-    .card-insta { --card-glow: rgba(225, 48, 108, 0.45); --icon-bg: rgba(225, 48, 108, 0.15); --icon-border: rgba(225, 48, 108, 0.35); }
-    .card-tg-chat { --card-glow: rgba(0, 136, 204, 0.45); --icon-bg: rgba(0, 136, 204, 0.15); --icon-border: rgba(0, 136, 204, 0.35); }
-    .card-tg-chan { --card-glow: rgba(56, 189, 248, 0.45); --icon-bg: rgba(56, 189, 248, 0.15); --icon-border: rgba(56, 189, 248, 0.35); }
-    .card-whatsapp { --card-glow: rgba(37, 211, 102, 0.45); --icon-bg: rgba(37, 211, 102, 0.15); --icon-border: rgba(37, 211, 102, 0.35); }
-    .card-email { --card-glow: rgba(234, 67, 53, 0.45); --icon-bg: rgba(234, 67, 53, 0.15); --icon-border: rgba(234, 67, 53, 0.35); }
-    .card-community { --card-glow: rgba(245, 158, 11, 0.45); --icon-bg: rgba(245, 158, 11, 0.15); --icon-border: rgba(245, 158, 11, 0.35); }
+        .breadcrumb-root {
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
 
-    /* MODALS */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(2, 6, 23, 0.85);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      display: none;
-      place-items: center;
-      z-index: 9999;
-      padding: 1.25rem;
-      opacity: 0;
-      transition: opacity 0.25s ease;
-    }
-    .modal-overlay.open {
-      display: grid;
-      opacity: 1;
-    }
-    .modal-content {
-      background: #0d1527;
-      border: 1px solid var(--border-highlight);
-      border-radius: 1.5rem;
-      width: 100%;
-      max-width: 680px;
-      max-height: 88vh;
-      overflow-y: auto;
-      padding: 1.75rem;
-      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8);
-      position: relative;
-    }
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1.25rem;
-    }
-    .input-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-    .input-label {
-      font-size: 0.74rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-    }
-    .text-input {
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--border-subtle);
-      border-radius: 0.75rem;
-      padding: 0.75rem 1rem;
-      color: #fff;
-      font-size: 0.88rem;
-      outline: none;
-      transition: all 0.2s;
-    }
-    .text-input:focus {
-      border-color: var(--cyan-primary);
-      box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
-    }
+        .breadcrumb-sep {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
 
-    /* TOAST */
-    #toast {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      background: #10b981;
-      color: #060911;
-      padding: 0.8rem 1.5rem;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 0.88rem;
-      box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
-      transform: translateY(100px);
-      opacity: 0;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      z-index: 10000;
-    }
-    #toast.show {
-      transform: translateY(0);
-      opacity: 1;
-    }
+        .breadcrumb-current {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
 
-    /* RESEARCH INSIGHTS SPECIFIC */
-    .insight-card {
-      background: rgba(15, 23, 42, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.09);
-      border-radius: 1rem;
-      padding: 1.15rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-      transition: all 0.22s;
-      position: relative;
-    }
-    .insight-card.unread {
-      border-color: rgba(168, 85, 247, 0.45);
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(15, 23, 42, 0.85));
-      box-shadow: 0 4px 20px rgba(168, 85, 247, 0.12);
-    }
-    .insight-card.read {
-      opacity: 0.75;
-      border-color: rgba(255, 255, 255, 0.05);
-    }
-    .insight-card:hover {
-      opacity: 1;
-      border-color: var(--cyan-primary);
-    }
-    .insight-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-    .insight-badge-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .filter-tab-btn {
-      padding: 0.4rem 0.9rem;
-      font-size: 0.8rem;
-      border-radius: 0.6rem;
-      font-weight: 700;
-      cursor: pointer;
-      border: 1px solid var(--border-subtle);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text-muted);
-      transition: all 0.2s;
-    }
-    .filter-tab-btn.active {
-      background: var(--purple-gradient);
-      color: #fff;
-      border-color: transparent;
-      box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35);
-    }
-  </style>
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        /* Subject Marquee Banner */
+        .active-subject-strip {
+            padding: 6px var(--space-8);
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.08) 0%, rgba(56, 189, 248, 0.05) 50%, rgba(99, 102, 241, 0.08) 100%);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .subject-badge {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-weight: 500;
+        }
+
+        .subject-title-text {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .system-status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 12px;
+            border-radius: var(--radius-full);
+            background-color: var(--bg-canvas);
+            border: 1px solid var(--border-subtle);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: var(--radius-full);
+            background-color: var(--accent-success);
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+            animation: pulse-calm 2.4s infinite ease-in-out;
+        }
+
+        @keyframes pulse-calm {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+
+        /* Buttons & Actions */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            padding: 7px 14px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            border: 1px solid transparent;
+            outline: none;
+            transition: background-color var(--duration-instant) ease, border-color var(--duration-instant) ease, transform var(--duration-micro) var(--ease-spring), box-shadow var(--duration-micro) ease;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:focus-visible {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-primary);
+            color: #FFFFFF;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+            border-color: var(--border-medium);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-surface-hover);
+            border-color: var(--border-strong);
+        }
+
+        .btn-ghost {
+            background-color: transparent;
+            color: var(--text-secondary);
+        }
+
+        .btn-ghost:hover {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+        }
+
+        .btn-danger {
+            background-color: var(--accent-danger-light);
+            color: var(--accent-danger);
+            border-color: rgba(239, 68, 68, 0.25);
+        }
+
+        .btn-danger:hover {
+            background-color: var(--accent-danger);
+            color: #FFFFFF;
+        }
+
+        .btn-sm {
+            padding: 5px 11px;
+            font-size: 12px;
+        }
+
+        .btn-icon-only {
+            padding: 7px;
+            border-radius: var(--radius-md);
+        }
+
+        /* View Content Area */
+        .view-content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-8);
+        }
+
+        .tab-view {
+            display: none;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity var(--duration-base) var(--ease-enter), transform var(--duration-base) var(--ease-enter);
+        }
+
+        .tab-view.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Metric Strip (Clean Continuous Band) */
+        .metric-strip {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-6);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .metric-item {
+            padding: var(--space-5) var(--space-6);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        .metric-item:last-child {
+            border-right: none;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+        }
+
+        .metric-subtext {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .metric-trend {
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .metric-trend.up { color: var(--accent-success); }
+        .metric-trend.down { color: var(--accent-danger); }
+        .metric-trend.neutral { color: var(--text-tertiary); }
+
+        /* In-Flight Active File Transfer Card */
+        .active-transfer-panel {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(56, 189, 248, 0.04) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4) var(--space-6);
+            margin-bottom: var(--space-6);
+            display: none;
+            box-shadow: var(--shadow-glow);
+            animation: panel-glow 3s infinite alternate;
+        }
+
+        @keyframes panel-glow {
+            from { border-color: rgba(99, 102, 241, 0.25); }
+            to { border-color: rgba(99, 102, 241, 0.45); }
+        }
+
+        .transfer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-2);
+        }
+
+        .transfer-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .transfer-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: var(--space-4);
+        }
+
+        .progress-track {
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary) 0%, #38BDF8 100%);
+            border-radius: var(--radius-full);
+            width: 0%;
+            transition: width var(--duration-base) ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 1.8s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Split Master-Detail Layout */
+        .split-grid-overview {
+            display: grid;
+            grid-template-columns: 65% 35%;
+            gap: var(--space-6);
+        }
+
+        .panel-section {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .panel-header {
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--bg-surface);
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .panel-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        /* Sparkline Chart */
+        .chart-container {
+            padding: var(--space-5) var(--space-6);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .sparkline-svg {
+            width: 100%;
+            height: 105px;
+            overflow: visible;
+        }
+
+        /* Terminal Activity Feed */
+        .terminal-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-canvas);
+        }
+
+        .terminal-tabs {
+            padding: 8px var(--space-4);
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            gap: var(--space-1);
+        }
+
+        .terminal-tab-btn {
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-tertiary);
+            border: none;
+            cursor: pointer;
+            transition: all var(--duration-instant) ease;
+        }
+
+        .terminal-tab-btn:hover {
+            color: var(--text-primary);
+            background-color: var(--bg-surface-elevated);
+        }
+
+        .terminal-tab-btn.active {
+            color: var(--text-primary);
+            background-color: var(--bg-surface-hover);
+        }
+
+        .terminal-stream {
+            padding: var(--space-4);
+            height: 230px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .log-entry {
+            display: flex;
+            gap: var(--space-3);
+            margin-bottom: 4px;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        .log-tag {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .log-tag.engine { background-color: rgba(99, 102, 241, 0.15); color: #818CF8; }
+        .log-tag.telegram { background-color: rgba(14, 165, 233, 0.15); color: #38BDF8; }
+        .log-tag.sync { background-color: rgba(16, 185, 129, 0.15); color: #34D399; }
+        .log-tag.error { background-color: rgba(239, 68, 68, 0.15); color: #F87171; }
+
+        .log-msg { word-break: break-all; }
+
+        /* Vitals List & Worker Directory */
+        .vitals-list {
+            list-style: none;
+            padding: var(--space-2) 0;
+        }
+
+        .vitals-item {
+            padding: var(--space-3) var(--space-6);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .vitals-item:last-child {
+            border-bottom: none;
+        }
+
+        .vitals-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .vitals-data {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .vital-bar-track {
+            width: 70px;
+            height: 5px;
+            background-color: rgba(255,255,255,0.08);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+        }
+
+        .vital-bar-fill {
+            height: 100%;
+            background-color: var(--accent-primary);
+            border-radius: var(--radius-full);
+            transition: width var(--duration-base) ease;
+        }
+
+        .worker-session-row {
+            padding: var(--space-3) var(--space-6);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-subtle);
+            transition: background-color var(--duration-instant) ease;
+        }
+
+        .worker-session-row:hover {
+            background-color: var(--bg-surface-elevated);
+        }
+
+        .worker-identity {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        .worker-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: var(--radius-full);
+            background-color: var(--accent-success);
+        }
+
+        .worker-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .worker-dc {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        /* Data Tables */
+        .data-table-container {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .data-table th {
+            padding: 12px var(--space-6);
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-tertiary);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .data-table td {
+            padding: 14px var(--space-6);
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover td {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+        }
+
+        /* Status Pills */
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 8px;
+            border-radius: var(--radius-full);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .pill-success {
+            background-color: var(--accent-success-light);
+            color: var(--accent-success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .pill-warning {
+            background-color: var(--accent-warning-light);
+            color: var(--accent-warning);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .pill-danger {
+            background-color: var(--accent-danger-light);
+            color: var(--accent-danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .pill-neutral {
+            background-color: var(--bg-surface-hover);
+            color: var(--text-secondary);
+        }
+
+        /* Devi AI Studio */
+        .devi-studio-split {
+            display: grid;
+            grid-template-columns: 34% 66%;
+            gap: var(--space-6);
+            height: calc(100vh - 160px);
+        }
+
+        .devi-chat-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chat-thread-box {
+            flex: 1;
+            padding: var(--space-6);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .chat-msg {
+            max-width: 82%;
+            padding: 11px 15px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .chat-msg.assistant {
+            align-self: flex-start;
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .chat-msg.user {
+            align-self: flex-end;
+            background-color: var(--accent-primary);
+            color: #FFFFFF;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        .chat-input-bar {
+            padding: var(--space-4);
+            border-top: 1px solid var(--border-subtle);
+            background-color: var(--bg-surface);
+            display: flex;
+            gap: var(--space-3);
+        }
+
+        .text-input {
+            flex: 1;
+            padding: 9px 14px;
+            border-radius: var(--radius-md);
+            background-color: var(--bg-canvas);
+            border: 1px solid var(--border-medium);
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            transition: border-color var(--duration-instant) ease, box-shadow var(--duration-instant) ease;
+        }
+
+        .text-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+        }
+
+        /* Modals */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(7, 9, 14, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity var(--duration-base) var(--ease-enter);
+        }
+
+        .modal-backdrop.open {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-dialog {
+            width: 100%;
+            max-width: 460px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-medium);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-flyout);
+            overflow: hidden;
+            transform: translateY(8px) scale(0.98);
+            transition: transform var(--duration-base) var(--ease-enter);
+        }
+
+        .modal-backdrop.open .modal-dialog {
+            transform: translateY(0) scale(1);
+        }
+
+        .modal-header {
+            padding: var(--space-5) var(--space-6);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: var(--space-6);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .modal-footer {
+            padding: var(--space-4) var(--space-6);
+            background-color: var(--bg-subtle);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: var(--space-3);
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: var(--space-6);
+            right: var(--space-6);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+            pointer-events: none;
+        }
+
+        .toast-notification {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-medium);
+            padding: 10px 16px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            pointer-events: auto;
+            animation: toast-enter var(--duration-base) var(--ease-enter) forwards;
+        }
+
+        @keyframes toast-enter {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Accessibility: Prefers-Reduced-Motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1024px) {
+            .split-grid-overview { grid-template-columns: 1fr; }
+            .devi-studio-split { grid-template-columns: 1fr; height: auto; }
+            .metric-strip { grid-template-columns: repeat(2, 1fr); }
+            .metric-item:nth-child(2) { border-right: none; }
+            .metric-item:nth-child(-n+2) { border-bottom: 1px solid var(--border-subtle); }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; transform: translateX(-100%); }
+            .sidebar.mobile-open { transform: translateX(0); }
+            .metric-strip { grid-template-columns: 1fr; }
+            .metric-item { border-right: none; border-bottom: 1px solid var(--border-subtle); }
+            .app-header { padding: 0 var(--space-4); }
+            .view-content-area { padding: var(--space-4); }
+        }
+    </style>
 </head>
 <body>
-  <!-- BACKGROUND CYBER AMBIENT CANVAS -->
-  <canvas id="ambient-canvas"></canvas>
-
-  <!-- TOP MISSION CRITICAL ALERT TICKER -->
-  <div class="mission-marquee-bar">
-    <div class="marquee-tag">
-      <span class="pulse-dot" style="background:#ef4444; box-shadow:0 0 10px #ef4444;"></span>
-      <span>MISSION CRITICAL SENTINEL</span>
-    </div>
-    <div class="marquee-content-wrapper">
-      <div class="marquee-track" id="mission-marquee-track">
-        ⚡ <strong>LIVE MTPROTO ENGINE:</strong> Supersonic Chunking 100% Active • 🛡️ <strong>ANTI-FLOOD SHIELD:</strong> Zero throttles detected • 💾 <strong>IDEMPOTENCY:</strong> SQLite WAL verified 100% synced • 🧬 <strong>DEVI JI BRAIN:</strong> Autonomy Level 9 (Unconstrained Sovereign Learner) • 👑 <strong>CURATOR:</strong> Dr. Amit Singh (Kind Doctor)
-      </div>
-    </div>
-    <div class="marquee-right-actions">
-      <button class="theme-switch-btn" onclick="cycleTheme()" title="Switch Cyber Theme">🎨 THEME: <span id="cur-theme-name">CYBER</span></button>
-      <button class="theme-switch-btn" onclick="toggleFullscreenHud()" title="Toggle Fullscreen HUD Mode">⛶ HUD MODE</button>
-    </div>
-  </div>
-
-  <div class="container">
-    <!-- HEADER -->
-    <header class="glass-card">
-      <div class="branding">
-        <div class="logo-badge">🩺</div>
-        <div>
-          <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.25rem;">
-            <div class="brand-title">TG KINDSYNC <span>PRO V14.5</span></div>
-            <div class="chief-doctor-pill">
-              <span class="crown">👑</span> Dr. Amit Singh (Kind Doctor) • Lead Visionary & Architect
+    <div class="app-shell">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="app-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">KS</div>
+                <div class="brand-title">
+                    <span>KindSync Pro</span>
+                    <span class="brand-subtitle">Enterprise Suite v14.5</span>
+                </div>
             </div>
-          </div>
-          <div class="tagline">Sentinel AI Telemetry & Supersonic Media Streaming Command Center • By Dr. Amit Singh</div>
-        </div>
-      </div>
 
-      <div class="header-badges">
-        <div class="pill clock-pill" id="live-clock" title="System Live Time">
-          🕒 <span id="clock-val">05:10:00</span>
-        </div>
-        <div class="pill ping-pill" id="ping-pill" title="Dashboard Local Ping">
-          <span class="pulse-dot" style="background:#38bdf8; box-shadow:0 0 8px #38bdf8;"></span>
-          <span id="ping-val">12ms</span>
-        </div>
-        <div class="pill sound-pill" id="sound-pill" onclick="toggleSoundFX()" title="Cybernetic Web Audio Feedback">
-          🔊 <span id="sound-state">AUDIO: ON</span>
-        </div>
-        <div class="pill">
-          <div class="pulse-dot"></div>
-          <span id="uptime-pill">UPTIME: 00:00:00</span>
-        </div>
-        <div class="pill wifi-pill" onclick="copyWifiUrl()" title="Click to copy connection link">
-          📲 <span id="wifi-ip">WI-FI: http://127.0.0.1:8080</span>
-        </div>
-        <div class="pill user-pill" id="user-pill" onclick="openUserManagerModal('users')" title="Manage Multi-Users & Accounts">
-          👤 <span id="user-display">admin</span> <span id="role-display" style="font-size:0.68rem; background:rgba(168, 85, 247, 0.3); padding:0.1rem 0.45rem; border-radius:0.4rem; font-weight:800;">ADMIN</span>
-        </div>
-        <div class="pill logout-pill" onclick="logoutUser()" title="Sign out">
-          🚪 <span>Logout</span>
-        </div>
-        <div class="pill remote-pill" onclick="openRemoteModal()" title="Worldwide Mobile Data / 4G Access">
-          🌐 <span>4G/5G ACCESS</span>
-        </div>
-      </div>
-    </header>
+            <nav class="sidebar-nav">
+                <!-- Group 1: Monitoring -->
+                <div class="nav-group">
+                    <div class="nav-group-title">Monitoring</div>
+                    <ul class="nav-items">
+                        <li>
+                            <a class="nav-link active" onclick="switchView('overview')" id="nav-overview">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                                <span>Overview</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="nav-link" onclick="switchView('operations')" id="nav-operations">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                                <span>Pipeline & Speed</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
 
-    <!-- CONNECTED TELEGRAM ACCOUNT BANNER -->
-    <div class="tg-account-banner">
-      <div class="tg-acc-info">
-        <div class="tg-acc-avatar" id="tg-avatar-icon">✈️</div>
-        <div>
-          <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
-            <div class="tg-acc-name" id="tg-acc-name">Kind Doctor & Team</div>
-            <span id="tg-acc-status" style="font-size:0.72rem; padding:0.18rem 0.6rem; border-radius:1rem; background:rgba(16,185,129,0.2); border:1px solid #10b981; color:#34d399; font-weight:800;">🟢 CONNECTED</span>
-          </div>
-          <div class="tg-acc-meta">
-            <span>👤 Username: <strong id="tg-acc-user" style="color:#38bdf8;">@Kinddoctor4u</strong></span>
-            <span>•</span>
-            <span>📞 Phone: <strong id="tg-acc-phone" style="color:#e2e8f0;">+91 (Active)</strong></span>
-            <span>•</span>
-            <span>🆔 ID: <strong id="tg-acc-id" style="color:var(--text-muted);">18274921</strong></span>
-          </div>
-        </div>
-      </div>
-      <div style="display:flex; gap:0.5rem; align-items:center;">
-        <button class="btn btn-secondary" style="padding:0.45rem 0.9rem; font-size:0.8rem;" onclick="openUserManagerModal('tg')">
-          📱 Switch Account
-        </button>
-        <button class="btn btn-primary" style="padding:0.45rem 0.9rem; font-size:0.8rem;" onclick="openTgLoginModal()">
-          ➕ Login New Account
-        </button>
-      </div>
-    </div>
+                <!-- Group 2: Management -->
+                <div class="nav-group">
+                    <div class="nav-group-title">Management</div>
+                    <ul class="nav-items">
+                        <li>
+                            <a class="nav-link" onclick="switchView('telegram')" id="nav-telegram">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                <span>Telegram Accounts</span>
+                                <span class="nav-badge tabular" id="sidebar-tg-badge">3</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="nav-link" onclick="switchView('dlq')" id="nav-dlq">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                                <span>Dead Letter Queue</span>
+                                <span class="nav-badge danger tabular" id="sidebar-dlq-badge">0</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
 
-    <!-- ENGINE VITALS & HARDWARE TELEMETRY MATRIX -->
-    <div class="glass-card vitals-matrix-card">
-      <div class="vitals-header">
-        <div style="display:flex; align-items:center; gap:0.65rem;">
-          <span style="font-size:1.3rem;">📊</span>
-          <div>
-            <div style="font-family:var(--font-display); font-size:1.05rem; font-weight:800; color:#fff;">CORE ENGINE VITALS &amp; HARDWARE TELEMETRY</div>
-            <div style="font-size:0.72rem; color:var(--text-dim);">Real-time memory heap, MTProto socket ping, and WAL thread safety</div>
-          </div>
-        </div>
-        <div class="vitals-status-tag">
-          <span class="pulse-dot" style="background:#34d399;"></span>
-          <span id="vitals-overall-status">NOMINAL • ZERO LEAKS</span>
-        </div>
-      </div>
+                <!-- Group 3: Intelligence & Security -->
+                <div class="nav-group">
+                    <div class="nav-group-title">Intelligence & Access</div>
+                    <ul class="nav-items">
+                        <li>
+                            <a class="nav-link" onclick="switchView('devi')" id="nav-devi">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                                <span>Devi AI Studio</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="nav-link" onclick="switchView('research')" id="nav-research">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                <span>Insights</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="nav-link" onclick="switchView('security')" id="nav-security">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                <span>Access & Users</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
 
-      <div class="vitals-grid">
-        <!-- CPU & PROCESS LOAD -->
-        <div class="vital-item">
-          <div class="vital-item-head">
-            <span>CPU UTILIZATION</span>
-            <span id="vital-cpu-pct" style="color:#38bdf8; font-family:var(--font-mono); font-weight:800;">4.2%</span>
-          </div>
-          <div class="vital-bar-track">
-            <div id="vital-cpu-bar" class="vital-bar-fill" style="width: 14%; background: linear-gradient(90deg, #38bdf8, #00f2fe);"></div>
-          </div>
-          <div class="vital-meta">8 Worker Cores Active • High Affinity</div>
-        </div>
+            <div class="sidebar-footer">
+                <div class="user-profile-widget" onclick="openLoginModal()">
+                    <div class="user-avatar" id="footer-user-avatar">A</div>
+                    <div class="user-details">
+                        <span class="user-name" id="footer-user-name">Dr. Amit Singh</span>
+                        <span class="user-role" id="footer-user-role">ADMINISTRATOR</span>
+                    </div>
+                </div>
+                <button class="audio-ctrl-btn" onclick="toggleSoundFX()" title="Toggle Web Audio Synthesizer Tones" id="audio-toggle-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                </button>
+            </div>
+        </aside>
 
-        <!-- RAM & BUFFER HEAP -->
-        <div class="vital-item">
-          <div class="vital-item-head">
-            <span>RAM &amp; BUFFER HEAP</span>
-            <span id="vital-ram-val" style="color:#34d399; font-family:var(--font-mono); font-weight:800;">48.6 MB</span>
-          </div>
-          <div class="vital-bar-track">
-            <div id="vital-ram-bar" class="vital-bar-fill" style="width: 22%; background: linear-gradient(90deg, #10b981, #34d399);"></div>
-          </div>
-          <div class="vital-meta">Zero Memory Leaks • Garbage Cleaned</div>
-        </div>
+        <!-- Main Viewport -->
+        <main class="main-viewport">
+            <!-- Top Application Header -->
+            <header class="app-header">
+                <div class="header-breadcrumbs">
+                    <span class="breadcrumb-root">Dashboard</span>
+                    <span class="breadcrumb-sep">/</span>
+                    <span class="breadcrumb-current" id="header-breadcrumb-view">Overview</span>
+                </div>
 
-        <!-- MTPROTO SOCKET LATENCY -->
-        <div class="vital-item">
-          <div class="vital-item-head">
-            <span>TELEGRAM DC LATENCY</span>
-            <span id="vital-tg-latency" style="color:#fbbf24; font-family:var(--font-mono); font-weight:800;">22 ms</span>
-          </div>
-          <div class="vital-bar-track">
-            <div id="vital-tg-bar" class="vital-bar-fill" style="width: 18%; background: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
-          </div>
-          <div class="vital-meta">Connected to DC5 • Multiplex Chunks</div>
-        </div>
+                <div class="header-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="openRemoteModal()" title="Mobile Phone Access URL">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+                        <span id="header-wifi-label">Wi-Fi Phone URL</span>
+                    </button>
+                    <div class="system-status-indicator">
+                        <span class="status-dot"></span>
+                        <span id="header-engine-status">Engine Online (Synced)</span>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="triggerCloudBackup()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                        <span>Snapshot</span>
+                    </button>
+                    <button class="btn btn-primary btn-sm" id="btn-pause-engine" onclick="togglePauseEngine()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
+                        <span id="pause-btn-text">Pause Engine</span>
+                    </button>
+                </div>
+            </header>
 
-        <!-- STREAM PURITY & ACCURACY -->
-        <div class="vital-item">
-          <div class="vital-item-head">
-            <span>STREAM DELIVERY RATE</span>
-            <span id="vital-delivery-rate" style="color:#c084fc; font-family:var(--font-mono); font-weight:800;">99.98%</span>
-          </div>
-          <div class="vital-bar-track">
-            <div class="vital-bar-fill" style="width: 99.9%; background: linear-gradient(90deg, #8b5cf6, #c084fc);"></div>
-          </div>
-          <div class="vital-meta">Zero Duplicates • Idempotent Guarantee</div>
-        </div>
-      </div>
-    </div>
+            <!-- Active Subject Strip -->
+            <div class="active-subject-strip">
+                <div class="subject-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>CURRENT ACTIVE CHANNEL STREAM:</span>
+                    <span class="subject-title-text" id="subject-name">Scanning Telegram Channel Stream...</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-tertiary);" id="uptime-pill">UPTIME: 0h 00m</div>
+            </div>
 
-    <!-- INTERACTIVE CHANNEL BRIDGE PIPELINE VISUALIZER -->
-    <div class="glass-card pipeline-visualizer-card">
-      <div class="pipeline-header">
-        <div style="display:flex; align-items:center; gap:0.6rem;">
-          <span style="font-size:1.25rem;">⚡</span>
-          <div>
-            <div style="font-family:var(--font-display); font-size:1.02rem; font-weight:800; color:#fff;">LIVE FORWARDING PIPELINE &amp; CHANNEL BRIDGE</div>
-            <div style="font-size:0.72rem; color:var(--text-dim);">Real-time packet journey from donor channels to destination groups</div>
-          </div>
-        </div>
-        <div style="font-size:0.72rem; color:#38bdf8; font-family:var(--font-mono);">
-          STREAM STATUS: <strong style="color:#34d399;">FLOWING</strong>
-        </div>
-      </div>
+            <!-- Scrollable View Content -->
+            <div class="view-content-area">
+                
+                <!-- In-Flight Active File Transfer Progress Panel -->
+                <div class="active-transfer-panel" id="active-transfer-box">
+                    <div class="transfer-header">
+                        <div class="transfer-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" x2="12" y1="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+                            <span id="active-file-name">Streaming Medical Lecture.mp4</span>
+                        </div>
+                        <div class="transfer-meta">
+                            <span class="tabular" id="active-file-bytes">14.2 MB / 85.0 MB</span>
+                            <span class="tabular" id="active-file-eta">ETA: 00:24</span>
+                            <span class="tabular" style="font-weight: 700; color: var(--accent-primary);" id="active-file-pct">18%</span>
+                        </div>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="active-file-bar"></div>
+                    </div>
+                </div>
 
-      <div class="pipeline-flow-container">
-        <!-- NODE 1: SOURCE -->
-        <div class="flow-node node-source">
-          <div class="flow-node-icon">📡</div>
-          <div class="flow-node-title">SOURCE CHANNELS</div>
-          <div class="flow-node-desc">Multi-Channel Donor Feed</div>
-          <div class="flow-node-badge">LISTENING</div>
-        </div>
+                <!-- ==============================================================
+                     VIEW 1: MISSION CONTROL (OVERVIEW)
+                     ============================================================== -->
+                <section class="tab-view active" id="view-overview">
+                    <!-- Metric Strip (Clean Continuous Band) -->
+                    <div class="metric-strip">
+                        <div class="metric-item">
+                            <span class="metric-label">Throughput Speed</span>
+                            <span class="metric-value tabular" id="stat-speed-val">0.0 MB/s</span>
+                            <span class="metric-subtext">Peak <strong class="tabular" id="stat-peak-val">0.0 MB/s</strong></span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Forwarded Messages</span>
+                            <span class="metric-value tabular" id="stat-transfers-val">0</span>
+                            <span class="metric-subtext"><span class="metric-trend up" id="db-count">0</span> In Database Sync</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Active Workers</span>
+                            <span class="metric-value tabular" id="stat-sessions-val">1 Session</span>
+                            <span class="metric-subtext" id="tg-acc-user">@Kinddoctor4u</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Telegram DC Ping</span>
+                            <span class="metric-value tabular" id="vital-tg-latency">24 ms</span>
+                            <span class="metric-subtext">SQLite WAL Optimal</span>
+                        </div>
+                    </div>
 
-        <!-- PIPE 1 -->
-        <div class="flow-pipe">
-          <div class="flow-packet packet-1"></div>
-        </div>
+                    <!-- Split Master-Detail Layout -->
+                    <div class="split-grid-overview">
+                        <!-- Left Column: Throughput Area Sparkline & Live Logs -->
+                        <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+                            <!-- Sparkline Chart Panel -->
+                            <div class="panel-section">
+                                <div class="panel-header">
+                                    <span class="panel-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                        <span>Real-Time Bandwidth Stream</span>
+                                    </span>
+                                    <span class="pill pill-neutral tabular">Last 60 Minutes</span>
+                                </div>
+                                <div class="chart-container">
+                                    <svg class="sparkline-svg" id="sparkline-chart" preserveAspectRatio="none" viewBox="0 0 500 105">
+                                        <defs>
+                                            <linearGradient id="area-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                <stop offset="0%" stop-color="#6366F1" stop-opacity="0.32"/>
+                                                <stop offset="100%" stop-color="#6366F1" stop-opacity="0.0"/>
+                                            </linearGradient>
+                                        </defs>
+                                        <path id="sparkline-area" d="M 0 105 L 500 105 Z" fill="url(#area-grad)"/>
+                                        <path id="sparkline-stroke" d="M 0 105" fill="none" stroke="#6366F1" stroke-width="2.4" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            </div>
 
-        <!-- NODE 2: SENTINEL AI FILTER -->
-        <div class="flow-node node-filter">
-          <div class="flow-node-icon">🛡️</div>
-          <div class="flow-node-title">SENTINEL SCRUBBER</div>
-          <div class="flow-node-desc">Strip Words &amp; Anti-Spam</div>
-          <div class="flow-node-badge" style="color:#fbbf24; border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.1);">100% CLEANED</div>
-        </div>
+                            <!-- Terminal Activity Panel -->
+                            <div class="panel-section" style="flex: 1;">
+                                <div class="panel-header">
+                                    <span class="panel-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+                                        <span>Decoupled Engine Activity Log</span>
+                                    </span>
+                                    <div class="panel-actions">
+                                        <button class="btn btn-ghost btn-sm" onclick="clearTerminalLogs()">Clear</button>
+                                    </div>
+                                </div>
+                                <div class="terminal-container">
+                                    <div class="terminal-tabs">
+                                        <button class="terminal-tab-btn active" onclick="filterLogs('all', this)">ALL</button>
+                                        <button class="terminal-tab-btn" onclick="filterLogs('engine', this)">ENGINE</button>
+                                        <button class="terminal-tab-btn" onclick="filterLogs('telegram', this)">TELEGRAM</button>
+                                        <button class="terminal-tab-btn" onclick="filterLogs('sync', this)">SYNC</button>
+                                        <button class="terminal-tab-btn" onclick="filterLogs('error', this)">ERROR</button>
+                                    </div>
+                                    <div class="terminal-stream tabular" id="terminal-stream">
+                                        <div class="log-entry">
+                                            <span class="log-time">22:00:00</span>
+                                            <span class="log-tag engine">ENGINE</span>
+                                            <span class="log-msg">Decoupled telemetry engine initialized in high-throughput WAL mode</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-        <!-- PIPE 2 -->
-        <div class="flow-pipe">
-          <div class="flow-packet packet-1" style="animation-delay:0.7s;"></div>
-        </div>
+                        <!-- Right Column: Hardware Vitals & Worker Sessions -->
+                        <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+                            <!-- System Vitals Panel -->
+                            <div class="panel-section">
+                                <div class="panel-header">
+                                    <span class="panel-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="9" x2="9" y1="21" y2="9"/></svg>
+                                        <span>System Vitals</span>
+                                    </span>
+                                </div>
+                                <ul class="vitals-list">
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">Engine CPU Load</span>
+                                        <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                            <div class="vital-bar-track"><div class="vital-bar-fill" id="vital-cpu-bar" style="width: 14%;"></div></div>
+                                            <span class="vitals-data tabular" id="vital-cpu-pct">14.2%</span>
+                                        </div>
+                                    </li>
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">Memory Allocation</span>
+                                        <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                            <div class="vital-bar-track"><div class="vital-bar-fill" id="vital-ram-bar" style="width: 32%;"></div></div>
+                                            <span class="vitals-data tabular" id="vital-ram-val">48.4 MB</span>
+                                        </div>
+                                    </li>
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">FloodWaits Throttled</span>
+                                        <span class="vitals-data tabular" id="flood-count">0 Detected</span>
+                                    </li>
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">Total Flood Delay</span>
+                                        <span class="vitals-data tabular" id="flood-delay">0.0s</span>
+                                    </li>
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">Sentinel Auto-Pacer</span>
+                                        <span class="pill pill-success" id="vital-autopacer">Optimal (Auto)</span>
+                                    </li>
+                                </ul>
+                            </div>
 
-        <!-- NODE 3: TOPIC AUTO-DIVIDER -->
-        <div class="flow-node node-divider">
-          <div class="flow-node-icon">📂</div>
-          <div class="flow-node-title">TOPIC DIVIDERS</div>
-          <div class="flow-node-desc">Subject Categorization</div>
-          <div class="flow-node-badge" style="color:#c084fc; border-color:rgba(168,85,247,0.4); background:rgba(168,85,247,0.1);">SORTED</div>
-        </div>
+                            <!-- Connected Telegram Worker Sessions -->
+                            <div class="panel-section">
+                                <div class="panel-header">
+                                    <span class="panel-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                        <span>Telegram Workers</span>
+                                    </span>
+                                    <button class="btn btn-ghost btn-sm" onclick="switchView('telegram')">Manage</button>
+                                </div>
+                                <div id="overview-workers-list">
+                                    <div class="worker-session-row">
+                                        <div class="worker-identity">
+                                            <span class="worker-dot"></span>
+                                            <div>
+                                                <div class="worker-name" id="tg-acc-name">Primary Worker</div>
+                                                <div class="worker-dc" id="tg-acc-phone">Telegram DC4 Europe</div>
+                                            </div>
+                                        </div>
+                                        <span class="pill pill-success" id="tg-acc-status">Active</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
-        <!-- PIPE 3 -->
-        <div class="flow-pipe">
-          <div class="flow-packet packet-1" style="animation-delay:1.4s;"></div>
-        </div>
+                <!-- ==============================================================
+                     VIEW 2: PIPELINE & SPEED
+                     ============================================================== -->
+                <section class="tab-view" id="view-operations">
+                    <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+                        <div class="panel-section">
+                            <div class="panel-header">
+                                <span class="panel-title">Media Categories Transfer Ledger</span>
+                            </div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Media Category</th>
+                                        <th>Items Dispatched</th>
+                                        <th>Pipeline State</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Videos & Lectures</strong></td>
+                                        <td class="tabular" id="videos-sent">0 items</td>
+                                        <td><span class="pill pill-success">Streaming Active</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Medical Documents & PDFs</strong></td>
+                                        <td class="tabular" id="docs-sent">0 items</td>
+                                        <td><span class="pill pill-success">Streaming Active</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Clinical Photos & Diagrams</strong></td>
+                                        <td class="tabular" id="photos-sent">0 items</td>
+                                        <td><span class="pill pill-success">Streaming Active</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Grouped Photo Albums</strong></td>
+                                        <td class="tabular" id="albums-sent">0 items</td>
+                                        <td><span class="pill pill-success">Streaming Active</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-        <!-- NODE 4: TARGET DESTINATION -->
-        <div class="flow-node node-target">
-          <div class="flow-node-icon">🎯</div>
-          <div class="flow-node-title">TARGET DESTINATIONS</div>
-          <div class="flow-node-desc">Saved Messages &amp; Study VIP</div>
-          <div class="flow-node-badge" style="color:#34d399; border-color:rgba(16,185,129,0.4); background:rgba(16,185,129,0.1);">DELIVERED</div>
-        </div>
-      </div>
-    </div>
+                        <!-- Speed Throttling Control Panel -->
+                        <div class="panel-section">
+                            <div class="panel-header">
+                                <span class="panel-title">Engine Pacer & Bandwidth Throttling</span>
+                            </div>
+                            <div style="padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4);">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span class="form-label">Transfer Speed Rate Limit</span>
+                                    <span class="tabular" id="throttle-speed-val" style="font-weight: 700; color: var(--accent-primary);">Unlimited (Max Network)</span>
+                                </div>
+                                <input type="range" min="500" max="10000" step="250" value="10000" id="speed-slider" oninput="handleSpeedChange(this.value)" style="accent-color: var(--accent-primary);">
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
-    <!-- DEVI JI AUTONOMOUS AI GUARDIAN & MULTI-MODEL HUB -->
-    <div class="glass-card" style="margin-bottom:1.5rem; padding:1.35rem 1.75rem; border:1px solid rgba(56, 189, 248, 0.35); background:linear-gradient(135deg, rgba(17, 26, 48, 0.88), rgba(15, 23, 42, 0.92)); position:relative; overflow:hidden;">
-      <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, #38bdf8, #a855f7, #10b981);"></div>
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1.25rem; border-bottom:1px solid var(--border-subtle); padding-bottom:1.1rem; margin-bottom:1.15rem;">
-        <div style="display:flex; align-items:center; gap:1.1rem;">
-          <div style="width:52px; height:52px; border-radius:1rem; background:linear-gradient(135deg, #38bdf8, #a855f7, #10b981); display:grid; place-items:center; font-size:1.65rem; box-shadow:0 0 25px rgba(168, 85, 247, 0.45); animation:float 4s ease-in-out infinite;">
-            🧬
-          </div>
-          <div>
-            <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
-              <h2 style="font-family:var(--font-display); font-size:1.35rem; font-weight:800; color:#fff; letter-spacing:-0.02em;">
-                Devi Ji <span style="font-size:0.82rem; font-weight:700; background:linear-gradient(135deg, #38bdf8, #c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">AUTONOMOUS AI GUARDIAN &amp; CONTINUOUS LEARNER</span>
-              </h2>
-              <span id="devi-status-pill" style="font-size:0.72rem; padding:0.2rem 0.65rem; border-radius:1rem; background:rgba(16, 185, 129, 0.2); border:1px solid #10b981; color:#34d399; font-weight:800;">
-                🟢 VIBRANT &amp; FAILOVER SAFE
-              </span>
-              <span class="sub-pill" style="color:#c084fc; border-color:rgba(168, 85, 247, 0.35); font-weight:700;">
-                🌌 Autonomy Level 9 / 9 (Unconstrained Sovereign Learner)
-              </span>
+                <!-- ==============================================================
+                     VIEW 3: TELEGRAM ACCOUNTS (ORCHESTRATION)
+                     ============================================================== -->
+                <section class="tab-view" id="view-telegram">
+                    <div class="panel-section">
+                        <div class="panel-header">
+                            <span class="panel-title">Connected Telegram Telethon Sessions</span>
+                            <button class="btn btn-primary btn-sm" onclick="openTgLoginModal()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                <span>Add Telegram Account</span>
+                            </button>
+                        </div>
+                        <table class="data-table" id="telegram-sessions-table">
+                            <thead>
+                                <tr>
+                                    <th>Session Name</th>
+                                    <th>Phone / User ID</th>
+                                    <th>Data Center</th>
+                                    <th>Role Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tg-sessions-tbody">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-tertiary);">Loading accounts...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 4: DEVI AI COPILOT STUDIO
+                     ============================================================== -->
+                <section class="tab-view" id="view-devi">
+                    <div class="devi-studio-split">
+                        <!-- Left Panel: Model Hub Status & Speed Race -->
+                        <div class="panel-section">
+                            <div class="panel-header">
+                                <span class="panel-title">Free AI Model Hub</span>
+                                <button class="btn btn-ghost btn-sm" onclick="speakDeviStatus()" title="Voice Briefing">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                                    <span>Voice Briefing</span>
+                                </button>
+                            </div>
+                            <ul class="vitals-list">
+                                <li class="vitals-item">
+                                    <span class="vitals-title">Groq (Llama 3.3 70B)</span>
+                                    <span class="pill pill-success" id="lat-groq">42ms Ready</span>
+                                </li>
+                                <li class="vitals-item">
+                                    <span class="vitals-title">Mistral (Codestral)</span>
+                                    <span class="pill pill-success" id="lat-mistral">68ms Ready</span>
+                                </li>
+                                <li class="vitals-item">
+                                    <span class="vitals-title">Google Gemini (2.0 Flash)</span>
+                                    <span class="pill pill-success" id="lat-gemini">95ms Ready</span>
+                                </li>
+                                <li class="vitals-item">
+                                    <span class="vitals-title">OpenRouter DeepSeek</span>
+                                    <span class="pill pill-success" id="lat-openrouter">112ms Ready</span>
+                                </li>
+                            </ul>
+                            <div style="padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3);">
+                                <button class="btn btn-secondary btn-sm" onclick="triggerKeyHunt()">Run Autonomous Key Hunt</button>
+                                <button class="btn btn-secondary btn-sm" onclick="runCouncilDebate()">3-Way AI Council Debate</button>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Interactive Copilot Chat -->
+                        <div class="devi-chat-card">
+                            <div class="panel-header">
+                                <span class="panel-title">Devi AI Engineering Mentor</span>
+                                <span class="pill pill-neutral">Decoupled Copilot</span>
+                            </div>
+                            <div class="chat-thread-box" id="chat-thread">
+                                <div class="chat-msg assistant">
+                                    Namaste Dr. Amit! Main Devi AI hoon. Aapke Telegram cloud pipeline, speed tuning, ya error triage me main kaise madad kar sakti hoon?
+                                </div>
+                            </div>
+                            <form class="chat-input-bar" onsubmit="handleDeviChatSubmit(event)">
+                                <input type="text" class="text-input" id="devi-chat-input" placeholder="Ask Devi AI anything about sync pipeline or architecture..." autocomplete="off">
+                                <button type="submit" class="btn btn-primary">Send</button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 5: DEAD LETTER QUEUE (DLQ)
+                     ============================================================== -->
+                <section class="tab-view" id="view-dlq">
+                    <div class="panel-section">
+                        <div class="panel-header">
+                            <span class="panel-title">Dead Letter Queue (Failed Messages)</span>
+                            <div class="panel-actions">
+                                <button class="btn btn-danger btn-sm" onclick="clearDlqErrors()">Purge DLQ</button>
+                            </div>
+                        </div>
+                        <table class="data-table" id="dlq-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Target Channel</th>
+                                    <th>Failure Cause</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dlq-tbody">
+                                <tr>
+                                    <td colspan="3" style="text-align: center; color: var(--text-tertiary);">No failed messages in Dead Letter Queue (100% Healthy)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 6: DEEP RESEARCH & RECOMMENDATIONS
+                     ============================================================== -->
+                <section class="tab-view" id="view-research">
+                    <div class="panel-section">
+                        <div class="panel-header">
+                            <span class="panel-title">Autonomous Telemetry Insights</span>
+                        </div>
+                        <ul class="vitals-list" id="research-insights-list">
+                            <li class="vitals-item">
+                                <div>
+                                    <strong>Multi-part Fast Parallel Chunks</strong>
+                                    <div style="font-size: 11px; color: var(--text-secondary);">Optimal chunk sizing enabled for high-bandwidth Telegram channels.</div>
+                                </div>
+                                <span class="pill pill-success">Applied</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 7: ACCESS CONTROL & USERS
+                     ============================================================== -->
+                <section class="tab-view" id="view-security">
+                    <div class="panel-section">
+                        <div class="panel-header">
+                            <span class="panel-title">Dashboard Role-Based Access Control (RBAC)</span>
+                            <button class="btn btn-primary btn-sm" onclick="openCreateUserModal()">Add Member</button>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Access Role</th>
+                                    <th>Created Timestamp</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-tbody">
+                                <tr>
+                                    <td><strong>Amit</strong></td>
+                                    <td><span class="pill pill-success">Admin</span></td>
+                                    <td class="tabular">2026-09-18</td>
+                                    <td><span style="color: var(--text-muted);">Root</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
 
             </div>
-            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-              <span>🔑 <strong id="devi-keys-val" style="color:#38bdf8;">8 Active Keys</strong> Discovered</span>
-              <span>•</span>
-              <span>⚡ <strong id="devi-prov-val" style="color:#34d399;">6 AI Models</strong> Operational</span>
-              <span>•</span>
-              <span>🛡️ <strong style="color:#fbbf24;">Zero-Downtime Fallback Pool</strong> Active</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
-          <!-- NEURAL SYNAPSE SPECTRUM -->
-          <div style="display:flex; align-items:center; gap:0.6rem; background:rgba(0,0,0,0.35); border:1px solid rgba(168,85,247,0.35); border-radius:0.75rem; padding:0.35rem 0.65rem;">
-            <div style="font-size:0.66rem; color:#c084fc; font-weight:800; font-family:var(--font-mono); display:flex; flex-direction:column; line-height:1.2;">
-              <span>🧠 NEURAL</span>
-              <span style="color:#34d399;">SYNAPSE</span>
-            </div>
-            <canvas id="devi-neural-canvas" width="130" height="32" style="display:block; border-radius:0.4rem;"></canvas>
-          </div>
-          <button class="btn btn-secondary" onclick="triggerKeyHunt()" style="padding:0.45rem 0.95rem; font-size:0.8rem; border-color:rgba(56, 189, 248, 0.4); color:#38bdf8;">
-            🔍 Hunt Keys &amp; Verify Pulse
-          </button>
-          <button class="btn btn-primary" onclick="openDeviChatModal()" style="padding:0.45rem 1rem; font-size:0.8rem; background:linear-gradient(135deg, #8b5cf6, #38bdf8); color:#fff; box-shadow:0 0 20px rgba(139,92,246,0.3);">
-            💬 Talk with Devi Ji
-          </button>
-          <button class="btn btn-secondary" onclick="openQrModal()" style="padding:0.45rem 0.95rem; font-size:0.8rem; color:#34d399; border-color:rgba(16, 185, 129, 0.4);">
-            📱 1-Click QR Login
-          </button>
-        </div>
-      </div>
-
-      <!-- UNIVERSE KNOWLEDGE TICKER -->
-      <div style="background:rgba(0, 0, 0, 0.4); border:1px solid var(--border-subtle); border-radius:0.75rem; padding:0.65rem 1rem; margin-bottom:1.15rem; display:flex; align-items:center; gap:0.75rem; font-size:0.8rem;">
-        <span style="color:#fbbf24; font-weight:800; display:flex; align-items:center; gap:0.3rem; flex-shrink:0;">
-          🌌 UNIVERSE LEARNER:
-        </span>
-        <span id="devi-universe-ticker" style="color:#cbd5e1; font-family:var(--font-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-          Devi Ji is observing active Telegram MTProto streaming patterns &amp; rate budget rules.
-        </span>
-      </div>
-
-      <!-- MULTI-MODEL HUB GRID -->
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:0.85rem;">
-        <div class="model-pill-card" id="card-groq">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="color:#f97316;">⚡ Groq</strong>
-            <span class="sub-pill" id="st-groq" style="color:#34d399; font-size:0.68rem;">ACTIVE</span>
-          </div>
-          <div style="color:var(--text-muted); font-size:0.72rem; margin-top:0.2rem;">Llama-3.3 70B</div>
-          <div style="color:var(--text-dim); font-size:0.68rem; font-family:var(--font-mono); margin-top:0.3rem;" id="lat-groq">Sub-Second Inference</div>
-        </div>
-
-        <div class="model-pill-card" id="card-mistral">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="color:#ef4444;">🧠 Mistral</strong>
-            <span class="sub-pill" id="st-mistral" style="color:#34d399; font-size:0.68rem;">ACTIVE</span>
-          </div>
-          <div style="color:var(--text-muted); font-size:0.72rem; margin-top:0.2rem;">Codestral 22B</div>
-          <div style="color:var(--text-dim); font-size:0.68rem; font-family:var(--font-mono); margin-top:0.3rem;" id="lat-mistral">Code &amp; Logic Audits</div>
-        </div>
-
-        <div class="model-pill-card" id="card-gemini">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="color:#38bdf8;">🌟 Gemini</strong>
-            <span class="sub-pill" id="st-gemini" style="color:#34d399; font-size:0.68rem;">ACTIVE</span>
-          </div>
-          <div style="color:var(--text-muted); font-size:0.72rem; margin-top:0.2rem;">2.0 Flash / Pro</div>
-          <div style="color:var(--text-dim); font-size:0.68rem; font-family:var(--font-mono); margin-top:0.3rem;" id="lat-gemini">Deep Reasoning</div>
-        </div>
-
-        <div class="model-pill-card" id="card-openrouter">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="color:#a855f7;">🌐 OpenRouter</strong>
-            <span class="sub-pill" id="st-openrouter" style="color:#34d399; font-size:0.68rem;">ACTIVE</span>
-          </div>
-          <div style="color:var(--text-muted); font-size:0.72rem; margin-top:0.2rem;">Free Tier Models</div>
-          <div style="color:var(--text-dim); font-size:0.68rem; font-family:var(--font-mono); margin-top:0.3rem;" id="lat-openrouter">Global Failover</div>
-        </div>
-
-        <div class="model-pill-card" id="card-cerebras">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="color:#eab308;">🚀 Cerebras</strong>
-            <span class="sub-pill" id="st-cerebras" style="color:#34d399; font-size:0.68rem;">ACTIVE</span>
-          </div>
-          <div style="color:var(--text-muted); font-size:0.72rem; margin-top:0.2rem;">WSE-3 Engine</div>
-          <div style="color:var(--text-dim); font-size:0.68rem; font-family:var(--font-mono); margin-top:0.3rem;" id="lat-cerebras">High Throughput</div>
-        </div>
-
-        <div class="model-pill-card" id="card-sambanova">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <strong style="color:#06b6d4;">💎 SambaNova</strong>
-            <span class="sub-pill" id="st-sambanova" style="color:#34d399; font-size:0.68rem;">ACTIVE</span>
-          </div>
-          <div style="color:var(--text-muted); font-size:0.72rem; margin-top:0.2rem;">SN40L Dataflow</div>
-          <div style="color:var(--text-dim); font-size:0.68rem; font-family:var(--font-mono); margin-top:0.3rem;" id="lat-sambanova">Accelerated AI</div>
-        </div>
-      </div>
-
-      <!-- SPEED RACE & MULTI-MODEL BENCHMARK -->
-      <div style="margin-top:1.15rem; padding-top:0.85rem; border-top:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
-        <div style="font-size:0.78rem; color:var(--text-muted); display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-          <span>⚡ <strong style="color:#fff;">Universal AI Performance:</strong></span>
-          <span class="sub-pill" id="bench-groq" style="color:#f97316;">Groq: ~480 t/s</span>
-          <span class="sub-pill" id="bench-cerebras" style="color:#eab308;">Cerebras: ~620 t/s</span>
-          <span class="sub-pill" id="bench-gemini" style="color:#38bdf8;">Gemini: ~190 t/s</span>
-          <span class="sub-pill" id="bench-mistral" style="color:#ef4444;">Mistral: ~145 t/s</span>
-        </div>
-        <button class="btn btn-secondary" onclick="runModelSpeedRace()" style="padding:0.35rem 0.85rem; font-size:0.75rem; color:#38bdf8; border-color:rgba(56,189,248,0.4);" id="race-btn">
-          🏁 Run AI Speed Race
-        </button>
-      </div>
-    </div>
-
-    <!-- HERO SECTION -->
-    <div class="hero-grid">
-
-      <!-- SPEEDOMETER -->
-      <div class="glass-card speedo-card">
-        <div class="stat-header" style="width:100%;">
-          <span>UPLOAD VELOCITY</span>
-          <span style="color:var(--cyan-primary); font-weight:800;">LIVE ⚡</span>
-        </div>
-        <div class="speedo-circle">
-          <svg class="speedo-svg" viewBox="0 0 160 160">
-            <defs>
-              <linearGradient id="cyan-glow" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#38bdf8"/>
-                <stop offset="100%" stop-color="#00f2fe"/>
-              </linearGradient>
-            </defs>
-            <circle class="speedo-bg" cx="80" cy="80" r="60"/>
-            <circle id="speedo-bar" class="speedo-bar" cx="80" cy="80" r="60" stroke-dasharray="377" stroke-dashoffset="377"/>
-          </svg>
-          <div class="speedo-content">
-            <div id="speed-val" class="speed-val">0.00</div>
-            <div class="speed-unit">MB / SEC</div>
-          </div>
-        </div>
-        <div class="speed-peak-tag">
-          PEAK RECORD: <strong id="peak-val" style="color:#fff;">0.00 MB/s</strong>
-        </div>
-        
-        <!-- ACTIVE FILE PROGRESS DISPLAY -->
-        <div id="active-transfer-box" style="display:none; width:100%; margin-top:0.75rem; background:rgba(0,0,0,0.45); border:1px solid rgba(0,242,254,0.3); border-radius:0.75rem; padding:0.65rem 0.85rem; font-size:0.78rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center; color:#e2e8f0; margin-bottom:0.3rem;">
-            <span id="active-file-name" style="font-weight:700; color:var(--cyan-primary); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Streaming File...</span>
-            <span id="active-file-pct" style="font-family:var(--font-mono); color:#34d399; font-weight:800;">0%</span>
-          </div>
-          <div style="width:100%; height:5px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden;">
-            <div id="active-file-bar" style="width:0%; height:100%; background:var(--cyan-gradient); transition:width 0.3s ease;"></div>
-          </div>
-          <div style="display:flex; justify-content:space-between; color:var(--text-dim); margin-top:0.35rem; font-size:0.72rem; font-family:var(--font-mono);">
-            <span id="active-file-bytes">0 MB / 0 MB</span>
-            <span id="active-file-eta">ETA: --</span>
-          </div>
-        </div>
-
-        <!-- LIVE BANDWIDTH HISTORY SPECTRUM -->
-        <div style="width:100%; margin-top:0.75rem; background:rgba(0,0,0,0.4); border:1px solid rgba(0,242,254,0.2); border-radius:0.75rem; padding:0.6rem 0.75rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
-            <span style="font-size:0.68rem; font-weight:800; color:var(--cyan-primary); letter-spacing:0.05em;">BANDWIDTH SPECTRUM</span>
-            <span id="chart-live-val" style="font-size:0.68rem; font-family:var(--font-mono); color:#34d399; font-weight:700;">0.00 MB/s</span>
-          </div>
-          <svg id="bandwidth-sparkline-svg" viewBox="0 0 260 55" style="width:100%; height:55px; overflow:visible; display:block;">
-            <defs>
-              <linearGradient id="chart-cyan-fill" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.35"/>
-                <stop offset="100%" stop-color="#00f2fe" stop-opacity="0.0"/>
-              </linearGradient>
-            </defs>
-            <path id="sparkline-fill" d="M0,55 L260,55 Z" fill="url(#chart-cyan-fill)"/>
-            <path id="sparkline-path" d="M0,55 L260,55" fill="none" stroke="#00f2fe" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="drop-shadow(0 0 6px rgba(0,242,254,0.7))"/>
-            <circle id="sparkline-dot" cx="260" cy="55" r="3.5" fill="#fff" stroke="#00f2fe" stroke-width="2"/>
-          </svg>
-        </div>
-      </div>
-
-      <!-- METRICS & TELEMETRY -->
-      <div class="metrics-container">
-        <!-- ACTIVE SUBJECT BANNER -->
-        <div class="glass-card subject-banner">
-          <div class="subject-info">
-            <h4>CURRENT ACTIVE SUBJECT</h4>
-            <div id="subject-name" class="subject-name">Scanning Media Stream...</div>
-          </div>
-          <div class="pill" style="border-color:rgba(245, 158, 11, 0.45); color:#fbbf24; background:rgba(245, 158, 11, 0.1);">
-            📚 Topic Auto-Dividers Active
-          </div>
-        </div>
-
-        <!-- STATS GRID -->
-        <div class="stats-row">
-          <div class="glass-card stat-card">
-            <div class="stat-header">
-              <span>DELIVERED TODAY</span>
-              <span>📦</span>
-            </div>
-            <div id="total-delivered" class="stat-value" style="color:#34d399;">0</div>
-            <div class="stat-breakdown">
-              <span class="sub-pill" id="videos-sent">🎥 0</span>
-              <span class="sub-pill" id="docs-sent">📄 0</span>
-              <span class="sub-pill" id="photos-sent">🖼️ 0</span>
-              <span class="sub-pill" id="albums-sent">📚 0</span>
-            </div>
-          </div>
-
-          <div class="glass-card stat-card">
-            <div class="stat-header">
-              <span>TRACKED IN DB</span>
-              <span>💾</span>
-            </div>
-            <div id="db-count" class="stat-value" style="color:#38bdf8;">0</div>
-            <div class="stat-breakdown">
-              <span class="sub-pill">WAL Mode Enabled</span>
-              <span class="sub-pill">100% Idempotent</span>
-            </div>
-          </div>
-
-          <div class="glass-card stat-card">
-            <div class="stat-header">
-              <span>FLOODWAIT SHIELD</span>
-              <span>🛡️</span>
-            </div>
-            <div id="flood-count" class="stat-value" style="color:#fbbf24;">0</div>
-            <div class="stat-breakdown">
-              <span class="sub-pill" id="flood-delay">0.0s delay</span>
-              <span class="sub-pill">Auto-Paced</span>
-            </div>
-          </div>
-
-          <div class="glass-card stat-card">
-            <div class="stat-header">
-              <span>SYSTEM TELEMETRY</span>
-              <span>⚡</span>
-            </div>
-            <div id="system-health-val" class="stat-value" style="color:#c084fc; font-size:1.6rem;">HEALTHY</div>
-            <div class="stat-breakdown">
-              <span class="sub-pill">Anti-Ban 100%</span>
-              <span class="sub-pill">Dual Engine</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ACTION BAR -->
-    <div class="action-bar">
-      <button class="btn btn-primary" style="background: var(--purple-gradient); color: #fff; position:relative;" onclick="openResearchModal()">
-        🧠 AI Research Insights <span id="research-badge" class="badge-notify" style="display:none;">0 New</span>
-      </button>
-      <button class="btn btn-primary" onclick="triggerCloudBackup()">
-        📦 1-Click Cloud DB Backup
-      </button>
-      <button class="btn btn-secondary" style="border-color:rgba(168,85,247,0.5); color:#d8b4fe;" onclick="openCouncilModal()">
-        🧪 AI Council Debate
-      </button>
-      <button id="btn-pause" class="btn btn-secondary" onclick="togglePauseEngine()">
-        ⏸️ Pause Engine
-      </button>
-      <button id="btn-turbo" class="btn btn-secondary" style="border-color:rgba(245,158,11,0.5); color:#fbbf24;" onclick="toggleTurboPacer()">
-        ⚡ Turbo Engine
-      </button>
-      <button class="btn btn-secondary" onclick="openErrorsModal()">
-        ⚠️ View DLQ Errors (<span id="dlq-count-btn">0</span>)
-      </button>
-      <button class="btn btn-secondary" onclick="clearDlqErrors()">
-        🗑️ Clear DLQ
-      </button>
-      <button class="btn btn-secondary" onclick="exportTelemetryReport()">
-        📊 Export Telemetry
-      </button>
-      <button class="btn btn-secondary" onclick="openUserManagerModal('tg')">
-        👥 Multi-Account & Users
-      </button>
-      <button class="btn btn-secondary" onclick="copyWifiUrl()">
-        📲 Open on Phone
-      </button>
-    </div>
-
-    <!-- TERMINAL STREAM & INSIGHTS -->
-    <div class="stream-grid">
-      <!-- LIVE LOGS TERMINAL -->
-      <div class="glass-card terminal-card">
-        <div class="terminal-head">
-          <div class="terminal-dots">
-            <div class="t-dot t-red"></div>
-            <div class="t-dot t-yellow"></div>
-            <div class="t-dot t-green"></div>
-          </div>
-          <span style="font-size:0.78rem; color:var(--text-dim); font-family:var(--font-mono);">SENTINEL OBSERVER TELEMETRY STREAM</span>
-          <button onclick="clearTerminalLogs()" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:0.72rem;">Clear</button>
-        </div>
-        <div class="terminal-filter-bar">
-          <span style="font-size:0.68rem; color:var(--text-dim); font-weight:800; letter-spacing:0.04em;">FILTER:</span>
-          <button class="t-filter-chip active" onclick="filterLogs('all', this)">ALL</button>
-          <button class="t-filter-chip" onclick="filterLogs('forward', this)">FORWARDS</button>
-          <button class="t-filter-chip" onclick="filterLogs('stream', this)">STREAMING</button>
-          <button class="t-filter-chip" onclick="filterLogs('ai', this)">DEVI JI</button>
-          <button class="t-filter-chip" onclick="filterLogs('error', this)">ERRORS</button>
-        </div>
-        <div id="terminal-body" class="terminal-body">
-          <div class="log-line"><span class="log-time">[INIT]</span><span class="log-text">Connecting to Sentinel Telemetry daemon...</span></div>
-        </div>
-      </div>
-
-      <!-- TEACHER RECOMMENDATIONS -->
-      <div class="glass-card insights-card">
-        <div class="insights-head">
-          <span>🧠</span> AI TEACHER RECOMMENDATIONS
-        </div>
-        <div id="tips-container" style="display:flex; flex-direction:column; gap:0.65rem;">
-          <div class="tip-item"><span>💡</span> Sentinel Teacher active in 100% decoupled non-invasive mode.</div>
-        </div>
-      </div>
+        </main>
     </div>
 
-    <!-- DEVELOPER SHOWCASE -->
-    <section class="creator-section">
-      <div class="creator-header-card">
-        <div class="creator-profile">
-          <div class="creator-avatar">🩺</div>
-          <div>
-            <div class="creator-title-row">
-              <span class="creator-name">Dr. Amit Singh</span>
-              <span class="creator-badge kind">KIND DOCTOR</span>
-              <span class="creator-badge">PROJECT ARCHITECT</span>
+    <!-- Modals -->
+    <!-- 1. Wi-Fi / Remote Mobile Access Modal -->
+    <div class="modal-backdrop" id="remote-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Mobile Phone Wi-Fi Access</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeRemoteModal()">&times;</button>
             </div>
-            <div class="creator-role">
-              <strong>Lead Software Architect</strong> • Master Developer & Automation Specialist
+            <div class="modal-body">
+                <div style="text-align: center; margin-bottom: var(--space-3);">
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: var(--space-4);">
+                        Apne phone ke browser me neeche diya hua address open karein (ensure both phone and PC are on the same Wi-Fi):
+                    </div>
+                    <div class="tabular" style="font-size: 16px; font-weight: 700; color: var(--accent-info); padding: 12px; background-color: var(--bg-canvas); border-radius: var(--radius-md); border: 1px solid var(--border-medium); word-break: break-all;" id="wifi-modal-url">
+                        http://172.16.0.2:8080
+                    </div>
+                </div>
             </div>
-          </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="copyWifiUrl()">Copy Address</button>
+                <button class="btn btn-primary" onclick="closeRemoteModal()">Done</button>
+            </div>
         </div>
-        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-          <button type="button" class="copy-chip" onclick="copyToClipboard('@Ammitrajput1', 'Telegram Handle')" title="Click to copy Telegram Handle">✈️ @Ammitrajput1</button>
-          <button type="button" class="copy-chip" onclick="copyToClipboard('@Kinddoctor4u', 'Official Channel')" title="Click to copy Channel Handle">📢 @Kinddoctor4u</button>
-          <button type="button" class="copy-chip" onclick="copyToClipboard('Ammitrajput1@gmail.com', 'Support Email')" title="Click to copy Email">✉️ Ammitrajput1@gmail.com</button>
-        </div>
-      </div>
-
-      <div class="contact-grid">
-        <a href="https://www.instagram.com/ammmitrajput1" target="_blank" rel="noopener noreferrer" class="contact-card card-insta" title="Instagram: @ammmitrajput1">
-          <div class="contact-card-left">
-            <div class="contact-icon-box">📸</div>
-            <div class="contact-text">
-              <div class="contact-label">Instagram Profile</div>
-              <div class="contact-handle">@ammmitrajput1</div>
-            </div>
-          </div>
-          <div class="contact-action-btn">↗</div>
-        </a>
-
-        <a href="https://t.me/Ammitrajput1" target="_blank" rel="noopener noreferrer" class="contact-card card-tg-chat" title="Telegram: @Ammitrajput1">
-          <div class="contact-card-left">
-            <div class="contact-icon-box">✈️</div>
-            <div class="contact-text">
-              <div class="contact-label">Telegram Contact</div>
-              <div class="contact-handle">@Ammitrajput1</div>
-            </div>
-          </div>
-          <div class="contact-action-btn">↗</div>
-        </a>
-
-        <a href="https://t.me/Kinddoctor4u" target="_blank" rel="noopener noreferrer" class="contact-card card-tg-chan" title="Official Channel: @Kinddoctor4u">
-          <div class="contact-card-left">
-            <div class="contact-icon-box">📢</div>
-            <div class="contact-text">
-              <div class="contact-label">Official Channel</div>
-              <div class="contact-handle">@Kinddoctor4u</div>
-            </div>
-          </div>
-          <div class="contact-action-btn">↗</div>
-        </a>
-
-        <a href="https://wa.me/qr/placeholder" target="_blank" rel="noopener noreferrer" class="contact-card card-whatsapp" title="WhatsApp: Ammitrajput1">
-          <div class="contact-card-left">
-            <div class="contact-icon-box">💬</div>
-            <div class="contact-text">
-              <div class="contact-label">WhatsApp Official</div>
-              <div class="contact-handle">Ammitrajput1</div>
-            </div>
-          </div>
-          <div class="contact-action-btn">↗</div>
-        </a>
-
-        <a href="mailto:Ammitrajput1@gmail.com" class="contact-card card-email" title="Email Support: Ammitrajput1@gmail.com">
-          <div class="contact-card-left">
-            <div class="contact-icon-box">✉️</div>
-            <div class="contact-text">
-              <div class="contact-label">Email Support</div>
-              <div class="contact-handle">Ammitrajput1@gmail.com</div>
-            </div>
-          </div>
-          <div class="contact-action-btn">↗</div>
-        </a>
-
-        <div class="contact-card card-community" title="Branding: Kind Doctor & Team">
-          <div class="contact-card-left">
-            <div class="contact-icon-box">🎓</div>
-            <div class="contact-text">
-              <div class="contact-label">Branding & Study Group</div>
-              <div class="contact-handle">Kind Doctor & Team</div>
-            </div>
-          </div>
-          <div class="contact-action-btn" style="opacity:0.5;">✓</div>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- AI COUNCIL DEBATE MODAL -->
-  <div id="council-modal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 760px; border-color: rgba(168, 85, 247, 0.45); background: #0c1222;">
-      <div class="modal-header">
-        <div style="display:flex; align-items:center; gap:0.75rem;">
-          <div style="width:44px; height:44px; border-radius:0.75rem; background:linear-gradient(135deg, #a855f7, #38bdf8); display:grid; place-items:center; font-size:1.4rem; box-shadow:0 0 20px rgba(168,85,247,0.4);">🧪</div>
-          <div>
-            <h3 style="color:#fff; font-family:var(--font-display); font-size:1.25rem;">Multi-Model AI Council Debate</h3>
-            <p style="color:var(--text-dim); font-size:0.78rem;">Groq (LPU) + Mistral Codestral + Gemini 2.0 + OpenRouter Consensus</p>
-          </div>
-        </div>
-        <button class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.8rem;" onclick="closeCouncilModal()">✕ Close</button>
-      </div>
-
-      <div style="margin-bottom:1rem;">
-        <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); display:block; margin-bottom:0.4rem;">ENTER ARCHITECTURAL / SYSTEM STRATEGY TOPIC:</label>
-        <div style="display:flex; gap:0.6rem;">
-          <input type="text" id="council-topic-input" class="text-input" placeholder="e.g. Best MTProto chunk size and floodwait backoff for 4K video forwarding..." style="flex:1;" onkeydown="if(event.key==='Enter') runCouncilDebate()">
-          <button class="btn btn-primary" onclick="runCouncilDebate()" style="background:linear-gradient(135deg, #8b5cf6, #38bdf8); white-space:nowrap; padding:0 1.25rem;">⚡ Convene Council</button>
-        </div>
-        <div style="display:flex; gap:0.4rem; margin-top:0.5rem; flex-wrap:wrap;">
-          <span style="font-size:0.7rem; color:var(--text-dim);">Quick Topics:</span>
-          <button type="button" class="copy-chip" onclick="setCouncilTopic('Best concurrency and floodwait avoidance for large channels')">FloodWait Strategy</button>
-          <button type="button" class="copy-chip" onclick="setCouncilTopic('Decoupled async producer-consumer architecture for 2GB video uploads')">2GB Video Pipeline</button>
-          <button type="button" class="copy-chip" onclick="setCouncilTopic('SQLite WAL mode integrity and zero-corruption replication')">Database Reliability</button>
-        </div>
-      </div>
-
-      <!-- COUNCIL OUTPUT AREA -->
-      <div id="council-results" style="max-height: 48vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.85rem;">
-        <div style="color:var(--text-dim); text-align:center; padding:2rem; background:rgba(255,255,255,0.02); border-radius:0.85rem; border:1px solid var(--border-subtle);">
-          Click "Convene Council" to dispatch parallel debate across all 4 top-tier AI models.
-        </div>
-      </div>
     </div>
-  </div>
 
-  <!-- FLOATING DEVI JI ASSISTANT BADGE -->
-  <div id="devi-floating-badge" onclick="openDeviChatModal()" title="Devi Ji AI Assistant (Click to Chat)">
-    <div class="devi-float-avatar">🧬</div>
-    <div class="devi-float-info">
-      <div class="devi-float-name">Devi Ji AI</div>
-      <div class="devi-float-role">Level 9 Sovereign • Online</div>
+    <!-- 2. Telegram Login Modal -->
+    <div class="modal-backdrop" id="tg-login-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Connect Telegram Account</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeTgLoginModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" id="tg-phone-group">
+                    <label class="form-label">Phone Number (with Country Code)</label>
+                    <input type="text" class="text-input" id="tg-input-phone" placeholder="+919876543210">
+                </div>
+                <div class="form-group" id="tg-code-group" style="display: none;">
+                    <label class="form-label">Telegram OTP Code</label>
+                    <input type="text" class="text-input" id="tg-input-code" placeholder="12345">
+                </div>
+                <div class="form-group" id="tg-2fa-group" style="display: none;">
+                    <label class="form-label">2FA Cloud Password (Optional)</label>
+                    <input type="password" class="text-input" id="tg-input-2fa" placeholder="••••••••">
+                </div>
+                <div id="tg-modal-feedback" style="font-size: 12px; color: var(--accent-danger); display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTgLoginModal()">Cancel</button>
+                <button class="btn btn-primary" id="tg-modal-submit-btn" onclick="handleTgSendCode()">Send OTP Code</button>
+            </div>
+        </div>
     </div>
-    <div class="pulse-dot" style="background:#34d399; width:10px; height:10px;"></div>
-  </div>
 
-  <!-- TOAST NOTIFICATION -->
-  <div id="toast">✔ Action Completed</div>
-
-  <!-- LOGIN OVERLAY -->
-  <div id="login-modal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 420px; border-color: rgba(0, 242, 254, 0.4);">
-      <div style="text-align:center; margin-bottom:1.25rem;">
-        <div style="width:50px; height:50px; margin:0 auto 0.75rem; border-radius:1rem; background:var(--cyan-gradient); display:grid; place-items:center; font-size:1.5rem; box-shadow:0 0 20px rgba(0,242,254,0.4);">🔐</div>
-        <h3 style="color:#fff; font-family:var(--font-display); font-size:1.35rem;">Command Center Login</h3>
-        <p style="color:var(--text-dim); font-size:0.8rem; margin-top:0.25rem;">Multi-User Role-Based Access Control (RBAC)</p>
-      </div>
-      <form onsubmit="handleLoginSubmit(event)" style="display:flex; flex-direction:column; gap:0.85rem;">
-        <div class="input-group">
-          <label class="input-label">USERNAME</label>
-          <input type="text" id="login-username" class="text-input" placeholder="e.g. Amit" required autocomplete="username" />
-        </div>
-        <div class="input-group">
-          <label class="input-label">PASSWORD</label>
-          <input type="password" id="login-password" class="text-input" placeholder="••••••••" required autocomplete="current-password" />
-        </div>
-        <div id="login-error" style="color:#f43f5e; font-size:0.8rem; text-align:center; min-height:1rem;"></div>
-        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:0.75rem;">
-          🚀 Secure Login
-        </button>
-        <div style="font-size:0.72rem; color:var(--text-dim); text-align:center; margin-top:0.4rem;">
-          Default root admin: <code style="color:#38bdf8;">Amit</code> / <code style="color:#38bdf8;">Amit@123</code>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- INTERACTIVE TELEGRAM LOGIN MODAL -->
-  <div id="tg-login-modal" class="modal-overlay" onclick="if(event.target===this)closeTgLoginModal()">
-    <div class="modal-content" style="max-width: 480px; border-color: rgba(0, 136, 204, 0.5);">
-      <div class="modal-header">
-        <h3 style="color:#fff; font-family:var(--font-display); font-size:1.2rem; display:flex; align-items:center; gap:0.6rem;">
-          ✈️ Connect Telegram Account
-        </h3>
-        <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="closeTgLoginModal()">✕ Close</button>
-      </div>
-      <div class="modal-body">
-        <!-- STEP 1: PHONE NUMBER -->
-        <div id="tg-step-phone">
-          <p style="font-size:0.82rem; color:#cbd5e1; margin-bottom:1rem; line-height:1.5;">
-            Enter your Telegram registered phone number with country code. Telegram will send a verification code directly to your official Telegram app.
-          </p>
-          <form onsubmit="handleTgSendCode(event)" style="display:flex; flex-direction:column; gap:0.85rem;">
-            <div class="input-group">
-              <label class="input-label">PHONE NUMBER (WITH COUNTRY CODE)</label>
-              <input type="text" id="tg-login-phone" class="text-input" placeholder="+919876543210" required />
+    <!-- 3. Dashboard User Login Modal -->
+    <div class="modal-backdrop" id="login-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Admin Authentication</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeLoginModal()">&times;</button>
             </div>
-            <div class="input-group">
-              <label class="input-label">SESSION NAME (OPTIONAL)</label>
-              <input type="text" id="tg-login-sess-name" class="text-input" placeholder="e.g. account2" />
-            </div>
-            <div id="tg-phone-error" style="color:#f43f5e; font-size:0.8rem; min-height:1rem;"></div>
-            <button type="submit" id="tg-send-code-btn" class="btn btn-primary" style="justify-content:center; padding:0.75rem;">
-              📲 Send Verification Code
-            </button>
-          </form>
-        </div>
-
-        <!-- STEP 2: VERIFY CODE & 2FA -->
-        <div id="tg-step-code" style="display:none;">
-          <div style="background:rgba(0,242,254,0.08); border:1px solid rgba(0,242,254,0.3); border-radius:0.75rem; padding:0.85rem; margin-bottom:1rem; font-size:0.82rem; color:#e2e8f0;">
-            <strong style="color:var(--cyan-primary);">✔ Code Dispatched!</strong><br>
-            <span id="tg-code-dest-text">Check your official Telegram App chat.</span>
-          </div>
-          <form onsubmit="handleTgVerifyCode(event)" style="display:flex; flex-direction:column; gap:0.85rem;">
-            <div class="input-group">
-              <label class="input-label">5-DIGIT TELEGRAM CODE</label>
-              <input type="text" id="tg-login-code" class="text-input" placeholder="12345" required autocomplete="one-time-code" />
-            </div>
-            <div class="input-group" id="tg-2fa-container" style="display:none;">
-              <label class="input-label" style="color:#fbbf24;">2FA TWO-STEP VERIFICATION PASSWORD</label>
-              <input type="password" id="tg-login-2fa" class="text-input" placeholder="Enter cloud password" />
-            </div>
-            <div id="tg-verify-error" style="color:#f43f5e; font-size:0.8rem; min-height:1rem;"></div>
-            <button type="submit" id="tg-verify-btn" class="btn btn-primary" style="justify-content:center; padding:0.75rem;">
-              🚀 Verify & Connect Account
-            </button>
-            <button type="button" class="btn btn-secondary" style="justify-content:center;" onclick="resetTgLoginForm()">
-              ← Change Phone Number
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MULTI-USER & TELEGRAM SESSIONS MODAL -->
-  <div id="user-mgmt-modal" class="modal-overlay" onclick="if(event.target===this)closeUserManagerModal()">
-    <div class="modal-content" style="max-width: 740px;">
-      <div class="modal-header">
-        <h3 style="color:#fff; font-family:var(--font-display); font-size:1.15rem; display:flex; align-items:center; gap:0.5rem;">
-          👥 Multi-Account & User Management
-        </h3>
-        <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="closeUserManagerModal()">✕ Close</button>
-      </div>
-      <div class="modal-body">
-        <!-- TABS -->
-        <div style="display:flex; gap:0.5rem; border-bottom:1px solid var(--border-subtle); padding-bottom:0.75rem; margin-bottom:1rem;">
-          <button id="tab-tg-btn" class="btn btn-primary" style="padding:0.4rem 0.9rem; font-size:0.8rem;" onclick="switchMgmtTab('tg')">📱 Telegram Accounts</button>
-          <button id="tab-users-btn" class="btn btn-secondary" style="padding:0.4rem 0.9rem; font-size:0.8rem;" onclick="switchMgmtTab('users')">👤 Dashboard Users (RBAC)</button>
-        </div>
-
-        <!-- TAB 1: TELEGRAM ACCOUNTS -->
-        <div id="tab-tg-content">
-          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,242,254,0.06); border:1px solid rgba(0,242,254,0.2); border-radius:0.75rem; padding:0.75rem 1rem; margin-bottom:1rem; font-size:0.82rem; color:#e2e8f0; flex-wrap:wrap; gap:0.5rem;">
-            <div>
-              <strong style="color:var(--cyan-primary);">📱 Telegram Multi-Session Engine:</strong> Forwarder can route across all active accounts.
-            </div>
-            <button class="btn btn-primary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="closeUserManagerModal(); openTgLoginModal();">
-              ➕ Add New Account
-            </button>
-          </div>
-          <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:0.6rem;">Connected Telegram Accounts</h4>
-          <div id="tg-sessions-container" style="display:flex; flex-direction:column; gap:0.6rem;">
-            <div style="color:var(--text-dim); font-size:0.8rem;">Scanning account profiles...</div>
-          </div>
-        </div>
-
-        <!-- TAB 2: USERS -->
-        <div id="tab-users-content" style="display:none;">
-          <div style="margin-bottom:1.25rem;">
-            <h4 style="color:#38bdf8; font-size:0.85rem; margin-bottom:0.5rem;">Create New Dashboard User</h4>
-            <form onsubmit="handleCreateUser(event)" style="display:grid; grid-template-columns:1fr 1fr 120px 100px; gap:0.5rem; align-items:flex-end;">
-              <div>
-                <label class="input-label">USERNAME</label>
-                <input type="text" id="new-u-name" class="text-input" placeholder="User name" required />
-              </div>
-              <div>
-                <label class="input-label">PASSWORD</label>
-                <input type="password" id="new-u-pass" class="text-input" placeholder="Password" required />
-              </div>
-              <div>
-                <label class="input-label">ROLE</label>
-                <select id="new-u-role" class="text-input" style="padding:0.65rem 0.5rem;">
-                  <option value="viewer">Viewer</option>
-                  <option value="operator">Operator</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <button type="submit" class="btn btn-primary" style="padding:0.65rem 0.5rem; justify-content:center;">➕ Add</button>
+            <form onsubmit="handleLoginSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="text-input" id="login-username" value="Amit" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="text-input" id="login-password" value="Amit@123" required>
+                    </div>
+                    <div id="login-error-msg" style="font-size: 12px; color: var(--accent-danger); display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeLoginModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Log In</button>
+                </div>
             </form>
-          </div>
-
-          <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:0.5rem;">Active Dashboard Users</h4>
-          <div id="users-table-container" style="display:flex; flex-direction:column; gap:0.5rem;">
-            <div style="color:var(--text-dim); font-size:0.8rem;">Loading users...</div>
-          </div>
         </div>
-      </div>
     </div>
-  </div>
 
-  <!-- DLQ ERRORS MODAL -->
-  <div id="err-modal" class="modal-overlay" onclick="if(event.target===this)closeErrorsModal()">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 style="color:#f43f5e; font-family:var(--font-display); font-size:1.15rem; display:flex; align-items:center; gap:0.5rem;">
-          ⚠️ Dead Letter Queue (DLQ) Errors
-        </h3>
-        <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="closeErrorsModal()">✕ Close</button>
-      </div>
-      <div class="modal-body" id="modal-err-list">
-        <div style="color:var(--text-dim); text-align:center; padding:1.5rem;">Fetching errors...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PERSISTENT AI RESEARCH INSIGHTS MODAL (MARK AS READ / UNREAD) -->
-  <div id="research-modal" class="modal-overlay" onclick="if(event.target===this)closeResearchModal()">
-    <div class="modal-content" style="max-width: 860px;">
-      <div class="modal-header" style="border-bottom:1px solid var(--border-subtle); padding-bottom:0.85rem; margin-bottom:1rem;">
-        <div>
-          <h3 style="color:#c084fc; font-family:var(--font-display); font-size:1.3rem; display:flex; align-items:center; gap:0.6rem;">
-            🧠 Autonomous AI Research Advisor & Optimization Hub
-          </h3>
-          <p style="color:var(--text-dim); font-size:0.78rem; margin-top:0.2rem;">All research findings are permanently preserved. Mark items as read to acknowledge.</p>
-        </div>
-        <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="closeResearchModal()">✕ Close</button>
-      </div>
-
-      <!-- FILTER TABS & SEARCH BAR -->
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem;">
-        <div style="display:flex; gap:0.4rem;" id="research-tabs-bar">
-          <button class="filter-tab-btn active" id="tab-all-insights" onclick="setResearchFilter('all')">🔥 All (<span id="count-all">0</span>)</button>
-          <button class="filter-tab-btn" id="tab-unread-insights" onclick="setResearchFilter('unread')">📬 Unread (<span id="count-unread">0</span>)</button>
-          <button class="filter-tab-btn" id="tab-read-insights" onclick="setResearchFilter('read')">✅ Read History (<span id="count-read">0</span>)</button>
-        </div>
-
-        <div style="display:flex; gap:0.5rem; align-items:center;">
-          <input type="text" id="research-search" class="text-input" placeholder="🔍 Search insights..." style="padding:0.4rem 0.75rem; font-size:0.78rem; width:160px;" oninput="renderResearchList()" />
-          <button class="btn btn-secondary" style="padding:0.4rem 0.75rem; font-size:0.78rem; color:#34d399;" onclick="markAllInsightsRead()" title="Mark all items as read">
-            ✓✓ Mark All Read
-          </button>
-        </div>
-      </div>
-
-      <div class="modal-body" id="modal-research-list" style="display:flex; flex-direction:column; gap:0.85rem; max-height:58vh; overflow-y:auto;">
-        <div style="color:var(--text-dim); text-align:center; padding:2rem;">Loading research findings...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- REMOTE MODAL -->
-  <div id="remote-modal" class="modal-overlay" onclick="if(event.target===this)closeRemoteModal()">
-    <div class="modal-content" style="max-width: 580px;">
-      <div class="modal-header">
-        <h3 style="color:#34d399; font-family:var(--font-display); font-size:1.15rem; display:flex; align-items:center; gap:0.5rem;">
-          🌐 Worldwide Mobile Access (4G/5G)
-        </h3>
-        <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="closeRemoteModal()">✕ Close</button>
-      </div>
-      <div class="modal-body" style="font-size:0.85rem; color:#cbd5e1; line-height:1.6;">
-        <div style="background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.3); border-radius:0.75rem; padding:1rem; margin-bottom:0.5rem;">
-          <strong style="color:#34d399;">🌍 Access from anywhere outside home Wi-Fi:</strong>
-          <p style="margin-top:0.3rem;">Run Cloudflare Tunnel or ngrok to create a secure worldwide tunnel:</p>
-          <code style="display:block; background:#000; padding:0.5rem 0.75rem; border-radius:0.4rem; margin-top:0.5rem; color:#38bdf8; font-family:var(--font-mono); font-size:0.8rem;">cloudflared tunnel --url http://127.0.0.1:8080</code>
-        </div>
-      </div>
-  <!-- DEVI JI LIVE CHAT DRAWER / MODAL -->
-  <div id="devi-chat-modal" class="modal-overlay" onclick="if(event.target===this)closeDeviChatModal()">
-    <div class="modal-content" style="max-width: 680px; display:flex; flex-direction:column; height:80vh; max-height:750px;">
-      <div class="modal-header" style="border-bottom:1px solid var(--border-subtle); padding-bottom:0.85rem;">
-        <div style="display:flex; align-items:center; gap:0.75rem;">
-          <div style="width:38px; height:38px; border-radius:0.75rem; background:linear-gradient(135deg, #8b5cf6, #38bdf8); display:grid; place-items:center; font-size:1.2rem;">
-            🧬
-          </div>
-          <div>
-            <h3 style="color:#fff; font-family:var(--font-display); font-size:1.15rem;">
-              Chat with Devi Ji 🙏
-            </h3>
-            <p style="color:var(--text-dim); font-size:0.74rem;">Autonomous AI Guardian &amp; Mentor • Roman Hinglish Assisted</p>
-          </div>
-        </div>
-        <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="closeDeviChatModal()">✕ Close</button>
-      </div>
-
-      <!-- QUICK PROMPT CHIPS -->
-      <div style="display:flex; gap:0.4rem; padding:0.65rem 0; overflow-x:auto; flex-wrap:nowrap; border-bottom:1px solid rgba(255,255,255,0.05);">
-        <button class="btn btn-secondary" style="font-size:0.72rem; padding:0.25rem 0.65rem; white-space:nowrap;" onclick="sendDeviPrompt('Devi Ji, forwarding speed aur health ka report do')">⚡ Forwarding Health</button>
-        <button class="btn btn-secondary" style="font-size:0.72rem; padding:0.25rem 0.65rem; white-space:nowrap;" onclick="sendDeviPrompt('System memory aur vitals kaisi hain?')">💻 System Vitals</button>
-        <button class="btn btn-secondary" style="font-size:0.72rem; padding:0.25rem 0.65rem; white-space:nowrap;" onclick="sendDeviPrompt('Devi Ji, aapne universe se kya seekha?')">🌌 Universe Learning</button>
-        <button class="btn btn-secondary" style="font-size:0.72rem; padding:0.25rem 0.65rem; white-space:nowrap;" onclick="sendDeviPrompt('Telegram FloodWait se bachne ke tips batao')">🛡️ Anti-Flood Tips</button>
-      </div>
-
-      <!-- CHAT MESSAGE BODY -->
-      <div id="devi-chat-body" style="flex:1; overflow-y:auto; padding:1rem 0; display:flex; flex-direction:column; gap:0.85rem;">
-        <div style="display:flex; gap:0.65rem; align-items:flex-start;">
-          <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg, #8b5cf6, #38bdf8); display:grid; place-items:center; font-size:1rem; flex-shrink:0;">🧬</div>
-          <div style="background:rgba(168, 85, 247, 0.12); border:1px solid rgba(168, 85, 247, 0.3); border-radius:0.85rem; padding:0.75rem 1rem; color:#f1f5f9; font-size:0.85rem; line-height:1.5; max-width:85%;">
-            Pranam Dr. Amit Singh! 🙏 Main Devi Ji hoon — aapki personal autonomous AI Guardian. Telegram forwarding, channel metrics, ya koi bhi system optimization ke bare me mujhse poochhiye, main turant madad karungi!
-          </div>
-        </div>
-      </div>
-
-      <!-- CHAT INPUT -->
-      <form onsubmit="handleDeviChatSubmit(event)" style="display:flex; gap:0.5rem; padding-top:0.75rem; border-top:1px solid var(--border-subtle);">
-        <input type="text" id="devi-chat-input" class="text-input" placeholder="Devi Ji se baat karein (Roman Hinglish)..." style="flex:1; padding:0.65rem 1rem; font-size:0.85rem;" autocomplete="off" />
-        <button type="submit" id="devi-chat-send-btn" class="btn btn-primary" style="padding:0.65rem 1.25rem; font-size:0.85rem;">
-          Send ➔
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- 1-CLICK QR LOGIN MODAL -->
-  <div id="qr-modal" class="modal-overlay" onclick="if(event.target===this)closeQrModal()">
-    <div class="modal-content" style="max-width:460px; text-align:center;">
-      <div class="modal-header" style="justify-content:space-between;">
-        <h3 style="color:#38bdf8; font-family:var(--font-display); font-size:1.2rem; display:flex; align-items:center; gap:0.5rem;">
-          📱 Instant QR Code Login
-        </h3>
-        <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="closeQrModal()">✕ Close</button>
-      </div>
-      <div class="modal-body" style="padding:1rem 0;">
-        <p style="color:var(--text-muted); font-size:0.84rem; margin-bottom:1rem; line-height:1.5;">
-          Open Telegram on your Phone:<br>
-          <strong style="color:#fff;">Settings ➔ Devices ➔ Link Desktop Device</strong>
-        </p>
-        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(0,242,254,0.3); padding:1.25rem; border-radius:1.25rem; display:inline-block; box-shadow:0 0 35px rgba(0, 242, 254, 0.2); margin-bottom:1rem;">
-          <iframe src="http://127.0.0.1:5005" id="qr-frame" style="width:320px; height:380px; border:none; border-radius:1rem; background:#0a0f1d;"></iframe>
-        </div>
-        <div style="display:flex; gap:0.5rem; justify-content:center;">
-          <a href="http://127.0.0.1:5005" target="_blank" class="btn btn-primary" style="padding:0.5rem 1.2rem; font-size:0.82rem;">
-            🔗 Open Login Wizard in New Tab
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-
-    let authToken = localStorage.getItem('tg_auth_token') || '';
-    let currentUser = null;
-    let currentLoginId = null;
-    let cachedInsights = [];
-    let currentResearchFilter = 'all';
-
-    // ==========================================
-    // 1. CYBERNETIC SOUND FX SYNTHESIZER (WEB AUDIO API)
-    // ==========================================
-    let audioCtx = null;
-    let soundEnabled = localStorage.getItem('tg_sound_fx') !== 'false';
-
-    function initAudioContext() {
-      if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-    }
-
-    const soundFX = {
-      playClick() {
-        if (!soundEnabled) return;
-        try {
-          initAudioContext();
-          if (!audioCtx) return;
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(950, audioCtx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(1400, audioCtx.currentTime + 0.035);
-          gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.035);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start();
-          osc.stop(audioCtx.currentTime + 0.04);
-        } catch(e) {}
-      },
-      playSuccess() {
-        if (!soundEnabled) return;
-        try {
-          initAudioContext();
-          if (!audioCtx) return;
-          const now = audioCtx.currentTime;
-          [523.25, 659.25, 783.99].forEach((freq, i) => {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(freq, now + i * 0.05);
-            gain.gain.setValueAtTime(0.05, now + i * 0.05);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.05 + 0.18);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(now + i * 0.05);
-            osc.stop(now + i * 0.05 + 0.2);
-          });
-        } catch(e) {}
-      },
-      playAlert() {
-        if (!soundEnabled) return;
-        try {
-          initAudioContext();
-          if (!audioCtx) return;
-          const now = audioCtx.currentTime;
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(450, now);
-          osc.frequency.exponentialRampToValueAtTime(220, now + 0.12);
-          gain.gain.setValueAtTime(0.04, now);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now);
-          osc.stop(now + 0.13);
-        } catch(e) {}
-      }
-    };
-
-    function toggleSoundFX() {
-      soundEnabled = !soundEnabled;
-      localStorage.setItem('tg_sound_fx', soundEnabled);
-      const el = document.getElementById('sound-state');
-      if (el) el.innerText = soundEnabled ? 'AUDIO: ON' : 'AUDIO: MUTED';
-      showToast(soundEnabled ? '🔊 Cybernetic Audio FX Enabled' : '🔇 Audio FX Muted');
-      if (soundEnabled) soundFX.playSuccess();
-    }
-
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('button, .pill, .contact-card, .copy-chip')) {
-        soundFX.playClick();
-      }
-    });
-
-    // ==========================================
-    // 2. BACKGROUND AMBIENT PARTICLE CANVAS
-    // ==========================================
-    function initAmbientCanvas() {
-      const canvas = document.getElementById('ambient-canvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      let w = canvas.width = window.innerWidth;
-      let h = canvas.height = window.innerHeight;
-
-      window.addEventListener('resize', () => {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
-      });
-
-      const particleCount = Math.min(45, Math.floor(w / 35));
-      const particles = [];
-      for (let i = 0; i < particleCount; i++) {
-        particles.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          vx: (Math.random() - 0.5) * 0.45,
-          vy: (Math.random() - 0.5) * 0.45,
-          radius: Math.random() * 1.6 + 0.6,
-          color: Math.random() > 0.5 ? 'rgba(0, 242, 254, ' : 'rgba(168, 85, 247, '
-        });
-      }
-
-      function draw() {
-        ctx.clearRect(0, 0, w, h);
-        for (let i = 0; i < particles.length; i++) {
-          const p = particles[i];
-          p.x += p.vx;
-          p.y += p.vy;
-          if (p.x < 0) p.x = w;
-          if (p.x > w) p.x = 0;
-          if (p.y < 0) p.y = h;
-          if (p.y > h) p.y = 0;
-
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-          ctx.fillStyle = p.color + '0.75)';
-          ctx.fill();
-
-          for (let j = i + 1; j < particles.length; j++) {
-            const p2 = particles[j];
-            const dx = p.x - p2.x;
-            const dy = p.y - p2.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 95) {
-              ctx.beginPath();
-              ctx.moveTo(p.x, p.y);
-              ctx.lineTo(p2.x, p2.y);
-              ctx.strokeStyle = `rgba(0, 242, 254, ${(1 - dist / 95) * 0.18})`;
-              ctx.lineWidth = 0.8;
-              ctx.stroke();
-            }
-          }
-        }
-        requestAnimationFrame(draw);
-      }
-      requestAnimationFrame(draw);
-    }
-
-    // ==========================================
-    // 3. DEVI JI NEURAL SYNAPSE BRAINWAVE CANVAS
-    // ==========================================
-    function initDeviNeuralCanvas() {
-      const canvas = document.getElementById('devi-neural-canvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      let step = 0;
-
-      function renderWave() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const w = canvas.width;
-        const h = canvas.height;
-        const midY = h / 2;
-
-        // Wave 1: Cyan
-        ctx.beginPath();
-        ctx.strokeStyle = '#00f2fe';
-        ctx.lineWidth = 1.8;
-        ctx.shadowColor = '#00f2fe';
-        ctx.shadowBlur = 6;
-        for (let x = 0; x < w; x++) {
-          const y = midY + Math.sin(x * 0.09 + step * 0.05) * 7 * Math.sin(x * 0.03 + step * 0.02);
-          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-
-        // Wave 2: Purple
-        ctx.beginPath();
-        ctx.strokeStyle = '#c084fc';
-        ctx.lineWidth = 1.4;
-        ctx.shadowColor = '#c084fc';
-        ctx.shadowBlur = 4;
-        for (let x = 0; x < w; x++) {
-          const y = midY + Math.cos(x * 0.07 - step * 0.04) * 6 * Math.cos(x * 0.04 + step * 0.015);
-          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-
-        step++;
-        requestAnimationFrame(renderWave);
-      }
-      requestAnimationFrame(renderWave);
-    }
-
-    // ==========================================
-    // 4. LIVE BANDWIDTH SPARKLINE SPECTRUM
-    // ==========================================
-    const speedHistory = new Array(20).fill(0);
-
-    function updateBandwidthSparkline(currentSpeed) {
-      speedHistory.shift();
-      speedHistory.push(currentSpeed);
-
-      const svg = document.getElementById('bandwidth-sparkline-svg');
-      const fillPath = document.getElementById('sparkline-fill');
-      const linePath = document.getElementById('sparkline-path');
-      const dot = document.getElementById('sparkline-dot');
-      const liveVal = document.getElementById('chart-live-val');
-      if (!svg || !linePath) return;
-
-      if (liveVal) liveVal.innerText = `${currentSpeed.toFixed(2)} MB/s`;
-
-      const maxVal = Math.max(10, ...speedHistory) * 1.15;
-      const width = 260;
-      const height = 55;
-      const paddingBottom = 4;
-      const paddingTop = 4;
-      const usableHeight = height - paddingTop - paddingBottom;
-
-      const pts = speedHistory.map((val, idx) => {
-        const x = (idx / (speedHistory.length - 1)) * width;
-        const y = height - paddingBottom - (val / maxVal) * usableHeight;
-        return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)) };
-      });
-
-      let d = `M${pts[0].x},${pts[0].y}`;
-      for (let i = 1; i < pts.length; i++) {
-        const prev = pts[i - 1];
-        const curr = pts[i];
-        const midX = (prev.x + curr.x) / 2;
-        d += ` C${midX},${prev.y} ${midX},${curr.y} ${curr.x},${curr.y}`;
-      }
-
-      linePath.setAttribute('d', d);
-      if (fillPath) {
-        fillPath.setAttribute('d', `${d} L${width},${height} L0,${height} Z`);
-      }
-      if (dot) {
-        const lastPt = pts[pts.length - 1];
-        dot.setAttribute('cx', lastPt.x);
-        dot.setAttribute('cy', lastPt.y);
-      }
-    }
-
-    // ==========================================
-    // 5. LIVE DIGITAL CLOCK TICKER
-    // ==========================================
-    function initLiveClock() {
-      function tick() {
-        const now = new Date();
-        const str = now.toLocaleTimeString('en-US', { hour12: false });
-        const el = document.getElementById('clock-val');
-        if (el) el.innerText = str;
-      }
-      setInterval(tick, 1000);
-      tick();
-    }
-
-    // ==========================================
-    // 6. AI COUNCIL DEBATE
-    // ==========================================
-    function openCouncilModal() {
-      document.getElementById('council-modal').classList.add('open');
-      const inp = document.getElementById('council-topic-input');
-      if (inp) inp.focus();
-    }
-
-    function closeCouncilModal() {
-      document.getElementById('council-modal').classList.remove('open');
-    }
-
-    function setCouncilTopic(txt) {
-      const inp = document.getElementById('council-topic-input');
-      if (inp) {
-        inp.value = txt;
-        inp.focus();
-      }
-    }
-
-    async function runCouncilDebate() {
-      const inp = document.getElementById('council-topic-input');
-      const topic = inp.value.trim();
-      if (!topic) return;
-
-      const resCont = document.getElementById('council-results');
-      resCont.innerHTML = `
-        <div style="text-align:center; padding:2rem; color:var(--cyan-primary);">
-          <div style="font-size:2rem; animation:float 1.5s ease-in-out infinite; display:inline-block;">⚡</div>
-          <div style="font-weight:700; margin-top:0.75rem;">Convening Multi-Model AI Council...</div>
-          <div style="font-size:0.78rem; color:var(--text-dim); margin-top:0.25rem;">Dispatching parallel queries across Groq, Mistral, Gemini, OpenRouter</div>
-        </div>
-      `;
-
-      try {
-        const res = await fetch('/api/devi/council', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ topic })
-        });
-        const d = await res.json();
-        if (d.success) {
-          soundFX.playSuccess();
-          const perspectivesHtml = (d.perspectives || []).map(p => `
-            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:0.75rem; padding:0.85rem 1rem;">
-              <div style="font-size:0.78rem; font-weight:800; color:#38bdf8; margin-bottom:0.25rem;">
-                🤖 ${p.model || 'Council Member'}
-              </div>
-              <div style="font-size:0.82rem; color:#e2e8f0; line-height:1.5;">
-                ${escapeHtml(p.opinion || '')}
-              </div>
+    <!-- 4. Add Member Modal -->
+    <div class="modal-backdrop" id="create-user-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Add Team Member</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeCreateUserModal()">&times;</button>
             </div>
-          `).join('');
-
-          resCont.innerHTML = `
-            <div style="background:linear-gradient(135deg, rgba(168,85,247,0.15), rgba(0,242,254,0.12)); border:1px solid rgba(168,85,247,0.4); border-radius:1rem; padding:1.15rem; box-shadow:0 8px 30px rgba(168,85,247,0.2);">
-              <div style="display:flex; align-items:center; gap:0.5rem; color:#fbbf24; font-weight:800; font-size:0.95rem; margin-bottom:0.45rem;">
-                👑 UNIFIED COUNCIL CONSENSUS
-              </div>
-              <div style="color:#fff; font-size:0.88rem; line-height:1.6;">
-                ${escapeHtml(d.consensus || 'Consensus reached.')}
-              </div>
-            </div>
-            <div style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-top:0.5rem;">
-              INDIVIDUAL MODEL PERSPECTIVES:
-            </div>
-            ${perspectivesHtml}
-          `;
-        } else {
-          resCont.innerHTML = `<div style="color:#f43f5e; padding:1rem;">Failed to convene council: ${d.error || 'Check API keys'}</div>`;
-        }
-      } catch(e) {
-        resCont.innerHTML = `<div style="color:#f43f5e; padding:1rem;">Council connection timeout. Check server.</div>`;
-      }
-    }
-
-    // ==========================================
-    // 7. TURBO PACER & TELEMETRY EXPORT
-    // ==========================================
-    let turboModeActive = false;
-
-    function toggleTurboPacer() {
-      turboModeActive = !turboModeActive;
-      const btn = document.getElementById('btn-turbo');
-      if (turboModeActive) {
-        btn.innerText = '🔥 TURBO: ACTIVE (100 MB/s)';
-        btn.style.background = 'linear-gradient(135deg, #f59e0b, #ef4444)';
-        btn.style.color = '#fff';
-        btn.style.borderColor = '#f59e0b';
-        showToast('🚀 Supersonic Turbo Mode: Chunk pacing set to minimum latency!');
-        soundFX.playSuccess();
-      } else {
-        btn.innerText = '⚡ Turbo Engine';
-        btn.style.background = '';
-        btn.style.color = '#fbbf24';
-        btn.style.borderColor = 'rgba(245,158,11,0.5)';
-        showToast('⚡ Turbo Mode deactivated. Standard pacing restored.');
-      }
-    }
-
-    async function exportTelemetryReport() {
-      showToast('Generating Telemetry JSON report...');
-      try {
-        const res = await fetch('/api/status', { headers: getAuthHeaders() });
-        const d = await res.json();
-        const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const now = new Date();
-        const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-        const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-        const dayName = days[now.getDay()];
-        const dateNum = String(now.getDate()).padStart(2, '0');
-        const monthName = months[now.getMonth()];
-        const year = now.getFullYear();
-        let hours = now.getHours();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12;
-        const mins = String(now.getMinutes()).padStart(2, '0');
-        const timeStr = `${String(hours).padStart(2, '0')}-${mins}${ampm}`;
-        const stamp = `${dayName}_${dateNum}-${monthName}-${year}_${timeStr}`;
-        a.download = `tg_kindsync_telemetry_${stamp}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast('✔ Telemetry export downloaded successfully!');
-        soundFX.playSuccess();
-      } catch(e) {
-        showToast('❌ Export failed');
-      }
-    }
-
-    function copyToClipboard(text, label) {
-      navigator.clipboard.writeText(text).then(() => {
-        showToast(`📋 Copied ${label} to clipboard: ${text}`);
-        soundFX.playClick();
-      }).catch(() => {
-        showToast(`🔗 ${text}`);
-      });
-    }
-
-    // ==========================================
-    // 8. THEME CYCLING & FULLSCREEN HUD
-    // ==========================================
-    const THEMES = ['default', 'crimson', 'emerald', 'gold'];
-    let currentThemeIdx = THEMES.indexOf(localStorage.getItem('tg_theme') || 'default');
-    if (currentThemeIdx === -1) currentThemeIdx = 0;
-
-    function applyTheme(themeName) {
-      document.body.className = (themeName === 'default') ? '' : `theme-${themeName}`;
-      localStorage.setItem('tg_theme', themeName);
-      const el = document.getElementById('cur-theme-name');
-      if (el) el.innerText = themeName.toUpperCase();
-    }
-
-    function cycleTheme() {
-      currentThemeIdx = (currentThemeIdx + 1) % THEMES.length;
-      const t = THEMES[currentThemeIdx];
-      applyTheme(t);
-      showToast(`🎨 Theme switched to: ${t.toUpperCase()}`);
-      soundFX.playClick();
-    }
-
-    function toggleFullscreenHud() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-        showToast('⛶ Fullscreen Cyber HUD Mode Activated');
-      } else {
-        if (document.exitFullscreen) document.exitFullscreen();
-        showToast('⛶ Standard View Restored');
-      }
-      soundFX.playClick();
-    }
-
-    // ==========================================
-    // 9. AI SPEED RACE BENCHMARK
-    // ==========================================
-    async function runModelSpeedRace() {
-      const btn = document.getElementById('race-btn');
-      btn.innerText = '⏳ Racing Models...';
-      btn.disabled = true;
-      showToast('🏁 Dispatched live speed benchmark to all 4 AI engines...');
-      soundFX.playClick();
-
-      try {
-        const t0 = performance.now();
-        const res = await fetch('/api/devi/chat', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ message: "Generate 10 words: 'Devi Ji supersonic forwarding speed test'" })
-        });
-        const d = await res.json();
-        const elapsed = Math.round(performance.now() - t0);
-
-        const groqSpeed = Math.floor(Math.random() * 50 + 470);
-        const cerSpeed = Math.floor(Math.random() * 60 + 590);
-        const gemSpeed = Math.floor(Math.random() * 30 + 175);
-        const misSpeed = Math.floor(Math.random() * 20 + 135);
-
-        document.getElementById('bench-groq').innerText = `Groq: ~${groqSpeed} t/s`;
-        document.getElementById('bench-cerebras').innerText = `Cerebras: ~${cerSpeed} t/s`;
-        document.getElementById('bench-gemini').innerText = `Gemini: ~${gemSpeed} t/s`;
-        document.getElementById('bench-mistral').innerText = `Mistral: ~${misSpeed} t/s`;
-
-        soundFX.playSuccess();
-        showToast(`🏆 Race Complete! Response delivered in ${d.latency_ms || elapsed}ms (${d.provider || 'Groq'})`);
-      } catch(e) {
-        showToast('🏁 Benchmark cycle finished.');
-      } finally {
-        btn.innerText = '🏁 Run AI Speed Race';
-        btn.disabled = false;
-      }
-    }
-
-    // ==========================================
-    // 10. TERMINAL LOG FILTERS
-    // ==========================================
-    let currentLogFilter = 'all';
-
-    function filterLogs(category, btnEl) {
-      currentLogFilter = category;
-      document.querySelectorAll('.t-filter-chip').forEach(b => b.classList.remove('active'));
-      if (btnEl) btnEl.classList.add('active');
-
-      const lines = document.querySelectorAll('#terminal-body .log-line');
-      lines.forEach(line => {
-        const txt = line.innerText.toLowerCase();
-        if (category === 'all') {
-          line.style.display = 'flex';
-        } else if (category === 'forward' && (txt.includes('forward') || txt.includes('sent') || txt.includes('wal'))) {
-          line.style.display = 'flex';
-        } else if (category === 'stream' && (txt.includes('stream') || txt.includes('speed') || txt.includes('chunk') || txt.includes('broadcast'))) {
-          line.style.display = 'flex';
-        } else if (category === 'ai' && (txt.includes('devi') || txt.includes('learning') || txt.includes('council') || txt.includes('sentinel'))) {
-          line.style.display = 'flex';
-        } else if (category === 'error' && (txt.includes('error') || txt.includes('fail') || txt.includes('flood') || txt.includes('dlq'))) {
-          line.style.display = 'flex';
-        } else {
-          line.style.display = 'none';
-        }
-      });
-      soundFX.playClick();
-    }
-
-    function getAuthHeaders() {
-      const headers = { 'Content-Type': 'application/json' };
-      if (authToken) {
-        headers['Authorization'] = 'Bearer ' + authToken;
-      }
-      return headers;
-    }
-
-    async function checkAuth() {
-      if (!authToken) {
-        showLoginModal();
-        return false;
-      }
-      try {
-        const res = await fetch('/api/auth/me', { headers: getAuthHeaders() });
-        if (res.status === 401) {
-          showLoginModal();
-          return false;
-        }
-        const data = await res.json();
-        if (data.authenticated) {
-          currentUser = data;
-          document.getElementById('user-display').innerText = data.username;
-          document.getElementById('role-display').innerText = (data.role || 'VIEWER').toUpperCase();
-          hideLoginModal();
-          return true;
-        } else {
-          showLoginModal();
-          return false;
-        }
-      } catch (e) {
-        return false;
-      }
-    }
-
-    function showLoginModal() { document.getElementById('login-modal').classList.add('open'); }
-    function hideLoginModal() { document.getElementById('login-modal').classList.remove('open'); }
-
-    async function handleLoginSubmit(e) {
-      e.preventDefault();
-      const u = document.getElementById('login-username').value.trim();
-      const p = document.getElementById('login-password').value;
-      const errEl = document.getElementById('login-error');
-      errEl.innerText = '';
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: u, password: p })
-        });
-        const d = await res.json();
-        if (d.success && d.token) {
-          authToken = d.token;
-          localStorage.setItem('tg_auth_token', authToken);
-          currentUser = d;
-          document.getElementById('user-display').innerText = d.username;
-          document.getElementById('role-display').innerText = (d.role || 'VIEWER').toUpperCase();
-          hideLoginModal();
-          showToast('✔ Welcome back, ' + d.username + '!');
-          updateStatus();
-        } else {
-          errEl.innerText = d.error || 'Invalid credentials';
-        }
-      } catch (err) {
-        errEl.innerText = 'Connection error. Check server.';
-      }
-    }
-
-    async function logoutUser() {
-      if (authToken) {
-        try { await fetch('/api/auth/logout', { method: 'POST', headers: getAuthHeaders() }); } catch(e) {}
-      }
-      authToken = '';
-      localStorage.removeItem('tg_auth_token');
-      currentUser = null;
-      showToast('Logged out');
-      showLoginModal();
-    }
-
-    function showToast(msg) {
-      const t = document.getElementById('toast');
-      t.innerText = msg;
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 3500);
-    }
-
-    function copyWifiUrl() {
-      const ip = document.getElementById('wifi-ip').innerText.replace('WI-FI: ', '').trim();
-      navigator.clipboard.writeText(ip).then(() => {
-        showToast('📋 Dashboard link copied to clipboard!');
-      }).catch(() => {
-        showToast('🔗 ' + ip);
-      });
-    }
-
-    function clearTerminalLogs() {
-      document.getElementById('terminal-body').innerHTML = '<div class="log-line"><span class="log-time">[CLEARED]</span><span class="log-text">Terminal cleared by operator.</span></div>';
-    }
-
-    // TELEMETRY UPDATES
-    async function updateStatus() {
-      try {
-        const t0 = performance.now();
-        const res = await fetch('/api/status', { headers: getAuthHeaders() });
-        const pingMs = Math.max(1, Math.round(performance.now() - t0));
-        const pingEl = document.getElementById('ping-val');
-        if (pingEl) pingEl.innerText = `${pingMs}ms`;
-
-        if (res.status === 401) {
-          showLoginModal();
-          return;
-        }
-        const d = await res.json();
-
-        // Uptime & Wi-Fi IP
-        document.getElementById('uptime-pill').innerText = `UPTIME: ${d.uptime}`;
-        if (d.wifi_url) {
-          document.getElementById('wifi-ip').innerText = `WI-FI: ${d.wifi_url}`;
-        }
-
-        // Active Telegram Account Info in Banner
-        if (d.active_tg_account) {
-          const acc = d.active_tg_account;
-          document.getElementById('tg-acc-name').innerText = acc.first_name || 'Telegram Account';
-          document.getElementById('tg-acc-user').innerText = acc.username ? `@${acc.username}` : '@Kinddoctor4u';
-          document.getElementById('tg-acc-phone').innerText = acc.phone || '+91 Active';
-          document.getElementById('tg-acc-id').innerText = acc.id || '18274921';
-        }
-
-        // Speedometer & Progress
-        const curSpeed = d.current_speed_mb || 0;
-        const peakSpeed = d.peak_speed_mb || 0;
-        document.getElementById('speed-val').innerText = curSpeed.toFixed(2);
-        document.getElementById('peak-val').innerText = `${peakSpeed.toFixed(2)} MB/s`;
-
-        // Update Live Bandwidth Sparkline
-        updateBandwidthSparkline(curSpeed);
-
-        const maxRefSpeed = Math.max(30, peakSpeed * 1.1);
-        const fraction = Math.min(1.0, curSpeed / maxRefSpeed);
-        const circumference = 377;
-        const offset = circumference - (fraction * circumference);
-        document.getElementById('speedo-bar').style.strokeDashoffset = offset;
-
-        // Active File Box
-        const tBox = document.getElementById('active-transfer-box');
-        if (d.is_transferring || d.active_file_name) {
-          tBox.style.display = 'block';
-          document.getElementById('active-file-name').innerText = d.active_file_name || 'Streaming Media...';
-          document.getElementById('active-file-pct').innerText = `${Math.round(d.active_file_progress || 0)}%`;
-          document.getElementById('active-file-bar').style.width = `${Math.min(100, Math.max(0, d.active_file_progress || 0))}%`;
-          document.getElementById('active-file-bytes').innerText = `${d.active_file_transferred || '0 MB'} / ${d.active_file_total || '0 MB'}`;
-          document.getElementById('active-file-eta').innerText = `ETA: ${d.active_file_eta || '--'}`;
-        } else {
-          tBox.style.display = 'none';
-        }
-
-        // Subject & Metrics
-        document.getElementById('subject-name').innerText = d.current_subject || 'Scanning Stream...';
-        document.getElementById('total-delivered').innerText = d.total_transfers || 0;
-        document.getElementById('videos-sent').innerText = `🎥 ${d.videos_sent || 0}`;
-        document.getElementById('docs-sent').innerText = `📄 ${d.docs_sent || 0}`;
-        document.getElementById('photos-sent').innerText = `🖼️ ${d.photos_sent || 0}`;
-        document.getElementById('albums-sent').innerText = `📚 ${d.albums_sent || 0}`;
-
-        // Hardware Vitals Live Calibration
-        const cpuPct = (Math.min(95, Math.max(3.5, curSpeed * 1.8 + 4.2))).toFixed(1);
-        const cpuEl = document.getElementById('vital-cpu-pct');
-        const cpuBar = document.getElementById('vital-cpu-bar');
-        if (cpuEl) cpuEl.innerText = `${cpuPct}%`;
-        if (cpuBar) cpuBar.style.width = `${cpuPct}%`;
-
-        const ramMb = (48.4 + (d.total_transfers % 10) * 0.4).toFixed(1);
-        const ramEl = document.getElementById('vital-ram-val');
-        const ramBar = document.getElementById('vital-ram-bar');
-        if (ramEl) ramEl.innerText = `${ramMb} MB`;
-        if (ramBar) ramBar.style.width = `${Math.min(100, Math.round(ramMb / 1.5))}%`;
-
-        const dcPing = Math.max(18, pingMs + 10);
-        const dcLatEl = document.getElementById('vital-tg-latency');
-        const dcBar = document.getElementById('vital-tg-bar');
-        if (dcLatEl) dcLatEl.innerText = `${dcPing} ms`;
-        if (dcBar) dcBar.style.width = `${Math.min(100, Math.round(dcPing / 1.2))}%`;
-
-        document.getElementById('db-count').innerText = (d.db_forwarded || 0).toLocaleString();
-        document.getElementById('flood-count').innerText = d.flood_waits_detected || 0;
-        const fwSecs = d.flood_wait_seconds_total || 0;
-        document.getElementById('flood-delay').innerText = `${fwSecs.toFixed(1)}s delayed`;
-
-        // DLQ Count
-        document.getElementById('dlq-count-btn').innerText = d.dlq_count || 0;
-
-        // Logs
-        const tBody = document.getElementById('terminal-body');
-        if (d.recent_events && d.recent_events.length > 0) {
-          tBody.innerHTML = d.recent_events.map(ev => {
-            const timeStr = new Date().toLocaleTimeString();
-            return `<div class="log-line"><span class="log-time">[${timeStr}]</span><span class="log-text">${ev}</span></div>`;
-          }).join('');
-        }
-
-        // Research Badge
-        const rBadge = document.getElementById('research-badge');
-        if (rBadge) {
-          const count = d.research_count || 0;
-          if (count > 0) {
-            rBadge.style.display = 'inline-flex';
-            rBadge.innerText = `${count} New`;
-          } else {
-            rBadge.style.display = 'none';
-          }
-        }
-
-        // Tips
-        const tipsCont = document.getElementById('tips-container');
-        if (d.recommendations && d.recommendations.length > 0) {
-          const total = d.recommendations.length;
-          tipsCont.innerHTML = d.recommendations.map((t, idx) => {
-            const isLatest = (idx === total - 1);
-            const badge = isLatest ? `<span class="badge-tip-latest">🔥 LATEST #${total}</span>` : `<span class="badge-tip-num">#${idx + 1}</span>`;
-            return `<div class="tip-item ${isLatest ? 'tip-item-latest' : ''}">${badge} <span style="color:#e2e8f0;">${t}</span></div>`;
-          }).reverse().join('');
-        }
-
-        // DEVI JI VITALITY & MULTI-MODEL UPDATE
-        if (d.devi_vitality) {
-          const dv = d.devi_vitality;
-          const kEl = document.getElementById('devi-keys-val');
-          if (kEl) kEl.innerText = `${dv.keys_discovered || 8} Active Keys`;
-          const pEl = document.getElementById('devi-prov-val');
-          if (pEl) pEl.innerText = `${dv.active_providers_count || 6} AI Models`;
-          const tEl = document.getElementById('devi-universe-ticker');
-          if (tEl && dv.latest_learning) tEl.innerText = dv.latest_learning;
-
-          if (dv.providers) {
-            for (const [prov, info] of Object.entries(dv.providers)) {
-              const stEl = document.getElementById(`st-${prov}`);
-              const latEl = document.getElementById(`lat-${prov}`);
-              if (stEl) {
-                stEl.innerText = info.status || 'ACTIVE';
-                stEl.style.color = (info.status === 'RATE_LIMITED') ? '#f43f5e' : '#34d399';
-              }
-              if (latEl && info.latency_ms > 0) {
-                latEl.innerText = `Latency: ${info.latency_ms}ms`;
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Status fetch error:', err);
-      }
-    }
-
-    // DEVI JI INTERACTIVE FUNCTIONS
-    async function triggerKeyHunt() {
-      showToast('🔍 Devi Ji scanning environment & rotating failovers...');
-      try {
-        const res = await fetch('/api/devi/hunt', { method: 'POST', headers: getAuthHeaders() });
-        const d = await res.json();
-        if (d.success) {
-          showToast(`✔ Devi Ji discovered ${d.vitality.keys_discovered} keys! 100% Failover Safe.`);
-          updateStatus();
-        } else {
-          showToast('❌ Scan completed with local fallback.');
-        }
-      } catch (e) {
-        showToast('❌ Key hunt failed');
-      }
-    }
-
-    function openDeviChatModal() {
-      document.getElementById('devi-chat-modal').classList.add('open');
-      document.getElementById('devi-chat-input').focus();
-    }
-
-    function closeDeviChatModal() {
-      document.getElementById('devi-chat-modal').classList.remove('open');
-    }
-
-    function sendDeviPrompt(promptText) {
-      document.getElementById('devi-chat-input').value = promptText;
-      handleDeviChatSubmit(new Event('submit'));
-    }
-
-    async function handleDeviChatSubmit(e) {
-      if (e && e.preventDefault) e.preventDefault();
-      const input = document.getElementById('devi-chat-input');
-      const text = input.value.trim();
-      if (!text) return;
-
-      const body = document.getElementById('devi-chat-body');
-      // Append user bubble
-      body.innerHTML += `
-        <div style="display:flex; gap:0.65rem; align-items:flex-start; justify-content:flex-end;">
-          <div style="background:linear-gradient(135deg, #0088cc, #00f2fe); color:#060911; font-weight:600; border-radius:0.85rem; padding:0.65rem 0.95rem; font-size:0.85rem; max-width:85%;">
-            ${escapeHtml(text)}
-          </div>
-          <div style="width:32px; height:32px; border-radius:50%; background:#1e293b; display:grid; place-items:center; font-size:1rem; flex-shrink:0;">👤</div>
-        </div>
-      `;
-      input.value = '';
-      body.scrollTop = body.scrollHeight;
-
-      // Loading bubble
-      const loadId = 'loading-' + Date.now();
-      body.innerHTML += `
-        <div id="${loadId}" style="display:flex; gap:0.65rem; align-items:flex-start;">
-          <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg, #8b5cf6, #38bdf8); display:grid; place-items:center; font-size:1rem; flex-shrink:0;">🧬</div>
-          <div style="background:rgba(255,255,255,0.05); border:1px solid var(--border-subtle); border-radius:0.85rem; padding:0.65rem 0.95rem; color:var(--text-dim); font-size:0.85rem;">
-            Devi Ji is thinking...
-          </div>
-        </div>
-      `;
-      body.scrollTop = body.scrollHeight;
-
-      try {
-        const res = await fetch('/api/devi/chat', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ message: text })
-        });
-        const d = await res.json();
-        const loadEl = document.getElementById(loadId);
-        if (loadEl) loadEl.remove();
-
-        const reply = d.response || 'Devi Ji local core verified your request.';
-        const provBadge = d.provider ? `<span style="font-size:0.68rem; color:#38bdf8; display:block; margin-top:0.35rem; font-family:var(--font-mono);">Powered by ${d.provider} (${d.model || 'Free Tier'}) · ${d.latency_ms || 0}ms</span>` : '';
-
-        body.innerHTML += `
-          <div style="display:flex; gap:0.65rem; align-items:flex-start;">
-            <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg, #8b5cf6, #38bdf8); display:grid; place-items:center; font-size:1rem; flex-shrink:0;">🧬</div>
-            <div style="background:rgba(168, 85, 247, 0.12); border:1px solid rgba(168, 85, 247, 0.3); border-radius:0.85rem; padding:0.75rem 1rem; color:#f1f5f9; font-size:0.85rem; line-height:1.5; max-width:85%;">
-              ${escapeHtml(reply)}
-              ${provBadge}
-            </div>
-          </div>
-        `;
-        body.scrollTop = body.scrollHeight;
-      } catch (err) {
-        const loadEl = document.getElementById(loadId);
-        if (loadEl) loadEl.remove();
-        showToast('❌ Devi Ji connection delay');
-      }
-    }
-
-    function openQrModal() {
-      document.getElementById('qr-modal').classList.add('open');
-      const frame = document.getElementById('qr-frame');
-      frame.src = 'http://127.0.0.1:5005';
-    }
-
-    function closeQrModal() {
-      document.getElementById('qr-modal').classList.remove('open');
-    }
-
-    function escapeHtml(str) {
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    }
-
-    // CLOUD BACKUP
-
-    async function triggerCloudBackup() {
-      showToast('Initiating online SQLite snapshot...');
-      try {
-        const res = await fetch('/api/backup', { method: 'POST', headers: getAuthHeaders() });
-        const d = await res.json();
-        if (d.success) {
-          showToast('✔ Snapshot dispatched to Telegram Saved Messages!');
-        } else {
-          showToast('❌ Backup failed: ' + (d.error || 'Check connection'));
-        }
-      } catch (e) {
-        showToast('❌ Error triggering backup');
-      }
-    }
-
-    // ENGINE PAUSE/RESUME
-    async function togglePauseEngine() {
-      try {
-        const res = await fetch('/api/pause', { method: 'POST', headers: getAuthHeaders() });
-        const d = await res.json();
-        const pBtn = document.getElementById('btn-pause');
-        if (d.paused) {
-          pBtn.innerText = '▶️ Resume Engine';
-          pBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-          showToast('⏸️ Engine paused');
-        } else {
-          pBtn.innerText = '⏸️ Pause Engine';
-          pBtn.style.background = '';
-          showToast('▶️ Engine resumed');
-        }
-      } catch (e) {
-        showToast('❌ Error toggling pause');
-      }
-    }
-
-    // CLEAR DLQ
-    async function clearDlqErrors() {
-      if (!confirm('Clear all dead-letter queue error records?')) return;
-      try {
-        const res = await fetch('/api/clear_dlq', { method: 'POST', headers: getAuthHeaders() });
-        const d = await res.json();
-        if (d.success) {
-          showToast('✔ DLQ Errors cleared');
-          document.getElementById('dlq-count-btn').innerText = '0';
-        }
-      } catch (e) {
-        showToast('❌ Error clearing DLQ');
-      }
-    }
-
-    // TELEGRAM WEB LOGIN FLOW
-    function openTgLoginModal() {
-      document.getElementById('tg-login-modal').classList.add('open');
-      resetTgLoginForm();
-    }
-
-    function closeTgLoginModal() {
-      document.getElementById('tg-login-modal').classList.remove('open');
-    }
-
-    function resetTgLoginForm() {
-      currentLoginId = null;
-      document.getElementById('tg-step-phone').style.display = 'block';
-      document.getElementById('tg-step-code').style.display = 'none';
-      document.getElementById('tg-phone-error').innerText = '';
-      document.getElementById('tg-verify-error').innerText = '';
-      document.getElementById('tg-2fa-container').style.display = 'none';
-      document.getElementById('tg-send-code-btn').innerText = '📲 Send Verification Code';
-      document.getElementById('tg-send-code-btn').disabled = false;
-      document.getElementById('tg-verify-btn').innerText = '🚀 Verify & Connect Account';
-      document.getElementById('tg-verify-btn').disabled = false;
-    }
-
-    async function handleTgSendCode(e) {
-      e.preventDefault();
-      const phone = document.getElementById('tg-login-phone').value.trim();
-      const sessName = document.getElementById('tg-login-sess-name').value.trim();
-      const btn = document.getElementById('tg-send-code-btn');
-      const errEl = document.getElementById('tg-phone-error');
-      errEl.innerText = '';
-      btn.innerText = '⏳ Contacting Telegram...';
-      btn.disabled = true;
-
-      try {
-        const res = await fetch('/api/telegram/send_code', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ phone: phone, session_name: sessName })
-        });
-        const d = await res.json();
-        if (d.success) {
-          currentLoginId = d.login_id;
-          document.getElementById('tg-code-dest-text').innerText = 'Code sent via: ' + (d.destination || 'Telegram App');
-          document.getElementById('tg-step-phone').style.display = 'none';
-          document.getElementById('tg-step-code').style.display = 'block';
-          document.getElementById('tg-login-code').focus();
-          showToast('✔ Code sent to ' + phone);
-        } else {
-          errEl.innerText = d.error || 'Failed to send code';
-          btn.innerText = '📲 Send Verification Code';
-          btn.disabled = false;
-        }
-      } catch (err) {
-        errEl.innerText = 'Connection error. Check server.';
-        btn.innerText = '📲 Send Verification Code';
-        btn.disabled = false;
-      }
-    }
-
-    async function handleTgVerifyCode(e) {
-      e.preventDefault();
-      const code = document.getElementById('tg-login-code').value.trim();
-      const pwd = document.getElementById('tg-login-2fa').value;
-      const btn = document.getElementById('tg-verify-btn');
-      const errEl = document.getElementById('tg-verify-error');
-      errEl.innerText = '';
-      btn.innerText = '⏳ Verifying with Telegram...';
-      btn.disabled = true;
-
-      try {
-        const res = await fetch('/api/telegram/verify_code', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ login_id: currentLoginId, code: code, password: pwd })
-        });
-        const d = await res.json();
-        if (d.success) {
-          closeTgLoginModal();
-          showToast('🎉 Successfully connected as ' + (d.user.first_name || 'User') + '!');
-          updateStatus();
-          loadTelegramSessions();
-        } else if (d.requires_2fa) {
-          document.getElementById('tg-2fa-container').style.display = 'block';
-          document.getElementById('tg-login-2fa').focus();
-          errEl.innerText = '🔑 Please enter your 2FA Two-Step Password above.';
-          btn.innerText = '🚀 Verify with 2FA Password';
-          btn.disabled = false;
-        } else {
-          errEl.innerText = d.error || 'Verification failed';
-          btn.innerText = '🚀 Verify & Connect Account';
-          btn.disabled = false;
-        }
-      } catch (err) {
-        errEl.innerText = 'Connection error. Check server.';
-        btn.innerText = '🚀 Verify & Connect Account';
-        btn.disabled = false;
-      }
-    }
-
-    // USER MANAGEMENT & TELEGRAM SESSIONS
-    function openUserManagerModal(tab = 'tg') {
-      document.getElementById('user-mgmt-modal').classList.add('open');
-      switchMgmtTab(tab);
-    }
-
-    function closeUserManagerModal() {
-      document.getElementById('user-mgmt-modal').classList.remove('open');
-    }
-
-    function switchMgmtTab(tab) {
-      const uBtn = document.getElementById('tab-users-btn');
-      const tgBtn = document.getElementById('tab-tg-btn');
-      const uContent = document.getElementById('tab-users-content');
-      const tgContent = document.getElementById('tab-tg-content');
-
-      if (tab === 'users') {
-        uBtn.className = 'btn btn-primary';
-        tgBtn.className = 'btn btn-secondary';
-        uContent.style.display = 'block';
-        tgContent.style.display = 'none';
-        loadUsersList();
-      } else {
-        uBtn.className = 'btn btn-secondary';
-        tgBtn.className = 'btn btn-primary';
-        uContent.style.display = 'none';
-        tgContent.style.display = 'block';
-        loadTelegramSessions();
-      }
-    }
-
-    async function loadUsersList() {
-      const cont = document.getElementById('users-table-container');
-      try {
-        const res = await fetch('/api/auth/users', { headers: getAuthHeaders() });
-        const d = await res.json();
-        if (!d.users || d.users.length === 0) {
-          cont.innerHTML = '<div style="color:var(--text-dim); text-align:center; padding:1rem;">No users found.</div>';
-          return;
-        }
-        cont.innerHTML = d.users.map(u => {
-          const isRoot = (u.username === 'Amit' || u.username === 'admin');
-          return `
-            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:0.75rem; padding:0.75rem 1rem; display:flex; justify-content:space-between; align-items:center;">
-              <div style="display:flex; align-items:center; gap:0.75rem;">
-                <span style="font-size:1.2rem;">👤</span>
-                <div>
-                  <div style="color:#fff; font-weight:700; font-size:0.92rem;">${u.username}</div>
-                  <div style="color:var(--text-dim); font-size:0.74rem;">Last active: ${u.last_login ? u.last_login.slice(0, 19).replace('T', ' ') : 'Never'}</div>
+            <form onsubmit="handleCreateUserSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="text-input" id="new-user-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="text-input" id="new-user-pass" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Role</label>
+                        <select class="text-input" id="new-user-role">
+                            <option value="operator">Operator</option>
+                            <option value="viewer">Viewer</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
                 </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:0.6rem;">
-                <span style="font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:0.4rem; background:rgba(0,242,254,0.1); border:1px solid rgba(0,242,254,0.3); color:var(--cyan-primary); font-weight:700; text-transform:uppercase;">${u.role}</span>
-                ${isRoot ? '' : `<button onclick="deleteUser('${u.username}')" class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem; color:#f43f5e;" title="Delete User">🗑️</button>`}
-              </div>
-            </div>
-          `;
-        }).join('');
-      } catch (e) {
-        cont.innerHTML = '<div style="color:#f43f5e;">Failed to load users list.</div>';
-      }
-    }
-
-    async function handleCreateUser(e) {
-      e.preventDefault();
-      const u = document.getElementById('new-u-name').value.trim();
-      const p = document.getElementById('new-u-pass').value;
-      const r = document.getElementById('new-u-role').value;
-      try {
-        const res = await fetch('/api/auth/create_user', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ username: u, password: p, role: r })
-        });
-        const d = await res.json();
-        if (d.success) {
-          showToast('✔ User ' + u + ' created!');
-          document.getElementById('new-u-name').value = '';
-          document.getElementById('new-u-pass').value = '';
-          loadUsersList();
-        } else {
-          showToast('❌ ' + (d.error || 'Failed to create user'));
-        }
-      } catch (err) {
-        showToast('❌ Error creating user');
-      }
-    }
-
-    async function deleteUser(username) {
-      if (!confirm('Are you sure you want to delete user ' + username + '?')) return;
-      try {
-        const res = await fetch('/api/auth/delete_user', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ username: username })
-        });
-        const d = await res.json();
-        if (d.success) {
-          showToast('✔ User deleted');
-          loadUsersList();
-        } else {
-          showToast('❌ ' + (d.error || 'Failed to delete user'));
-        }
-      } catch (e) {
-        showToast('❌ Error deleting user');
-      }
-    }
-
-    async function loadTelegramSessions() {
-      const cont = document.getElementById('tg-sessions-container');
-      try {
-        const res = await fetch('/api/telegram/accounts', { headers: getAuthHeaders() });
-        const d = await res.json();
-        if (!d.accounts || d.accounts.length === 0) {
-          cont.innerHTML = '<div style="color:var(--text-dim); padding:1rem; text-align:center;">No .session files found. Click "Add New Account" above to connect your Telegram account.</div>';
-          return;
-        }
-        cont.innerHTML = d.accounts.map(s => {
-          const u = s.user || {};
-          const isPrimary = s.is_primary;
-          const isActive = s.is_active;
-          return `
-            <div style="background:rgba(255,255,255,0.03); border:1px solid ${isActive ? 'rgba(0,242,254,0.45)' : 'var(--border-subtle)'}; border-radius:0.85rem; padding:0.85rem 1.1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
-              <div style="display:flex; align-items:center; gap:0.9rem;">
-                <div style="width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg, #0088cc, #00f2fe); display:grid; place-items:center; font-size:1.3rem;">✈️</div>
-                <div>
-                  <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-                    <span style="color:#fff; font-weight:700; font-size:0.95rem;">${u.first_name || s.session_name}</span>
-                    ${u.username ? `<span style="color:#38bdf8; font-size:0.8rem; font-family:var(--font-mono);">@${u.username}</span>` : ''}
-                    ${isActive ? '<span style="font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:0.4rem; background:rgba(0,242,254,0.2); border:1px solid var(--cyan-primary); color:var(--cyan-primary); font-weight:800;">ACTIVE NOW</span>' : ''}
-                  </div>
-                  <div style="color:var(--text-dim); font-size:0.75rem; margin-top:0.2rem;">
-                    Session: <code>${s.filename}</code> · Size: ${s.size_kb} KB ${u.phone ? `· Phone: ${u.phone}` : ''}
-                  </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Account</button>
                 </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:0.5rem;">
-                ${isActive ? '' : `<button onclick="setActiveTelegramSession('${s.session_name}')" class="btn btn-secondary" style="padding:0.3rem 0.7rem; font-size:0.75rem; color:#38bdf8;">⚡ Set Active</button>`}
-              </div>
-            </div>
-          `;
-        }).join('');
-      } catch (e) {
-        cont.innerHTML = '<div style="color:#f43f5e;">Failed to scan Telegram accounts.</div>';
-      }
-    }
+            </form>
+        </div>
+    </div>
 
-    async function setActiveTelegramSession(sessionName) {
-      try {
-        const res = await fetch('/api/telegram/set_active', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ session_name: sessionName })
-        });
-        const d = await res.json();
-        if (d.success) {
-          showToast('✔ Active account switched to ' + sessionName);
-          loadTelegramSessions();
-          updateStatus();
-        } else {
-          showToast('❌ ' + (d.error || 'Failed to switch account'));
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // State
+        let currentView = 'overview';
+        let currentUser = null;
+        let soundEnabled = true;
+        let speedHistory = [0, 5, 12, 18, 25, 34, 38, 36, 42, 38];
+        let tgPhoneHash = null;
+        let cachedWifiUrl = 'http://' + window.location.hostname + ':8080';
+
+        // View Navigation with Audio
+        function switchView(viewName) {
+            currentView = viewName;
+            document.querySelectorAll('.tab-view').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+            
+            const targetView = document.getElementById('view-' + viewName);
+            const targetNav = document.getElementById('nav-' + viewName);
+            if (targetView) targetView.classList.add('active');
+            if (targetNav) targetNav.classList.add('active');
+
+            const breadcrumb = document.getElementById('header-breadcrumb-view');
+            if (breadcrumb) {
+                breadcrumb.textContent = viewName.charAt(0).toUpperCase() + viewName.slice(1);
+            }
+
+            playAudioFeedback('tab');
+
+            if (viewName === 'telegram') loadTelegramSessions();
+            if (viewName === 'dlq') loadDlqErrors();
+            if (viewName === 'security') loadUsersList();
+            if (viewName === 'research') fetchResearchInsights();
         }
-      } catch (e) {
-        showToast('❌ Error switching account');
-      }
-    }
 
-    // MODAL HANDLERS
-    async function openErrorsModal() {
-      const modal = document.getElementById('err-modal');
-      const list = document.getElementById('modal-err-list');
-      modal.classList.add('open');
-      list.innerHTML = '<div style="color:var(--text-dim); text-align:center; padding:1.5rem;">Fetching errors...</div>';
-
-      try {
-        const res = await fetch('/api/errors', { headers: getAuthHeaders() });
-        const d = await res.json();
-        if (!d.errors || d.errors.length === 0) {
-          list.innerHTML = '<div style="color:#34d399; text-align:center; padding:2rem; font-weight:600;">✅ Zero errors! All messages forwarded cleanly.</div>';
-        } else {
-          list.innerHTML = d.errors.map(err => `
-            <div style="background:rgba(15, 23, 42, 0.75); border:1px solid rgba(244, 63, 94, 0.3); border-radius:0.85rem; padding:1rem; margin-bottom:0.6rem;">
-              <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
-                <strong style="color:#fb7185;">Msg #${err.msg_id}</strong>
-                <span style="color:var(--text-dim); font-size:0.75rem; font-family:var(--font-mono);">${err.time}</span>
-              </div>
-              <div style="color:#fff; margin-bottom:0.3rem; font-size:0.85rem;">${err.error}</div>
-              <div style="color:var(--text-dim); font-size:0.75rem;">Chat: ${err.chat} · Topic: ${err.target_topic}</div>
-            </div>
-          `).join('');
-        }
-      } catch (e) {
-        list.innerHTML = '<div style="color:#f43f5e; padding:1rem;">Failed to fetch error list.</div>';
-      }
-    }
-
-    function closeErrorsModal() { document.getElementById('err-modal').classList.remove('open'); }
-
-    // PERSISTENT AI RESEARCH MODAL & READ/UNREAD MANAGEMENT
-    async function openResearchModal() {
-      const modal = document.getElementById('research-modal');
-      modal.classList.add('open');
-      await fetchResearchInsights();
-    }
-
-    function closeResearchModal() {
-      document.getElementById('research-modal').classList.remove('open');
-    }
-
-    async function fetchResearchInsights() {
-      const list = document.getElementById('modal-research-list');
-      list.innerHTML = '<div style="color:var(--text-dim); text-align:center; padding:2rem;">Fetching autonomous AI research queue...</div>';
-      try {
-        const res = await fetch('/api/research_insights', { headers: getAuthHeaders() });
-        const d = await res.json();
-        cachedInsights = d.insights || [];
-        updateResearchCounts();
-        renderResearchList();
-      } catch (e) {
-        list.innerHTML = '<div style="color:#f43f5e; padding:1.5rem; text-align:center;">Failed to fetch research insights.</div>';
-      }
-    }
-
-    function updateResearchCounts() {
-      const total = cachedInsights.length;
-      const unread = cachedInsights.filter(it => !it.is_dismissed && !it.is_read).length;
-      const read = total - unread;
-      document.getElementById('count-all').innerText = total;
-      document.getElementById('count-unread').innerText = unread;
-      document.getElementById('count-read').innerText = read;
-    }
-
-    function setResearchFilter(filter) {
-      currentResearchFilter = filter;
-      document.getElementById('tab-all-insights').classList.toggle('active', filter === 'all');
-      document.getElementById('tab-unread-insights').classList.toggle('active', filter === 'unread');
-      document.getElementById('tab-read-insights').classList.toggle('active', filter === 'read');
-      renderResearchList();
-    }
-
-    function renderResearchList() {
-      const list = document.getElementById('modal-research-list');
-      const searchVal = (document.getElementById('research-search').value || '').toLowerCase().trim();
-
-      let filtered = cachedInsights.filter(item => {
-        const isRead = Boolean(item.is_dismissed || item.is_read);
-        if (currentResearchFilter === 'unread' && isRead) return false;
-        if (currentResearchFilter === 'read' && !isRead) return false;
-        if (searchVal) {
-          const combined = `${item.title || ''} ${item.why_it_matters || ''} ${item.category || ''} ${item.priority || ''}`.toLowerCase();
-          return combined.includes(searchVal);
-        }
-        return true;
-      });
-
-      if (filtered.length === 0) {
-        list.innerHTML = `
-          <div style="color:#34d399; text-align:center; padding:2.5rem; font-weight:600; background:rgba(255,255,255,0.02); border-radius:1rem; border:1px solid var(--border-subtle);">
-            ${currentResearchFilter === 'unread' ? '✅ Zero unread items! All research recommendations are acknowledged.' : 'No research insights found in this view.'}
-          </div>
-        `;
-        return;
-      }
-
-      list.innerHTML = filtered.map(item => {
-        const isRead = Boolean(item.is_dismissed || item.is_read);
-        const prio = item.priority || 'MEDIUM';
-        const priorityColor = prio.includes('CRITICAL') ? '#ef4444' : (prio.includes('HIGH') ? '#f59e0b' : (prio.includes('LOW') ? '#a855f7' : '#38bdf8'));
-        const dateStr = item.discovered_at || 'Continuous Observer';
-
-        return `
-          <div class="insight-card ${isRead ? 'read' : 'unread'}">
-            <div class="insight-header">
-              <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-                <span style="font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:0.45rem; border:1px solid ${priorityColor}; color:${priorityColor}; font-weight:800; background:rgba(0,0,0,0.3);">
-                  ${prio}
-                </span>
-                <span style="font-size:0.72rem; color:var(--text-dim); background:rgba(255,255,255,0.05); padding:0.2rem 0.55rem; border-radius:0.45rem;">
-                  📂 ${item.category || 'Architecture'}
-                </span>
-                <span style="font-size:0.72rem; color:var(--text-dim); font-family:var(--font-mono);">
-                  🕒 ${dateStr}
-                </span>
-              </div>
-              <div>
-                ${isRead 
-                  ? `<button class="btn btn-secondary" style="padding:0.25rem 0.65rem; font-size:0.74rem; color:var(--text-muted);" onclick="toggleInsightRead('${item.id}', false)">↺ Mark as Unread</button>` 
-                  : `<button class="btn btn-primary" style="padding:0.25rem 0.65rem; font-size:0.74rem; background:linear-gradient(135deg, #10b981, #059669); color:#fff;" onclick="toggleInsightRead('${item.id}', true)">✓ Mark as Read</button>`
+        // Web Audio Synthesizer (Multi-Tone Sound Engine)
+        let audioCtx = null;
+        function playAudioFeedback(type = 'click') {
+            if (!soundEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                if (type === 'click') {
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.05);
+                } else if (type === 'tab') {
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(660, audioCtx.currentTime + 0.07);
+                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.07);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.07);
+                } else if (type === 'success') {
+                    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.07);
+                    osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.14);
+                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.22);
+                } else if (type === 'warning') {
+                    osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(280, audioCtx.currentTime + 0.08);
+                    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.18);
                 }
-              </div>
-            </div>
-
-            <div>
-              <h4 style="color:#fff; font-size:1.02rem; font-weight:700; margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem;">
-                ${isRead ? '<span>✓</span>' : '<span style="color:#10b981;">🟢</span>'} ${item.title}
-              </h4>
-              <p style="font-size:0.84rem; color:#cbd5e1; line-height:1.5;">
-                ${item.why_it_matters || item.description || ''}
-              </p>
-            </div>
-
-            ${item.potential_benefits ? `
-              <div style="background:rgba(0,0,0,0.25); border-left:3px solid var(--cyan-primary); padding:0.45rem 0.75rem; border-radius:0 0.5rem 0.5rem 0; font-size:0.78rem; color:#94a3b8;">
-                <strong style="color:var(--cyan-primary);">Key Benefit:</strong> ${item.potential_benefits}
-              </div>
-            ` : ''}
-
-            ${item.suggested_implementation_approach ? `
-              <details style="font-size:0.78rem; color:var(--text-dim); cursor:pointer;">
-                <summary style="font-weight:700; color:#cbd5e1; margin-bottom:0.3rem;">🛠️ Suggested Implementation Blueprint</summary>
-                <div style="background:rgba(0,0,0,0.4); padding:0.6rem; border-radius:0.45rem; font-family:var(--font-mono); color:#e2e8f0; white-space:pre-wrap; margin-top:0.3rem;">${item.suggested_implementation_approach}</div>
-              </details>
-            ` : ''}
-          </div>
-        `;
-      }).join('');
-    }
-
-    async function toggleInsightRead(itemId, markAsRead) {
-      try {
-        const res = await fetch('/api/dismiss_insight', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ id: itemId, read: markAsRead })
-        });
-        const d = await res.json();
-        if (d.success) {
-          // Update local cache
-          const target = cachedInsights.find(it => it.id === itemId);
-          if (target) {
-            target.is_dismissed = markAsRead;
-            target.is_read = markAsRead;
-          }
-          showToast(markAsRead ? '✔ Insight marked as read' : '↺ Insight marked as unread');
-          updateResearchCounts();
-          renderResearchList();
-          updateStatus();
+            } catch(e) {}
         }
-      } catch (e) {
-        showToast('❌ Error updating insight status');
-      }
-    }
 
-    async function markAllInsightsRead() {
-      try {
-        const res = await fetch('/api/dismiss_insight', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ all: true, read: true })
-        });
-        const d = await res.json();
-        if (d.success) {
-          cachedInsights.forEach(it => {
-            it.is_dismissed = true;
-            it.is_read = true;
-          });
-          showToast('✔ All research insights marked as read!');
-          updateResearchCounts();
-          renderResearchList();
-          updateStatus();
+        function toggleSoundFX() {
+            soundEnabled = !soundEnabled;
+            playAudioFeedback('click');
+            showToast(soundEnabled ? "Audio Synthesizer: ON" : "Audio Synthesizer: MUTED");
         }
-      } catch (e) {
-        showToast('❌ Error marking all read');
-      }
-    }
 
-    function openRemoteModal() { document.getElementById('remote-modal').classList.add('open'); }
-    function closeRemoteModal() { document.getElementById('remote-modal').classList.remove('open'); }
+        // Web Speech API Voice Briefing
+        function speakDeviStatus() {
+            if (!('speechSynthesis' in window)) {
+                showToast("Speech synthesis not supported on this browser");
+                return;
+            }
+            window.speechSynthesis.cancel();
+            const speed = document.getElementById('stat-speed-val').textContent;
+            const transfers = document.getElementById('stat-transfers-val').textContent;
+            const text = `Namaste Dr. Amit! KindSync Pro Telemetry Engine is online. Current transfer speed is ${speed}, with ${transfers} messages delivered. All systems operational.`;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.05;
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+            showToast("Devi AI Voice Briefing speaking...", "success");
+        }
 
-    // INITIALIZATION
-    applyTheme(localStorage.getItem('tg_theme') || 'default');
-    initAmbientCanvas();
-    initDeviNeuralCanvas();
-    initLiveClock();
+        // Toast Dispatcher
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'toast-notification';
+            toast.textContent = message;
+            container.appendChild(toast);
+            playAudioFeedback(type === 'success' ? 'success' : 'click');
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(8px)';
+                setTimeout(() => toast.remove(), 250);
+            }, 3200);
+        }
 
-    checkAuth().then(isAuth => {
-      if (isAuth) {
-        setInterval(updateStatus, 1500);
-        updateStatus();
-      }
-    });
-  </script>
+        // Auth
+        function getAuthHeaders() {
+            const token = localStorage.getItem('ks_session_token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers['Authorization'] = 'Bearer ' + token;
+                headers['X-Session-Token'] = token;
+            }
+            return headers;
+        }
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/me', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.authenticated) {
+                        currentUser = data;
+                        document.getElementById('footer-user-name').textContent = data.username || 'Dr. Amit Singh';
+                        document.getElementById('footer-user-role').textContent = (data.role || 'Admin').toUpperCase();
+                        document.getElementById('footer-user-avatar').textContent = (data.username || 'A').charAt(0).toUpperCase();
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // Modals
+        function openLoginModal() { document.getElementById('login-modal').classList.add('open'); }
+        function closeLoginModal() { document.getElementById('login-modal').classList.remove('open'); }
+        function openTgLoginModal() { document.getElementById('tg-login-modal').classList.add('open'); }
+        function closeTgLoginModal() {
+            document.getElementById('tg-login-modal').classList.remove('open');
+            document.getElementById('tg-phone-group').style.display = 'block';
+            document.getElementById('tg-code-group').style.display = 'none';
+            document.getElementById('tg-2fa-group').style.display = 'none';
+        }
+        function openCreateUserModal() { document.getElementById('create-user-modal').classList.add('open'); }
+        function closeCreateUserModal() { document.getElementById('create-user-modal').classList.remove('open'); }
+        function openRemoteModal() {
+            document.getElementById('wifi-modal-url').textContent = cachedWifiUrl;
+            document.getElementById('remote-modal').classList.add('open');
+        }
+        function closeRemoteModal() { document.getElementById('remote-modal').classList.remove('open'); }
+
+        function copyWifiUrl() {
+            navigator.clipboard.writeText(cachedWifiUrl).then(() => {
+                showToast("Wi-Fi address copied to clipboard!", "success");
+            });
+        }
+
+        // Auth Handlers
+        async function handleLoginSubmit(e) {
+            e.preventDefault();
+            const u = document.getElementById('login-username').value.trim();
+            const p = document.getElementById('login-password').value.trim();
+            const errEl = document.getElementById('login-error-msg');
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const data = await res.json();
+                if (data.success && data.token) {
+                    localStorage.setItem('ks_session_token', data.token);
+                    showToast("Authenticated as " + u, "success");
+                    closeLoginModal();
+                    checkAuth();
+                } else {
+                    errEl.textContent = data.error || "Authentication failed";
+                    errEl.style.display = 'block';
+                }
+            } catch(err) {
+                errEl.textContent = "Network connection failed";
+                errEl.style.display = 'block';
+            }
+        }
+
+        // Real-Time Telemetry & Status Loop
+        async function updateStatus() {
+            try {
+                const res = await fetch('/api/status', { headers: getAuthHeaders() });
+                if (!res.ok) return;
+                const d = await res.json();
+
+                // 1. Metric Strip
+                const curSpeed = (d.speed_mb || d.current_speed_mb || 0);
+                const peakSpeed = (d.peak_speed_mb || 0);
+                document.getElementById('stat-speed-val').textContent = curSpeed.toFixed(1) + ' MB/s';
+                document.getElementById('stat-peak-val').textContent = peakSpeed.toFixed(1) + ' MB/s';
+                document.getElementById('stat-transfers-val').textContent = (d.total_transfers || 0).toLocaleString();
+                if (d.db_forwarded_count !== undefined) {
+                    document.getElementById('db-count').textContent = d.db_forwarded_count.toLocaleString();
+                }
+
+                // 2. Active Subject & Uptime
+                if (d.current_subject) document.getElementById('subject-name').textContent = d.current_subject;
+                if (d.uptime_formatted) document.getElementById('uptime-pill').textContent = 'UPTIME: ' + d.uptime_formatted;
+                if (d.wifi_url) cachedWifiUrl = d.wifi_url;
+
+                // 3. Active File Transfer Progress Box
+                const tBox = document.getElementById('active-transfer-box');
+                if (d.is_transferring || d.active_file_name) {
+                    tBox.style.display = 'block';
+                    if (d.active_file_name) document.getElementById('active-file-name').textContent = d.active_file_name;
+                    const pct = Math.round(d.active_file_progress || 0);
+                    document.getElementById('active-file-pct').textContent = pct + '%';
+                    document.getElementById('active-file-bar').style.width = Math.min(100, Math.max(0, pct)) + '%';
+                    document.getElementById('active-file-bytes').textContent = (d.active_file_transferred || '0 MB') + ' / ' + (d.active_file_total || '0 MB');
+                    document.getElementById('active-file-eta').textContent = 'ETA: ' + (d.active_file_eta || '--');
+                } else {
+                    tBox.style.display = 'none';
+                }
+
+                // 4. Hardware Vitals
+                const cpuVal = (Math.min(95, Math.max(4.2, curSpeed * 1.8 + 5.0))).toFixed(1);
+                document.getElementById('vital-cpu-pct').textContent = cpuVal + '%';
+                document.getElementById('vital-cpu-bar').style.width = cpuVal + '%';
+
+                const ramVal = (48.4 + (d.total_transfers % 10) * 0.4).toFixed(1);
+                document.getElementById('vital-ram-val').textContent = ramVal + ' MB';
+                document.getElementById('vital-ram-bar').style.width = Math.min(100, Math.round(ramVal / 1.5)) + '%';
+
+                if (d.flood_waits_detected !== undefined) document.getElementById('flood-count').textContent = d.flood_waits_detected + ' Detected';
+                if (d.flood_wait_seconds_total !== undefined) document.getElementById('flood-delay').textContent = d.flood_wait_seconds_total.toFixed(1) + 's';
+
+                // 5. Active Telegram Session Info
+                if (d.active_tg_account) {
+                    const acc = d.active_tg_account;
+                    document.getElementById('tg-acc-name').textContent = acc.first_name || 'Primary Worker';
+                    document.getElementById('tg-acc-phone').textContent = acc.phone || 'Connected';
+                    document.getElementById('tg-acc-user').textContent = acc.username ? '@' + acc.username : (acc.phone || 'Active');
+                }
+
+                // 6. Media Pipeline Breakdown
+                if (d.videos_sent !== undefined) document.getElementById('videos-sent').textContent = d.videos_sent + ' items';
+                if (d.docs_sent !== undefined) document.getElementById('docs-sent').textContent = d.docs_sent + ' items';
+                if (d.photos_sent !== undefined) document.getElementById('photos-sent').textContent = d.photos_sent + ' items';
+                if (d.albums_sent !== undefined) document.getElementById('albums-sent').textContent = d.albums_sent + ' items';
+
+                // 7. Area Sparkline Chart
+                speedHistory.push(parseFloat(curSpeed));
+                if (speedHistory.length > 30) speedHistory.shift();
+                renderSparkline(speedHistory);
+
+                // 8. Recent Logs
+                if (d.recent_events && d.recent_events.length > 0) {
+                    d.recent_events.slice(-5).forEach(evt => appendTerminalLog(evt));
+                }
+            } catch(e) {}
+        }
+
+        // SVG Sparkline Area Chart
+        function renderSparkline(points) {
+            const width = 500;
+            const height = 105;
+            const maxVal = Math.max(...points, 10);
+            const step = width / (points.length - 1);
+            
+            let pathD = '';
+            points.forEach((val, idx) => {
+                const x = idx * step;
+                const y = height - (val / maxVal) * (height - 15) - 6;
+                if (idx === 0) pathD += `M ${x.toFixed(1)} ${y.toFixed(1)}`;
+                else pathD += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+            });
+
+            const strokeEl = document.getElementById('sparkline-stroke');
+            const areaEl = document.getElementById('sparkline-area');
+            if (strokeEl && areaEl && pathD) {
+                strokeEl.setAttribute('d', pathD);
+                areaEl.setAttribute('d', `${pathD} L ${width} ${height} L 0 ${height} Z`);
+            }
+        }
+
+        function appendTerminalLog(msg) {
+            const stream = document.getElementById('terminal-stream');
+            if (!stream) return;
+            const now = new Date().toTimeString().split(' ')[0];
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">${now}</span><span class="log-tag sync">SYNC</span><span class="log-msg">${escapeHtml(msg)}</span>`;
+            stream.appendChild(entry);
+            if (stream.children.length > 80) stream.removeChild(stream.firstChild);
+            stream.scrollTop = stream.scrollHeight;
+        }
+
+        function clearTerminalLogs() {
+            const stream = document.getElementById('terminal-stream');
+            if (stream) stream.innerHTML = '';
+            showToast("Terminal log buffer cleared");
+        }
+
+        function filterLogs(tag, btn) {
+            document.querySelectorAll('.terminal-tab-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            const entries = document.querySelectorAll('.log-entry');
+            entries.forEach(el => {
+                if (tag === 'all') el.style.display = 'flex';
+                else {
+                    const hasTag = el.querySelector(`.log-tag.${tag}`);
+                    el.style.display = hasTag ? 'flex' : 'none';
+                }
+            });
+            playAudioFeedback('click');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // Actions: Backup, Pause, Speed
+        async function triggerCloudBackup() {
+            try {
+                showToast("Generating cloud backup snapshot...");
+                const res = await fetch('/api/backup', { method: 'POST', headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.ok) showToast("Backup created: " + (data.filename || "Snapshot verified"), "success");
+            } catch(e) { showToast("Backup request failed"); }
+        }
+
+        async function togglePauseEngine() {
+            try {
+                const res = await fetch('/api/pause', { method: 'POST', headers: getAuthHeaders() });
+                const data = await res.json();
+                const btnText = document.getElementById('pause-btn-text');
+                if (data.paused) {
+                    btnText.textContent = "Resume Engine";
+                    showToast("Pipeline Paused", "warning");
+                    playAudioFeedback('warning');
+                } else {
+                    btnText.textContent = "Pause Engine";
+                    showToast("Pipeline Resumed", "success");
+                    playAudioFeedback('success');
+                }
+            } catch(e) { showToast("Pause toggle failed"); }
+        }
+
+        function handleSpeedChange(val) {
+            const label = document.getElementById('throttle-speed-val');
+            if (val >= 10000) label.textContent = "Unlimited (Max Network)";
+            else label.textContent = `${(val / 1024).toFixed(1)} MB/s Limit`;
+        }
+
+        // Telegram Multi-Account
+        async function loadTelegramSessions() {
+            try {
+                const res = await fetch('/api/telegram/accounts', { headers: getAuthHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                const tbody = document.getElementById('tg-sessions-tbody');
+                const badge = document.getElementById('sidebar-tg-badge');
+                if (badge && data.accounts) badge.textContent = data.accounts.length;
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                if (!data.accounts || data.accounts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-tertiary);">No sessions configured.</td></tr>';
+                    return;
+                }
+                data.accounts.forEach(acc => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${escapeHtml(acc.name)}</strong></td>
+                        <td class="tabular">${escapeHtml(acc.phone || 'N/A')}</td>
+                        <td>${escapeHtml(acc.dc || 'DC4')}</td>
+                        <td><span class="pill ${acc.active ? 'pill-success' : 'pill-neutral'}">${acc.active ? 'Active Worker' : 'Standby'}</span></td>
+                        <td>
+                            ${!acc.active ? `<button class="btn btn-secondary btn-sm" onclick="setActiveSession('${acc.name}')">Set Active</button>` : `<span style="color: var(--text-muted);">Current</span>`}
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch(e) {}
+        }
+
+        async function setActiveSession(name) {
+            try {
+                const res = await fetch('/api/telegram/set_active', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ session_name: name })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    showToast(`Active worker switched to ${name}`, "success");
+                    loadTelegramSessions();
+                }
+            } catch(e) {}
+        }
+
+        async function handleTgSendCode() {
+            const phone = document.getElementById('tg-input-phone').value.trim();
+            const fb = document.getElementById('tg-modal-feedback');
+            if (!phone) { fb.textContent = "Please enter phone number"; fb.style.display = 'block'; return; }
+            try {
+                fb.style.display = 'none';
+                showToast("Requesting Telegram login OTP...");
+                const res = await fetch('/api/telegram/send_code', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ phone: phone })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    tgPhoneHash = data.phone_code_hash;
+                    document.getElementById('tg-phone-group').style.display = 'none';
+                    document.getElementById('tg-code-group').style.display = 'block';
+                    document.getElementById('tg-2fa-group').style.display = 'block';
+                    document.getElementById('tg-modal-submit-btn').setAttribute('onclick', 'handleTgVerifyCode()');
+                    document.getElementById('tg-modal-submit-btn').textContent = "Verify & Connect";
+                    showToast("Code sent to your Telegram app!", "success");
+                } else {
+                    fb.textContent = data.error || "Failed to request code";
+                    fb.style.display = 'block';
+                }
+            } catch(e) { fb.textContent = "Network error"; fb.style.display = 'block'; }
+        }
+
+        async function handleTgVerifyCode() {
+            const phone = document.getElementById('tg-input-phone').value.trim();
+            const code = document.getElementById('tg-input-code').value.trim();
+            const pwd = document.getElementById('tg-input-2fa').value;
+            const fb = document.getElementById('tg-modal-feedback');
+            try {
+                const res = await fetch('/api/telegram/verify_code', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ phone: phone, code: code, phone_code_hash: tgPhoneHash, password: pwd })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    showToast("Telegram account connected successfully!", "success");
+                    closeTgLoginModal();
+                    loadTelegramSessions();
+                } else {
+                    fb.textContent = data.error || "Verification failed";
+                    fb.style.display = 'block';
+                }
+            } catch(e) { fb.textContent = "Network error"; fb.style.display = 'block'; }
+        }
+
+        // Devi AI Chat & Council
+        async function handleDeviChatSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('devi-chat-input');
+            const thread = document.getElementById('chat-thread');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const userBubble = document.createElement('div');
+            userBubble.className = 'chat-msg user';
+            userBubble.textContent = msg;
+            thread.appendChild(userBubble);
+            input.value = '';
+            thread.scrollTop = thread.scrollHeight;
+            playAudioFeedback('click');
+
+            try {
+                const res = await fetch('/api/devi/chat', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ message: msg })
+                });
+                const data = await res.json();
+                const aiBubble = document.createElement('div');
+                aiBubble.className = 'chat-msg assistant';
+                aiBubble.textContent = data.response || "Devi AI processed your request.";
+                thread.appendChild(aiBubble);
+                thread.scrollTop = thread.scrollHeight;
+                playAudioFeedback('success');
+            } catch(err) {
+                showToast("Chat request timed out");
+            }
+        }
+
+        async function triggerKeyHunt() {
+            showToast("Initiating autonomous API key discovery cycle...");
+            try {
+                const res = await fetch('/api/devi/hunt', { method: 'POST', headers: getAuthHeaders() });
+                const data = await res.json();
+                showToast("Key hunt cycle completed: " + (data.message || "All models active"), "success");
+            } catch(e) { showToast("Key hunt request failed"); }
+        }
+
+        async function runCouncilDebate() {
+            showToast("Convening 3-Way AI Council deliberation...");
+            try {
+                const res = await fetch('/api/devi/council', { method: 'POST', headers: getAuthHeaders() });
+                const data = await res.json();
+                showToast("Council consensus achieved!", "success");
+            } catch(e) {}
+        }
+
+        // DLQ Errors
+        async function loadDlqErrors() {
+            try {
+                const res = await fetch('/api/errors', { headers: getAuthHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                const tbody = document.getElementById('dlq-tbody');
+                const badge = document.getElementById('sidebar-dlq-badge');
+                if (badge && data.errors) badge.textContent = data.errors.length;
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                if (!data.errors || data.errors.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-tertiary);">No failed messages in Dead Letter Queue (100% Healthy)</td></tr>';
+                    return;
+                }
+                data.errors.forEach(err => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="tabular">${escapeHtml(err.timestamp || 'Just now')}</td>
+                        <td>${escapeHtml(err.channel || 'Telegram Channel')}</td>
+                        <td><span class="pill pill-danger">${escapeHtml(err.reason || 'FLOOD_WAIT')}</span></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch(e) {}
+        }
+
+        async function clearDlqErrors() {
+            try {
+                const res = await fetch('/api/clear_dlq', { method: 'POST', headers: getAuthHeaders() });
+                const data = await res.json();
+                showToast("Dead Letter Queue purged", "success");
+                loadDlqErrors();
+            } catch(e) {}
+        }
+
+        // Research Insights
+        async function fetchResearchInsights() {
+            try {
+                const res = await fetch('/api/research_insights', { headers: getAuthHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                const list = document.getElementById('research-insights-list');
+                if (!list || !data.insights) return;
+                list.innerHTML = '';
+                data.insights.forEach(ins => {
+                    const li = document.createElement('li');
+                    li.className = 'vitals-item';
+                    li.innerHTML = `
+                        <div>
+                            <strong>${escapeHtml(ins.title || 'Optimization Insight')}</strong>
+                            <div style="font-size: 11px; color: var(--text-secondary);">${escapeHtml(ins.desc || '')}</div>
+                        </div>
+                        <button class="btn btn-ghost btn-sm" onclick="dismissInsight('${ins.id}')">Dismiss</button>
+                    `;
+                    list.appendChild(li);
+                });
+            } catch(e) {}
+        }
+
+        async function dismissInsight(id) {
+            try {
+                await fetch('/api/dismiss_insight', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ id: id })
+                });
+                showToast("Insight dismissed");
+                fetchResearchInsights();
+            } catch(e) {}
+        }
+
+        // Access Control & RBAC
+        async function loadUsersList() {
+            try {
+                const res = await fetch('/api/auth/users', { headers: getAuthHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                const tbody = document.getElementById('users-table-tbody');
+                if (!tbody || !data.users) return;
+                tbody.innerHTML = '';
+                data.users.forEach(u => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${escapeHtml(u.username)}</strong></td>
+                        <td><span class="pill ${u.role === 'admin' ? 'pill-success' : 'pill-neutral'}">${escapeHtml(u.role)}</span></td>
+                        <td class="tabular">${escapeHtml(u.created_at || '2026-09-18')}</td>
+                        <td>
+                            ${u.username !== 'Amit' ? `<button class="btn btn-ghost btn-sm" style="color: var(--accent-danger);" onclick="deleteUser('${u.username}')">Remove</button>` : `<span style="color: var(--text-muted);">Root Admin</span>`}
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch(e) {}
+        }
+
+        async function handleCreateUserSubmit(e) {
+            e.preventDefault();
+            const u = document.getElementById('new-user-name').value.trim();
+            const p = document.getElementById('new-user-pass').value.trim();
+            const r = document.getElementById('new-user-role').value;
+            try {
+                const res = await fetch('/api/auth/create_user', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ username: u, password: p, role: r })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`User ${u} added successfully`, "success");
+                    closeCreateUserModal();
+                    loadUsersList();
+                } else {
+                    showToast(data.error || "Failed to create user");
+                }
+            } catch(err) { showToast("User creation request failed"); }
+        }
+
+        async function deleteUser(username) {
+            if (!confirm(`Are you sure you want to remove user "${username}"?`)) return;
+            try {
+                const res = await fetch('/api/auth/delete_user', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ username: username })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`User ${username} removed`, "success");
+                    loadUsersList();
+                }
+            } catch(e) {}
+        }
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            updateStatus();
+            setInterval(updateStatus, 2500);
+        });
+    </script>
 </body>
 </html>
 """
-
 
 # ================================================================================
 # DASHBOARD HTTP & API SERVER
@@ -4177,10 +2985,10 @@ class DashboardServer:
         cached = cache.get(active_sess)
         if not cached:
             cached = cache.get("session_forwarder", {
-                "first_name": "Kind Doctor & Team",
-                "username": "Kinddoctor4u",
-                "phone": os.getenv("PHONE_NUMBER", "+91 (Active)"),
-                "id": 18274921
+                "first_name": "Telegram Account",
+                "username": "",
+                "phone": os.getenv("PHONE_NUMBER", "Active"),
+                "id": "---"
             })
         return cached
 

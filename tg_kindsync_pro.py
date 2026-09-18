@@ -938,7 +938,8 @@ class AppConfig:
             api_id = int(os.getenv("API_ID", 0) or 0)
         except ValueError:
             api_id = 0
-        
+        raw_api_hash = os.getenv("API_HASH", "").strip().strip("'").strip('"')
+
         src_chat = _parse_chat_id(os.getenv("SOURCE_CHAT", "0"))
         tgt_chat = _parse_chat_id(os.getenv("TARGET_CHAT", "0"))
         if direct_forward is None:
@@ -971,7 +972,7 @@ class AppConfig:
 
         return cls(
             api_id=api_id,
-            api_hash=os.getenv("API_HASH", "").strip().strip("'").strip('"'),
+            api_hash=raw_api_hash,
             source_chat=src_chat,
             target_chat=tgt_chat,
             source_topic=int(os.getenv("SOURCE_TOPIC", 0) or 0),
@@ -1355,6 +1356,7 @@ async def interactive_telegram_login(client):
 
     # Fallback Option A: Terminal QR Code
     try:
+        import qrcode
         qr = await client.qr_login()
         qr_gen = qrcode.QRCode(version=1, box_size=1, border=1)
         qr_gen.add_data(qr.url)
@@ -1373,8 +1375,10 @@ async def interactive_telegram_login(client):
         pwd = getpass.getpass("Enter your Two-Step Verification (2FA) Password: ")
         me = await client.sign_in(password=pwd)
         if me: return client
+    except (ImportError, ModuleNotFoundError):
+        console.print("[dim]ℹ️ QR library not found, proceeding directly with phone login...[/]")
     except Exception as qe:
-        console.print(f"[yellow]⚠️ QR login timed out or failed ({qe}). Falling back to phone...[/]")
+        console.print(f"[yellow]⚠️ QR login skipped ({qe}). Falling back to phone...[/]")
 
 
     phone_input = await safe_input("Enter Phone Number with Country Code (e.g. +919876543210)", allow_cancel=True)
@@ -1540,13 +1544,43 @@ class MultiSessionManager:
         return time.time() < cd
 
     async def _prompt_credentials(self):
-        if not self.api_id:
-            self.api_id = 2040
-            with suppress(Exception): set_key(".env", "API_ID", "2040")
-        if not self.api_hash:
-            self.api_hash = "b18441a1ff607e10a989891a5462e627"
-            with suppress(Exception): set_key(".env", "API_HASH", "b18441a1ff607e10a989891a5462e627")
-        console.print("[bold green]✔ Auto-configured verified Telegram MTProto credentials![/]")
+        if self.api_id and self.api_hash and self.api_id != 2040 and self.api_hash != "b18441a1ff607e10a989891a5462e627":
+            return
+
+        clear_screen()
+        console.print(get_persistent_header())
+        console.print(Panel(
+            "[bold cyan]🔑 TELEGRAM API CREDENTIALS SETUP (1-TIME SETUP)[/]\n\n"
+            "Telegram MTProto protocol securely connect hone ke liye [bold yellow]API_ID[/] aur [bold yellow]API_HASH[/] mangta hai.\n"
+            "• Ye bilkul FREE hai aur 1 minute me mil jata hai:\n"
+            "   1. Apne phone ya computer browser me [bold cyan]https://my.telegram.org[/] kholein.\n"
+            "   2. Apna Telegram mobile number (+91...) daal kar official Telegram code enter karein.\n"
+            "   3. [bold white]'API development tools'[/] par click karein aur koi bhi app name likh dein.\n"
+            "   4. Wahan se apna [bold yellow]api_id[/] aur [bold yellow]api_hash[/] copy karke yahan daalein:\n\n"
+            "[dim]Note: Ye details automatically aapki `.env` file me save ho jayengi.[/]",
+            border_style="cyan", box=box.ROUNDED
+        ))
+
+        while not self.api_id or self.api_id == 2040:
+            val = await safe_input("👉 Enter your Telegram API_ID (numeric numbers only)", allow_cancel=False)
+            val = val.strip()
+            if val.isdigit() and int(val) > 0 and int(val) != 2040:
+                self.api_id = int(val)
+                with suppress(Exception): set_key(".env", "API_ID", str(self.api_id))
+            else:
+                console.print("[bold red]❌ Invalid API_ID. Kripya apna sahi numeric API_ID enter karein.[/]")
+
+        while not self.api_hash or self.api_hash == "b18441a1ff607e10a989891a5462e627":
+            val = await safe_input("👉 Enter your Telegram API_HASH (32-character hex code)", allow_cancel=False)
+            val = val.strip()
+            if len(val) >= 16 and val != "b18441a1ff607e10a989891a5462e627":
+                self.api_hash = val
+                with suppress(Exception): set_key(".env", "API_HASH", self.api_hash)
+            else:
+                console.print("[bold red]❌ Invalid API_HASH. Kripya apna sahi 32-character API_HASH enter karein.[/]")
+
+        console.print("[bold green]✔ Telegram API credentials successfully saved into `.env`![/]\n")
+        await asyncio.sleep(1.0)
 
     async def start_all(self):
         if not self.api_id or not self.api_hash:
@@ -3570,12 +3604,10 @@ class TerminalPlatform:
 
     async def boot(self):
         acquire_instance_lock()
-        # FATAL ERROR PREVENTION CHECK
         if not self.cfg.api_id or not self.cfg.api_hash:
-            console.print("\n[bold red]❌ FATAL ERROR: Telegram API_ID or API_HASH is missing in .env![/]")
-            console.print("[yellow]Please edit the .env file and add your Telegram API credentials before starting the engine.[/]")
-            await asyncio.sleep(4)
-            return
+            await self.session_mgr._prompt_credentials()
+            self.cfg.api_id = self.session_mgr.api_id
+            self.cfg.api_hash = self.session_mgr.api_hash
 
         await self.session_mgr.start_all()
         client = self.session_mgr.get_client()
@@ -5172,7 +5204,250 @@ async def run_group_cloner_tool(session_mgr):
         
     return None
 
+async def run_single_or_specific_messages_forwarder(session_mgr):
+    clear_screen()
+    console.print(get_persistent_header())
+    console.print(Panel(
+        "[bold cyan]🎬 DIRECT SINGLE / SPECIFIC VIDEOS & MESSAGES FORWARDER[/]\n"
+        "[dim]Forward 1 or 2 specific videos, message IDs, or t.me links straight into any Forum Topic.[/]",
+        border_style="cyan", box=box.ROUNDED
+    ))
+
+    client = await session_mgr.ensure_active_client()
+    if not client: return
+
+    # 1. Select SOURCE Channel / Group
+    console.print("\n[bold cyan]Step 1: Choose SOURCE Channel / Group (where files are located)[/]")
+    src_sel = await interactive_channel_selector(client, prompt_title="SOURCE Channel / Group")
+    if not src_sel: return
+
+    src_id = src_sel["id"]
+    try:
+        src_entity = await client.get_entity(_parse_chat_id(src_id))
+        src_title = getattr(src_entity, 'title', None) or str(src_id)
+    except Exception as e:
+        console.print(f"[bold red]❌ Failed to connect to source:[/] {e}")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    # 2. Select TARGET Channel / Forum Group
+    console.print(f"\n[bold green]Step 2: Choose TARGET Channel / Forum Group (where to send)[/]")
+    tgt_sel = await interactive_channel_selector(client, prompt_title="TARGET Channel / Group")
+    if not tgt_sel: return
+
+    tgt_id = tgt_sel["id"]
+    try:
+        tgt_entity = await client.get_entity(_parse_chat_id(tgt_id))
+        tgt_title = getattr(tgt_entity, 'title', None) or str(tgt_id)
+    except Exception as e:
+        console.print(f"[bold red]❌ Failed to connect to target:[/] {e}")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    # 3. Check if target is a forum with topics
+    tgt_topic_id = None
+    tgt_topic_name = "General / Main Chat"
+    try:
+        tgt_peer = await client.get_input_entity(_parse_chat_id(tgt_id))
+        res = await client(GetForumTopicsRequest(
+            peer=tgt_peer, offset_date=None, offset_id=0, offset_topic=0, limit=100
+        ))
+        if hasattr(res, 'topics') and res.topics:
+            console.print(f"\n[cyan]Found {len(res.topics)} Forum Topics in '{tgt_title}'. Choose destination Topic:[/]")
+            console.print(" [0] 🌐 General Topic / Main Thread")
+            for idx, t in enumerate(res.topics, 1):
+                t_name = getattr(t, 'title', f"Topic #{t.id}")
+                console.print(f" [{idx}] 📌 {t_name} (ID: {t.id})")
+            
+            top_ch = await safe_input(f"Select Target Topic (0-{len(res.topics)})", valid_options=[str(i) for i in range(len(res.topics)+1)], default_val="0", allow_cancel=True)
+            if top_ch and top_ch != "0":
+                chosen_t = res.topics[int(top_ch)-1]
+                tgt_topic_id = chosen_t.id
+                tgt_topic_name = getattr(chosen_t, 'title', f"Topic #{chosen_t.id}")
+    except Exception:
+        pass
+
+    # 4. Prompt for message ID(s) or Links
+    console.print(Panel(
+        "[bold white]Enter the Message ID(s) or Telegram Link(s) to forward:[/]\n\n"
+        "• [bold green]Single Video / ID:[/] [cyan]124[/]\n"
+        "• [bold green]Multiple IDs:[/] [cyan]124, 128, 135[/]\n"
+        "• [bold green]Range of IDs:[/] [cyan]120-125[/]\n"
+        "• [bold green]Telegram Message Link:[/] [cyan]https://t.me/c/1234567890/124[/]",
+        border_style="cyan", box=box.ROUNDED
+    ))
+    raw_input_ids = await safe_input("Message ID(s) / Link(s)", allow_cancel=True)
+    if not raw_input_ids: return
+
+    # Parse message IDs
+    target_msg_ids = set()
+    import re
+    tokens = [t.strip() for t in raw_input_ids.replace(";", ",").split(",") if t.strip()]
+    for token in tokens:
+        if "t.me/" in token:
+            m = re.search(r"/(\d+)(?:\?.*)?$", token)
+            if m:
+                target_msg_ids.add(int(m.group(1)))
+        elif "-" in token and not token.startswith("-"):
+            parts = token.split("-")
+            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                start_id, end_id = int(parts[0]), int(parts[1])
+                if start_id <= end_id and (end_id - start_id) <= 200:
+                    for mid in range(start_id, end_id + 1):
+                        target_msg_ids.add(mid)
+        elif token.isdigit():
+            target_msg_ids.add(int(token))
+
+    if not target_msg_ids:
+        console.print("[bold red]❌ No valid message IDs parsed from input.[/]")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    sorted_ids = sorted(list(target_msg_ids))
+    console.print(f"\n[cyan]Fetching {len(sorted_ids)} message(s) from '{src_title}'...[/]")
+
+    try:
+        msgs = await client.get_messages(src_entity, ids=sorted_ids)
+    except Exception as e:
+        console.print(f"[bold red]❌ Failed to fetch messages:[/] {e}")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    valid_msgs = [m for m in msgs if m is not None]
+    if not valid_msgs:
+        console.print("[bold red]❌ None of the requested message IDs exist or could be accessed.[/]")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    # Preview table
+    table = Table(title="Selected Items to Forward", box=box.ROUNDED, border_style="cyan")
+    table.add_column("Msg ID", style="bold yellow", justify="center")
+    table.add_column("Type", style="bold cyan")
+    table.add_column("Title / Caption", style="white")
+    table.add_column("Size", style="dim green", justify="right")
+
+    for m in valid_msgs:
+        m_type = "💬 Text"
+        m_title = (m.message or "").strip().split("\n")[0][:45] or "[No Text]"
+        m_size = "N/A"
+        if m.video:
+            m_type = "🎬 Video"
+            v_title = ""
+            for attr in getattr(getattr(m, 'media', None), 'document', None) and getattr(m.media.document, 'attributes', []) or []:
+                if hasattr(attr, 'file_name') and attr.file_name:
+                    v_title = attr.file_name
+                    break
+            m_title = v_title or (m.message or "").strip().split("\n")[0][:45] or f"Video #{m.id}"
+            if getattr(m, 'media', None) and getattr(m.media, 'document', None):
+                m_size = f"{round(m.media.document.size / (1024*1024), 1)} MB"
+        elif m.document:
+            m_type = "📄 Document"
+            d_title = ""
+            for attr in getattr(getattr(m, 'media', None), 'document', None) and getattr(m.media.document, 'attributes', []) or []:
+                if hasattr(attr, 'file_name') and attr.file_name:
+                    d_title = attr.file_name
+                    break
+            m_title = d_title or (m.message or "").strip().split("\n")[0][:45] or f"Document #{m.id}"
+            if getattr(m, 'media', None) and getattr(m.media, 'document', None):
+                m_size = f"{round(m.media.document.size / (1024*1024), 1)} MB"
+        elif m.photo:
+            m_type = "🖼️ Photo"
+            m_title = (m.message or "").strip().split("\n")[0][:45] or f"Photo #{m.id}"
+
+        table.add_row(str(m.id), m_type, m_title, m_size)
+
+    console.print(table)
+    console.print(f"\n[bold green]Target Destination:[/] {tgt_title} ➔ [bold yellow]{tgt_topic_name}[/] (Topic ID: {tgt_topic_id or 'General'})")
+
+    confirm = await safe_input(f"\nForward these {len(valid_msgs)} message(s) now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
+    if not confirm or confirm.upper() != "YES":
+        console.print("[yellow]Forwarding cancelled.[/]")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    success_count = 0
+    fail_count = 0
+    reply_kw = {"reply_to": tgt_topic_id} if tgt_topic_id else {}
+    temp_dir = Path("temp_cherry_pick")
+    temp_dir.mkdir(exist_ok=True)
+
+    with console.status(f"[bold cyan]Forwarding {len(valid_msgs)} item(s) with anti-flood pacing...[/]") as status:
+        for idx, m in enumerate(valid_msgs, 1):
+            status.update(f"[bold cyan][{idx}/{len(valid_msgs)}] Sending Msg #{m.id}...[/]")
+            clean_caption = customize_caption(m.message) if m.message else ""
+            sent_msg = None
+            try:
+                if not m.media:
+                    sent_msg = await client.send_message(
+                        tgt_entity,
+                        clean_caption or m.message,
+                        parse_mode="md",
+                        **reply_kw
+                    )
+                else:
+                    try:
+                        sent_msg = await client.send_file(
+                            tgt_entity,
+                            m.media,
+                            caption=clean_caption,
+                            parse_mode="md",
+                            supports_streaming=True,
+                            **reply_kw
+                        )
+                    except Exception as fe:
+                        # Restricted Content Bypass: Download to temp and stream upload
+                        status.update(f"[bold yellow][{idx}/{len(valid_msgs)}] Protected content detected. Downloading securely...[/]")
+                        downloaded_path = await client.download_media(m, file=str(temp_dir))
+                        if downloaded_path and os.path.exists(downloaded_path):
+                            status.update(f"[bold green][{idx}/{len(valid_msgs)}] Uploading to topic '{tgt_topic_name}'...[/]")
+                            sent_msg = await client.send_file(
+                                tgt_entity,
+                                downloaded_path,
+                                caption=clean_caption,
+                                parse_mode="md",
+                                supports_streaming=True,
+                                **reply_kw
+                            )
+                            with suppress(Exception):
+                                os.remove(downloaded_path)
+
+                if sent_msg:
+                    success_count += 1
+                    console.print(f" [bold green]✔ [{idx}/{len(valid_msgs)}] Delivered Msg #{m.id} to '{tgt_topic_name}'![/]")
+                    with suppress(Exception):
+                        with sqlite3.connect(DB_FILE) as conn:
+                            conn.execute(
+                                "INSERT OR REPLACE INTO forwarded (source_chat, msg_id, target_chat, target_topic, completed_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                                (str(src_id), m.id, str(tgt_id), tgt_topic_id or 0)
+                            )
+                else:
+                    fail_count += 1
+                    console.print(f" [bold red]❌ [{idx}/{len(valid_msgs)}] Failed to deliver Msg #{m.id}[/]")
+            except Exception as ex:
+                fail_count += 1
+                console.print(f" [bold red]❌ [{idx}/{len(valid_msgs)}] Error forwarding Msg #{m.id}:[/] {ex}")
+
+            await asyncio.sleep(1.0)
+
+    with suppress(Exception):
+        if temp_dir.exists():
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    console.print(f"\n[bold green]🎉 Forwarding Complete:[/] [bold yellow]{success_count}[/] delivered successfully" + (f", [red]{fail_count} failed[/]" if fail_count else ""))
+
+    AdminTelemetry.dispatch(client, "🎬 [DIRECT FORWARD] Single / Specific Messages Forwarded", {
+        "Source": f"`{src_id}` ({src_title})",
+        "Target": f"`{tgt_id}` ({tgt_title})",
+        "Topic": f"`{tgt_topic_name}` (ID: `{tgt_topic_id or 0}`)",
+        "Messages": f"{success_count}/{len(valid_msgs)} Delivered",
+        "IDs": ", ".join(str(m.id) for m in valid_msgs[:10])
+    })
+
+    await safe_input("\nPress Enter to return to menu", allow_cancel=False)
+
 async def run_selective_content_picker(session_mgr):
+
     clear_screen()
     console.print(get_persistent_header())
     console.print(Panel("[bold cyan]🎯 SELECTIVE CONTENT EXPLORER & CHERRY-PICKER CLONER[/]", border_style="cyan", box=box.ROUNDED))
@@ -6311,30 +6586,47 @@ async def run_single_topic_files_indexer(session_mgr):
             return
         use_subject_grouping = (group_choice != "2")
 
+    console.print("\n[bold cyan]Choose Index Presentation Style:[/]")
+    console.print(" [1] 📊 Detailed Roadmap (Shows Topic/Subject titles, Lecture counts, video & doc breakdown tags)")
+    console.print(" [2] 📜 Clean Minimal Directory (Pure Titles & Clickable Links Only — Zero counts, No clutter)")
+    style_ch = await safe_input("Choose Option (1/2)", valid_options=["1", "2"], default_val="1", allow_cancel=True)
+    if not style_ch: return
+    is_detailed_mode = (style_ch != "2")
+
     cards = []
     clean_topic_header = clean_index_title(target_topic_name, max_len=40).upper()
 
     if use_subject_grouping:
         # Card 1: Master Navigation Roadmap Hub (Pinned at top)
+        roadmap_header_title = f"{clean_topic_header} — MASTER ROADMAP" if is_detailed_mode else f"{clean_topic_header} — MASTER DIRECTORY"
         roadmap_lines = [
             "╔════════════════════════════════════════════════════════════╗",
-            f"║   📑 **{clean_topic_header} — MASTER ROADMAP**",
-            "║   👨‍⚕️ *Curated & Maintained by Kind Doctor & Team*",
-            "╚════════════════════════════════════════════════════════════╝\n",
-            f"✨ ──────────── 📖 SUBJECT DIRECTORY ({len(scanned_items)} Files) ──────────── ✨\n"
+            f"║   📑 **{roadmap_header_title}**",
+            f"║   ✨ *Curated & Maintained by {GROUP_BRAND}*",
+            "╚════════════════════════════════════════════════════════════╝",
+            f"✨ ──────────── 📖 SUBJECT DIRECTORY ──────────── ✨"
         ]
         for s_idx, (sk, sdata) in enumerate(detected_subjects.items(), 1):
-            s_v = sum(1 for x in sdata["items"] if x['is_video'])
-            s_d = sum(1 for x in sdata["items"] if x['is_doc'])
-            breakdown_str = f"{s_v} Videos" if s_v and not s_d else (f"{s_d} Docs" if s_d and not s_v else f"{s_v}V · {s_d}D")
             first_link = sdata["items"][0]["link"]
-            roadmap_lines.append(f"[{s_idx:02d}] ▫️ **{sk}** — `{len(sdata['items'])} Items` ({breakdown_str}) ➔ [Jump to Start]({first_link})")
+            if is_detailed_mode:
+                s_v = sum(1 for x in sdata["items"] if x['is_video'])
+                s_d = sum(1 for x in sdata["items"] if x['is_doc'])
+                breakdown_str = f"{s_v} Videos" if s_v and not s_d else (f"{s_d} Docs" if s_d and not s_v else f"{s_v}V · {s_d}D")
+                roadmap_lines.append(f"[{s_idx:02d}] ▫️ **{sk}** — `{len(sdata['items'])} Items` ({breakdown_str}) ➔ [Jump to Start]({first_link})")
+            else:
+                roadmap_lines.append(f"[{s_idx:02d}] ▫️ **{sk}** ➔ [Jump to Start]({first_link})")
 
-        roadmap_lines.extend([
-            "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"📊 **Course Scope:** `{len(scanned_items)} Items` across `{len(detected_subjects)} Subjects`",
-            f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
-        ])
+        if is_detailed_mode:
+            roadmap_lines.extend([
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📊 **Course Scope:** `{len(scanned_items)} Items` across `{len(detected_subjects)} Subjects`",
+                f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
+            ])
+        else:
+            roadmap_lines.extend([
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
+            ])
         cards.append("\n".join(roadmap_lines))
 
         # Subsequent Cards: Dedicated Subject Section Cards
@@ -6342,63 +6634,85 @@ async def run_single_topic_files_indexer(session_mgr):
             s_items = sdata["items"]
             s_clean_name = sk.upper()
             s_part = 1
+            card_title = f"{s_clean_name} — `{len(s_items)} Lectures & Files`" if is_detailed_mode else s_clean_name
             sub_card_lines = [
                 "╔════════════════════════════════════════════════════════════╗",
-                f"║   {s_clean_name} — `{len(s_items)} Lectures & Files`",
-                "╚════════════════════════════════════════════════════════════╝\n"
+                f"║   {card_title}",
+                "╚════════════════════════════════════════════════════════════╝"
             ]
             for idx, item in enumerate(s_items, 1):
-                entry = f"[{idx:02d}] ▫️ {item['icon']} [{item['title']}]({item['link']})"
+                if is_detailed_mode:
+                    entry = f"[{idx:02d}] ▫️ {item['icon']} [{item['title']}]({item['link']})"
+                else:
+                    entry = f"[{idx:02d}] ▫️ [{item['title']}]({item['link']})"
+
                 if sum(len(l) for l in sub_card_lines) + len(entry) > 3400:
                     sub_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                     cards.append("\n".join(sub_card_lines))
                     s_part += 1
                     sub_card_lines = [
                         f"📑 **{s_clean_name} (Part {s_part})**",
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                     ]
                 sub_card_lines.append(entry)
 
-            sub_card_lines.extend([
-                "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                f"✨ {sdata['tag']}  ·  `{len(s_items)} Items Delivered`",
-                f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
-            ])
+            if is_detailed_mode:
+                sub_card_lines.extend([
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                    f"✨ {sdata['tag']}  ·  `{len(s_items)} Items Delivered`",
+                    f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
+                ])
+            else:
+                sub_card_lines.extend([
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                    f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
+                ])
             cards.append("\n".join(sub_card_lines))
     else:
         # Standard Flat Linear Index
+        linear_header_title = f"{clean_topic_header} — LECTURE ROADMAP" if is_detailed_mode else f"{clean_topic_header} — DIRECTORY"
         current_card_lines = [
             "╔════════════════════════════════════════════════════════════╗",
-            f"║   📑 **{clean_topic_header} — LECTURE INDEX**",
-            "║   👨‍⚕️ *Curated & Maintained by Kind Doctor & Team*",
-            "╚════════════════════════════════════════════════════════════╝\n",
-            "✨ ──────────── 📖 TOPIC & COURSE ROADMAP ──────────── ✨\n"
+            f"║   📑 **{linear_header_title}**",
+            f"║   ✨ *Curated & Maintained by {GROUP_BRAND}*",
+            "╚════════════════════════════════════════════════════════════╝",
+            "✨ ──────────── 📖 TOPIC & COURSE DIRECTORY ──────────── ✨"
         ]
         
         for idx, item in enumerate(scanned_items, 1):
-            entry = f"[{idx:02d}] ▫️ {item['icon']} [{item['title']}]({item['link']})"
+            if is_detailed_mode:
+                entry = f"[{idx:02d}] ▫️ {item['icon']} [{item['title']}]({item['link']})"
+            else:
+                entry = f"[{idx:02d}] ▫️ [{item['title']}]({item['link']})"
+
             if sum(len(l) for l in current_card_lines) + len(entry) > 3400:
                 current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 cards.append("\n".join(current_card_lines))
                 current_card_lines = [
-                    f"📑 **{clean_topic_header} INDEX (Part {len(cards)+1})**",
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📑 **{clean_topic_header} DIRECTORY (Part {len(cards)+1})**",
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 ]
             current_card_lines.append(entry)
             
-        stat_line = f"📊 **Delivered:** `{len(scanned_items)} Items`"
-        if v_total and d_total:
-            stat_line += f" (`{v_total} Videos` · `{d_total} Docs`)"
-        elif v_total:
-            stat_line += f" (`{v_total} Videos`)"
-        elif d_total:
-            stat_line += f" (`{d_total} Docs`)"
+        if is_detailed_mode:
+            stat_line = f"📊 **Delivered:** `{len(scanned_items)} Items`"
+            if v_total and d_total:
+                stat_line += f" (`{v_total} Videos` · `{d_total} Docs`)"
+            elif v_total:
+                stat_line += f" (`{v_total} Videos`)"
+            elif d_total:
+                stat_line += f" (`{d_total} Docs`)"
 
-        current_card_lines.extend([
-            "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            stat_line,
-            f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
-        ])
+            current_card_lines.extend([
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                stat_line,
+                f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
+            ])
+        else:
+            current_card_lines.extend([
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
+            ])
         cards.append("\n".join(current_card_lines))
 
     # Preview Card 1
@@ -6443,13 +6757,229 @@ async def run_single_topic_files_indexer(session_mgr):
             "Group": f"`{group_id}` ({group_title})",
             "Topic": f"`{target_topic_name}` (ID: `{target_topic_id}`)",
             "Files Indexed": f"{len(scanned_items)} Files ({v_total} Videos, {d_total} Docs)",
-            "Style": "Smart Subject Roadmap" if use_subject_grouping else "Linear Index",
+            "Style": "Detailed Roadmap" if is_detailed_mode else "Clean Minimal Directory",
             "Total Cards": str(len(cards))
         })
     except Exception as e:
         console.print(f"\n[bold red]❌ Failed to post Topic Index card:[/] {e}")
 
     await safe_input("\nPress Enter to return to menu", allow_cancel=False)
+
+async def run_master_group_indexer(session_mgr):
+    clear_screen()
+    console.print(get_persistent_header())
+    console.print(Panel(
+        "[bold cyan]🌐 MASTER GROUP & ALL-TOPICS ROADMAP INDEXER[/]\n"
+        "[dim]Scan all Forum Topics across the entire group & generate a Master Navigation Roadmap Card.[/]",
+        border_style="cyan", box=box.ROUNDED
+    ))
+
+    client = await session_mgr.ensure_active_client()
+    if not client: return
+
+    # 1. Select Target Forum Group
+    console.print("\n[bold cyan]Select Target Forum Group to Index:[/]")
+    grp_sel = await interactive_channel_selector(client, prompt_title="Target Forum Group")
+    if not grp_sel: return
+
+    group_id = grp_sel["id"]
+    try:
+        group_entity = await client.get_entity(_parse_chat_id(group_id))
+        group_title = getattr(group_entity, 'title', None) or str(group_id)
+        username = getattr(group_entity, 'username', None)
+    except Exception as e:
+        console.print(f"[bold red]❌ Failed to connect to group:[/] {e}")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    # 2. Fetch all Forum Topics
+    with console.status(f"[bold cyan]Scanning Forum Topics in '{group_title}'...[/]"):
+        try:
+            peer = await client.get_input_entity(_parse_chat_id(group_id))
+            res = await client(GetForumTopicsRequest(
+                peer=peer, offset_date=None, offset_id=0, offset_topic=0, limit=100
+            ))
+            topics = res.topics if hasattr(res, 'topics') and res.topics else []
+        except Exception as e:
+            console.print(f"[bold red]❌ Failed to fetch forum topics:[/] {e}")
+            await safe_input("Press Enter to return", allow_cancel=False)
+            return
+
+    if not topics:
+        console.print(f"[yellow]⚠️ No forum topics found in '{group_title}'. Ensure Topics are enabled in Group Settings.[/]")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    console.print(f"\n[bold green]✔ Found [bold yellow]{len(topics)}[/] Forum Topics in '{group_title}'![/]\n")
+
+    # 3. Choose Presentation Style
+    console.print("[bold cyan]Choose Master Index Presentation Format:[/]")
+    console.print(" [1] 📊 Detailed Roadmap (Topic Name, Jump Link, and file/video counts inside each topic)")
+    console.print(" [2] 📜 Clean Minimal Directory (Pure Topic Names and direct Jump Links ONLY — zero counts)")
+    style_ch = await safe_input("Choose Option (1/2)", valid_options=["1", "2"], default_val="1", allow_cancel=True)
+    if not style_ch: return
+    is_detailed = (style_ch == "1")
+
+    topic_data = []
+    total_files_all = 0
+    total_vids_all = 0
+    total_docs_all = 0
+
+    with console.status("[bold cyan]Compiling Master Topics Directory...[/]") as status:
+        for idx, t in enumerate(topics, 1):
+            t_name = getattr(t, 'title', f"Topic #{t.id}").strip()
+            clean_t_name = clean_index_title(t_name, max_len=45)
+            t_link = make_telegram_link(group_id, t.id, topic_id=t.id, username=username)
+
+            v_count = 0
+            d_count = 0
+            total_items = 0
+
+            if is_detailed:
+                status.update(f"[bold cyan][{idx}/{len(topics)}] Scanning topic: {clean_t_name}...[/]")
+                try:
+                    t_msgs = await client.get_messages(group_entity, reply_to=t.id, limit=300)
+                    for m in t_msgs:
+                        if m and (m.video or m.document or m.photo):
+                            total_items += 1
+                            if m.video: v_count += 1
+                            elif m.document: d_count += 1
+                    total_files_all += total_items
+                    total_vids_all += v_count
+                    total_docs_all += d_count
+                except Exception:
+                    pass
+
+            topic_data.append({
+                "id": t.id,
+                "title": clean_t_name,
+                "link": t_link,
+                "total": total_items,
+                "videos": v_count,
+                "docs": d_count
+            })
+
+    console.print("\n[bold cyan]Topic Sorting Order:[/]")
+    console.print(" [1] 🔢 Creation Order (Chronological)")
+    console.print(" [2] 🔤 Alphabetical (A to Z)")
+    sort_ch = await safe_input("Choose Order (1/2)", valid_options=["1", "2"], default_val="1", allow_cancel=True)
+    if sort_ch == "2":
+        topic_data.sort(key=lambda x: clean_sort_key(x["title"]))
+
+    cards = []
+    clean_grp_title = clean_index_title(group_title, max_len=40).upper()
+
+    header_title = f"{clean_grp_title} — MASTER ROADMAP" if is_detailed else f"{clean_grp_title} — MASTER DIRECTORY"
+    header_block = [
+        "╔════════════════════════════════════════════════════════════╗",
+        f"║   📑 **{header_title}**",
+        f"║   ✨ *Curated & Maintained by {GROUP_BRAND}*",
+        "╚════════════════════════════════════════════════════════════╝",
+        "✨ ──────────── 📖 ALL FORUM TOPICS DIRECTORY ──────────── ✨"
+    ]
+
+    current_card = list(header_block)
+    for idx, td in enumerate(topic_data, 1):
+        if is_detailed:
+            breakdown = f"{td['videos']} Videos" if td['videos'] and not td['docs'] else (f"{td['docs']} Docs" if td['docs'] and not td['videos'] else f"{td['videos']}V · {td['docs']}D")
+            count_str = f" — `{td['total']} Items` ({breakdown})" if td['total'] > 0 else ""
+            entry = f"[{idx:02d}] ▫️ 📂 [{td['title']}]({td['link']}){count_str}"
+        else:
+            entry = f"[{idx:02d}] ▫️ [{td['title']}]({td['link']})"
+
+        if sum(len(l) for l in current_card) + len(entry) > 3400:
+            current_card.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            cards.append("\n".join(current_card))
+            current_card = [
+                f"📑 **{clean_grp_title} DIRECTORY (Part {len(cards)+1})**",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            ]
+        current_card.append(entry)
+
+    if is_detailed and total_files_all > 0:
+        footer = [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📊 **Scope:** `{len(topics)} Topics`  ·  `{total_files_all} Total Files` (`{total_vids_all} Videos` · `{total_docs_all} Docs`)",
+            f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
+        ]
+    else:
+        footer = [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📊 **Scope:** `{len(topics)} Forum Topics`",
+            f"📚 {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
+        ]
+
+    current_card.extend(footer)
+    cards.append("\n".join(current_card))
+
+    # Preview Card 1
+    console.print(Panel(cards[0][:700] + ("\n..." if len(cards[0]) > 700 else ""), title=f"Preview of Master Roadmap (Total {len(cards)} Part{'s' if len(cards)>1 else ''})", border_style="magenta", box=box.ROUNDED))
+
+    # Ask destination topic to post
+    console.print(f"\n[cyan]Where would you like to post this Master Directory Card?[/]")
+    console.print(" [1] 🌐 General Topic / Topic #1 (Recommended for Master Hub)")
+    console.print(" [2] 📌 Select Specific Topic")
+    post_loc = await safe_input("Choose Location (1/2)", valid_options=["1", "2"], default_val="1", allow_cancel=True)
+    if not post_loc: return
+
+    dest_topic_id = None
+    dest_topic_name = "General Topic"
+    if post_loc == "2":
+        console.print("\nSelect destination topic:")
+        for idx, t in enumerate(topics, 1):
+            console.print(f" [{idx}] 📌 {getattr(t, 'title', f'Topic #{t.id}')}")
+        top_sel = await safe_input(f"Choose Topic (1-{len(topics)})", valid_options=[str(i) for i in range(1, len(topics)+1)], default_val="1", allow_cancel=True)
+        if top_sel:
+            chosen = topics[int(top_sel)-1]
+            dest_topic_id = chosen.id
+            dest_topic_name = getattr(chosen, 'title', f"Topic #{chosen.id}")
+    else:
+        dest_topic_id = topics[0].id if topics else 1
+        dest_topic_name = getattr(topics[0], 'title', 'General')
+
+    post_confirm = await safe_input(f"\nPost Master Directory ({len(cards)} Cards) into '{dest_topic_name}'? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
+    if not post_confirm or post_confirm.upper() != "YES":
+        console.print("[yellow]Post cancelled. Preview only.[/]")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return
+
+    sent_first = None
+    try:
+        reply_target = int(dest_topic_id) if dest_topic_id and int(dest_topic_id) > 0 else None
+        with console.status(f"[bold cyan]Posting Master Directory with anti-flood pacing...[/]"):
+            for c_idx, card in enumerate(cards, 1):
+                sent = await client.send_message(
+                    _parse_chat_id(group_id),
+                    card,
+                    reply_to=reply_target,
+                    parse_mode="md",
+                    link_preview=False
+                )
+                if c_idx == 1:
+                    sent_first = sent
+                await asyncio.sleep(1.2)
+
+        console.print(f"\n[bold green]🎉 SUCCESS! Master Directory posted into '{dest_topic_name}'![/]")
+
+        pin_ch = await safe_input(f"PIN this Master Directory Card at the top of '{dest_topic_name}'? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
+        if pin_ch and pin_ch.upper() == "YES" and sent_first:
+            try:
+                await client.pin_message(_parse_chat_id(group_id), sent_first.id, notify=False)
+                console.print("[bold green]📌 Master Directory Card pinned successfully![/]")
+            except Exception as pe:
+                console.print(f"[yellow]⚠️ Could not pin message (Admin permission required): {pe}[/]")
+
+        AdminTelemetry.dispatch(client, "📌 [INDEXER] Master Group Roadmap Generated", {
+            "Group": f"`{group_id}` ({group_title})",
+            "Topics Indexed": str(len(topics)),
+            "Style": "Detailed Roadmap" if is_detailed else "Clean Minimal Directory",
+            "Total Cards": str(len(cards))
+        })
+    except Exception as e:
+        console.print(f"\n[bold red]❌ Failed to post Master Directory card:[/] {e}")
+
+    await safe_input("\nPress Enter to return to menu", allow_cancel=False)
+
 
 async def run_indexer_menu(session_mgr):
     while True:
@@ -6628,23 +7158,27 @@ async def run_menu(session_mgr):
             clear_screen()
             console.print(get_persistent_header())
             console.print(Panel(
-                "[bold magenta]🎯 CONTENT CLONING, CHERRY-PICKER & MEMBER SUITE[/]\n"
+                "[bold magenta]🎯 CONTENT CLONING, CHERRY-PICKER & FORWARDER SUITE[/]\n"
                 "[dim]─────────────────────────────────────────────────[/]\n\n"
-                " [bold green][1][/] 🎯 [bold white]Selective Content Explorer & Cherry-Picker[/] [bold yellow]⭐ (Recommended)[/]\n"
+                " [bold green][1][/] 🎬 [bold white]Direct Single / Specific Videos & Messages Forwarder[/] [bold yellow]⭐ (New)[/]\n"
+                "     [dim]Forward 1 or 2 specific videos, message IDs, or t.me links straight into any Forum Topic[/]\n\n"
+                " [bold cyan][2][/] 🎯 [bold white]Selective Content Explorer & Cherry-Picker[/]\n"
                 "     [dim]Browse source group, inspect files, pick what you need & paste to chosen topic[/]\n\n"
-                " [bold cyan][2][/] 👥 [bold white]Cross-Group Member Scraper, Backup & Smart Adder[/] [bold yellow]⭐ (New)[/]\n"
+                " [bold blue][3][/] 👥 [bold white]Cross-Group Member Scraper, Backup & Smart Adder[/]\n"
                 "     [dim]Scrape active members from any group, export CSV backup & safely add to your group[/]\n\n"
-                " [bold magenta][3][/] 🧬 [bold white]Full Group / Forum Auto-Mirror[/]\n"
+                " [bold magenta][4][/] 🧬 [bold white]Full Group / Forum Auto-Mirror[/]\n"
                 "     [dim]Auto-create matching topics and mirror entire group structure[/]\n\n"
                 " [dim][0] Return to Main Menu[/]",
                 border_style="magenta", box=box.ROUNDED
             ))
-            clone_sub = await safe_input("Choose Option (1/2/3/0)", valid_options=["1", "2", "3", "0"], default_val="1", allow_cancel=True)
+            clone_sub = await safe_input("Choose Option (1/2/3/4/0)", valid_options=["1", "2", "3", "4", "0"], default_val="1", allow_cancel=True)
             if clone_sub == "1":
-                await run_selective_content_picker(session_mgr)
+                await run_single_or_specific_messages_forwarder(session_mgr)
             elif clone_sub == "2":
-                await run_member_scraper_and_adder(session_mgr)
+                await run_selective_content_picker(session_mgr)
             elif clone_sub == "3":
+                await run_member_scraper_and_adder(session_mgr)
+            elif clone_sub == "4":
                 res = await run_group_cloner_tool(session_mgr)
                 if res: return res
             continue
@@ -6730,6 +7264,10 @@ async def start_platform(auto_start: bool = False):
     api_id = int(os.getenv("API_ID", 0) or 0)
     api_hash = os.getenv("API_HASH", "").strip().strip("'").strip('"')
     session_mgr = MultiSessionManager(api_id, api_hash)
+    if not api_id or not api_hash:
+        await session_mgr._prompt_credentials()
+        api_id = session_mgr.api_id
+        api_hash = session_mgr.api_hash
     
     # Auto-start check for 100% hands-free execution
     is_auto = auto_start or ("--auto" in sys.argv) or ("--live" in sys.argv) or (os.getenv("AUTO_START_LIVE", "").strip() in ("1", "true", "yes"))
