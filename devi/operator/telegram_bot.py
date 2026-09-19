@@ -905,18 +905,53 @@ class DeviTelegramBot:
         return result
 
     def _format_sangmata_dossier(self, dossier: dict, title_prefix: str = "SANGMATA IDENTITY RADAR") -> str:
-        """Formats full A-to-Z Sangmata intelligence dossier card."""
+        """Formats full A-to-Z Sangmata intelligence & deep OSINT forensic dossier card."""
         user_id = dossier.get("user_id")
         fn = dossier.get("full_name") or "Anonymous"
         uname = dossier.get("username")
         uname_str = f"@{uname}" if uname else "No Username"
         user_mention = f"[{fn}](tg://user?id={user_id})" if user_id else fn
         
-        is_prem = "Active ⭐️" if dossier.get("is_premium") else "Standard"
+        is_prem = "⭐️ Active Subscriber (Telegram Premium)" if dossier.get("is_premium") else "Standard Free Tier"
         acct_age = self._estimate_account_age(user_id)
-        first_seen = str(dossier.get("first_seen") or "Just Now")[:16]
+        first_seen = str(dossier.get("first_seen") or "Just Now")[:19]
         total_msgs = dossier.get("total_messages", 1)
         total_changes = dossier.get("changes_count", 0)
+        phone = dossier.get("phone", "Not Shared")
+        phone_str = f"⚠️ Leaked: `{phone}`" if phone and phone != "Not Shared" else "🔒 Clean (No Phone Leaked)"
+        lang = (dossier.get("language") or "en").upper()
+        hex_id = f"0x{user_id:X}" if user_id else "N/A"
+
+        # Activity engagement tier
+        if total_msgs >= 50:
+            act_tier = "🔥 Super Contributor (50+ Msgs)"
+        elif total_msgs >= 10:
+            act_tier = "🌱 Regular Student (10–50 Msgs)"
+        else:
+            act_tier = "👀 New Joiner / Silent Reader (<10 Msgs)"
+
+        # Identity Shift Velocity & Risk Gauge
+        risk_score = 0
+        if total_changes >= 3:
+            risk_score += 35
+            velocity_str = f"⚠️ High Velocity ({total_changes} changes detected - Impersonation Watchlist)"
+        elif total_changes > 0:
+            risk_score += 10
+            velocity_str = f"🟡 Moderate ({total_changes} change detected)"
+        else:
+            velocity_str = "🟢 0 Shifts (100% Stable Identity)"
+
+        if "Fresh Account" in acct_age or "Brand New" in acct_age:
+            risk_score += 25
+        if phone != "Not Shared" and phone != "None":
+            risk_score += 10
+
+        if risk_score >= 50:
+            risk_badge = f"🔴 {risk_score}/100 (High Risk / Threat Alert)"
+        elif risk_score >= 25:
+            risk_badge = f"🟡 {risk_score}/100 (Moderate Watchlist)"
+        else:
+            risk_badge = f"🟢 {risk_score}/100 (Safe Student Account)"
 
         # Build complete A-to-Z Name History
         name_hist = dossier.get("name_history", [])
@@ -940,21 +975,27 @@ class DeviTelegramBot:
         uname_lines.append(f"✨ `{uname_str}` ➔ `(Current Active Username)`")
 
         card = (
-            f"🕵️‍♂️ **{title_prefix} — COMPLETE AUDIT** 🩺\n"
+            f"🕵️‍♂️ **{title_prefix} — OSINT DOSSIER** 🩺\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👤 **Member:** {user_mention} (`{user_id}`)\n"
-            f"🆔 **Permanent ID:** `{user_id}`\n"
-            f"🗓️ **Estimated Age:** {acct_age}\n"
-            f"⭐️ **Telegram Premium:** {is_prem}\n"
-            f"💬 **Total Activity:** `{total_msgs}` messages\n"
+            f"👤 **Student Name:** {user_mention}\n"
+            f"🏷️ **Username:** `{uname_str}`\n"
+            f"🆔 **Telegram ID:** `{user_id}` (`{hex_id}`)\n"
+            f"🗓️ **Account Age:** {acct_age}\n"
+            f"⭐️ **Telegram Tier:** {is_prem}\n"
+            f"🌐 **Language:** `{lang}`\n"
+            f"📱 **Phone Status:** {phone_str}\n"
+            f"💬 **Engagement:** `{total_msgs} msgs` ({act_tier})\n"
             f"🕒 **First Tracked:** `{first_seen}`\n"
-            f"⚠️ **Total Identity Changes:** `{total_changes}`\n\n"
+            f"🔄 **Shift Velocity:** {velocity_str}\n"
+            f"🛡️ **OSINT Risk Level:** {risk_badge}\n"
+            f"🔗 **Permanent Link:** [Open Profile in Telegram](tg://user?id={user_id})\n\n"
             f"📜 **Complete Name History (A to Z):**\n" + "\n".join(name_lines) + "\n\n"
             f"🏷️ **Complete Username History (A to Z):**\n" + "\n".join(uname_lines) + "\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🛡️ *Kind Doctor Live Sentinel • Anti-Impersonation & Member Safety*"
+            f"🛡️ *Kind Doctor Live Sentinel • OSINT Biometrics & Member Protection*"
         )
         return card
+
 
     def get_all_admins(self) -> Set[int]:
         return self.master_admin_ids.union(self.co_admins)
@@ -3904,31 +3945,83 @@ class DeviTelegramBot:
             bot_status_str = "🤖 Bot Account" if live_is_bot else "👤 Human User (Real Account)"
             photo_str = f"{photo_count} Photo{'s' if photo_count != 1 else ''} Uploaded" if photo_count > 0 else "None (Default / Hidden Avatar)"
 
+            # Deep OSINT Analytics & Threat Scoring
+            total_changes = len(name_hist_list) + len(uname_hist_list)
+            phone_val = user_data["phone_number"] if user_data and "phone_number" in user_data.keys() else None
+            phone_str = f"⚠️ Leaked in Group: `{phone_val}`" if phone_val and phone_val != "Not Shared" else "🔒 Clean (No Leaked Phone Tracked)"
+            hex_id = f"0x{u_id:X}" if u_id else "N/A"
+
+            if total_m >= 50:
+                act_tier = "🔥 Super Contributor (50+ Msgs)"
+            elif total_m >= 10:
+                act_tier = "🌱 Regular Student (10–50 Msgs)"
+            else:
+                act_tier = "👀 New Joiner / Silent Reader (<10 Msgs)"
+
+            risk_score = 0
+            if total_changes >= 3:
+                risk_score += 35
+                velocity_str = f"⚠️ High Velocity ({total_changes} identity shifts detected - Impersonation Watchlist)"
+            elif total_changes > 0:
+                risk_score += 10
+                velocity_str = f"🟡 Moderate ({total_changes} identity shift detected)"
+            else:
+                velocity_str = "🟢 0 Shifts (100% Stable Identity)"
+
+            if "Fresh Account" in u_age or "Brand New" in u_age:
+                risk_score += 25
+            if phone_val and phone_val != "Not Shared":
+                risk_score += 15
+
+            if risk_score >= 50:
+                risk_badge = f"🔴 {risk_score}/100 (High Risk / Threat Alert)"
+            elif risk_score >= 25:
+                risk_badge = f"🟡 {risk_score}/100 (Moderate Watchlist)"
+            else:
+                risk_badge = f"🟢 {risk_score}/100 (Safe Student Account)"
+
             card = (
-                f"👤 **User Intelligence Dossier (SangMata Full Audit)** 🩺\n"
+                f"👤 **USER INTELLIGENCE & SANGMATA OSINT DOSSIER** 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"{fwd_origin_notice}"
-                f"👤 **Full Name**: {full_n}\n"
-                f"🏷️ **Username**: @{uname}\n"
-                f"🆔 **User ID**: `{u_id}`\n"
+                f"👤 **Student Name**: [{full_n}](tg://user?id={u_id})\n"
+                f"🏷️ **Username**: @{uname} {'(https://t.me/' + uname + ')' if uname != 'No Username' else ''}\n"
+                f"🆔 **Telegram ID**: `<code>{u_id}</code>` (Hex: `<code>{hex_id}</code>`)\n"
                 f"🏢 **Data Center**: `{dc_string}`\n"
-                f"⏳ **Account Age**: {u_age}\n"
-                f"🌟 **Account Type**: {prem}\n"
+                f"🗓️ **Account Age**: {u_age}\n"
+                f"⭐️ **Telegram Tier**: {prem}\n"
                 f"🤖 **Account Nature**: {bot_status_str}\n"
                 f"🖼️ **Profile Photos**: `{photo_str}`\n"
-                f"🌐 **Language**: `{lang}`\n"
+                f"🌐 **Language**: `{lang.upper()}`\n"
+                f"📱 **Phone Tracking**: {phone_str}\n"
                 f"🛡️ **Group Status**: {group_role_str}\n"
-                f"💬 **Group Messages**: `{total_m}` messages sent\n"
+                f"💬 **Group Engagement**: `{total_m}` messages sent ({act_tier})\n"
                 f"🕒 **First Seen**: `{first_s}`\n"
                 f"🕒 **Last Active**: `{last_s}`\n"
-                f"🔗 **Permanent Link**: [Direct Profile](tg://user?id={u_id})\n\n"
-                f"📜 **Complete Name History (A to Z):**\n"
+                f"🔄 **Shift Velocity**: {velocity_str}\n"
+                f"🛡️ **OSINT Risk Level**: {risk_badge}\n"
+                f"🔗 **Permanent Link**: [Open Profile in Telegram](tg://user?id={u_id})\n\n"
+                f"📜 **Complete Name History (A to Z Timeline):**\n"
                 f"{name_hist_text}\n\n"
-                f"🏷️ **Complete Username History (A to Z):**\n"
+                f"🏷️ **Complete Username History (A to Z Timeline):**\n"
                 f"{uname_hist_text}\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🛡️ *Kind Doctor Live Sentinel • OSINT Biometrics & Member Protection*"
             )
-            await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+
+            whois_markup = None
+            if self.is_admin(admin_id) and u_id != admin_id:
+                whois_markup = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "🚫 Ban Member", "callback_data": f"ban_{u_id}"},
+                            {"text": "👢 Kick Member", "callback_data": f"kick_{u_id}"}
+                        ]
+                    ]
+                }
+
+            await self._send_message(session, chat_id, card, reply_markup=whois_markup, message_thread_id=thread_id)
+
 
         # -------------------------------------------------------------
         # 3. GROUP SEARCH & DISCOVERY ENGINE
