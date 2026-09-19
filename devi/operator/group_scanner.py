@@ -66,13 +66,20 @@ async def scan_group(target_chat_id: int, scan_messages: bool = True):
     from telethon import TelegramClient
     from telethon.tl.functions.messages import GetForumTopicsRequest
 
-    # Prioritize primary forwarder session for authentic supergroup access
-    sess_path = ROOT_DIR / "session_forwarder"
-    if not (ROOT_DIR / "session_forwarder.session").exists():
-        sess_path = ROOT_DIR / "session_scanner"
+    # Use available session file without locking conflicts
+    sess_path = ROOT_DIR / "session_scanner"
+    if (ROOT_DIR / "session_account_9081.session").exists():
+        sess_path = ROOT_DIR / "session_account_9081"
+    elif (ROOT_DIR / "session_account2.session").exists():
+        sess_path = ROOT_DIR / "session_account2"
 
     client = TelegramClient(str(sess_path), API_ID, API_HASH)
-    await client.connect()
+    try:
+        await client.connect()
+    except Exception:
+        sess_path = ROOT_DIR / "session_scanner"
+        client = TelegramClient(str(sess_path), API_ID, API_HASH)
+        await client.connect()
 
     is_user_auth = await client.is_user_authorized()
     if not is_user_auth:
@@ -82,7 +89,23 @@ async def scan_group(target_chat_id: int, scan_messages: bool = True):
         await client.start(bot_token=BOT_TOKEN)
 
     try:
-        peer = await client.get_input_entity(target_chat_id)
+        peer = None
+        try:
+            peer = await client.get_input_entity(target_chat_id)
+        except Exception:
+            try:
+                async for dialog in client.iter_dialogs(limit=100):
+                    if dialog.id == target_chat_id or getattr(dialog.entity, 'id', None) == abs(target_chat_id) % 10000000000:
+                        peer = dialog.input_entity
+                        break
+            except Exception:
+                pass
+            if not peer:
+                try:
+                    peer = await client.get_entity(target_chat_id)
+                except Exception as e:
+                    print(f"[!] Warning: Could not resolve peer for {target_chat_id}: {e}")
+                    return
 
         # 1. Fetch Forum Topics from Telegram
         try:
@@ -139,7 +162,7 @@ async def scan_group(target_chat_id: int, scan_messages: bool = True):
                         continue  # General root topic
 
                     try:
-                        async for msg in client.iter_messages(target_chat_id, reply_to=t.id, limit=60):
+                        async for msg in client.iter_messages(peer, reply_to=t.id, limit=60):
                             title = None
                             icon = "🎬"
                             if msg.video:

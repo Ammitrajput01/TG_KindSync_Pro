@@ -44,6 +44,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 BASE_PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
 DB_PATH = BASE_PROJECT_DIR / "history_core.sqlite"
 ENV_PATH = BASE_PROJECT_DIR / ".env"
+load_dotenv(ENV_PATH)
 
 def get_db_conn() -> sqlite3.Connection:
     """Thread-safe, locked-resistant SQLite connection with 30s timeout and WAL pragma."""
@@ -724,8 +725,21 @@ class DeviTelegramBot:
             pass
         return chat_id
 
-    def _get_topics(self, chat_id: int, sort_alphabetical: bool = True) -> list:
-        """Retrieves all registered topics for a group, sorted alphabetically (A to Z) by default."""
+    @staticmethod
+    def _natural_sort_key(title: str):
+        """Natural sort key so Lecture 2 comes before Lecture 10 and Part 01 comes before Part 02."""
+        if not title:
+            return []
+        parts = []
+        for segment in re.split(r'(\d+)', str(title)):
+            if segment.isdigit():
+                parts.append(int(segment))
+            else:
+                parts.append(segment.lower())
+        return parts
+
+    def _get_topics(self, chat_id: int, sort_mode: str = "az") -> list:
+        """Retrieves all registered topics for a group. sort_mode: 'az' (alphabetical) or 'seq' (forum order)."""
         try:
             with get_db_conn() as conn:
                 conn.row_factory = sqlite3.Row
@@ -734,8 +748,10 @@ class DeviTelegramBot:
                     (chat_id,)
                 ).fetchall()
                 topics = [dict(r) for r in rows]
-                if sort_alphabetical and topics:
+                if sort_mode == "az" and topics:
                     topics.sort(key=lambda t: self._clean_sort_key(t.get("topic_title", "")))
+                elif sort_mode == "seq" and topics:
+                    topics.sort(key=lambda t: t.get("topic_id", 0))
                 return topics
         except Exception as e:
             logger.warning(f"Error fetching topics for chat {chat_id}: {e}")
@@ -764,8 +780,8 @@ class DeviTelegramBot:
             logger.warning(f"Error saving topic item: {e}")
             return 0
 
-    def _get_topic_items(self, chat_id: int, topic_id: int) -> list:
-        """Retrieves all items under a specific topic."""
+    def _get_topic_items(self, chat_id: int, topic_id: int, sort_mode: str = "seq") -> list:
+        """Retrieves all items under a specific topic. sort_mode: 'seq' (natural numeric) or 'az' (alphabetical)."""
         try:
             with get_db_conn() as conn:
                 conn.row_factory = sqlite3.Row
@@ -773,7 +789,12 @@ class DeviTelegramBot:
                     "SELECT id, title, msg_id, custom_link, icon FROM telegram_topic_items WHERE chat_id = ? AND topic_id = ? ORDER BY id ASC",
                     (chat_id, topic_id)
                 ).fetchall()
-                return [dict(r) for r in rows]
+                items = [dict(r) for r in rows]
+                if sort_mode == "az" and items:
+                    items.sort(key=lambda x: self._clean_sort_key(x.get("title", "")))
+                elif sort_mode == "seq" and items:
+                    items.sort(key=lambda x: self._natural_sort_key(x.get("title", "")))
+                return items
         except Exception as e:
             logger.warning(f"Error fetching topic items: {e}")
             return []
@@ -1228,6 +1249,43 @@ class DeviTelegramBot:
                 return resp.status == 200
         except Exception as e:
             logger.warning(f"Failed to pin message {message_id} in {chat_id}: {e}")
+            return False
+
+    async def _edit_message(
+        self,
+        session: aiohttp.ClientSession,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        reply_markup: Optional[dict] = None,
+        disable_web_page_preview: bool = True,
+        parse_mode: str = "HTML"
+    ) -> bool:
+        """Edits an existing message text and inline keyboard in-place without generating a new message."""
+        url = f"https://api.telegram.org/bot{self.token}/editMessageText"
+        formatted_text = self._format_clean_html(text) if parse_mode == "HTML" else text
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": formatted_text,
+            "parse_mode": parse_mode,
+            "disable_web_page_preview": disable_web_page_preview
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        try:
+            async with session.post(url, json=payload, timeout=10) as resp:
+                if resp.status == 200:
+                    return True
+                # Fallback to plain text if HTML parsing issues occur
+                clean_plain = re.sub(r'<[^>]+>', '', formatted_text)
+                clean_plain = re.sub(r'[*_`]', '', clean_plain)
+                payload["text"] = clean_plain
+                payload.pop("parse_mode", None)
+                async with session.post(url, json=payload, timeout=10) as r2:
+                    return r2.status == 200
+        except Exception as e:
+            logger.warning(f"Failed to edit message {message_id} in {chat_id}: {e}")
             return False
 
     async def _send_document(
@@ -2659,7 +2717,7 @@ class DeviTelegramBot:
             except Exception as e:
                 logger.warning(f"Error executing group scanner: {e}")
 
-            topics = self._get_topics(target_scan_chat, sort_alphabetical=True)
+            topics = self._get_topics(target_scan_chat, sort_mode="az")
             total_items = 0
             try:
                 with get_db_conn() as conn:
@@ -2671,7 +2729,7 @@ class DeviTelegramBot:
             done_msg = (
                 f"✅ **Auto-Scan & Indexing Successful!** 🎯\n\n"
                 f"📊 **Scan Summary:**\n"
-                f"• **Topics Registered (A-Z):** `{len(topics)}`\n"
+                f"• **Topics Registered:** `{len(topics)}`\n"
                 f"• **Lectures/Files Indexed:** `{total_items}`\n\n"
                 f"👉 Ab aap `/mainindex` tap karein Master Hub dekhne ke liye, ya kisi topic me `/topicindex` bhejein!"
             )
@@ -2681,7 +2739,14 @@ class DeviTelegramBot:
 
         elif cmd in ("/mainindex", "/main_index", "/indexmaster", "/alltopics"):
             target_index_chat = self._resolve_study_group_id(chat_id)
-            topics = self._get_topics(target_index_chat, sort_alphabetical=True)
+            sort_mode = "az"
+            for p in parts[1:]:
+                if p.lower() in ("seq", "num", "forum", "order"):
+                    sort_mode = "seq"
+                elif p.lower() in ("az", "alpha", "a-z"):
+                    sort_mode = "az"
+
+            topics = self._get_topics(target_index_chat, sort_mode=sort_mode)
             if not topics:
                 scan_notify = await self._send_message(
                     session, chat_id,
@@ -2695,7 +2760,7 @@ class DeviTelegramBot:
                         stderr=asyncio.subprocess.PIPE
                     )
                     await asyncio.wait_for(proc.communicate(), timeout=120.0)
-                    topics = self._get_topics(target_index_chat, sort_alphabetical=True)
+                    topics = self._get_topics(target_index_chat, sort_mode=sort_mode)
                 except Exception as e:
                     logger.warning(f"Error during auto-healing scan: {e}")
                 if scan_notify:
@@ -2712,55 +2777,15 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, help_msg, message_thread_id=thread_id)
                 return
 
-            clean_chat_id = str(target_index_chat).replace("-100", "").replace("-", "").lstrip("@")
-            cards = []
-            current_card_lines = [
-                "✨ <b>MASTER TOPIC DIRECTORY</b> 📑",
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                "🏛️ <i>Official Study Repository • A to Z Directory</i>",
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            ]
-
-            current_letter = None
-            for idx, top in enumerate(topics, 1):
-                t_id = top["topic_id"]
-                t_title = top["topic_title"]
-                t_icon = top.get("topic_icon") or "📖"
-                link = f"https://t.me/c/{clean_chat_id}/{t_id}" if clean_chat_id.isdigit() else f"https://t.me/{clean_chat_id}/{t_id}"
-                
-                sort_k = self._clean_sort_key(t_title)
-                first_char = sort_k[0].upper() if sort_k else "#"
-                if not first_char.isalpha():
-                    first_char = "0-9"
-                if first_char != current_letter:
-                    current_letter = first_char
-                    current_card_lines.append(f"\n🏷️ <b>SECTION #{current_letter}</b>")
-
-                safe_title = html.escape(t_title.strip())
-                line = f"{t_icon} <code>[{idx:02d}]</code> <a href=\"{link}\">{safe_title}</a>"
-                if sum(len(l) for l in current_card_lines) + len(line) > 3400:
-                    current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                    cards.append("\n".join(current_card_lines))
-                    current_card_lines = [
-                        f"📑 <b>MASTER TOPIC DIRECTORY (Cont. #{current_letter})</b>",
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                    ]
-                current_card_lines.append(line)
-
-            current_card_lines.extend([
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                f"📊 <b>Indexed Topics:</b> <code>{len(topics)}</code> (Alphabetical A–Z)",
-                "📌 <i>Tap any subject title above to open its study topic.</i>",
-                "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Medical Study Companion</i>"
-            ])
-            cards.append("\n".join(current_card_lines))
-
+            cards, reply_markup = self._build_main_index_cards(target_index_chat, sort_mode=sort_mode)
             first_msg_id = None
             for idx, card in enumerate(cards):
+                m_markup = reply_markup if idx == len(cards) - 1 or idx == 0 else None
                 m_id = await self._send_message(
                     session,
                     chat_id,
                     card,
+                    reply_markup=m_markup,
                     message_thread_id=thread_id,
                     disable_web_page_preview=True
                 )
@@ -2774,7 +2799,7 @@ class DeviTelegramBot:
                 conf = await self._send_message(
                     session,
                     chat_id,
-                    f"✅ <b>Master Hub Index Published!</b> {pin_status}",
+                    f"✅ <b>Master Hub Index Published!</b> ({'Alphabetical A–Z' if sort_mode == 'az' else 'Forum Sequence'}) {pin_status}",
                     message_thread_id=thread_id
                 )
                 if conf and os.getenv("ENABLE_AUTO_DELETE", "false").lower() == "true":
@@ -2791,10 +2816,16 @@ class DeviTelegramBot:
 
         elif cmd in ("/topicindex", "/subindex", "/index"):
             target_index_chat = self._resolve_study_group_id(chat_id)
-            clean_chat_id = str(target_index_chat).replace("-100", "").replace("-", "").lstrip("@")
             target_t_id = thread_id
-            if len(parts) > 1 and parts[1].isdigit():
-                target_t_id = int(parts[1])
+            sort_mode = "seq"  # Default is natural lecture sequence (1, 2, 3...)
+
+            for p in parts[1:]:
+                if p.isdigit():
+                    target_t_id = int(p)
+                elif p.lower() in ("az", "alpha", "a-z"):
+                    sort_mode = "az"
+                elif p.lower() in ("seq", "num", "lecture", "order"):
+                    sort_mode = "seq"
 
             # If user ran /index without specifying a topic in DM or General topic (t_id is None or 0)
             # automatically show the Master Topic Directory!
@@ -2803,33 +2834,11 @@ class DeviTelegramBot:
                 return
 
             # Find topic title
-            topics = self._get_topics(target_index_chat, sort_alphabetical=True)
+            topics = self._get_topics(target_index_chat, sort_mode="seq")
             matched_topic = next((t for t in topics if t["topic_id"] == target_t_id), None)
             topic_title = matched_topic["topic_title"] if matched_topic else (f"Topic #{target_t_id}" if target_t_id else "General Topic")
 
-            # Retrieve items
-            items = self._get_topic_items(target_index_chat, target_t_id)
-
-            # Fallback: check forwarded table if no manual items exist
-            if not items and target_t_id is not None:
-                try:
-                    with get_db_conn() as conn:
-                        conn.row_factory = sqlite3.Row
-                        cur = conn.execute(
-                            "SELECT msg_id, source_chat, completed_at FROM forwarded WHERE target_chat = ? AND target_topic = ? ORDER BY msg_id ASC",
-                            (str(chat_id), target_t_id)
-                        )
-                        f_rows = cur.fetchall()
-                        for r in f_rows:
-                            items.append({
-                                "id": r["msg_id"],
-                                "title": f"File / Lecture #{r['msg_id']}",
-                                "msg_id": r["msg_id"],
-                                "custom_link": None,
-                                "icon": "🎬"
-                            })
-                except Exception as e:
-                    logger.warning(f"Error querying forwarded table: {e}")
+            items = self._get_topic_items(target_index_chat, target_t_id, sort_mode=sort_mode)
 
             if not items and target_t_id:
                 scan_notify = await self._send_message(
