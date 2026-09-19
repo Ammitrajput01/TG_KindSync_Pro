@@ -26,6 +26,7 @@ import io
 import random
 import base64
 import struct
+import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Set, Dict, Any, Optional
@@ -79,6 +80,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/stats", "/leaderboard", "/topmembers", "/history", "/rules",
     "/userinfo", "/whois", "/botinfo", "/about",
     "/engine", "/status", "/backup", "/clean", "/cleanbot", "/sangmata",
+    "/phone", "/email", "/phonelookup", "/emaillookup",
     "/mcq", "/pearl", "/score", "/pomodoro", "/ask"
 )
 STUDENT_ALLOWED_COMMANDS = PUBLIC_ALLOWED_COMMANDS
@@ -543,6 +545,158 @@ class DeviTelegramBot:
             return "🆕 Recent Account (~2024)"
         else:
             return "⚡ Fresh Account (2025–2026 - Brand New)"
+
+    @staticmethod
+    def _lookup_phone_osint(phone_input: str) -> dict:
+        """Deep Phone Number OSINT & Telecommunications Intelligence."""
+        raw_digits = re.sub(r'[^\d+]', '', str(phone_input).strip())
+        digits_only = re.sub(r'[^\d]', '', raw_digits)
+        
+        country_code = "International / Global"
+        country_flag = "🌐"
+        carrier_hint = "Cellular / Mobile Network"
+        formatted_intl = raw_digits
+        local_num = digits_only
+
+        if digits_only.startswith("91") and len(digits_only) >= 12:
+            country_code = "India"
+            country_flag = "🇮🇳"
+            local_num = digits_only[2:]
+            formatted_intl = f"+91 {local_num[:5]} {local_num[5:]}"
+        elif len(digits_only) == 10 and digits_only[0] in "6789":
+            country_code = "India"
+            country_flag = "🇮🇳"
+            local_num = digits_only
+            formatted_intl = f"+91 {local_num[:5]} {local_num[5:]}"
+            digits_only = "91" + digits_only
+        elif digits_only.startswith("1") and len(digits_only) == 11:
+            country_code = "USA / Canada"
+            country_flag = "🇺🇸 / 🇨🇦"
+            local_num = digits_only[1:]
+            formatted_intl = f"+1 ({local_num[:3]}) {local_num[3:6]}-{local_num[6:]}"
+        elif digits_only.startswith("44") and len(digits_only) >= 11:
+            country_code = "United Kingdom"
+            country_flag = "🇬🇧"
+            formatted_intl = f"+44 {digits_only[2:]}"
+        elif digits_only.startswith("971"):
+            country_code = "United Arab Emirates"
+            country_flag = "🇦🇪"
+            formatted_intl = f"+971 {digits_only[3:]}"
+        elif digits_only.startswith("92") and len(digits_only) >= 11:
+            country_code = "Pakistan"
+            country_flag = "🇵🇰"
+        elif digits_only.startswith("880"):
+            country_code = "Bangladesh"
+            country_flag = "🇧🇩"
+        elif digits_only.startswith("977"):
+            country_code = "Nepal"
+            country_flag = "🇳🇵"
+
+        if country_code == "India" and len(local_num) == 10:
+            pfx = local_num[:2]
+            if pfx in ("62", "63", "70", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"):
+                carrier_hint = "Jio / Airtel / Vi / BSNL (Indian Telecom Circle)"
+
+        matched_users = []
+        try:
+            with get_db_conn() as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT user_id, first_name, last_name, username, phone_number, total_messages FROM telegram_users_dossier WHERE phone_number LIKE ? OR phone_number LIKE ? LIMIT 5",
+                    (f"%{local_num}%", f"%{digits_only}%")
+                ).fetchall()
+                for r in rows:
+                    matched_users.append(dict(r))
+        except Exception:
+            pass
+
+        clean_e164 = f"+{digits_only}" if not raw_digits.startswith("+") else raw_digits
+
+        return {
+            "query": phone_input,
+            "digits_only": digits_only,
+            "local_num": local_num,
+            "e164": clean_e164,
+            "formatted": formatted_intl,
+            "country": country_code,
+            "country_flag": country_flag,
+            "carrier": carrier_hint,
+            "matched_users": matched_users,
+            "whatsapp_link": f"https://wa.me/{digits_only}",
+            "telegram_link": f"https://t.me/+{digits_only}",
+            "truecaller_url": f"https://www.truecaller.com/search/in/{local_num}"
+        }
+
+    @staticmethod
+    def _lookup_email_osint(email_input: str) -> dict:
+        """Deep Email Address OSINT & Domain Intelligence."""
+        email_clean = str(email_input).strip().lower()
+        is_valid = bool(re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', email_clean))
+        domain = email_clean.split('@')[1] if '@' in email_clean else ""
+        
+        disposable_domains = {
+            "tempmail.com", "10minutemail.com", "mailinator.com", "guerrillamail.com",
+            "throwawaymail.com", "yopmail.com", "sharklasers.com", "trashmail.com",
+            "getairmail.com", "dispostable.com", "burnermail.io", "fakemailgenerator.com",
+            "temp-mail.org", "mohmal.com", "crazymailing.com", "mytemp.email"
+        }
+        is_disposable = domain in disposable_domains or "temp" in domain or "fake" in domain
+        
+        provider_type = "Corporate / Custom Domain"
+        provider_icon = "🏢"
+        if domain in ("gmail.com", "googlemail.com"):
+            provider_type = "Google Mail (Consumer Workspace)"
+            provider_icon = "🔴"
+        elif domain in ("outlook.com", "hotmail.com", "live.com", "msn.com"):
+            provider_type = "Microsoft Outlook / Live"
+            provider_icon = "🟦"
+        elif domain in ("yahoo.com", "ymail.com", "myyahoo.com"):
+            provider_type = "Yahoo! Mail"
+            provider_icon = "🟣"
+        elif domain in ("icloud.com", "me.com", "mac.com"):
+            provider_type = "Apple iCloud Mail"
+            provider_icon = "🍎"
+        elif domain in ("proton.me", "protonmail.com", "pm.me"):
+            provider_type = "ProtonMail (End-to-End Encrypted Swiss)"
+            provider_icon = "🔒"
+        elif domain.endswith(".edu") or domain.endswith(".edu.in") or domain.endswith(".ac.in"):
+            provider_type = "Educational / University Academic Institution"
+            provider_icon = "🎓"
+        elif domain.endswith(".gov") or domain.endswith(".gov.in"):
+            provider_type = "Government Authority Domain"
+            provider_icon = "🏛️"
+        elif is_disposable:
+            provider_type = "⚠️ Disposable / Temporary Burner Email"
+            provider_icon = "🗑️"
+
+        gravatar_hash = hashlib.md5(email_clean.encode('utf-8')).hexdigest()
+        gravatar_url = f"https://www.gravatar.com/avatar/{gravatar_hash}?d=identicon"
+
+        matched_users = []
+        try:
+            with get_db_conn() as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT user_id, first_name, last_name, username, total_messages FROM telegram_users_dossier WHERE first_name LIKE ? OR username LIKE ? LIMIT 5",
+                    (f"%{email_clean.split('@')[0]}%", f"%{email_clean.split('@')[0]}%")
+                ).fetchall()
+                for r in rows:
+                    matched_users.append(dict(r))
+        except Exception:
+            pass
+
+        return {
+            "email": email_clean,
+            "is_valid": is_valid,
+            "domain": domain,
+            "is_disposable": is_disposable,
+            "provider_type": provider_type,
+            "provider_icon": provider_icon,
+            "gravatar_url": gravatar_url,
+            "matched_users": matched_users,
+            "hibp_url": f"https://haveibeenpwned.com/account/{email_clean}"
+        }
+
 
     def _get_group_settings(self, chat_id: int) -> dict:
         """Fetches custom welcome and moderation settings for a group."""
@@ -4023,11 +4177,98 @@ class DeviTelegramBot:
 
             await self._send_message(session, chat_id, card, reply_markup=whois_markup, message_thread_id=thread_id)
 
+        elif cmd in ("/phone", "/phonelookup"):
+            if len(parts) < 2:
+                await self._send_message(
+                    session, chat_id,
+                    "📞 **Phone Intelligence Usage:**\nType `/phone <number>`\n\nExample: `/phone +919876543210` or `/phone 9876543210`",
+                    message_thread_id=thread_id
+                )
+                return
+
+            phone_query = parts[1].strip()
+            p_data = self._lookup_phone_osint(phone_query)
+
+            matched_str = "• *No registered group members matched.*"
+            if p_data["matched_users"]:
+                matched_lines = []
+                for u in p_data["matched_users"]:
+                    fn = f"{u.get('first_name') or ''} {u.get('last_name') or ''}".strip() or "User"
+                    un = f"@{u['username']}" if u.get("username") else "No Username"
+                    matched_lines.append(f"• [{fn}](tg://user?id={u['user_id']}) ({un}) — `ID: {u['user_id']}`")
+                matched_str = "\n".join(matched_lines)
+
+            phone_card = (
+                f"📞 **TELECOM & PHONE NUMBER OSINT RADAR** 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📱 **Query Number**: <code>{p_data['formatted']}</code>\n"
+                f"🌐 **Country / Region**: {p_data['country_flag']} {p_data['country']}\n"
+                f"📡 **Carrier Circle**: `{p_data['carrier']}`\n"
+                f"🔢 **E.164 Format**: <code>{p_data['e164']}</code>\n\n"
+                f"👥 **Matched Group Profiles in Database:**\n"
+                f"{matched_str}\n\n"
+                f"⚡ **Direct Action Links:**\n"
+                f"• 💬 [Open in WhatsApp]({p_data['whatsapp_link']})\n"
+                f"• 📱 [Direct Telegram Chat]({p_data['telegram_link']})\n"
+                f"• 🔍 [Truecaller Web Lookup]({p_data['truecaller_url']})\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🛡️ *Kind Doctor Live Sentinel • OSINT Telecommunication Intelligence*"
+            )
+            await self._send_message(session, chat_id, phone_card, message_thread_id=thread_id)
+
+        elif cmd in ("/email", "/emaillookup"):
+            if len(parts) < 2:
+                await self._send_message(
+                    session, chat_id,
+                    "✉️ **Email OSINT Usage:**\nType `/email <address>`\n\nExample: `/email doctor@gmail.com`",
+                    message_thread_id=thread_id
+                )
+                return
+
+            email_query = parts[1].strip()
+            e_data = self._lookup_email_osint(email_query)
+
+            if not e_data["is_valid"]:
+                await self._send_message(
+                    session, chat_id,
+                    f"⚠️ **Invalid Email Syntax**: `{email_query}`\nKripya valid email format enter karein (e.g. `user@example.com`).",
+                    message_thread_id=thread_id
+                )
+                return
+
+            disp_tag = "🔴 High Risk (Burner / Disposable Email Detected)" if e_data["is_disposable"] else "🟢 Valid (Standard Mailbox)"
+            
+            matched_str = "• *No registered group members matched.*"
+            if e_data["matched_users"]:
+                matched_lines = []
+                for u in e_data["matched_users"]:
+                    fn = f"{u.get('first_name') or ''} {u.get('last_name') or ''}".strip() or "User"
+                    un = f"@{u['username']}" if u.get("username") else "No Username"
+                    matched_lines.append(f"• [{fn}](tg://user?id={u['user_id']}) ({un}) — `ID: {u['user_id']}`")
+                matched_str = "\n".join(matched_lines)
+
+            email_card = (
+                f"✉️ **EMAIL ADDRESS & DOMAIN OSINT RADAR** 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📧 **Query Email**: <code>{e_data['email']}</code>\n"
+                f"🏢 **Domain**: <code>{e_data['domain']}</code>\n"
+                f"{e_data['provider_icon']} **Mail Provider**: `{e_data['provider_type']}`\n"
+                f"🛡️ **Mailbox Authenticity**: {disp_tag}\n\n"
+                f"👥 **Matched Group Profiles:**\n"
+                f"{matched_str}\n\n"
+                f"⚡ **Deep Forensic Links:**\n"
+                f"• 🖼️ [Gravatar Profile Avatar]({e_data['gravatar_url']})\n"
+                f"• 🔓 [HaveIBeenPwned Breach Check]({e_data['hibp_url']})\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🛡️ *Kind Doctor Live Sentinel • Email Digital Footprint Analysis*"
+            )
+            await self._send_message(session, chat_id, email_card, message_thread_id=thread_id)
 
         # -------------------------------------------------------------
         # 3. GROUP SEARCH & DISCOVERY ENGINE
         # -------------------------------------------------------------
         elif cmd in ("/find", "/search"):
+
             if len(parts) < 2:
                 await self._send_message(
                     session,
