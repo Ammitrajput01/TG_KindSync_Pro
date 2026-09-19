@@ -54,7 +54,8 @@ After=network.target
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${CURRENT_DIR}
-ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/main.py
+Environment=\"PYTHONPATH=${CURRENT_DIR}\" \"PYTHONUNBUFFERED=1\" \"AUTO_START_LIVE=1\"
+ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/main.py --live
 Restart=always
 RestartSec=5
 StandardOutput=append:${CURRENT_DIR}/logs/forwarder_service.log
@@ -73,7 +74,7 @@ After=network.target
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${CURRENT_DIR}
-Environment="PYTHONPATH=${CURRENT_DIR}"
+Environment=\"PYTHONPATH=${CURRENT_DIR}\" \"PYTHONUNBUFFERED=1\"
 ExecStart=${CURRENT_DIR}/.venv/bin/python -m devi.operator.telegram_bot
 Restart=always
 RestartSec=5
@@ -93,6 +94,7 @@ After=network.target
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${CURRENT_DIR}
+Environment=\"PYTHONPATH=${CURRENT_DIR}\" \"PYTHONUNBUFFERED=1\"
 ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/web_dashboard.py
 Restart=always
 RestartSec=5
@@ -103,9 +105,11 @@ StandardError=append:${CURRENT_DIR}/logs/dashboard_service.log
 WantedBy=multi-user.target
 EOF"
 
+# Create symlinks for tg-sentinel alias
+sudo ln -sf /etc/systemd/system/tg-kinddoc-bot.service /etc/systemd/system/tg-sentinel.service 2>/dev/null || true
 sudo systemctl daemon-reload
 chmod +x deploy/update_oracle.sh
-echo "[+] Step 4/5: Systemd Services Installed Successfully!"
+echo "[+] Step 4/5: Systemd Services Installed Successfully (with --live Headless Autopilot)!"
 echo ""
 echo "============================================================"
 echo "  🎉 DEPLOYMENT COMPLETE!"

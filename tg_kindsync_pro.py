@@ -2483,20 +2483,32 @@ class PipelineProcessor:
         self.batch_index_records = []
 
     async def check_and_send_subject_header(self, active_messages, target_chat, resolved_topic, client, silent_mode):
-        auto_subj = os.getenv("AUTO_SUBJECT_HEADERS", "false").strip().lower() in ("true", "1", "yes")
-        if not auto_subj or not getattr(self.cfg, "auto_subject_headers", False):
+        auto_subj_env = os.getenv("AUTO_SUBJECT_HEADERS", "true").strip().lower() in ("true", "1", "yes")
+        auto_subj_cfg = bool(getattr(self.cfg, "auto_subject_headers", False))
+        if not auto_subj_env and not auto_subj_cfg:
             return
         
         detected = None
         for m in active_messages:
             t = str(getattr(m, "text", "") or "")
             fn = ""
-            if getattr(m, "file", None):
-                fn = str(getattr(m.file, "name", "") or "")
+            if getattr(m, "file", None) and getattr(m.file, "name", None):
+                fn = str(m.file.name)
+            elif getattr(m, "document", None) and hasattr(m.document, "attributes"):
+                for attr in m.document.attributes:
+                    if isinstance(attr, DocumentAttributeFilename):
+                        fn = str(getattr(attr, "file_name", "") or "")
+                        break
             detected = detect_subject(t, fn)
             if detected:
                 break
                 
+        if not detected and resolved_topic:
+            with suppress(Exception):
+                t_title = await self.get_topic_title(target_chat, resolved_topic, client)
+                if t_title:
+                    detected = detect_subject(t_title, "")
+
         if not detected:
             return
             
@@ -2505,7 +2517,7 @@ class PipelineProcessor:
         
         if last_subj != detected["name"]:
             self.last_subject_sent[route_key] = detected["name"]
-            auto_hashtags_enabled = os.getenv("AUTO_HASHTAGS", "false").strip().lower() in ("true", "1", "yes")
+            auto_hashtags_enabled = os.getenv("AUTO_HASHTAGS", "true").strip().lower() in ("true", "1", "yes")
             if auto_hashtags_enabled and detected.get("tag"):
                 header_text = f"✨ {detected['icon']} **{detected['name']}** ✨  {detected['tag']}"
             else:
@@ -3048,6 +3060,10 @@ class TerminalPlatform:
         try:
             telem_file = self._telemetry_dir / "engine_telemetry.json"
             tmp_file = self._telemetry_dir / "engine_telemetry.tmp"
+            total_d = self.metrics.get("discovered", 0)
+            total_f = self.metrics.get("messages_forwarded", 0)
+            remaining_f = max(0, total_d - total_f)
+            pct_d = round((total_f / max(1, total_d)) * 100.0, 1) if total_d > 0 else 0.0
             data = {
                 "timestamp": time.time(),
                 "active_file_name": self.active_file_name,
@@ -3057,7 +3073,17 @@ class TerminalPlatform:
                 "active_file_eta": self.active_file_eta,
                 "current_speed_mb": round(self.current_speed_mb, 2) if not is_done else 0.0,
                 "peak_speed_mb": round(self.peak_speed_mb, 2),
-                "is_transferring": (not is_done and self.active_file_progress < 100.0 and self.active_file_progress > 0.0)
+                "is_transferring": (not is_done and self.active_file_progress < 100.0 and self.active_file_progress > 0.0),
+                "total_files": total_d,
+                "discovered": total_d,
+                "messages_forwarded": total_f,
+                "files_completed": total_f,
+                "files_remaining": remaining_f,
+                "batch_progress_pct": pct_d,
+                "videos_sent": self.metrics.get("videos_sent", 0),
+                "docs_sent": self.metrics.get("docs_sent", 0),
+                "photos_sent": self.metrics.get("photos_sent", 0),
+                "text_sent": self.metrics.get("text_sent", 0)
             }
             with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f)

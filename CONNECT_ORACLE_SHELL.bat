@@ -7,10 +7,10 @@ echo    IP: 130.210.1.32 (ap-mumbai-1)
 echo ======================================================================
 echo.
 
-set KEY_PATH="C:\Users\Ammit\Downloads\oracle_key_latest.key"
-if not exist %KEY_PATH% (
-    set KEY_PATH="%~dp0oracle_key_latest.key"
-)
+set KEY_PATH="C:\oracle_key_latest.key"
+if not exist %KEY_PATH% set KEY_PATH="%~dp0oracle_key_latest.key"
+if not exist %KEY_PATH% set KEY_PATH="C:\Users\%USERNAME%\Downloads\oracle_key_latest.key"
+if not exist %KEY_PATH% set KEY_PATH="C:\Users\Ammit\Downloads\oracle_key_latest.key"
 
 echo [*] Using Private Key: %KEY_PATH%
 echo [*] Connecting to ubuntu@130.210.1.32...

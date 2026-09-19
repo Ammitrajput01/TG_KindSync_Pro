@@ -1891,6 +1891,74 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>
                     </div>
 
+                    <!-- Batch Transmission Telemetry & Media Breakdown Hub -->
+                    <div class="panel-section" style="margin-bottom: var(--space-6); background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(99, 102, 241, 0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.35); backdrop-filter: blur(16px); border-radius: var(--radius-lg); padding: var(--space-5);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-3);">
+                            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                                <span style="font-size: 22px; filter: drop-shadow(0 0 8px rgba(99,102,241,0.5));">📦</span>
+                                <div>
+                                    <div style="font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.2px;">Real-Time Batch Telemetry & Media Hub</div>
+                                    <div style="font-size: 12px; color: var(--text-tertiary);">Live file queue status, remaining transfers & categorized lecture streams</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span class="pill pill-success" style="font-weight: 700; letter-spacing: 0.5px;">STREAM ACTIVE</span>
+                                <span class="pill pill-neutral tabular" id="batch-progress-pct" style="font-weight: 800; color: #38BDF8; font-size: 13px; border-color: rgba(56,189,248,0.3);">0%</span>
+                            </div>
+                        </div>
+
+                        <!-- 4-Stat Cards Grid -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4);">
+                            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-md); padding: var(--space-3); text-align: center;">
+                                <div style="font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase;">Total Files</div>
+                                <div class="tabular" id="total-files-val" style="font-size: 22px; font-weight: 800; color: #38BDF8; margin-top: 2px;">0</div>
+                            </div>
+                            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-md); padding: var(--space-3); text-align: center;">
+                                <div style="font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase;">Files Sent</div>
+                                <div class="tabular" id="files-sent-val" style="font-size: 22px; font-weight: 800; color: #4ADE80; margin-top: 2px;">0</div>
+                            </div>
+                            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-md); padding: var(--space-3); text-align: center;">
+                                <div style="font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase;">Remaining</div>
+                                <div class="tabular" id="files-remaining-val" style="font-size: 22px; font-weight: 800; color: #FACC15; margin-top: 2px;">0</div>
+                            </div>
+                            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-md); padding: var(--space-3); text-align: center;">
+                                <div style="font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase;">Transfer Speed</div>
+                                <div class="tabular" id="hud-speed-val" style="font-size: 22px; font-weight: 800; color: #A855F7; margin-top: 2px;">0.0 MB/s</div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar Track -->
+                        <div style="margin-bottom: var(--space-4);">
+                            <div style="height: 10px; background: rgba(15, 23, 42, 0.8); border-radius: 999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); position: relative;">
+                                <div id="batch-progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #38BDF8 0%, #6366F1 50%, #4ADE80 100%); transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);"></div>
+                            </div>
+                        </div>
+
+                        <!-- Media Breakdown Badges Strip -->
+                        <div style="display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: var(--space-2); background: rgba(15, 23, 42, 0.45); border-radius: var(--radius-md); padding: var(--space-3); border: 1px solid rgba(255,255,255,0.05);">
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span style="font-size: 16px;">🎥</span>
+                                <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Videos:</span>
+                                <span class="tabular pill pill-neutral" id="media-videos-count" style="font-weight: 800; color: #38BDF8;">0</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span style="font-size: 16px;">📄</span>
+                                <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">PDFs & Notes:</span>
+                                <span class="tabular pill pill-neutral" id="media-docs-count" style="font-weight: 800; color: #4ADE80;">0</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span style="font-size: 16px;">🖼️</span>
+                                <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Photos:</span>
+                                <span class="tabular pill pill-neutral" id="media-photos-count" style="font-weight: 800; color: #F472B6;">0</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span style="font-size: 16px;">🎵</span>
+                                <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Audios & Text:</span>
+                                <span class="tabular pill pill-neutral" id="media-audios-count" style="font-weight: 800; color: #FACC15;">0</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Split Master-Detail Layout -->
                     <div class="split-grid-overview">
                         <!-- Left Column: Throughput Area Sparkline & Live Logs -->
@@ -2590,6 +2658,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     document.getElementById('db-count').textContent = d.db_forwarded_count.toLocaleString();
                 }
 
+                // Batch Telemetry & Media Hub
+                const totFiles = d.total_files || (d.files_completed ? d.files_completed + (d.files_remaining || 0) : 0);
+                const filesSent = d.files_completed !== undefined ? d.files_completed : (d.total_transfers || 0);
+                const filesRem = d.files_remaining !== undefined ? d.files_remaining : Math.max(0, totFiles - filesSent);
+                const progPct = d.batch_progress_pct !== undefined ? d.batch_progress_pct : (totFiles > 0 ? ((filesSent / totFiles) * 100).toFixed(1) : (d.total_transfers > 0 ? '100' : '0'));
+
+                const elTot = document.getElementById('total-files-val');
+                if (elTot) elTot.textContent = totFiles.toLocaleString();
+                const elSent = document.getElementById('files-sent-val');
+                if (elSent) elSent.textContent = filesSent.toLocaleString();
+                const elRem = document.getElementById('files-remaining-val');
+                if (elRem) elRem.textContent = filesRem.toLocaleString();
+                const elSpeed = document.getElementById('hud-speed-val');
+                if (elSpeed) elSpeed.textContent = curSpeed.toFixed(1) + ' MB/s';
+                
+                const elProgPct = document.getElementById('batch-progress-pct');
+                if (elProgPct) elProgPct.textContent = progPct + '%';
+                const elProgBar = document.getElementById('batch-progress-bar');
+                if (elProgBar) elProgBar.style.width = Math.min(100, Math.max(0, parseFloat(progPct) || 0)) + '%';
+
+                const elVid = document.getElementById('media-videos-count');
+                if (elVid && d.videos_sent !== undefined) elVid.textContent = d.videos_sent;
+                const elDocs = document.getElementById('media-docs-count');
+                if (elDocs && d.docs_sent !== undefined) elDocs.textContent = d.docs_sent;
+                const elPhotos = document.getElementById('media-photos-count');
+                if (elPhotos && d.photos_sent !== undefined) elPhotos.textContent = d.photos_sent;
+                const elAudios = document.getElementById('media-audios-count');
+                if (elAudios && (d.text_sent !== undefined || d.albums_sent !== undefined)) {
+                    elAudios.textContent = (d.text_sent || 0) + (d.albums_sent || 0);
+                }
+
                 // 2. Active Subject & Uptime
                 if (d.current_subject) document.getElementById('subject-name').textContent = d.current_subject;
                 if (d.uptime_formatted) document.getElementById('uptime-pill').textContent = 'UPTIME: ' + d.uptime_formatted;
@@ -3205,13 +3304,22 @@ class DashboardServer:
         active_file_total = ""
         active_file_eta = ""
         is_transferring = False
+        total_files = 0
+        files_completed = self.state.total_transfers
+        files_remaining = 0
+        batch_progress_pct = 0.0
+        videos_sent = self.state.videos_sent
+        docs_sent = self.state.docs_sent
+        photos_sent = self.state.photos_sent
+        albums_sent = self.state.albums_sent
+        text_sent = 0
 
         if ENGINE_TELEMETRY_FILE.exists():
             with suppress(Exception):
                 with open(ENGINE_TELEMETRY_FILE, "r", encoding="utf-8") as f:
                     t_data = json.load(f)
                     ts = float(t_data.get("timestamp", 0))
-                    if time.time() - ts < 12.0:
+                    if time.time() - ts < 15.0:
                         cur_speed = float(t_data.get("current_speed_mb", 0.0))
                         t_peak = float(t_data.get("peak_speed_mb", 0.0))
                         if t_peak > peak_speed:
@@ -3222,6 +3330,23 @@ class DashboardServer:
                         active_file_total = t_data.get("active_file_total", "")
                         active_file_eta = t_data.get("active_file_eta", "")
                         is_transferring = bool(t_data.get("is_transferring", False))
+
+                        if t_data.get("total_files"): total_files = int(t_data["total_files"])
+                        elif t_data.get("discovered"): total_files = int(t_data["discovered"])
+                        
+                        if t_data.get("files_completed") is not None: files_completed = int(t_data["files_completed"])
+                        elif t_data.get("messages_forwarded") is not None: files_completed = int(t_data["messages_forwarded"])
+                        
+                        if t_data.get("files_remaining") is not None: files_remaining = int(t_data["files_remaining"])
+                        elif total_files > 0: files_remaining = max(0, total_files - files_completed)
+                        
+                        if t_data.get("batch_progress_pct") is not None: batch_progress_pct = float(t_data["batch_progress_pct"])
+                        elif total_files > 0: batch_progress_pct = round((files_completed / total_files) * 100.0, 1)
+
+                        if t_data.get("videos_sent") is not None: videos_sent = int(t_data["videos_sent"])
+                        if t_data.get("docs_sent") is not None: docs_sent = int(t_data["docs_sent"])
+                        if t_data.get("photos_sent") is not None: photos_sent = int(t_data["photos_sent"])
+                        if t_data.get("text_sent") is not None: text_sent = int(t_data["text_sent"])
                     else:
                         t_peak = float(t_data.get("peak_speed_mb", 0.0))
                         if t_peak > peak_speed:
@@ -3254,11 +3379,16 @@ class DashboardServer:
             "active_file_total": active_file_total,
             "active_file_eta": active_file_eta,
             "is_transferring": is_transferring,
-            "total_transfers": self.state.total_transfers,
-            "videos_sent": self.state.videos_sent,
-            "docs_sent": self.state.docs_sent,
-            "photos_sent": self.state.photos_sent,
-            "albums_sent": self.state.albums_sent,
+            "total_transfers": files_completed,
+            "total_files": total_files,
+            "files_completed": files_completed,
+            "files_remaining": files_remaining,
+            "batch_progress_pct": batch_progress_pct,
+            "videos_sent": videos_sent,
+            "docs_sent": docs_sent,
+            "photos_sent": photos_sent,
+            "albums_sent": albums_sent,
+            "text_sent": text_sent,
             "current_subject": self.state.current_subject,
             "flood_waits_detected": self.state.flood_waits_detected,
             "flood_wait_seconds_total": self.state.flood_wait_seconds_total,

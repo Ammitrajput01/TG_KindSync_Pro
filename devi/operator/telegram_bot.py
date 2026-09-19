@@ -1096,8 +1096,16 @@ class DeviTelegramBot:
 
             while self.is_running:
                 try:
-                    url = f"https://api.telegram.org/bot{self.token}/getUpdates?offset={self.offset}&timeout=20"
-                    async with session.get(url, timeout=30) as resp:
+                    url = f"https://api.telegram.org/bot{self.token}/getUpdates"
+                    poll_payload = {
+                        "offset": self.offset,
+                        "timeout": 20,
+                        "allowed_updates": [
+                            "message", "edited_message", "channel_post", "edited_channel_post",
+                            "callback_query", "chat_member", "my_chat_member", "chat_join_request"
+                        ]
+                    }
+                    async with session.post(url, json=poll_payload, timeout=30) as resp:
                         if resp.status == 200:
                             data = await resp.json()
                             for update in data.get("result", []):
@@ -1326,11 +1334,13 @@ class DeviTelegramBot:
             logger.warning(f"Error in _handle_my_chat_member: {e}")
 
     async def _handle_chat_member(self, session: aiohttp.ClientSession, chat_member: dict):
-        """Tracks member join dates and initial identities in SQLite."""
+        """Auto-detects newly joined members, tracks SangMata dossier, and posts Welcome + OSINT Audit Card."""
         try:
             chat = chat_member.get("chat", {})
             chat_id = chat.get("id")
+            old_state = chat_member.get("old_chat_member", {})
             new_state = chat_member.get("new_chat_member", {})
+            old_status = old_state.get("status")
             status = new_state.get("status")
             user = new_state.get("user", {})
             user_id = user.get("id")
@@ -1340,13 +1350,46 @@ class DeviTelegramBot:
                 
             full_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "User"
             username = user.get("username") or ""
+            grp_title = chat.get("title", "Study Group")
             
+            is_new_join = (status in ("member", "administrator")) and (old_status in ("left", "kicked", "restricted", None))
+
             if status in ("member", "administrator"):
                 with get_db_conn() as conn:
                     conn.execute("""
                         INSERT OR IGNORE INTO member_history (user_id, chat_id, full_name, username, join_date)
                         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """, (user_id, chat_id, full_name, username))
+                    
+            if is_new_join:
+                dossier = self._track_user_dossier(user)
+                g_settings = self._get_group_settings(chat_id)
+                
+                if g_settings.get("welcome_enabled", 1):
+                    safe_full_name = html.escape(full_name)
+                    safe_grp_title = html.escape(grp_title)
+                    user_tag = f"<b>@{html.escape(username)}</b>" if username else f'<a href="tg://user?id={user_id}"><b>{safe_full_name}</b></a>'
+                    
+                    sangmata_card = self._format_sangmata_dossier(dossier, title_prefix="MEMBER JOIN & SANGMATA OSINT RADAR")
+                    welcome_header = (
+                        f"👋 <b>Welcome to {safe_grp_title}, {user_tag}!</b> 🩺✨\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    )
+                    full_card_text = welcome_header + sangmata_card
+                    
+                    card_markup = {
+                        "inline_keyboard": [
+                            [
+                                {"text": "🗑️ Purge Card (Admins)", "callback_data": f"purge_card_{user_id}"}
+                            ]
+                        ]
+                    }
+                    
+                    await self._send_message(
+                        session, chat_id, full_card_text,
+                        reply_markup=card_markup,
+                        parse_mode="Markdown"
+                    )
         except Exception as e:
             logger.warning(f"Error in _handle_chat_member: {e}")
 
@@ -1450,6 +1493,18 @@ class DeviTelegramBot:
         from_user = cb.get("from", {})
         admin_id = from_user.get("id")
         chat_id = cb.get("message", {}).get("chat", {}).get("id")
+
+        # Admin 1-Click Card Purge
+        if data.startswith("purge_card"):
+            msg_obj = cb.get("message", {})
+            msg_id = msg_obj.get("message_id")
+            is_adm = (admin_id in self.master_admin_ids) or (await self.is_admin_for_chat(session, chat_id, admin_id, message=msg_obj))
+            if is_adm and msg_id:
+                await self._delete_message(session, chat_id, msg_id)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Card Purged Successfully 🗑️"})
+            else:
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⚠️ Strictly Group Admins Only!", "show_alert": True})
+            return
 
         # Public Interactive Study & Dashboard Actions (Available to ALL members)
         if data.startswith("act_"):
@@ -4680,6 +4735,43 @@ class DeviTelegramBot:
                 ]
             }
             await self._send_message(session, chat_id, status_report, reply_markup=control_keyboard, message_thread_id=thread_id)
+
+        elif cmd in ("/pause_engine", "/stop_engine", "/pause"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+            ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
+            try:
+                with open(ctrl_p, "w", encoding="utf-8") as cf:
+                    json.dump({"paused": True, "ts": time.time(), "by": admin_id}, cf)
+                await self._send_message(
+                    session, chat_id,
+                    "⏸️ **Forwarder Engine PAUSED Remotely!** 🩺\n\n"
+                    "• Active transfers suspended cleanly.\n"
+                    "• Background services and sessions remain alive 24/7.\n"
+                    "• Type `/resume_engine` anytime to continue forwarding.",
+                    message_thread_id=thread_id
+                )
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Failed to pause engine: {e}", message_thread_id=thread_id)
+
+        elif cmd in ("/resume_engine", "/start_engine", "/resume"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+            ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
+            try:
+                with open(ctrl_p, "w", encoding="utf-8") as cf:
+                    json.dump({"paused": False, "ts": time.time(), "by": admin_id}, cf)
+                await self._send_message(
+                    session, chat_id,
+                    "▶️ **Forwarder Engine RESUMED!** 🚀\n\n"
+                    "• High-speed streaming forwarder is active.\n"
+                    "• Media queue processing at maximum uncapped wire speed.",
+                    message_thread_id=thread_id
+                )
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Failed to resume engine: {e}", message_thread_id=thread_id)
 
         elif cmd == "/backup":
             if not self.is_admin(admin_id):
