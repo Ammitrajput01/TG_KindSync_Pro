@@ -3743,6 +3743,12 @@ class DeviTelegramBot:
                     target_user_id = int(arg)
                 else:
                     target_username = arg
+            elif "@" in parts[0]:
+                cmd_uname = parts[0].split("@", 1)[1].strip()
+                if cmd_uname.lower() not in ("kinddoc_bot", "kinddocbot", "kindsync_bot", "tg_kindsync_pro_bot", "kinddoctor_bot", "bot"):
+                    target_username = cmd_uname
+                else:
+                    target_user_id = admin_id
             else:
                 target_user_id = admin_id
 
@@ -3755,6 +3761,25 @@ class DeviTelegramBot:
                     user_data = conn.execute("SELECT * FROM telegram_users_dossier WHERE username = ? COLLATE NOCASE", (target_username,)).fetchone()
                     if user_data:
                         target_user_id = user_data["user_id"]
+                    else:
+                        try:
+                            row = conn.execute("SELECT user_id FROM member_name_changes WHERE old_username = ? OR new_username = ? COLLATE NOCASE LIMIT 1", (target_username, target_username)).fetchone()
+                            if row:
+                                target_user_id = row["user_id"]
+                                user_data = conn.execute("SELECT * FROM telegram_users_dossier WHERE user_id = ?", (target_user_id,)).fetchone()
+                        except Exception:
+                            pass
+
+            if not target_user_id and target_username:
+                await self._send_message(
+                    session, chat_id,
+                    f"⚠️ **User @{html.escape(target_username)} database me nahi mila.**\n\n"
+                    f"💡 **Aisa isliye ho sakta hai:**\n"
+                    f"• User ne abhi tak is study group me koi message nahi bheja ya join nahi kiya hai.\n"
+                    f"• **Instant Check ke liye:** User ke kisi bhi message par **Reply** karke `/whois` likhein, ya user ka message bot ke DM me **Forward** karein!",
+                    message_thread_id=thread_id
+                )
+                return
 
             photo_count = 0
             dc_string = "DC2 (Amsterdam, NL) [Estimated]"
