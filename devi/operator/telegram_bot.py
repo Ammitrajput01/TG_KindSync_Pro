@@ -1190,18 +1190,19 @@ class DeviTelegramBot:
         """Converts Markdown formatting (**bold**, _italic_, `code`, [link](url)) to robust Telegram HTML so asterisks never show."""
         if not text:
             return ""
-        # If already predominantly HTML tags, return as-is
-        if "<b>" in text or "<code>" in text or "<a href=" in text:
-            return text
         # Convert markdown links [title](url) to HTML <a href="url">title</a>
         text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', text)
         # Convert **bold** to <b>bold</b>
         text = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', text)
         # Convert `code` to <code>code</code>
         text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+        # Clean double nested code tags if any
+        text = text.replace("<code><code>", "<code>").replace("</code></code>", "</code>")
+        text = text.replace("<code><code>", "<code>").replace("</code></code>", "</code>")
         # Convert _italic_ to <i>italic</i> (when not part of a URL or word)
-        text = re.sub(r'(?<![<\w])_([^_]+)_(?![>\w])', r'<i>\1</i>', text)
+        text = re.sub(r'(?<![<\w/])_([^_]+)_(?![>\w])', r'<i>\1</i>', text)
         return text
+
 
     async def _send_message(
         self, 
@@ -3986,7 +3987,7 @@ class DeviTelegramBot:
                 f"{fwd_origin_notice}"
                 f"👤 **Student Name**: [{full_n}](tg://user?id={u_id})\n"
                 f"🏷️ **Username**: @{uname} {'(https://t.me/' + uname + ')' if uname != 'No Username' else ''}\n"
-                f"🆔 **Telegram ID**: `<code>{u_id}</code>` (Hex: `<code>{hex_id}</code>`)\n"
+                f"🆔 **Telegram ID**: <code>{u_id}</code> (Hex: <code>{hex_id}</code>)\n"
                 f"🏢 **Data Center**: `{dc_string}`\n"
                 f"🗓️ **Account Age**: {u_age}\n"
                 f"⭐️ **Telegram Tier**: {prem}\n"
