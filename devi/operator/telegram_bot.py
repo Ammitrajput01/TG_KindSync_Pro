@@ -3886,54 +3886,8 @@ class DeviTelegramBot:
             target_username = None
             fwd_origin_notice = ""
 
-            if reply_to:
-                # UserInfoBot / Rose style: check if reply_to is a forwarded message
-                if "forward_from" in reply_to and reply_to["forward_from"]:
-                    fwd_u = reply_to["forward_from"]
-                    target_user_id = fwd_u.get("id")
-                    target_username = fwd_u.get("username")
-                    fwd_origin_notice = "📩 *(Extracted from Forwarded Message Author)*\n"
-                elif "forward_origin" in reply_to and reply_to["forward_origin"]:
-                    fwd_orig = reply_to["forward_origin"]
-                    orig_type = fwd_orig.get("type")
-                    if orig_type == "user" and "sender_user" in fwd_orig:
-                        target_user_id = fwd_orig["sender_user"].get("id")
-                        target_username = fwd_orig["sender_user"].get("username")
-                        fwd_origin_notice = "📩 *(Extracted from Forwarded Message Author)*\n"
-                    elif orig_type == "hidden_user":
-                        hidden_name = fwd_orig.get("sender_user_name", "Anonymous")
-                        await self._send_message(
-                            session, chat_id,
-                            f"👤 **User Intelligence Dossier (SangMata & Rose style)** 🩺\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"👤 **Display Name**: {hidden_name}\n"
-                            f"🔒 **Privacy Status**: This user has enabled Telegram Forward Privacy.\n"
-                            f"⚠️ Numerical ID and direct profile link are masked by Telegram security settings.\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                            message_thread_id=thread_id
-                        )
-                        return
-                    elif orig_type in ("channel", "chat"):
-                        fwd_c = fwd_orig.get("chat", {})
-                        c_title = fwd_c.get("title", "Channel/Group")
-                        c_id = fwd_c.get("id")
-                        c_uname = fwd_c.get("username")
-                        await self._send_message(
-                            session, chat_id,
-                            f"📢 **Channel/Group Intelligence Card** 🩺\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"📢 **Title**: {c_title}\n"
-                            f"🆔 **Chat ID**: `{c_id}`\n"
-                            f"🏷️ **Username**: @{c_uname if c_uname else 'Private'}\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                            message_thread_id=thread_id
-                        )
-                        return
-
-                if not target_user_id and reply_to.get("from"):
-                    target_user_id = reply_to["from"].get("id")
-                    target_username = reply_to["from"].get("username")
-            elif len(parts) > 1:
+            # 1. First priority: Explicit Argument provided in text (/whois @username, /whois 12345, /whois@username)
+            if len(parts) > 1:
                 arg = parts[1].strip().lstrip("@")
                 if arg.isdigit():
                     target_user_id = int(arg)
@@ -3943,10 +3897,61 @@ class DeviTelegramBot:
                 cmd_uname = parts[0].split("@", 1)[1].strip()
                 if cmd_uname.lower() not in ("kinddoc_bot", "kinddocbot", "kindsync_bot", "tg_kindsync_pro_bot", "kinddoctor_bot", "bot"):
                     target_username = cmd_uname
-                else:
-                    target_user_id = admin_id
-            else:
+
+            # 2. Second priority: If no explicit argument was given, check real reply-to message
+            if not target_user_id and not target_username and reply_to:
+                is_forum_header = reply_to.get("forum_topic_created") or (thread_id and reply_to.get("message_id") == thread_id)
+                if not is_forum_header:
+                    if "forward_from" in reply_to and reply_to["forward_from"]:
+                        fwd_u = reply_to["forward_from"]
+                        target_user_id = fwd_u.get("id")
+                        target_username = fwd_u.get("username")
+                        fwd_origin_notice = "📩 *(Extracted from Forwarded Message Author)*\n"
+                    elif "forward_origin" in reply_to and reply_to["forward_origin"]:
+                        fwd_orig = reply_to["forward_origin"]
+                        orig_type = fwd_orig.get("type")
+                        if orig_type == "user" and "sender_user" in fwd_orig:
+                            target_user_id = fwd_orig["sender_user"].get("id")
+                            target_username = fwd_orig["sender_user"].get("username")
+                            fwd_origin_notice = "📩 *(Extracted from Forwarded Message Author)*\n"
+                        elif orig_type == "hidden_user":
+                            hidden_name = fwd_orig.get("sender_user_name", "Anonymous")
+                            await self._send_message(
+                                session, chat_id,
+                                f"👤 **User Intelligence Dossier (SangMata & Rose style)** 🩺\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"👤 **Display Name**: {hidden_name}\n"
+                                f"🔒 **Privacy Status**: This user has enabled Telegram Forward Privacy.\n"
+                                f"⚠️ Numerical ID and direct profile link are masked by Telegram security settings.\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                                message_thread_id=thread_id
+                            )
+                            return
+                        elif orig_type in ("channel", "chat"):
+                            fwd_c = fwd_orig.get("chat", {})
+                            c_title = fwd_c.get("title", "Channel/Group")
+                            c_id = fwd_c.get("id")
+                            c_uname = fwd_c.get("username")
+                            await self._send_message(
+                                session, chat_id,
+                                f"📢 **Channel/Group Intelligence Card** 🩺\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"📢 **Title**: {c_title}\n"
+                                f"🆔 **Chat ID**: `{c_id}`\n"
+                                f"🏷️ **Username**: @{c_uname if c_uname else 'Private'}\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                                message_thread_id=thread_id
+                            )
+                            return
+
+                    if not target_user_id and reply_to.get("from"):
+                        target_user_id = reply_to["from"].get("id")
+                        target_username = reply_to["from"].get("username")
+
+            # 3. Third priority: If still no target user, default to admin's own ID
+            if not target_user_id and not target_username:
                 target_user_id = admin_id
+
 
             user_data = None
             with get_db_conn() as conn:
