@@ -3966,16 +3966,42 @@ class DeviTelegramBot:
                         except Exception:
                             pass
 
+            live_global_user = None
+            if not target_user_id and target_username:
+                try:
+                    from devi.operator.osint_resolver import osint_resolver
+                    live_global_user = await osint_resolver.resolve_entity(target_username)
+                    if live_global_user:
+                        target_user_id = live_global_user["user_id"]
+                        with get_db_conn() as conn:
+                            conn.execute("""
+                                INSERT OR IGNORE INTO telegram_users_dossier 
+                                (user_id, first_name, last_name, username, phone_number, is_premium, language_code, first_seen, last_seen, total_messages, name_history, username_history, changes_count)
+                                VALUES (?, ?, ?, ?, ?, ?, 'en', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, '[]', '[]', 0)
+                            """, (
+                                live_global_user["user_id"],
+                                live_global_user["first_name"],
+                                live_global_user["last_name"],
+                                live_global_user["username"],
+                                live_global_user["phone"],
+                                1 if live_global_user["is_premium"] else 0
+                            ))
+                            conn.row_factory = sqlite3.Row
+                            user_data = conn.execute("SELECT * FROM telegram_users_dossier WHERE user_id = ?", (target_user_id,)).fetchone()
+                except Exception as ex:
+                    logger.warning(f"Live OSINT entity resolution error: {ex}")
+
             if not target_user_id and target_username:
                 await self._send_message(
                     session, chat_id,
-                    f"⚠️ **User @{html.escape(target_username)} database me nahi mila.**\n\n"
-                    f"💡 **Aisa isliye ho sakta hai:**\n"
-                    f"• User ne abhi tak is study group me koi message nahi bheja ya join nahi kiya hai.\n"
-                    f"• **Instant Check ke liye:** User ke kisi bhi message par **Reply** karke `/whois` likhein, ya user ka message bot ke DM me **Forward** karein!",
+                    f"⚠️ **Telegram par '@{html.escape(target_username)}' naam ka koi active user nahi mila.**\n\n"
+                    f"💡 **Check Karein:**\n"
+                    f"• Username spelling sahi hai ya nahi\n"
+                    f"• User ID ya direct message forward karke bhi check kar sakte hain!",
                     message_thread_id=thread_id
                 )
                 return
+
 
             photo_count = 0
             dc_string = "DC2 (Amsterdam, NL) [Estimated]"
@@ -4135,6 +4161,19 @@ class DeviTelegramBot:
             else:
                 risk_badge = f"🟢 {risk_score}/100 (Safe Student Account)"
 
+            extra_intel_lines = []
+            if live_global_user:
+                if live_global_user.get("bio"):
+                    extra_intel_lines.append(f"📝 **Profile Bio**: {html.escape(live_global_user['bio'])}")
+                if live_global_user.get("common_chats_count", 0) > 0:
+                    extra_intel_lines.append(f"👥 **Shared Groups**: {live_global_user['common_chats_count']} common chats with bot")
+                if live_global_user.get("is_scam") or live_global_user.get("is_fake"):
+                    extra_intel_lines.append("🚨 **SECURITY ALERT**: ⚠️ Official Telegram Scam/Fake Flag Detected!")
+                if live_global_user.get("is_verified"):
+                    extra_intel_lines.append("🌟 **Verification**: Official Verified Account")
+
+            extra_intel_str = "\n".join(extra_intel_lines) + "\n" if extra_intel_lines else ""
+
             card = (
                 f"👤 **USER INTELLIGENCE & SANGMATA OSINT DOSSIER** 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -4149,6 +4188,7 @@ class DeviTelegramBot:
                 f"🖼️ **Profile Photos**: `{photo_str}`\n"
                 f"🌐 **Language**: `{lang.upper()}`\n"
                 f"📱 **Phone Tracking**: {phone_str}\n"
+                f"{extra_intel_str}"
                 f"🛡️ **Group Status**: {group_role_str}\n"
                 f"💬 **Group Engagement**: `{total_m}` messages sent ({act_tier})\n"
                 f"🕒 **First Seen**: `{first_s}`\n"
@@ -4163,6 +4203,7 @@ class DeviTelegramBot:
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"🛡️ *Kind Doctor Live Sentinel • OSINT Biometrics & Member Protection*"
             )
+
 
             whois_markup = None
             if self.is_admin(admin_id) and u_id != admin_id:
