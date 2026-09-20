@@ -46,6 +46,9 @@ if hasattr(sys.stderr, "reconfigure"):
     with suppress(Exception):
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+logging.getLogger("telethon.crypto.libssl").setLevel(logging.ERROR)
+logging.getLogger("telethon.crypto.aes").setLevel(logging.ERROR)
+
 # ============================================================
 # 1. OPTIONAL HARDWARE & SOFTWARE ACCELERATORS
 # ============================================================

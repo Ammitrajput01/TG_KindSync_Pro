@@ -18,6 +18,10 @@ if hasattr(sys.stderr, "reconfigure"):
     with suppress(Exception):
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+import logging
+logging.getLogger("telethon.crypto.libssl").setLevel(logging.ERROR)
+logging.getLogger("telethon.crypto.aes").setLevel(logging.ERROR)
+
 from tg_kindsync_pro import start_platform, release_lock
 
 if __name__ == "__main__":
