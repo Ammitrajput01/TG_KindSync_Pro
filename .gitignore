@@ -155,6 +155,8 @@ data/dashboard_users.json
 *.jpg
 *.jpeg
 *.png
+!docs/assets/**
+
 
 # IDE files
 .vscode/
