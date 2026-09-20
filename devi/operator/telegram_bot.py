@@ -30,6 +30,7 @@ import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Set, Dict, Any, Optional
+from contextlib import suppress
 
 from dotenv import load_dotenv, set_key
 
@@ -910,6 +911,66 @@ class DeviTelegramBot:
         except Exception as e:
             logger.warning(f"Error fetching topics for chat {chat_id}: {e}")
             return []
+
+    def _build_main_index_cards(self, chat_id: int, sort_mode: str = "az") -> tuple[list, Optional[dict]]:
+        """Generates formatted HTML card chunks and interactive buttons for Master Topic Directory."""
+        topics = self._get_topics(chat_id, sort_mode=sort_mode)
+        if not topics:
+            return [], None
+
+        clean_chat_id = str(chat_id).replace("-100", "").replace("-", "").lstrip("@")
+        cards = []
+        current_card_lines = [
+            "✨ <b>MASTER TOPIC DIRECTORY</b> 📑",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"🏛️ <i>Official Study Repository • {'Alphabetical (#A to #Z)' if sort_mode == 'az' else 'Forum Sequence'}</i>",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ]
+
+        current_letter = None
+        for idx, top in enumerate(topics, 1):
+            t_id = top["topic_id"]
+            t_title = top["topic_title"]
+            t_icon = top.get("topic_icon") or "📖"
+            link = f"https://t.me/c/{clean_chat_id}/{t_id}" if clean_chat_id.isdigit() else f"https://t.me/{clean_chat_id}/{t_id}"
+
+            if sort_mode == "az":
+                sort_k = self._clean_sort_key(t_title)
+                first_char = sort_k[0].upper() if sort_k else "#"
+                if not first_char.isalpha():
+                    first_char = "0-9"
+                if first_char != current_letter:
+                    current_letter = first_char
+                    current_card_lines.append(f"\n🏷️ <b>SECTION #{current_letter}</b>")
+
+            safe_title = html.escape(t_title.strip())
+            line = f"{t_icon} <code>[{idx:02d}]</code> <a href=\"{link}\">{safe_title}</a>"
+            if sum(len(l) for l in current_card_lines) + len(line) > 3400:
+                current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                cards.append("\n".join(current_card_lines))
+                current_card_lines = [
+                    f"📑 <b>MASTER TOPIC DIRECTORY (Part {len(cards)+1})</b>",
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                ]
+            current_card_lines.append(line)
+
+        current_card_lines.extend([
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📊 <b>Indexed Topics:</b> <code>{len(topics)}</code> ({'Alphabetical A–Z' if sort_mode == 'az' else 'Forum Sequence'})",
+            "📌 <i>Tap any subject title above to open its study topic.</i>",
+            "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Medical Study Companion</i>"
+        ])
+        cards.append("\n".join(current_card_lines))
+
+        reply_markup = {
+            "inline_keyboard": [
+                [
+                    {"text": "🔄 Refresh Index", "callback_data": "act_mainindex"},
+                    {"text": "🩺 Clinical Tools", "callback_data": "act_menu"}
+                ]
+            ]
+        }
+        return cards, reply_markup
 
     def _delete_topic(self, chat_id: int, topic_id: int) -> bool:
         """Removes a topic and its items from the group index."""
@@ -1799,6 +1860,8 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
             elif action == "manual":
                 await self._handle_admin_command(session, chat_id, admin_id, "/fullhelp", message=msg_obj)
+            elif action == "menu":
+                await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
             elif action == "support":
                 await self._handle_admin_command(session, chat_id, admin_id, "/support", message=msg_obj)
             elif action == "toggle_direct":
@@ -2337,9 +2400,9 @@ class DeviTelegramBot:
                     return
 
             # C. Group Commands, Smart FAQs or Tags
-            bot_tag = "@kinddoc_bot"
-            is_tagged = bot_tag in text.lower()
-            is_command = text.startswith("/")
+            cur_bot_tag = f"@{self.bot_username}".lower() if getattr(self, "bot_username", None) else "@kinddoc_bot"
+            is_tagged = (cur_bot_tag in text.lower()) or ("@kinddoc" in text.lower()) or ("@kinddoctor" in text.lower())
+            is_command = text.startswith("/") or any(text.lower().startswith(c) for c in ("index", "mainindex", "topics", "help", "menu", "stats", "manual", "find", "scan"))
 
             if not (is_tagged or is_command):
                 # Smart FAQ trigger: Check if any keyword matches a saved FAQ
@@ -2360,9 +2423,10 @@ class DeviTelegramBot:
                 if cmd_cleanup_delay > 0:
                     self.create_tracked_task(self._auto_delete_message(session, chat_id, msg_id, cmd_cleanup_delay))
 
-            clean_text = text.replace("@KindDoc_bot", "").replace("@kinddoc_bot", "").strip()
+            # Strip any bot username mention (e.g. /mainindex@KindDoc_bot or /mainindex@KindDoctor4u_bot -> /mainindex)
+            clean_text = re.sub(r'@[a-zA-Z0-9_]+', '', text).strip()
             first_word = clean_text.split()[0].lower().split("@")[0] if clean_text else ""
-            if not first_word.startswith("/") and first_word in ("index", "mainindex", "topics", "help", "menu", "stats", "manual", "find", "scan"):
+            if not first_word.startswith("/") and (first_word in ("index", "mainindex", "topics", "help", "menu", "stats", "manual", "find", "scan") or f"/{first_word}" in STUDENT_ALLOWED_COMMANDS):
                 first_word = f"/{first_word}"
                 clean_text = f"/{clean_text}"
 
@@ -2570,7 +2634,7 @@ class DeviTelegramBot:
             await self._send_message(session, chat_id, add_guide)
 
         # Check if message matches any Command or Custom Command (with or without /)
-        clean_prompt = text.strip()
+        clean_prompt = re.sub(r'@[a-zA-Z0-9_]+', '', text).strip()
         cmd_first = clean_prompt.split()[0].lower().split("@")[0] if clean_prompt else ""
         if not cmd_first.startswith("/"):
             if f"/{cmd_first}" in STUDENT_ALLOWED_COMMANDS or cmd_first in ("index", "mainindex", "topics", "help", "menu", "stats", "scan", "manual", "find"):
@@ -3222,7 +3286,7 @@ class DeviTelegramBot:
 
         elif cmd == "/topics":
             target_topics_chat = self._resolve_study_group_id(chat_id)
-            topics = self._get_topics(target_topics_chat, sort_alphabetical=True)
+            topics = self._get_topics(target_topics_chat, sort_mode="az")
             if not topics:
                 await self._send_message(session, chat_id, "Abhi is group me koi Topics registered nahi hain. <code>/settopic &lt;title&gt;</code> use karein.", message_thread_id=thread_id)
                 return
