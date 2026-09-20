@@ -10,8 +10,18 @@ echo "  🚀 TG KINDSYNC PRO — LIVE VPS AUTO-UPDATER"
 echo "  Pulling latest code updates from Private GitHub..."
 echo "============================================================"
 
-# 1. Pull latest commits from GitHub
-git pull origin main
+# Auto-initialize git if missing
+if [ ! -d ".git" ]; then
+    echo "[*] Initializing Git repository link..."
+    git init
+    git branch -M main
+    git remote add origin https://github.com/Ammitrajput01/TG_KindSync_Pro.git 2>/dev/null || git remote set-url origin https://github.com/Ammitrajput01/TG_KindSync_Pro.git
+    git fetch origin main
+    git checkout -f -B main origin/main
+else
+    # 1. Pull latest commits from GitHub
+    git pull origin main
+fi
 
 # 2. Update dependencies if any changed
 if [ -d ".venv" ]; then
