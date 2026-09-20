@@ -12,7 +12,7 @@
    - [B. DEVI AI Ecosystem (5-Phase Autonomous Agent)](#b-devi-ai-ecosystem-5-phase-autonomous-agent)
    - [C. @KindDoc_bot (Medical Sentinel & Community Hub)](#c-kinddoc_bot-medical-sentinel--community-hub)
    - [D. Universal Free AI Model Hub & AI Council](#d-universal-free-ai-model-hub--ai-council)
-   - [E. Web Dashboard, Ayugram Glass HUD & Companion](#e-web-dashboard-ayugram-glass-hud--companion)
+   - [E. Web Dashboard, KindSync Glass HUD & Command Center](#e-web-dashboard-kindsync-glass-hud--command-center)
    - [F. Verification Suites & 100% Test Coverage](#f-verification-suites--100-test-coverage)
    - [G. Deployment, Cloud & Android Termux Suite](#g-deployment-cloud--android-termux-suite)
 3. [Architecture & System Topology](#3-architecture--system-topology)
@@ -214,7 +214,7 @@ DEVI (*Dedicated Evolutionary Virtual Intelligence*) ek fully isolated, autonomo
 | | `3_START_DEVI_DASHBOARD.bat` | Web UI Dashboard at `http://localhost:8080` |
 | | `4_TEST_SYSTEM.bat` | Diagnostics & Model Benchmark launcher |
 | | `5_INSTALL_DEPENDENCIES.bat` | Auto-installer for pip dependencies |
-| | `START_AYUGRAM_TURBO.bat` | Ayugram companion overlay launcher |
+| | `DEPLOY_ORACLE.bat` | 1-Click GitHub push & Oracle VPS deployer |
 | **Core Engines** | `tg_kind_mode_v14.py` | Main MTProto forwarder & streaming pipeline |
 | | `web_dashboard.py` | Web UI backend |
 | | `sentinel_observer.py` | Live background engine telemetry watcher |
