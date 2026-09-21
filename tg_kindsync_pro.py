@@ -6376,267 +6376,6 @@ async def run_member_scraper_and_adder(session_mgr):
             console.print(table)
         await safe_input("Press Enter to return", allow_cancel=False)
 
-async def run_master_group_indexer(session_mgr):
-    clear_screen()
-    console.print(get_persistent_header())
-    console.print(Panel("[bold cyan]📑 1-CLICK MASTER GROUP & FORUM TOPICS INDEXER[/]", border_style="cyan", box=box.ROUNDED))
-    console.print("[dim]Scan all forum topics across your group and auto-generate/update the master directory card![/]\n")
-    
-    client = await session_mgr.ensure_active_client()
-    if not client: return
-        
-    console.print("[bold cyan]Step 1: Choose Group to Index (e.g. Study Help)[/]")
-    sel_group = await interactive_channel_selector(client, prompt_title="Group to Index")
-    if not sel_group:
-        return
-        
-    group_id = sel_group["id"]
-    entity = await client.get_entity(_parse_chat_id(group_id))
-    group_title = getattr(entity, 'title', None) or (sel_group.get("title") if not str(sel_group.get("title")).startswith("-") else "Study Help 😉")
-    member_count = getattr(entity, 'participants_count', 1974) or 1974
-    
-    console.print(f"\n[cyan]🔍 Inspecting Forum Structure & Topics for [bold yellow]{group_title}[/]...[/]")
-    
-    topics = []
-    try:
-        input_peer = await client.get_input_entity(_parse_chat_id(group_id))
-        res = await client(GetForumTopicsRequest(
-            peer=input_peer,
-            offset_date=None,
-            offset_id=0,
-            offset_topic=0,
-            limit=100
-        ))
-        if hasattr(res, 'topics'):
-            topics = res.topics
-    except Exception as e:
-        console.print(f"[bold red]❌ Error reading forum topics:[/] {e}")
-        await safe_input("\nPress Enter to return", allow_cancel=False)
-        return
-        
-    if not topics:
-        console.print("[yellow]⚠️ No Forum Topics found in this group. It might be a standard group.[/]")
-        await safe_input("\nPress Enter to return", allow_cancel=False)
-        return
-
-    console.print(f"[bold green]✨ Found {len(topics)} Forum Topics![/]")
-    
-    # Auto-detect "INDEX & Backup" or index topic
-    index_topic_obj = None
-    content_topics = []
-    for t in topics:
-        t_name = getattr(t, 'title', f'Topic {t.id}').strip()
-        if re.search(r"(?i)\b(?:index|backup|directory|toc)\b", t_name):
-            index_topic_obj = t
-        else:
-            content_topics.append(t)
-            
-    if not content_topics:
-        content_topics = list(topics)
-        
-    console.print(f"\n[yellow]⚠️ You are about to scan ALL {len(content_topics)} topics in '{group_title}' to build an overarching Master Group Roadmap Index.[/]")
-    confirm_all = await safe_input("Proceed with scanning all topics? (YES / NO)", valid_options=["YES", "NO", "yes", "no", "Y", "N", "y", "n"], default_val="YES", allow_cancel=True)
-    if not confirm_all or confirm_all.upper() not in ["YES", "Y"]:
-        console.print("[yellow]Scan cancelled. Returning to Indexer menu.[/]")
-        await safe_input("\nPress Enter to return", allow_cancel=False)
-        return
-
-    console.print("\n[bold cyan]Step 2: Choose Index Sorting Style[/]")
-    console.print(" [1] 🔤 [bold green]Alphabetical (A to Z)[/] [bold yellow]⭐ (Recommended)[/] (e.g. Cerebellum ➔ DVMCI ➔ Prepladder)")
-    console.print(" [2] 📑 [bold white]Forum Group Order[/] (As arranged in Telegram group)")
-    sort_choice = await safe_input("Choose Sorting Style (1/2)", valid_options=["1", "2", ""], default_val="1", allow_cancel=True)
-    if sort_choice is None:
-        return
-
-    if sort_choice != "2":
-        content_topics.sort(key=lambda t: clean_sort_key(getattr(t, 'title', f'Topic {t.id}')))
-        console.print("[bold green]✔ Sorted topics Alphabetically (A to Z)![/]")
-    else:
-        console.print("[cyan]✔ Kept original Forum Group Order.[/]")
-
-    console.print(f"[cyan]📊 Scanning message stats across {len(content_topics)} topics (Videos & PDFs count)...[/]")
-    
-    topic_data = []
-    raw_chat_id = str(group_id).replace("-100", "").replace("-", "")
-    
-    emoji_map = [
-        ("Pharmacology", "💊", r"(?i)\bpharm"),
-        ("Surgery", "✂️", r"(?i)\bsurg"),
-        ("Paediatrics", "🍼", r"(?i)\bp[ae]+diat"),
-        ("Pathology", "🔬", r"(?i)\bpath"),
-        ("Microbiology", "🦠", r"(?i)\bmicro"),
-        ("Anatomy", "🦴", r"(?i)\banat"),
-        ("Physiology", "🫀", r"(?i)\bphysio"),
-        ("Biochemistry", "🧬", r"(?i)\bbiochem"),
-        ("Forensic", "⚖️", r"(?i)\bfmt|forensic"),
-        ("PSM", "🏥", r"(?i)\bpsm|community"),
-        ("Ophthalmology", "👁️", r"(?i)\bophthal|eye"),
-        ("ENT", "👂", r"(?i)\bent"),
-        ("Medicine", "🩺", r"(?i)\bmedicine|meded|\bmed\b|priyansh|dilip"),
-        ("OBG", "👶", r"(?i)\bobg|gynae|prasan"),
-        ("Dermatology", "🧴", r"(?i)\bderma"),
-        ("Radiology", "🩻", r"(?i)\bradio"),
-        ("Psychiatry", "🧠", r"(?i)\bpsych"),
-        ("Orthopedics", "🦿", r"(?i)\bortho"),
-        ("Anesthesia", "💉", r"(?i)\ban[ae]+sthesia"),
-        ("Grand Tests", "🎯", r"(?i)\bgt|grand test|test series"),
-        ("Rapid Revision", "⚡", r"(?i)\brr\b|rapid|lrr|btr|fastrack|bootcamp|sureshot"),
-        ("PYQs & Flashcards", "📑", r"(?i)\bpyq|pyt|flashcard"),
-        ("Workbooks & Notes", "📚", r"(?i)\bnote|workbook|pdf|handbook|mind map"),
-        ("Dissection", "🩻", r"(?i)\bdissection"),
-        ("Discussion & Chat", "💬", r"(?i)\bchat|discussion|chatter"),
-    ]
-    
-    with console.status("[bold cyan]Scanning topics and counting media files...[/]"):
-        for t in content_topics:
-            t_id = t.id
-            t_title = getattr(t, 'title', f'Topic {t.id}').strip()
-            
-            icon = "📖"
-            for _, em, pat in emoji_map:
-                if re.search(pat, t_title):
-                    icon = em
-                    break
-                    
-            v_cnt = 0
-            d_cnt = 0
-            try:
-                async for msg in client.iter_messages(entity, reply_to=t_id, limit=200):
-                    if getattr(msg, 'video', None):
-                        v_cnt += 1
-                    elif getattr(msg, 'document', None):
-                        d_cnt += 1
-            except Exception:
-                pass
-                
-            link = f"https://t.me/c/{raw_chat_id}/{t_id}" if raw_chat_id.isdigit() else f"https://t.me/{raw_chat_id}/{t_id}"
-            topic_data.append({
-                "id": t_id,
-                "title": t_title,
-                "icon": icon,
-                "link": link,
-                "videos": v_cnt,
-                "docs": d_cnt
-            })
-            await asyncio.sleep(0.05)
-
-    clear_screen()
-    console.print(get_persistent_header())
-    console.print(Panel(f"[bold green]✨ INDEX SCAN COMPLETED FOR {group_title.upper()}[/]", border_style="green", box=box.ROUNDED))
-    
-    table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan", expand=True)
-    table.add_column("#", style="dim", width=4)
-    table.add_column("Icon", width=4)
-    table.add_column("Topic / Course Title", style="bold yellow")
-    table.add_column("Videos", style="green", justify="right")
-    table.add_column("PDF Notes", style="magenta", justify="right")
-    table.add_column("Topic Link", style="blue")
-    
-    for idx, td in enumerate(topic_data, 1):
-        table.add_row(str(idx), td["icon"], td["title"], f"{td['videos']} 🎬", f"{td['docs']} 📄", td["link"])
-    console.print(table)
-    
-    dest_topic_id = None
-    dest_topic_name = "INDEX & Backup"
-    if index_topic_obj:
-        dest_topic_id = index_topic_obj.id
-        dest_topic_name = getattr(index_topic_obj, 'title', 'INDEX & Backup')
-        console.print(f"\n[bold green]🎯 Auto-Detected Destination Topic:[/] [yellow]{dest_topic_name}[/] (ID: {dest_topic_id})")
-    else:
-        console.print("\n[yellow]Select Destination Topic to post this Master Index Card:[/]")
-        for idx, t in enumerate(topics, 1):
-            console.print(f" [{idx}] {getattr(t, 'title', f'Topic {t.id}')}")
-        t_sel = await safe_input("Enter Topic # (or 0 to cancel)", valid_options=[str(i) for i in range(len(topics)+1)], default_val="1")
-        if not t_sel or t_sel == "0": return
-        dest_topic_id = topics[int(t_sel)-1].id
-        dest_topic_name = getattr(topics[int(t_sel)-1], 'title', 'Selected Topic')
-
-    cards = []
-    current_card_lines = [
-        "╔════════════════════════════════════════════════════════════╗",
-        f"║   📚 **{group_title.upper()} — MASTER GROUP INDEX**",
-        "║   👨‍⚕️ *Curated & Maintained by Kind Doctor & Team*",
-        "╚════════════════════════════════════════════════════════════╝\n",
-        "✨ ──────────── 📖 TOPIC & COURSE ROADMAP ──────────── ✨\n"
-    ]
-    
-    current_letter = None
-    for idx, td in enumerate(topic_data, 1):
-        v = td['videos']
-        d = td['docs']
-        
-        badges = []
-        if v > 0:
-            badges.append(f"🎬 `{v} Videos`" if v > 1 else "🎬 `1 Video`")
-        if d > 0:
-            badges.append(f"📄 `{d} PDF Notes`" if d > 1 else "📄 `1 PDF Note`")
-            
-        if badges:
-            detail_line = "     └─ " + "  ·  ".join(badges)
-        else:
-            detail_line = "     └─ 🔗 `Tap to Open Topic`"
-            
-        # Clean title to prevent Markdown URL syntax breakage from nested parentheses/brackets
-        safe_title = str(td['title']).strip()
-        safe_title = safe_title.replace('[', '⟦').replace(']', '⟧').replace('(', '❨').replace(')', '❩').replace('*', '')
-        
-        # Option B: Clean Hashtag Divider (#A, #B, #C)
-        header_tag = ""
-        if sort_choice != "2":
-            sort_k = clean_sort_key(td['title'])
-            first_char = sort_k[0].upper() if sort_k else "#"
-            if not first_char.isalpha():
-                first_char = "0-9"
-            if first_char != current_letter:
-                current_letter = first_char
-                header_tag = f"\n#{current_letter}\n"
-
-        topic_entry = f"{header_tag}[{idx:02d}] ▫️ {td['icon']} [{safe_title}]({td['link']})\n{detail_line}\n"
-        
-        if sum(len(l) for l in current_card_lines) + len(topic_entry) > 3100:
-            current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            cards.append("\n".join(current_card_lines))
-            current_card_lines = [
-                f"📑 **{group_title.upper()} INDEX (Part {len(cards)+1})**",
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            ]
-        current_card_lines.append(topic_entry)
-        
-    current_card_lines.extend([
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"📊 **Master Index:** `{len(topic_data)} Topics Indexed`",
-        f"🏷️ **Brand:** {TELEGRAM_BRAND}  ·  💬 {GROUP_BRAND}"
-    ])
-    cards.append("\n".join(current_card_lines))
-    
-    console.print(Panel(cards[0][:600] + "\n...", title="Preview of Master Card", border_style="magenta", box=box.ROUNDED))
-    
-    post_confirm = await safe_input(f"\nPost Master Index Card directly into '{dest_topic_name}' topic? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
-    if post_confirm and post_confirm.upper() == "YES":
-        try:
-            for c_idx, card in enumerate(cards, 1):
-                await client.send_message(
-                    _parse_chat_id(group_id),
-                    card,
-                    reply_to=dest_topic_id,
-                    parse_mode="md",
-                    link_preview=False
-                )
-                await asyncio.sleep(0.5)
-            console.print(f"\n[bold green]🎉 SUCCESS! Master Index successfully posted to '{dest_topic_name}' topic![/]")
-            AdminTelemetry.dispatch(client, "📑 [INDEXER] Master Group Index Updated", {
-                "Group": f"`{group_id}` ({group_title})",
-                "Destination Topic": f"`{dest_topic_name}` (ID: `{dest_topic_id}`)",
-                "Topics Indexed": f"{len(topic_data)} Topics",
-                "Members": f"{member_count:,}"
-            })
-        except Exception as e:
-            console.print(f"\n[bold red]❌ Failed to post Master Index card:[/] {e}")
-    else:
-        console.print("[yellow]Post cancelled. Master index preview was generated.[/]")
-        
-    await safe_input("\nPress Enter to return to menu", allow_cancel=False)
-
 async def run_single_topic_files_indexer(session_mgr):
     clear_screen()
     console.print(get_persistent_header())
@@ -7714,15 +7453,25 @@ async def start_platform(auto_start: bool = False):
             cfg = AppConfig.load(media_filter=m_filter, workers=w_count, parallelism=parallel, adaptive=is_adaptive, routing_mode=routing_mode, run_dlq=dlq_flag, live_mode=live_mode)
             platform = TerminalPlatform(cfg, session_mgr=session_mgr)
             await platform.boot()
-            await safe_input("\nPress Enter to return to Main Menu", allow_cancel=False)
+            if not is_auto:
+                await safe_input("\nPress Enter to return to Main Menu", allow_cancel=False)
+            else:
+                await asyncio.sleep(5)
+                first_run = True
         except (KeyboardInterrupt, asyncio.CancelledError):
             console.print("\n[bold yellow]Returning to Main Menu...[/]")
             await asyncio.sleep(0.5)
+            if is_auto:
+                break
             continue
         except Exception as e:
             console.print(f"\n[bold red]❌ FATAL ERROR: {e}[/]")
             traceback.print_exc()
-            await safe_input("\nPress Enter to return to menu", allow_cancel=False)
+            if not is_auto:
+                await safe_input("\nPress Enter to return to menu", allow_cancel=False)
+            else:
+                await asyncio.sleep(5)
+                first_run = True
 
 async def main_async():
     await start_platform()

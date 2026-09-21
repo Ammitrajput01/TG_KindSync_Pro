@@ -91,3 +91,41 @@ def test_dashboard_pause_toggle():
     toggle2 = server._toggle_pause()
     assert "paused" in toggle2
     assert toggle1["paused"] != toggle2["paused"]
+
+
+def test_dashboard_forward_routes_crud():
+    state = ObserverState()
+    server = DashboardServer(state=state)
+    
+    # 1. Create Route
+    route_id = server._create_forward_route(
+        src_chat=-1001112223334,
+        tgt_chat=-1005556667778,
+        tgt_topic=10,
+        media_filter="video",
+        strip_links=True
+    )
+    assert route_id > 0
+
+    # 2. Get Routes
+    routes = server._get_forward_routes()
+    assert isinstance(routes, list)
+    target_r = next((r for r in routes if r["id"] == route_id), None)
+    assert target_r is not None
+    assert target_r["source_chat_id"] == -1001112223334
+    assert target_r["target_chat_id"] == -1005556667778
+    assert target_r["target_topic_id"] == 10
+
+    # 3. Toggle Route
+    toggled = server._toggle_forward_route(route_id)
+    assert toggled is True
+    updated_r = next((r for r in server._get_forward_routes() if r["id"] == route_id), None)
+    assert updated_r is not None
+    assert updated_r["is_active"] is False
+
+    # 4. Delete Route
+    deleted = server._delete_forward_route(route_id)
+    assert deleted is True
+    deleted_r = next((r for r in server._get_forward_routes() if r["id"] == route_id), None)
+    assert deleted_r is None
+

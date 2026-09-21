@@ -1,3 +1,4 @@
+import sqlite3
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -618,6 +619,143 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .tabular, code, pre, .mono {
             font-family: 'JetBrains Mono', monospace;
             font-variant-numeric: tabular-nums;
+        }
+
+        
+        /* SVG Speedometer Upload Velocity Dial */
+        .speedometer-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: var(--radius-lg);
+            padding: var(--space-5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(16px);
+            transition: transform var(--duration-base) var(--ease-spring), border-color var(--duration-base) ease;
+        }
+
+        .speedometer-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 12px 36px rgba(99, 102, 241, 0.2);
+        }
+
+        .speedometer-svg {
+            width: 220px;
+            height: 125px;
+            overflow: visible;
+        }
+
+        .gauge-bg-arc {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.08);
+            stroke-width: 14;
+            stroke-linecap: round;
+        }
+
+        .gauge-val-arc {
+            fill: none;
+            stroke: url(#speedGaugeGrad);
+            stroke-width: 14;
+            stroke-linecap: round;
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .gauge-needle {
+            transform-origin: 110px 110px;
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .gauge-readout {
+            margin-top: -15px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .gauge-speed-num {
+            font-size: 28px;
+            font-weight: 800;
+            color: #FFFFFF;
+            letter-spacing: -0.5px;
+            line-height: 1.1;
+            text-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+        }
+
+        .gauge-tier-badge {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: var(--radius-full);
+            margin-top: 4px;
+            background: rgba(99, 102, 241, 0.18);
+            color: #818CF8;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        /* Visual Route Matrix Modal & Cards */
+        .route-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: var(--space-4);
+            max-height: 60vh;
+            overflow-y: auto;
+            padding-right: var(--space-2);
+        }
+
+        .route-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-medium);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            transition: all var(--duration-base) var(--ease-spring);
+        }
+
+        .route-card:hover {
+            border-color: var(--accent-primary);
+            background: rgba(15, 23, 42, 0.85);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+        }
+
+        .route-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-2);
+        }
+
+        .route-node {
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .route-arrow {
+            color: var(--accent-primary);
+            font-size: 16px;
+            font-weight: 800;
         }
 
         /* App Shell */
@@ -1821,6 +1959,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <span class="status-dot"></span>
                         <span id="header-engine-status">Engine Online (Synced)</span>
                     </div>
+                                        <button class="btn btn-secondary btn-sm" onclick="openRouteMatrixModal()" title="Visual Forwarding Route Matrix">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+                        <span>Route Matrix</span>
+                    </button>
                     <button class="btn btn-secondary btn-sm" onclick="triggerCloudBackup()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
                         <span>Snapshot</span>
@@ -1888,6 +2030,64 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <span class="metric-label">Telegram DC Ping</span>
                             <span class="metric-value tabular" id="vital-tg-latency">24 ms</span>
                             <span class="metric-subtext">SQLite WAL Optimal</span>
+                        </div>
+                    </div>
+
+                                        <!-- Real-Time SVG Upload Velocity Speedometer & Throughput Gauge -->
+                    <div style="display: grid; grid-template-columns: 260px 1fr; gap: var(--space-6); margin-bottom: var(--space-6);">
+                        <div class="speedometer-card">
+                            <svg class="speedometer-svg" viewBox="0 0 220 125">
+                                <defs>
+                                    <linearGradient id="speedGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="#38BDF8" />
+                                        <stop offset="50%" stop-color="#6366F1" />
+                                        <stop offset="100%" stop-color="#A855F7" />
+                                    </linearGradient>
+                                </defs>
+                                <!-- Background Track Arc (180 deg) -->
+                                <path class="gauge-bg-arc" d="M 25 110 A 85 85 0 0 1 195 110" />
+                                <!-- Dynamic Value Arc -->
+                                <path id="svg-gauge-val-arc" class="gauge-val-arc" d="M 25 110 A 85 85 0 0 1 195 110" />
+                                <!-- Center Hub -->
+                                <circle cx="110" cy="110" r="8" fill="#1E293B" stroke="#6366F1" stroke-width="3" />
+                                <!-- Needle -->
+                                <g id="svg-gauge-needle" class="gauge-needle" style="transform: rotate(-90deg);">
+                                    <polygon points="107,110 113,110 110,32" fill="#F8FAFC" />
+                                    <circle cx="110" cy="32" r="2.5" fill="#38BDF8" />
+                                </g>
+                            </svg>
+                            <div class="gauge-readout">
+                                <span class="gauge-speed-num tabular" id="gauge-speed-display">0.0</span>
+                                <span style="font-size: 11px; color: var(--text-tertiary); font-weight: 600;">MB / SECOND</span>
+                                <span class="gauge-tier-badge" id="gauge-tier-badge">⚪ IDLE</span>
+                            </div>
+                        </div>
+
+                        <!-- System Vitality Status Card -->
+                        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: var(--space-5); display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm);">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                                    <div style="font-size: 15px; font-weight: 700; color: var(--text-primary);">⚡ Forwarding Velocity & Stream Health</div>
+                                    <span class="pill pill-success tabular" id="vitality-health-pill">STREAMING OPTIMAL</span>
+                                </div>
+                                <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;" id="vitality-desc">
+                                    Zero floodwait backpressure detected. High-throughput multi-part Telegram chunk pipeline operating at peak efficiency.
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: var(--space-4); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);">
+                                <div>
+                                    <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase;">Peak Session Rate</div>
+                                    <div class="tabular" id="card-peak-speed" style="font-size: 16px; font-weight: 700; color: #38BDF8;">0.0 MB/s</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase;">Total Transferred</div>
+                                    <div class="tabular" id="card-total-mb" style="font-size: 16px; font-weight: 700; color: #4ADE80;">0.0 MB</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: var(--text-tertiary); text-transform: uppercase;">Active Profile</div>
+                                    <div class="tabular" id="card-profile-name" style="font-size: 16px; font-weight: 700; color: #A855F7;">@Kinddoctor4u</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -3200,6 +3400,55 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             setInterval(updateStatus, 2500);
         });
     </script>
+
+    <!-- Visual Forwarding Route Matrix Modal -->
+    <div class="modal-backdrop" id="modal-route-matrix">
+        <div class="modal-dialog" style="max-width: 720px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: var(--space-3);">
+                    <div style="width: 32px; height: 32px; border-radius: var(--radius-md); background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%); display: flex; align-items: center; justify-content: center; color: white;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="modal-title">Visual Forwarding Route Matrix</div>
+                        <div style="font-size: 12px; color: var(--text-tertiary);">Real-time mapping of Telegram source channels to target study groups & topics</div>
+                    </div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="closeRouteMatrixModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <!-- Add New Route Quick Form -->
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-medium); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-3);">➕ Add New Forwarding Route</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 120px auto; gap: var(--space-3); align-items: flex-end;">
+                        <div class="form-group">
+                            <label class="form-label">Source Chat ID</label>
+                            <input type="text" class="text-input" id="new-route-src" placeholder="-1001234567890">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Target Chat ID</label>
+                            <input type="text" class="text-input" id="new-route-tgt" placeholder="-1009876543210">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Target Topic ID</label>
+                            <input type="number" class="text-input" id="new-route-topic" placeholder="0">
+                        </div>
+                        <button class="btn btn-primary" onclick="handleCreateRoute()" style="height: 38px;">Add Route</button>
+                    </div>
+                </div>
+
+                <!-- Active Routes Grid -->
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: var(--space-2);">Configured Forwarding Routes</div>
+                <div class="route-grid" id="route-matrix-container">
+                    <div style="text-align: center; padding: var(--space-6); color: var(--text-tertiary);">Loading routes...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRouteMatrixModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
 """
@@ -3417,6 +3666,64 @@ class DashboardServer:
             }
 
 
+    
+    def _get_forward_routes(self) -> list:
+        routes = []
+        try:
+            db_file = BASE_DIR / "history_core.sqlite"
+            if db_file.exists():
+                with sqlite3.connect(db_file, timeout=10.0) as conn:
+                    conn.row_factory = sqlite3.Row
+                    rows = conn.execute("SELECT * FROM telegram_forward_routes ORDER BY id DESC").fetchall()
+                    for r in rows:
+                        routes.append({
+                            "id": r["id"],
+                            "source_chat_id": r["source_chat_id"],
+                            "source_topic_id": r["source_topic_id"],
+                            "target_chat_id": r["target_chat_id"],
+                            "target_topic_id": r["target_topic_id"],
+                            "media_filter": r["media_filter"] or "all",
+                            "strip_links": bool(r["strip_links"]),
+                            "is_active": bool(r["is_active"]),
+                            "created_at": str(r["created_at"])[:19]
+                        })
+        except Exception as e:
+            print(f"Error reading forward routes: {e}")
+        return routes
+
+    def _create_forward_route(self, src_chat: int, tgt_chat: int, tgt_topic: int = 0, media_filter: str = "all", strip_links: bool = True) -> int:
+        try:
+            db_file = BASE_DIR / "history_core.sqlite"
+            with sqlite3.connect(db_file, timeout=10.0) as conn:
+                cur = conn.execute("""
+                    INSERT INTO telegram_forward_routes (source_chat_id, target_chat_id, target_topic_id, media_filter, strip_links, is_active)
+                    VALUES (?, ?, ?, ?, ?, 1)
+                """, (src_chat, tgt_chat, tgt_topic, media_filter, 1 if strip_links else 0))
+                return cur.lastrowid
+        except Exception as e:
+            print(f"Error creating forward route: {e}")
+            return 0
+
+    def _toggle_forward_route(self, route_id: int) -> bool:
+        try:
+            db_file = BASE_DIR / "history_core.sqlite"
+            with sqlite3.connect(db_file, timeout=10.0) as conn:
+                conn.execute("UPDATE telegram_forward_routes SET is_active = CASE WHEN is_active=1 THEN 0 ELSE 1 END WHERE id = ?", (route_id,))
+                return True
+        except Exception as e:
+            print(f"Error toggling route: {e}")
+            return False
+
+    def _delete_forward_route(self, route_id: int) -> bool:
+        try:
+            db_file = BASE_DIR / "history_core.sqlite"
+            with sqlite3.connect(db_file, timeout=10.0) as conn:
+                conn.execute("DELETE FROM telegram_forward_routes WHERE id = ?", (route_id,))
+                return True
+        except Exception as e:
+            print(f"Error deleting route: {e}")
+            return False
+
     def _get_dlq_errors_list(self):
         errors = []
         if DLQ_FILE.exists():
@@ -3619,6 +3926,43 @@ class DashboardServer:
 
     async def handle_api_devi_status(self, request):
         return web.json_response(self._get_devi_vitality_summary())
+
+    
+    async def handle_api_routes(self, request):
+        return web.json_response({"routes": self._get_forward_routes()})
+
+    async def handle_api_create_route(self, request):
+        try:
+            data = await request.json()
+            src = int(data.get("source_chat_id", 0))
+            tgt = int(data.get("target_chat_id", 0))
+            top = int(data.get("target_topic_id", 0))
+            med = str(data.get("media_filter", "all"))
+            strp = bool(data.get("strip_links", True))
+            if not src or not tgt:
+                return web.json_response({"success": False, "error": "Source and Target Chat IDs required"}, status=400)
+            new_id = self._create_forward_route(src, tgt, top, med, strp)
+            return web.json_response({"success": bool(new_id), "route_id": new_id})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    async def handle_api_toggle_route(self, request):
+        try:
+            data = await request.json()
+            rid = int(data.get("id", 0))
+            ok = self._toggle_forward_route(rid)
+            return web.json_response({"success": ok})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    async def handle_api_delete_route(self, request):
+        try:
+            data = await request.json()
+            rid = int(data.get("id", 0))
+            ok = self._delete_forward_route(rid)
+            return web.json_response({"success": ok})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
 
     async def handle_api_devi_hunt(self, request):
         try:
@@ -3866,8 +4210,12 @@ class DashboardServer:
             self.app.router.add_post("/api/telegram/send_code", self.handle_api_telegram_send_code)
             self.app.router.add_post("/api/telegram/verify_code", self.handle_api_telegram_verify_code)
             self.app.router.add_post("/api/telegram/import_string", self.handle_api_telegram_import_string)
-            self.app.router.add_post("/api/telegram/set_active", self.handle_api_telegram_set_active)
+            self.app.router.add_get("/api/routes", self.handle_api_routes)
+            self.app.router.add_post("/api/routes/create", self.handle_api_create_route)
+            self.app.router.add_post("/api/routes/toggle", self.handle_api_toggle_route)
+            self.app.router.add_post("/api/routes/delete", self.handle_api_delete_route)
             self.app.router.add_post("/api/backup", self.handle_api_backup)
+
             self.app.router.add_post("/api/pause", self.handle_api_pause)
             self.app.router.add_post("/api/clear_dlq", self.handle_api_clear_dlq)
             self.app.router.add_get("/api/errors", self.handle_api_errors)

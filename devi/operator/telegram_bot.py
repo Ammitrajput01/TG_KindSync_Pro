@@ -39,6 +39,28 @@ from devi.memory.memory_store import MemoryStore
 from devi.tools.system_tools import SystemTools
 from devi.evolution.evaluator import Evaluator
 from devi.brain.model_router import ModelRouter
+from devi.operator.medical_calculator import (
+    calc_bmi,
+    calc_bsa,
+    calc_gfr,
+    calc_pediatric_dose,
+    calc_mg_per_kg,
+    calc_maintenance_fluids,
+    calc_et_tube,
+    calc_apgar,
+    calc_parkland,
+    calc_urine_output,
+    calc_edd,
+    calc_psm_matrix,
+    calc_iv_drip,
+    calc_inotrope_infusion,
+    calc_map,
+    calc_anion_gap,
+    calc_corrected_sodium,
+    calc_gcs,
+    calc_curb65,
+    calc_wells_pe,
+)
 
 logger = logging.getLogger("DEVI.TelegramBot")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -82,7 +104,12 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/userinfo", "/whois", "/botinfo", "/about",
     "/engine", "/status", "/backup", "/clean", "/cleanbot", "/sangmata",
     "/phone", "/email", "/phonelookup", "/emaillookup",
-    "/mcq", "/pearl", "/score", "/pomodoro", "/ask"
+    "/calc", "/dose", "/formula", "/score",
+    "/bmi", "/bsa", "/gfr", "/pedia", "/burns", "/uop", "/edd", "/psm",
+    "/drip", "/infusion", "/map", "/abg", "/sodium", "/gcs", "/curb65", "/wells",
+    "/save", "/get", "/note", "/notes", "/saved", "/clear", "/delnote",
+    "/filter", "/setfilter", "/stop", "/delfilter", "/filters",
+    "/mcq", "/pearl", "/pomodoro", "/ask"
 )
 STUDENT_ALLOWED_COMMANDS = PUBLIC_ALLOWED_COMMANDS
 
@@ -199,12 +226,24 @@ class DeviTelegramBot:
                 conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_topic_items_chat_topic ON telegram_topic_items(chat_id, topic_id)
                 """)
+                # Rose Style Group Notes Table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS telegram_group_notes (
+                        chat_id INTEGER,
+                        note_name TEXT,
+                        content TEXT,
+                        created_by INTEGER,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY(chat_id, note_name)
+                    )
+                """)
                 # Group FAQs Table
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS telegram_group_faqs (
                         chat_id INTEGER,
                         keyword TEXT,
                         response_text TEXT,
+
                         created_by INTEGER,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         PRIMARY KEY(chat_id, keyword)
@@ -397,8 +436,70 @@ class DeviTelegramBot:
         except Exception:
             return None
 
+    def _save_note(self, chat_id: int, note_name: str, content: str, created_by: int) -> bool:
+        """Saves or updates a Rose-style group note."""
+        clean_name = note_name.lower().strip().lstrip("#")
+        try:
+            with get_db_conn() as conn:
+                conn.execute("""
+                    INSERT INTO telegram_group_notes (chat_id, note_name, content, created_by, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(chat_id, note_name) DO UPDATE SET
+                        content = excluded.content,
+                        created_by = excluded.created_by,
+                        created_at = CURRENT_TIMESTAMP
+                """, (chat_id, clean_name, content.strip(), created_by))
+                return True
+        except Exception as e:
+            logger.warning(f"Error saving group note: {e}")
+            return False
+
+    def _get_note(self, chat_id: int, note_name: str) -> Optional[str]:
+        """Fetches a Rose-style group note content."""
+        clean_name = note_name.lower().strip().lstrip("#")
+        try:
+            with get_db_conn() as conn:
+                row = conn.execute(
+                    "SELECT content FROM telegram_group_notes WHERE chat_id = ? AND note_name = ? COLLATE NOCASE",
+                    (chat_id, clean_name)
+                ).fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            logger.warning(f"Error fetching group note: {e}")
+            return None
+
+    def _delete_note(self, chat_id: int, note_name: str) -> bool:
+        """Deletes a Rose-style group note."""
+        clean_name = note_name.lower().strip().lstrip("#")
+        try:
+            with get_db_conn() as conn:
+                cur = conn.execute(
+                    "DELETE FROM telegram_group_notes WHERE chat_id = ? AND note_name = ? COLLATE NOCASE",
+                    (chat_id, clean_name)
+                )
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.warning(f"Error deleting group note: {e}")
+            return False
+
+
+    def _list_notes(self, chat_id: int) -> list:
+        """Lists all Rose-style notes for the group."""
+        try:
+            with get_db_conn() as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT note_name, content, created_at FROM telegram_group_notes WHERE chat_id = ? ORDER BY note_name ASC",
+                    (chat_id,)
+                ).fetchall()
+                return [dict(r) for r in rows]
+        except Exception as e:
+            logger.warning(f"Error listing group notes: {e}")
+            return []
+
     def _save_faq(self, chat_id: int, keyword: str, response: str, created_by: int):
         """Saves or updates an auto-reply FAQ for a group."""
+
         try:
             with get_db_conn() as conn:
                 conn.execute("""
@@ -1168,26 +1269,30 @@ class DeviTelegramBot:
         else:
             risk_badge = f"🟢 {risk_score}/100 (Safe Student Account)"
 
-        # Build complete A-to-Z Name History
+        # Build complete A-to-Z Name History (Exact SangMata Biometric format)
         name_hist = dossier.get("name_history", [])
         name_lines = []
-        for idx, item in enumerate(name_hist, 1):
-            n = item.get("name", "Unknown")
-            ts = item.get("changed_at", "")
-            ts_str = f" ➔ `({ts})`" if ts else ""
-            name_lines.append(f"{idx}️⃣ `{n}`{ts_str}")
-        name_lines.append(f"✨ `{fn}` ➔ `(Current Active Name)`")
+        if name_hist:
+            for idx, item in enumerate(name_hist, 1):
+                n = item.get("name", "Unknown")
+                ts = item.get("changed_at", "")
+                ts_str = f"[{ts}] " if ts else ""
+                name_lines.append(f"{idx}. {ts_str}`{n}`")
+        else:
+            name_lines.append(f"1. `{fn}` ➔ `(Current Active Name)`")
 
-        # Build complete A-to-Z Username History
+        # Build complete A-to-Z Username History (Exact SangMata Biometric format)
         uname_hist = dossier.get("username_history", [])
         uname_lines = []
-        for idx, item in enumerate(uname_hist, 1):
-            u = item.get("username", "None")
-            u_formatted = f"@{u}" if u != "None" else "No Username"
-            ts = item.get("changed_at", "")
-            ts_str = f" ➔ `({ts})`" if ts else ""
-            uname_lines.append(f"{idx}️⃣ `{u_formatted}`{ts_str}")
-        uname_lines.append(f"✨ `{uname_str}` ➔ `(Current Active Username)`")
+        if uname_hist:
+            for idx, item in enumerate(uname_hist, 1):
+                u = item.get("username", "None")
+                u_formatted = u if u.startswith("@") or u == "(empty)" else f"@{u}"
+                ts = item.get("changed_at", "")
+                ts_str = f"[{ts}] " if ts else ""
+                uname_lines.append(f"{idx}. {ts_str}`{u_formatted}`")
+        else:
+            uname_lines.append(f"1. `{uname_str}` ➔ `(Current Active Username)`")
 
         card = (
             f"🕵️‍♂️ **{title_prefix} — OSINT DOSSIER** 🩺\n"
@@ -1204,8 +1309,8 @@ class DeviTelegramBot:
             f"🔄 **Shift Velocity:** {velocity_str}\n"
             f"🛡️ **OSINT Risk Level:** {risk_badge}\n"
             f"🔗 **Permanent Link:** [Open Profile in Telegram](tg://user?id={user_id})\n\n"
-            f"📜 **Complete Name History (A to Z):**\n" + "\n".join(name_lines) + "\n\n"
-            f"🏷️ **Complete Username History (A to Z):**\n" + "\n".join(uname_lines) + "\n"
+            f"📜 **Complete Name History (A to Z Timeline):**\n" + "\n".join(name_lines) + "\n\n"
+            f"🏷️ **Complete Username History (A to Z Timeline):**\n" + "\n".join(uname_lines) + "\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"🛡️ *Kind Doctor Live Sentinel • OSINT Biometrics & Member Protection*"
         )
@@ -2108,54 +2213,41 @@ class DeviTelegramBot:
                     except Exception as e:
                         logger.warning(f"Error saving member_history for {nm_id}: {e}")
 
-                    # 1. Group Side: Tagged Clean Welcome Card (Persistent; purged on-demand via /cleanbot)
+                    # 1. Chatter Box: Sleek Tagged Welcome Message with Inspirational Study Quote
                     if g_settings.get("welcome_enabled", 1):
                         quotes = [
-                            "❝ The good physician treats the disease; the great physician treats the patient who has the disease. ❞ 🩺💫",
-                            "❝ Wherever the art of Medicine is loved, there is also a love of Humanity. ❞ 🤍✨",
-                            "❝ To cure sometimes, to relieve often, to comfort always. ❞ 🩺💙",
-                            "❝ Medicine is a science of uncertainty and an art of probability. Learn relentlessly! ❞ 📚🔬",
-                            "❝ The secret of the care of the patient is in caring for the patient. ❞ 🩺✨",
-                            "❝ It is much more important to know what sort of a patient has a disease than what sort of a disease a patient has. ❞ 🌟🩺",
-                            "❝ Healing is a matter of time, but it is sometimes also a matter of opportunity. ❞ 💫🌱",
-                            "❝ In the sick room, ten cents' worth of human understanding equals ten dollars' worth of medical science. ❞ 🩺🤍",
-                            "❝ Wear the white coat with pride, carry your stethoscope with honor, and practice with pure compassion. ❞ 🥼✨",
-                            "❝ Success is not final, failure is not fatal: it is the courage to continue that counts. ❞ 🎯🔥",
-                            "❝ Dreams don't work unless you do. Every page you read today will save a life tomorrow. ❞ 📖💫",
-                            "❝ Let your stethoscope be an instrument of hope, and your knowledge a beacon of healing. ❞ 🩺🌟",
-                            "❝ The greatest medicine of all is to teach people how not to need it. ❞ 🤍🌿",
-                            "❝ Observation, Reason, Human Understanding, Courage: these make the physician. ❞ 🔬🩺",
-                            "❝ Stay curious, stay dedicated. One day, you will be the doctor you always needed. ❞ 🌟🥼",
-                            "❝ You don't just study medicine to pass exams; you study to prepare for the lives that will depend on you. ❞ 🩺🎯",
-                            "❝ Small daily improvements over time lead to stunning clinical mastery. ❞ 📈✨",
-                            "❝ Keep your eyes on the stars, your feet on the ground, and your heart in healing. ❞ 💫🩺",
-                            "❝ Hard work beats talent when talent doesn't work hard. Your stethoscope is waiting for you! ❞ 🥼🔥",
-                            "❝ When you touch one life, you heal the world in miniature. Believe in your journey! ❞ 🌍🤍"
+                            "The good physician treats the disease; the great physician treats the patient who has the disease. 🩺💫",
+                            "Wherever the art of Medicine is loved, there is also a love of Humanity. 🤍✨",
+                            "To cure sometimes, to relieve often, to comfort always. 🩺💙",
+                            "Medicine is a science of uncertainty and an art of probability. Learn relentlessly! 📚🔬",
+                            "The secret of the care of the patient is in caring for the patient. 🩺✨",
+                            "Observation, Reason, Human Understanding, Courage: these make the physician. 🔬🩺",
+                            "Stay curious, stay dedicated. One day, you will be the doctor you always needed. 🌟🥼",
+                            "You don't just study medicine to pass exams; you study to prepare for the lives that will depend on you. 🩺🎯",
+                            "Small daily improvements over time lead to stunning clinical mastery. 📈✨",
+                            "Wear the white coat with pride, carry your stethoscope with honor, and practice with pure compassion. 🥼✨",
+                            "Dreams don't work unless you do. Every page you read today will save a life tomorrow. 📖💫",
+                            "Let your stethoscope be an instrument of hope, and your knowledge a beacon of healing. 🩺🌟",
+                            "Hard work beats talent when talent doesn't work hard. Your stethoscope is waiting for you! 🥼🔥",
+                            "When you touch one life, you heal the world in miniature. Believe in your journey! 🌍🤍"
                         ]
                         quote_choice = random.choice(quotes)
                         safe_grp_title = html.escape(grp_title)
 
                         custom_w = g_settings.get("welcome_text")
                         if custom_w:
-                            welcome_group_msg = custom_w.replace("{name}", nm_tag).replace("{group}", safe_grp_title).replace("{rules}", g_settings.get("rules_text") or "Standard Guidelines")
+                            welcome_group_msg = custom_w.replace("{name}", nm_tag).replace("{group}", safe_grp_title)
                         else:
                             lang = g_settings.get("language", "en")
                             if lang == "hi":
                                 greeting_line = f"👋 <b>Namaste & Hardik Swagat Hai, {nm_tag}!</b> 🙏✨"
-                                footer_line = "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Aapka Trusted Medical Study Saathi</i> 🩺"
                             else:
-                                greeting_line = f"👋 <b>Warm Greetings & Hearty Welcome, {nm_tag}!</b> 🙏✨"
-                                footer_line = "👨‍⚕️ <b>Kind Doctor</b> 🤍 • <i>Your Trusted Medical Study Companion</i> 🩺"
+                                greeting_line = f"👋 <b>Welcome {nm_tag} to {safe_grp_title}!</b> ✨"
 
                             welcome_group_msg = (
-                                f"✨ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                                f"🩺 <b>WELCOME TO {safe_grp_title.upper()}</b> 🤍\n"
-                                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                                f"{greeting_line}\n"
-                                f"{added_by_text}\n"
-                                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                                f"<i>{quote_choice}</i>\n\n"
-                                f"{footer_line}"
+                                f"{greeting_line}\n\n"
+                                f"❝ <i>{quote_choice}</i> ❞ 🩺📖\n\n"
+                                f"<i>Wishing you all the best for your studies! 🌟🤍</i>"
                             )
 
                         sent_welcome_id = await self._send_message(
@@ -2168,50 +2260,52 @@ class DeviTelegramBot:
                         if sent_welcome_id:
                             self._log_welcome_message(chat_id, sent_welcome_id)
 
-                        # Group Sangmata Alert if new joiner has known identity shifts
-                        if dossier.get("changes_count", 0) > 0:
-                            group_sangmata_card = self._format_sangmata_dossier(dossier, title_prefix="SANGMATA RADAR: NEW MEMBER JOIN WITH IDENTITY HISTORY")
-                            sent_radar_id = await self._send_message(session, chat_id, group_sangmata_card, message_thread_id=thread_id)
-                            if sent_radar_id:
-                                self._log_welcome_message(chat_id, sent_radar_id)
+                    # 2. General Topic / Admin Radar: Full OSINT & SangMata Biometric Dossier
+                    try:
+                        from devi.operator.osint_resolver import osint_resolver
+                        live_sm = await osint_resolver.fetch_live_sangmata_history(nm_id)
+                        if live_sm:
+                            if live_sm.get("names"):
+                                dossier["name_history"] = live_sm["names"]
+                            if live_sm.get("usernames"):
+                                dossier["username_history"] = live_sm["usernames"]
+                            dossier["changes_count"] = live_sm.get("total_shifts", dossier.get("changes_count", 0))
+                    except Exception as ex:
+                        logger.debug(f"SangMata fetch on join: {ex}")
 
-                    # 2. Admin Side: Rich Member Join Intelligence Alert
-                    if g_settings.get("join_track_enabled", 1) or dossier["changes_count"] > 0:
-                        identity_history_block = ""
-                        if dossier["changes_count"] > 0:
-                            history_items = []
-                            if dossier["username_history"]:
-                                prev_u = ", ".join(f"@{h['username']}" for h in dossier["username_history"])
-                                history_items.append(f"  • Previous Usernames: {prev_u}")
-                            if dossier["name_history"]:
-                                prev_n = ", ".join(f"'{h['name']}'" for h in dossier["name_history"])
-                                history_items.append(f"  • Previous Names: {prev_n}")
-                            identity_history_block = f"\n⚠️ **Identity History ({dossier['changes_count']} changes detected):**\n" + "\n".join(history_items)
+                    full_osint_card = self._format_sangmata_dossier(
+                        dossier,
+                        title_prefix="MEMBER JOIN INTELLIGENCE & SANGMATA OSINT RADAR"
+                    )
 
-                        admin_dossier_text = (
-                            f"👥 **[MEMBER JOIN INTELLIGENCE ALERT]** 🩺\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"🏛️ **Group**: {grp_title} (`{chat_id}`)\n"
-                            f"👤 **Member**: {dossier['full_name']} (@{dossier['username'] or 'No Username'})\n"
-                            f"🆔 **User ID**: `{nm_id}`\n"
-                            f"⏳ **Account Age**: {account_age}\n"
-                            f"🔗 **Join Source**: {source_info}\n"
-                            f"🕒 **Joined At**: `{join_time_str}`\n"
-                            f"🌟 **Account Type**: {'⭐️ Telegram Premium' if dossier['is_premium'] else 'Standard User'}{identity_history_block}\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    admin_markup = {
+                        "inline_keyboard": [
+                            [
+                                {"text": "👢 Kick Member", "callback_data": f"kick_{chat_id}_{nm_id}"},
+                                {"text": "🚫 Ban & Block", "callback_data": f"ban_{chat_id}_{nm_id}"}
+                            ]
+                        ]
+                    }
+
+                    # A. Post in General Topic of the group (if supergroup with topics)
+                    if thread_id:
+                        # Send to General Topic (ID None or 0)
+                        await self._send_message(
+                            session,
+                            chat_id,
+                            full_osint_card,
+                            message_thread_id=None,
+                            reply_markup=admin_markup
                         )
 
-                        admin_markup = {
-                            "inline_keyboard": [
-                                [
-                                    {"text": "👢 Kick Member", "callback_data": f"kick_{chat_id}_{nm_id}"},
-                                    {"text": "🚫 Ban & Block", "callback_data": f"ban_{chat_id}_{nm_id}"}
-                                ]
-                            ]
-                        }
-
-                        for adm_id in self.master_admin_ids:
-                            await self._send_message(session, adm_id, admin_dossier_text, reply_markup=admin_markup)
+                    # B. Also dispatch to Master Bot Admins for that specific group
+                    for adm_id in self.master_admin_ids:
+                        await self._send_message(
+                            session,
+                            adm_id,
+                            f"🏛️ **Group**: `{safe_grp_title}` (`{chat_id}`)\n\n" + full_osint_card,
+                            reply_markup=admin_markup
+                        )
                 return
 
             # Silent Service Message Purge: Auto-delete "User left the group" messages to keep public chat spotless
@@ -4159,38 +4253,48 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, "⚠️ User not found. Reply to a message, forward a message, or provide User ID / @username.", message_thread_id=thread_id)
                 return
 
-            # Full A-to-Z Sangmata History from telegram_users_dossier + member_name_changes
+            # Live SangMata Biometric & Multi-Year Timeline Interception
             name_hist_list = []
             uname_hist_list = []
-            if user_data:
-                try:
+            try:
+                from devi.operator.osint_resolver import osint_resolver
+                live_sm = await osint_resolver.fetch_live_sangmata_history(u_id or uname)
+                if live_sm:
+                    name_hist_list = live_sm.get("names", [])
+                    uname_hist_list = live_sm.get("usernames", [])
+            except Exception as e:
+                logger.debug(f"SangMata fetch error: {e}")
+
+            if not name_hist_list and user_data:
+                with suppress(Exception):
                     name_hist_list = json.loads(user_data["name_history"] or "[]")
-                except Exception:
-                    name_hist_list = []
-                try:
+            if not uname_hist_list and user_data:
+                with suppress(Exception):
                     uname_hist_list = json.loads(user_data["username_history"] or "[]")
-                except Exception:
-                    uname_hist_list = []
 
             name_lines = []
-            for idx, item in enumerate(name_hist_list, 1):
-                n = item.get("name", "Unknown")
-                ts = item.get("changed_at", "")
-                ts_str = f" ➔ `({ts})`" if ts else ""
-                name_lines.append(f"{idx}️⃣ `{n}`{ts_str}")
-            name_lines.append(f"✨ `{full_n}` ➔ `(Current Active Name)`")
+            if name_hist_list:
+                for idx, item in enumerate(name_hist_list, 1):
+                    n = item.get("name", "Unknown")
+                    ts = item.get("changed_at", "")
+                    ts_str = f"[{ts}] " if ts else ""
+                    name_lines.append(f"{idx}. {ts_str}`{n}`")
+            else:
+                name_lines.append(f"1. `{full_n}` ➔ `(Current Active Name)`")
 
             uname_lines = []
-            for idx, item in enumerate(uname_hist_list, 1):
-                u = item.get("username", "None")
-                u_formatted = f"@{u}" if u != "None" else "No Username"
-                ts = item.get("changed_at", "")
-                ts_str = f" ➔ `({ts})`" if ts else ""
-                uname_lines.append(f"{idx}️⃣ `{u_formatted}`{ts_str}")
-            uname_lines.append(f"✨ `@{uname}` ➔ `(Current Active Username)`")
+            if uname_hist_list:
+                for idx, item in enumerate(uname_hist_list, 1):
+                    u = item.get("username", "None")
+                    u_formatted = u if u.startswith("@") or u == "(empty)" else f"@{u}"
+                    ts = item.get("changed_at", "")
+                    ts_str = f"[{ts}] " if ts else ""
+                    uname_lines.append(f"{idx}. {ts_str}`{u_formatted}`")
+            else:
+                uname_lines.append(f"1. `@{uname}` ➔ `(Current Active Username)`")
 
-            name_hist_text = "\n".join(name_lines) if name_lines else "  • No previous names recorded."
-            uname_hist_text = "\n".join(uname_lines) if uname_lines else "  • No previous usernames recorded."
+            name_hist_text = "\n".join(name_lines)
+            uname_hist_text = "\n".join(uname_lines)
 
             bot_status_str = "🤖 Bot Account" if live_is_bot else "👤 Human User (Real Account)"
             photo_str = f"{photo_count} Photo{'s' if photo_count != 1 else ''} Uploaded" if photo_count > 0 else "None (Default / Hidden Avatar)"
@@ -4433,63 +4537,475 @@ class DeviTelegramBot:
             )
 
         # -------------------------------------------------------------
-        # 4. INTERACTIVE MEDICAL MCQ & QUIZ POLLS
+        # 4. SUBJECT-WISE CLINICAL MEDICAL FORMULA & DOSAGE ENGINE
         # -------------------------------------------------------------
-        elif cmd in ("/mcq", "/quiz"):
-            subject = " ".join(parts[1:]).strip() if len(parts) > 1 else "General Medicine / High Yield"
-            prompt = (
-                f"Create 1 high-yield, realistic medical multiple-choice question for Indian MBBS / NEET PG / USMLE exam on the subject: {subject}. "
-                f"Return ONLY a JSON object with this exact schema:\n"
-                f"{{\n"
-                f'  "question": "Clear medical clinical vignette or conceptual question",\n'
-                f'  "options": ["Option A text", "Option B text", "Option C text", "Option D text"],\n'
-                f'  "correct_index": 0,\n'
-                f'  "explanation": "High yield concise explanation (under 180 characters) why this option is correct."\n'
-                f"}}"
-            )
-            q_data = None
-            try:
-                res = await self.router.generate_response(
-                    system_prompt="You are a senior medical board question creator. Output valid JSON only, no markdown formatting.",
-                    user_prompt=prompt,
-                    category="fast"
-                )
-                raw_json = res.get("response", "").strip()
-                if "```json" in raw_json:
-                    raw_json = raw_json.split("```json")[1].split("```")[0].strip()
-                elif "```" in raw_json:
-                    raw_json = raw_json.split("```")[1].split("```")[0].strip()
-                q_data = json.loads(raw_json)
-            except Exception as e:
-                logger.warning(f"Error generating MCQ via AI: {e}")
+        elif cmd in ("/calc", "/dose", "/formula", "/score", "/bmi", "/bsa", "/gfr", "/pedia", "/burns", "/uop", "/edd", "/psm", "/drip", "/infusion", "/map", "/abg", "/sodium", "/gcs", "/curb65", "/wells"):
+            sub_cmd = cmd.lstrip("/").lower()
+            if sub_cmd in ("calc", "dose", "formula", "score"):
+                sub_cmd = parts[1].lower() if len(parts) > 1 else "menu"
+                calc_args = parts[2:]
+            else:
+                calc_args = parts[1:]
 
-            # Fallback high-yield question if AI json parsing fails
-            if not q_data or not isinstance(q_data.get("options"), list) or len(q_data.get("options", [])) < 2:
-                q_data = {
-                    "question": f"🩺 High-Yield {subject} Clinical MCQ:\nWhich diagnostic test is considered the gold standard for diagnosing acute pulmonary embolism?",
-                    "options": ["D-Dimer Assay", "CT Pulmonary Angiography (CTPA)", "Chest X-Ray", "Echocardiogram"],
-                    "correct_index": 1,
-                    "explanation": "CT Pulmonary Angiography (CTPA) is the gold standard imaging modality for acute PE diagnosis."
-                }
-
-            poll_id = await self._send_poll(
-                session,
-                chat_id,
-                q_data["question"],
-                q_data["options"],
-                int(q_data.get("correct_index", 0)),
-                q_data.get("explanation", "High-yield concept tested in clinical medical exams."),
-                message_thread_id=thread_id
-            )
-            if not poll_id:
-                opts_text = "\n".join(f"• **{chr(65+i)}.** {opt}" for i, opt in enumerate(q_data["options"]))
-                mcq_msg = (
-                    f"🩺 **Medical Quiz MCQ: {subject}**\n\n"
-                    f"❓ **Question:**\n{q_data['question']}\n\n"
-                    f"{opts_text}\n\n"
-                    f"💡 *Answer reveal: ||Option {chr(65+q_data['correct_index'])} - {q_data.get('explanation','')}||*"
+            # A. MASTER CLINICAL MENU
+            if sub_cmd in ("menu", "help", "?"):
+                menu_card = (
+                    "🧮 **KIND DOCTOR CLINICAL MEDICAL FORMULA & DOSAGE SUITE** 🩺\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Subject-Wise Clinical Ward, ICU & Exam Calculators:\n\n"
+                    "👶 **1. PEDIATRICS (Ward & PICU):**\n"
+                    "• `/pedia dose <adult_dose> <wt_kg>` ➔ Clark's & Young's Rule\n"
+                    "• `/pedia mgkg <dose_mg_kg> <wt_kg> [syrup_mg_5ml]` ➔ Exact Syrup mL\n"
+                    "• `/pedia ett <age_years>` ➔ ET Tube Size & Insertion Depth\n"
+                    "• `/pedia fluids <wt_kg>` ➔ Holliday-Segar 4-2-1 Maintenance IV Fluid\n"
+                    "• `/pedia apgar <A> <P> <G> <A> <R>` ➔ APGAR Score & Resuscitation\n\n"
+                    "🩺 **2. GENERAL MEDICINE & CRITICAL CARE:**\n"
+                    "• `/bmi <weight_kg> <height_cm>` ➔ BMI & Devine Ideal Body Weight\n"
+                    "• `/bsa <height_cm> <weight_kg>` ➔ Mosteller & DuBois Body Surface Area\n"
+                    "• `/gfr <age> <weight_kg> <serum_cr> <m/f>` ➔ Cockcroft-Gault CrCl & CKD Stage\n"
+                    "• `/map <sbp> <dbp>` ➔ Mean Arterial Pressure & Shock Perfusion\n"
+                    "• `/abg <Na> <Cl> <HCO3> [Albumin]` ➔ Serum Anion Gap & Albumin Correction\n"
+                    "• `/sodium <measured_na> <glucose>` ➔ Corrected Sodium in Hyperglycemia\n"
+                    "• `/gcs <E:1-4> <V:1-5> <M:1-6>` ➔ Glasgow Coma Scale\n"
+                    "• `/curb65 <C> <U> <R> <B> <65>` ➔ Pneumonia Severity & Admission\n"
+                    "• `/wells <DVT> <Alt> <HR> <Immob> <Prior> <Hemo> <Ca>` ➔ Wells PE Score\n\n"
+                    "🔪 **3. SURGERY & EMERGENCY:**\n"
+                    "• `/burns <weight_kg> <tbsa_percent>` ➔ Parkland 24h Ringer Lactate Fluid\n"
+                    "• `/uop <volume_ml> <weight_kg> <hours>` ➔ Urine Output Rate (mL/kg/hr)\n\n"
+                    "🤰 **4. OBSTETRICS & GYNECOLOGY (OBG):**\n"
+                    "• `/edd <LMP_Date_DD/MM/YYYY>` ➔ Naegele's Rule, POG Weeks & Trimester\n\n"
+                    "📊 **5. PSM & BIOSTATISTICS:**\n"
+                    "• `/psm matrix <TP> <FP> <FN> <TN>` ➔ Sensitivity, Specificity, PPV, NPV\n\n"
+                    "💊 **6. PHARMACOLOGY & INFUSIONS:**\n"
+                    "• `/drip <volume_ml> <hours> [drop_factor]` ➔ IV Drip Rate in Drops/min\n"
+                    "• `/infusion <drug_mg> <vol_ml> <dose_mcg_kg_min> <wt_kg>` ➔ Inotrope Syringe Pump (mL/hr)\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "💡 *Tip: Direct commands work anywhere, e.g. `/bmi 70 175` ya `/burns 60 30`*"
                 )
-                await self._send_message(session, chat_id, mcq_msg, message_thread_id=thread_id)
+                await self._send_message(session, chat_id, menu_card, message_thread_id=thread_id)
+
+            # B. BMI & BODY COMPOSITION
+            elif sub_cmd == "bmi":
+                if len(calc_args) < 2:
+                    await self._send_message(session, chat_id, "Usage: `/bmi <weight_kg> <height_cm>`\nExample: `/bmi 70 175`", message_thread_id=thread_id)
+                    return
+                try:
+                    wt, ht = float(calc_args[0]), float(calc_args[1])
+                    res = calc_bmi(wt, ht)
+                    card = (
+                        f"⚖️ **Clinical Calculator: Body Mass Index (BMI)** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Weight**: `{wt:.1f} kg` | **Height**: `{ht:.0f} cm`\n"
+                        f"• **Calculated BMI**: `{res['bmi']} kg/m²`\n"
+                        f"• **WHO Classification**: **{res['who_category']}**\n"
+                        f"• **Asian Cutoff**: `{res['asian_category']}`\n"
+                        f"• **Ideal Body Weight (Devine)**:\n"
+                        f"   - Male: `{res['ideal_body_weight_male']} kg` | Female: `{res['ideal_body_weight_female']} kg`\n\n"
+                        f"💡 *Clinical Pearl: Asian cutoff considers BMI ≥ 23.0 as overweight and ≥ 25.0 as obese.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input numbers. Example: `/bmi 70 175`", message_thread_id=thread_id)
+
+            # C. BSA (BODY SURFACE AREA)
+            elif sub_cmd == "bsa":
+                if len(calc_args) < 2:
+                    await self._send_message(session, chat_id, "Usage: `/bsa <height_cm> <weight_kg>`\nExample: `/bsa 175 70`", message_thread_id=thread_id)
+                    return
+                try:
+                    ht, wt = float(calc_args[0]), float(calc_args[1])
+                    res = calc_bsa(ht, wt)
+                    card = (
+                        f"📐 **Clinical Calculator: Body Surface Area (BSA)** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Mosteller Formula**: `{res['mosteller_m2']} m²`\n"
+                        f"• **DuBois Formula**: `{res['dubois_m2']} m²`\n\n"
+                        f"💡 *Used for Chemotherapy dosing, Cardiac Index, and Renal GFR normalization.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/bsa 175 70`", message_thread_id=thread_id)
+
+            # D. GFR & RENAL FUNCTION (Cockcroft-Gault)
+            elif sub_cmd == "gfr":
+                if len(calc_args) < 3:
+                    await self._send_message(session, chat_id, "Usage: `/gfr <age> <weight_kg> <serum_cr> [m/f]`\nExample: `/gfr 55 70 1.2 m`", message_thread_id=thread_id)
+                    return
+                try:
+                    age, wt, cr = float(calc_args[0]), float(calc_args[1]), float(calc_args[2])
+                    is_female = len(calc_args) > 3 and calc_args[3].lower().startswith("f")
+                    res = calc_gfr(age, wt, cr, is_female=is_female)
+                    card = (
+                        f"🫘 **Clinical Calculator: GFR / Creatinine Clearance (CrCl)** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Age**: `{age:.0f} yrs` | **Weight**: `{wt:.1f} kg` | **Cr**: `{cr:.2f} mg/dL` ({'Female' if is_female else 'Male'})\n"
+                        f"• **Calculated CrCl**: `{res['cr_cl_ml_min']} mL/min`\n"
+                        f"• **KDIGO CKD Staging**: **{res['ckd_stage']}**\n\n"
+                        f"💡 *Formula: Cockcroft-Gault equation [× 0.85 for female patients].*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/gfr 55 70 1.2 m`", message_thread_id=thread_id)
+
+            # E. PEDIATRIC SUITE
+            elif sub_cmd == "pedia":
+                p_action = calc_args[0].lower() if calc_args else "help"
+                if p_action == "dose" and len(calc_args) >= 3:
+                    try:
+                        adult_dose = float(calc_args[1])
+                        wt_or_age = float(calc_args[2])
+                        res = calc_pediatric_dose(adult_dose=adult_dose, weight_kg=wt_or_age, age_years=wt_or_age)
+                        lines = [f"• **{v['name']}**: `{v['dose']} {v['unit']}` `({v['formula']})`" for v in res.values()]
+                        card = (
+                            f"👶 **Pediatric Dosage Calculator** 🩺\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• **Adult Reference Dose**: `{adult_dose:.1f} mg`\n\n" +
+                            "\n".join(lines) + "\n\n"
+                            f"💡 *Tip: Clark's rule (weight-based) is clinically more accurate than Young's rule (age-based).*"
+                        )
+                        await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                    except ValueError:
+                        await self._send_message(session, chat_id, "Usage: `/pedia dose <adult_dose_mg> <weight_kg_or_age>`\nExample: `/pedia dose 500 14`", message_thread_id=thread_id)
+                elif p_action == "mgkg" and len(calc_args) >= 3:
+                    try:
+                        dose_mg_kg = float(calc_args[1])
+                        wt = float(calc_args[2])
+                        strength = float(calc_args[3]) if len(calc_args) > 3 else None
+                        res = calc_mg_per_kg(dose_mg_kg, wt, strength)
+                        syrup_text = f"\n• **Syrup Volume**: `{res['syrup_ml']} mL` *(Strength: {strength} mg / 5 mL)*" if "syrup_ml" in res else ""
+                        card = (
+                            f"👶 **Pediatric mg/kg/dose Calculator** 🩺\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• **Dose**: `{dose_mg_kg} mg/kg` | **Weight**: `{wt} kg`\n"
+                            f"• **Total Dose Required**: `{res['total_mg']} mg`" + syrup_text + "\n\n"
+                            f"💡 *Example: Paracetamol: 15 mg/kg/dose, Amoxicillin: 40-80 mg/kg/day.*"
+                        )
+                        await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                    except ValueError:
+                        await self._send_message(session, chat_id, "Usage: `/pedia mgkg <dose_mg_per_kg> <weight_kg> [syrup_mg_per_5ml]`\nExample: `/pedia mgkg 15 10 250`", message_thread_id=thread_id)
+                elif p_action == "fluids" and len(calc_args) >= 2:
+                    try:
+                        wt = float(calc_args[1])
+                        res = calc_maintenance_fluids(wt)
+                        card = (
+                            f"💧 **Pediatric Maintenance IV Fluid (Holliday-Segar 4-2-1 Rule)** 🩺\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• **Patient Weight**: `{wt:.1f} kg`\n"
+                            f"• **Hourly Infusion Rate**: `{res['rate_ml_hr']} mL/hour`\n"
+                            f"• **Total 24-Hour Volume**: `{res['total_24h_ml']} mL/day`\n\n"
+                            f"💡 *Rule: 1st 10kg @ 4mL/kg/hr, 2nd 10kg @ +2mL/kg/hr, >20kg @ +1mL/kg/hr.*"
+                        )
+                        await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                    except ValueError:
+                        await self._send_message(session, chat_id, "Usage: `/pedia fluids <weight_kg>`\nExample: `/pedia fluids 15`", message_thread_id=thread_id)
+                elif p_action == "ett" and len(calc_args) >= 2:
+                    try:
+                        age = float(calc_args[1])
+                        res = calc_et_tube(age)
+                        card = (
+                            f"🫁 **Pediatric Endotracheal (ET) Tube Size & Depth** 🩺\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• **Patient Age**: `{age:.1f} years`\n"
+                            f"• **Uncuffed ET Tube Size**: `{res['uncuffed_size_mm']} mm ID` `(Age/4 + 4)`\n"
+                            f"• **Cuffed ET Tube Size**: `{res['cuffed_size_mm']} mm ID` `(Age/4 + 3.5)`\n"
+                            f"• **Insertion Depth at Lip**: `{res['insertion_depth_cm']} cm` `(Age/2 + 12)`\n\n"
+                            f"💡 *Rule of Thumb Depth: {res['rule_of_thumb_depth']}. Always keep 0.5mm size above & below ready!*"
+                        )
+                        await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                    except ValueError:
+                        await self._send_message(session, chat_id, "Usage: `/pedia ett <age_years>`\nExample: `/pedia ett 4`", message_thread_id=thread_id)
+                elif p_action == "apgar" and len(calc_args) >= 6:
+                    try:
+                        a, p, g, a2, r = int(calc_args[1]), int(calc_args[2]), int(calc_args[3]), int(calc_args[4]), int(calc_args[5])
+                        res = calc_apgar(a, p, g, a2, r)
+                        card = (
+                            f"👶 **Neonatal APGAR Score** 🩺\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• **Total Score**: `{res['score']}/10` `({res['breakdown']})`\n"
+                            f"• **Clinical Status**: **{res['status']}**\n\n"
+                            f"💡 *Parameters: Appearance (Color), Pulse (HR), Grimace (Reflex), Activity (Tone), Respiration (Effort).*"
+                        )
+                        await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                    except ValueError:
+                        await self._send_message(session, chat_id, "Usage: `/pedia apgar <A:0-2> <P:0-2> <G:0-2> <A:0-2> <R:0-2>`\nExample: `/pedia apgar 2 2 1 2 2`", message_thread_id=thread_id)
+                else:
+                    guide = (
+                        "👶 **Pediatrics Formula Guide:**\n"
+                        "• `/pedia dose <adult_dose> <wt_kg>` (Clark's & Young's Rule)\n"
+                        "• `/pedia mgkg <dose_mg_kg> <wt_kg> [syrup_strength_mg_5ml]`\n"
+                        "• `/pedia fluids <weight_kg>` (4-2-1 Maintenance IV Fluid)\n"
+                        "• `/pedia ett <age_years>` (ET Tube Size & Depth)\n"
+                        "• `/pedia apgar <A> <P> <G> <A> <R>` (APGAR Score)"
+                    )
+                    await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
+
+            # F. PARKLAND BURNS FORMULA
+            elif sub_cmd == "burns":
+                if len(calc_args) < 2:
+                    await self._send_message(session, chat_id, "Usage: `/burns <weight_kg> <tbsa_percent>`\nExample: `/burns 70 30` (70 kg patient with 30% TBSA burns)", message_thread_id=thread_id)
+                    return
+                try:
+                    wt, tbsa = float(calc_args[0]), float(calc_args[1])
+                    res = calc_parkland(wt, tbsa)
+                    card = (
+                        f"🔥 **Parkland Burns Resuscitation Formula** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Weight**: `{wt:.1f} kg` | **% TBSA Burns**: `{tbsa:.0f}%`\n"
+                        f"• **Total 24h Ringer's Lactate**: `{res['total_24h_ml']:,} mL` `(4 mL × kg × %TBSA)`\n\n"
+                        f"⏱️ **Infusion Schedule:**\n"
+                        f"• **First 8 Hours** (from time of burn): `{res['first_8h_ml']:,} mL` ➔ **`{res['first_8h_rate_ml_hr']:.0f} mL/hour`**\n"
+                        f"• **Next 16 Hours**: `{res['remaining_16h_ml']:,} mL` ➔ **`{res['remaining_16h_rate_ml_hr']:.0f} mL/hour`**\n\n"
+                        f"💡 *Goal: Maintain adult urine output ≥ 0.5 mL/kg/hr.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/burns 70 30`", message_thread_id=thread_id)
+
+            # G. URINE OUTPUT RATE (UOP)
+            elif sub_cmd == "uop":
+                if len(calc_args) < 3:
+                    await self._send_message(session, chat_id, "Usage: `/uop <volume_ml> <weight_kg> <hours>`\nExample: `/uop 150 70 4`", message_thread_id=thread_id)
+                    return
+                try:
+                    vol, wt, hrs = float(calc_args[0]), float(calc_args[1]), float(calc_args[2])
+                    res = calc_urine_output(vol, wt, hrs)
+                    card = (
+                        f"💧 **Urine Output (UOP) Rate Calculator** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Volume**: `{vol:.0f} mL` over `{hrs:.1f} hrs` in `{wt:.1f} kg` patient\n"
+                        f"• **Calculated UOP**: `{res['uop_ml_kg_hr']} mL/kg/hour`\n"
+                        f"• **Clinical Status**: **{res['status']}**\n\n"
+                        f"💡 *Target: Adult ≥ 0.5 mL/kg/hr, Pediatrics ≥ 1.0 mL/kg/hr.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid numbers. Example: `/uop 150 70 4`", message_thread_id=thread_id)
+
+            # H. OBG: EDD & GESTATIONAL AGE (Naegele's Rule)
+            elif sub_cmd == "edd":
+                if len(calc_args) < 1:
+                    await self._send_message(session, chat_id, "Usage: `/edd <LMP_Date_DD/MM/YYYY>`\nExample: `/edd 15/01/2026`", message_thread_id=thread_id)
+                    return
+                res = calc_edd(calc_args[0])
+                if "error" in res:
+                    await self._send_message(session, chat_id, f"⚠️ {res['error']}", message_thread_id=thread_id)
+                    return
+                card = (
+                    f"🤰 **OBG: EDD & Gestational Age (Naegele's Rule)** 🩺\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• **Last Menstrual Period (LMP)**: `{res['lmp']}`\n"
+                    f"• **Estimated Date of Delivery (EDD)**: **`{res['edd']}`**\n"
+                    f"• **Period of Gestation (POG)**: **`{res['gestational_age']}`** (`{res['total_days']} Days`)\n"
+                    f"• **Current Trimester**: **{res['trimester']}**\n\n"
+                    f"💡 *Naegele's Formula: LMP + 9 Months + 7 Days (assumes standard 28-day cycle).*"
+                )
+                await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+
+            # I. PSM & BIOSTATISTICS (2x2 Matrix & Risk)
+            elif sub_cmd == "psm":
+                psm_mode = calc_args[0].lower() if calc_args else "matrix"
+                if psm_mode == "matrix" and len(calc_args) >= 5:
+                    try:
+                        tp, fp, fn, tn = float(calc_args[1]), float(calc_args[2]), float(calc_args[3]), float(calc_args[4])
+                        res = calc_psm_matrix(tp, fp, fn, tn)
+                        card = (
+                            f"📊 **PSM: 2x2 Diagnostic & Screening Evaluation** 🩺\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• **TP**: `{tp:.0f}` | **FP**: `{fp:.0f}` | **FN**: `{fn:.0f}` | **TN**: `{tn:.0f}`\n\n"
+                            f"🎯 **Diagnostic Performance:**\n"
+                            f"• **Sensitivity** `[TP / (TP+FN)]`: **`{res['sensitivity']}%`**\n"
+                            f"• **Specificity** `[TN / (TN+FP)]`: **`{res['specificity']}%`**\n"
+                            f"• **Positive Predictive Value (PPV)**: **`{res['ppv']}%`**\n"
+                            f"• **Negative Predictive Value (NPV)**: **`{res['npv']}%`**\n"
+                            f"• **Diagnostic Accuracy**: `{res['accuracy']}%`\n"
+                            f"• **Odds Ratio (OR)**: `{res['odds_ratio']}` | **Relative Risk (RR)**: `{res['relative_risk']}`\n\n"
+                            f"💡 *PPV increases with higher disease prevalence, while Sensitivity and Specificity remain stable.*"
+                        )
+                        await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                    except ValueError:
+                        await self._send_message(session, chat_id, "Usage: `/psm matrix <TP> <FP> <FN> <TN>`\nExample: `/psm matrix 80 20 10 90`", message_thread_id=thread_id)
+                else:
+                    guide = (
+                        "📊 **PSM Biostatistics Calculators:**\n"
+                        "• `/psm matrix <TP> <FP> <FN> <TN>` ➔ Sensitivity, Specificity, PPV, NPV, Odds Ratio\n"
+                        "Example: `/psm matrix 80 20 10 90`"
+                    )
+                    await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
+
+            # J. PHARMACOLOGY IV DRIP RATE
+            elif sub_cmd == "drip":
+                if len(calc_args) < 2:
+                    await self._send_message(session, chat_id, "Usage: `/drip <volume_ml> <hours> [drop_factor: 20/60]`\nExample: `/drip 1000 8 20`", message_thread_id=thread_id)
+                    return
+                try:
+                    vol, hrs = float(calc_args[0]), float(calc_args[1])
+                    df = int(calc_args[2]) if len(calc_args) > 2 else 20
+                    res = calc_iv_drip(vol, hrs, df)
+                    card = (
+                        f"💧 **Pharmacology: IV Drip Rate Calculator** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Total Volume**: `{vol:.0f} mL` over `{hrs:.1f} hours` (Drop Factor: `{df} gtt/mL`)\n"
+                        f"• **Drip Rate**: **`{res['drops_per_min']} Drops/min (gtt/min)`**\n"
+                        f"• **Volumetric Infusion Rate**: `{res['ml_per_hour']} mL/hour`\n\n"
+                        f"💡 *Formula: (Volume_mL × Drop_Factor) / (Hours × 60 min). Standard Macro set = 20 gtt/mL, Micro set = 60 gtt/mL.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid numbers. Example: `/drip 1000 8 20`", message_thread_id=thread_id)
+
+            # K. INOTROPE SYRINGE PUMP INFUSION (Norad, Dopamine, Dobutamine)
+            elif sub_cmd == "infusion":
+                if len(calc_args) < 4:
+                    await self._send_message(session, chat_id, "Usage: `/infusion <drug_mg> <vol_ml> <dose_mcg_kg_min> <weight_kg>`\nExample: `/infusion 4 50 0.1 70` (Noradrenaline 4mg in 50mL @ 0.1 mcg/kg/min for 70kg)", message_thread_id=thread_id)
+                    return
+                try:
+                    drug_mg, vol_ml, dose_mcg, wt = float(calc_args[0]), float(calc_args[1]), float(calc_args[2]), float(calc_args[3])
+                    res = calc_inotrope_infusion(drug_mg, vol_ml, dose_mcg, wt)
+                    card = (
+                        f"💉 **ICU Syringe Pump Infusion Rate** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Drug In Syringe**: `{drug_mg} mg` in `{vol_ml} mL` *(Conc: `{res['concentration_mcg_ml']} mcg/mL`)*\n"
+                        f"• **Desired Dose**: `{dose_mcg} mcg/kg/min` for `{wt} kg` patient\n"
+                        f"• **Set Syringe Pump Rate**: **`{res['rate_ml_hr']} mL/hour`**\n\n"
+                        f"💡 *Applicable for Noradrenaline, Dopamine, Dobutamine, Adrenaline syringe infusions.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/infusion 4 50 0.1 70`", message_thread_id=thread_id)
+
+            # L. MAP (MEAN ARTERIAL PRESSURE)
+            elif sub_cmd == "map":
+                if len(calc_args) < 2:
+                    await self._send_message(session, chat_id, "Usage: `/map <sbp> <dbp>`\nExample: `/map 120 80`", message_thread_id=thread_id)
+                    return
+                try:
+                    sbp, dbp = float(calc_args[0]), float(calc_args[1])
+                    res = calc_map(sbp, dbp)
+                    card = (
+                        f"🫀 **Clinical Score: Mean Arterial Pressure (MAP)** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Blood Pressure**: `{sbp:.0f}/{dbp:.0f} mmHg`\n"
+                        f"• **Calculated MAP**: **`{res['map']} mmHg`**\n"
+                        f"• **Perfusion Status**: **{res['status']}**\n\n"
+                        f"💡 *Formula: DBP + (SBP - DBP) / 3. Minimum target in sepsis resuscitation is ≥ 65 mmHg.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/map 120 80`", message_thread_id=thread_id)
+
+            # M. ABG & ANION GAP
+            elif sub_cmd in ("abg", "aniongap"):
+                if len(calc_args) < 3:
+                    await self._send_message(session, chat_id, "Usage: `/abg <Na> <Cl> <HCO3> [Albumin_g_dl]`\nExample: `/abg 140 102 24`", message_thread_id=thread_id)
+                    return
+                try:
+                    na, cl, hco3 = float(calc_args[0]), float(calc_args[1]), float(calc_args[2])
+                    alb = float(calc_args[3]) if len(calc_args) > 3 else None
+                    res = calc_anion_gap(na, cl, hco3, alb)
+                    corr_text = f"\n• **Albumin-Corrected Gap**: `{res['corrected_anion_gap']} mEq/L` *(Albumin: {alb} g/dL)*" if "corrected_anion_gap" in res else ""
+                    card = (
+                        f"🧪 **Clinical Score: Serum Anion Gap** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Electrolytes**: Na⁺ `{na:.0f}` | Cl⁻ `{cl:.0f}` | HCO₃⁻ `{hco3:.0f}` mEq/L\n"
+                        f"• **Calculated Anion Gap**: **`{res['anion_gap']} mEq/L`**" + corr_text + "\n"
+                        f"• **Interpretation**: **{res['interpretation']}**\n\n"
+                        f"💡 *Formula: Na⁺ - (Cl⁻ + HCO₃⁻). Normal reference: 8 - 12 mEq/L.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/abg 140 102 24`", message_thread_id=thread_id)
+
+            # N. CORRECTED SODIUM
+            elif sub_cmd == "sodium":
+                if len(calc_args) < 2:
+                    await self._send_message(session, chat_id, "Usage: `/sodium <measured_na> <blood_glucose_mg_dl>`\nExample: `/sodium 130 400`", message_thread_id=thread_id)
+                    return
+                try:
+                    na, glu = float(calc_args[0]), float(calc_args[1])
+                    res = calc_corrected_sodium(na, glu)
+                    card = (
+                        f"🧪 **Katz Corrected Sodium in Hyperglycemia** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Measured Na⁺**: `{na:.0f} mEq/L` | **Blood Glucose**: `{glu:.0f} mg/dL`\n"
+                        f"• **Corrected Sodium (Katz)**: **`{res['corrected_sodium_katz']} mEq/L`** `(+1.6 per 100mg/dL > 100)`\n"
+                        f"• **Corrected Sodium (Hillier)**: `{res['corrected_sodium_hillier']} mEq/L` `(+2.4 per 100mg/dL > 100)`\n"
+                        f"• **Correction Factor**: `+{res['correction_delta']} mEq/L`\n\n"
+                        f"💡 *Crucial in DKA and HHS management to prevent overcorrection of true sodium.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/sodium 130 400`", message_thread_id=thread_id)
+
+            # O. GLASGOW COMA SCALE (GCS)
+            elif sub_cmd == "gcs":
+                if len(calc_args) < 3:
+                    await self._send_message(session, chat_id, "Usage: `/gcs <Eye:1-4> <Verbal:1-5> <Motor:1-6>`\nExample: `/gcs 4 5 6` (Normal = 15/15, Coma ≤ 8)", message_thread_id=thread_id)
+                    return
+                try:
+                    e, v, m = int(calc_args[0]), int(calc_args[1]), int(calc_args[2])
+                    res = calc_gcs(e, v, m)
+                    card = (
+                        f"🧠 **Neurology: Glasgow Coma Scale (GCS)** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Eye (E)**: `{e}/4` | **Verbal (V)**: `{v}/5` | **Motor (M)**: `{m}/6`\n"
+                        f"• **Total GCS Score**: **`{res['score']}/15`** `({res['breakdown']})`\n"
+                        f"• **Brain Injury Severity**: **{res['severity']}**\n\n"
+                        f"💡 *Clinical Axiom: GCS ≤ 8, Intubate! (Requires definitive airway protection).*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/gcs 4 5 6`", message_thread_id=thread_id)
+
+            # P. CURB-65 PNEUMONIA SEVERITY
+            elif sub_cmd == "curb65":
+                if len(calc_args) < 5:
+                    await self._send_message(session, chat_id, "Usage: `/curb65 <Confusion:0/1> <Urea>19:0/1> <RR≥30:0/1> <BP<90/60:0/1> <Age≥65:0/1>`\nExample: `/curb65 1 0 1 0 1`", message_thread_id=thread_id)
+                    return
+                try:
+                    c, u, r, b, age65 = int(calc_args[0]), int(calc_args[1]), int(calc_args[2]), int(calc_args[3]), int(calc_args[4])
+                    res = calc_curb65(c, u, r, b, age65)
+                    card = (
+                        f"🫁 **CURB-65 Community-Acquired Pneumonia Severity** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **CURB-65 Score**: **`{res['score']}/5`**\n"
+                        f"• **Risk Group**: **{res['risk_group']}** `(30-day mortality: {res['mortality_risk']})`\n"
+                        f"• **Recommended Action**: **{res['recommendation']}**\n\n"
+                        f"💡 *Criteria: Confusion, Urea>19mg/dL (7mmol/L), RR≥30, SBP<90 or DBP≤60, Age≥65.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/curb65 1 0 1 0 1`", message_thread_id=thread_id)
+
+            # Q. WELLS SCORE FOR PULMONARY EMBOLISM
+            elif sub_cmd == "wells":
+                if len(calc_args) < 7:
+                    await self._send_message(session, chat_id, "Usage: `/wells <DVT_signs:0/1> <PE_likely:0/1> <HR>100:0/1> <Immob_Surg:0/1> <Prior_DVT_PE:0/1> <Hemoptysis:0/1> <Malignancy:0/1>`\nExample: `/wells 1 1 1 0 0 0 0`", message_thread_id=thread_id)
+                    return
+                try:
+                    dvt, pe_top, hr, immob, prior, hemo, ca = int(calc_args[0]), int(calc_args[1]), int(calc_args[2]), int(calc_args[3]), int(calc_args[4]), int(calc_args[5]), int(calc_args[6])
+                    res = calc_wells_pe(dvt, pe_top, hr, immob, prior, hemo, ca)
+                    card = (
+                        f"🫁 **Wells Criteria for Pulmonary Embolism (PE)** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Total Wells Score**: **`{res['score']} Points`**\n"
+                        f"• **Clinical Probability**: **{res['two_tier_risk']}** `({res['probability_three_tier']})`\n"
+                        f"• **Next Diagnostic Step**: **{res['management']}**\n\n"
+                        f"💡 *If PE Unlikely (≤4), order high-sensitivity D-dimer. If PE Likely (>4), proceed to CTPA immediately.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/wells 1 1 1 0 0 0 0`", message_thread_id=thread_id)
+
+        # -------------------------------------------------------------
+        # 5. LEGACY EDUCATIONAL COMMANDS REDIRECT
+        # -------------------------------------------------------------
+        elif cmd in ("/mcq", "/quiz", "/pearl", "/flashcard", "/pomodoro", "/focus"):
+            upgrade_notice = (
+                "💡 **CLINICAL SUITE UPGRADED!** 🩺\n\n"
+                "Old quiz/timer commands have been upgraded to the **Subject-Wise Clinical Medical Formula & Dosage Engine**!\n\n"
+                "👉 Type **`/calc`** or **`/dose`** to view all subject calculators (Pediatrics, Medicine, Surgery, OBG, PSM, Pharma)."
+            )
+            await self._send_message(session, chat_id, upgrade_notice, message_thread_id=thread_id)
 
         # -------------------------------------------------------------
         # 5. SMART FAQ & AUTO-RESPONDER
