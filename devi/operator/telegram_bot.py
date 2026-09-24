@@ -1221,53 +1221,17 @@ class DeviTelegramBot:
         return result
 
     def _format_sangmata_dossier(self, dossier: dict, title_prefix: str = "SANGMATA IDENTITY RADAR") -> str:
-        """Formats full A-to-Z Sangmata intelligence & deep OSINT forensic dossier card."""
+        """Formats clean, high-yield Sangmata intelligence & deep OSINT biometric dossier card."""
         user_id = dossier.get("user_id")
         fn = dossier.get("full_name") or "Anonymous"
         uname = dossier.get("username")
         uname_str = f"@{uname}" if uname else "No Username"
         user_mention = f"[{fn}](tg://user?id={user_id})" if user_id else fn
         
-        is_prem = "⭐️ Active Subscriber (Telegram Premium)" if dossier.get("is_premium") else "Standard Free Tier"
+        is_prem = "⭐️ Yes (Telegram Premium)" if dossier.get("is_premium") else "Standard Account"
         acct_age = self._estimate_account_age(user_id)
-        first_seen = str(dossier.get("first_seen") or "Just Now")[:19]
-        total_msgs = dossier.get("total_messages", 1)
-        total_changes = dossier.get("changes_count", 0)
         phone = dossier.get("phone", "Not Shared")
-        phone_str = f"⚠️ Leaked: `{phone}`" if phone and phone != "Not Shared" else "🔒 Clean (No Phone Leaked)"
-        lang = (dossier.get("language") or "en").upper()
-        hex_id = f"0x{user_id:X}" if user_id else "N/A"
-
-        # Activity engagement tier
-        if total_msgs >= 50:
-            act_tier = "🔥 Super Contributor (50+ Msgs)"
-        elif total_msgs >= 10:
-            act_tier = "🌱 Regular Student (10–50 Msgs)"
-        else:
-            act_tier = "👀 New Joiner / Silent Reader (<10 Msgs)"
-
-        # Identity Shift Velocity & Risk Gauge
-        risk_score = 0
-        if total_changes >= 3:
-            risk_score += 35
-            velocity_str = f"⚠️ High Velocity ({total_changes} changes detected - Impersonation Watchlist)"
-        elif total_changes > 0:
-            risk_score += 10
-            velocity_str = f"🟡 Moderate ({total_changes} change detected)"
-        else:
-            velocity_str = "🟢 0 Shifts (100% Stable Identity)"
-
-        if "Fresh Account" in acct_age or "Brand New" in acct_age:
-            risk_score += 25
-        if phone != "Not Shared" and phone != "None":
-            risk_score += 10
-
-        if risk_score >= 50:
-            risk_badge = f"🔴 {risk_score}/100 (High Risk / Threat Alert)"
-        elif risk_score >= 25:
-            risk_badge = f"🟡 {risk_score}/100 (Moderate Watchlist)"
-        else:
-            risk_badge = f"🟢 {risk_score}/100 (Safe Student Account)"
+        phone_str = f"📱 **Phone**: `{phone}`\n" if phone and phone != "Not Shared" and phone != "None" else ""
 
         # Build complete A-to-Z Name History (Exact SangMata Biometric format)
         name_hist = dossier.get("name_history", [])
@@ -1279,7 +1243,7 @@ class DeviTelegramBot:
                 ts_str = f"[{ts}] " if ts else ""
                 name_lines.append(f"{idx}. {ts_str}`{n}`")
         else:
-            name_lines.append(f"1. `{fn}` ➔ `(Current Active Name)`")
+            name_lines.append(f"1. `{fn}` *(Current Active Name)*")
 
         # Build complete A-to-Z Username History (Exact SangMata Biometric format)
         uname_hist = dossier.get("username_history", [])
@@ -1292,27 +1256,22 @@ class DeviTelegramBot:
                 ts_str = f"[{ts}] " if ts else ""
                 uname_lines.append(f"{idx}. {ts_str}`{u_formatted}`")
         else:
-            uname_lines.append(f"1. `{uname_str}` ➔ `(Current Active Username)`")
+            name_val = uname_str if uname_str != "No Username" else "No Username"
+            uname_lines.append(f"1. `{name_val}` *(Current Active Username)*")
 
         card = (
-            f"🕵️‍♂️ **{title_prefix} — OSINT DOSSIER** 🩺\n"
+            f"👤 **{title_prefix} — USER INTELLIGENCE** 🩺\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 **Student Name:** {user_mention}\n"
             f"🏷️ **Username:** `{uname_str}`\n"
-            f"🆔 **Telegram ID:** `{user_id}` (`{hex_id}`)\n"
+            f"🆔 **Telegram ID:** `{user_id}`\n"
             f"🗓️ **Account Age:** {acct_age}\n"
             f"⭐️ **Telegram Tier:** {is_prem}\n"
-            f"🌐 **Language:** `{lang}`\n"
-            f"📱 **Phone Status:** {phone_str}\n"
-            f"💬 **Engagement:** `{total_msgs} msgs` ({act_tier})\n"
-            f"🕒 **First Tracked:** `{first_seen}`\n"
-            f"🔄 **Shift Velocity:** {velocity_str}\n"
-            f"🛡️ **OSINT Risk Level:** {risk_badge}\n"
-            f"🔗 **Permanent Link:** [Open Profile in Telegram](tg://user?id={user_id})\n\n"
-            f"📜 **Complete Name History (A to Z Timeline):**\n" + "\n".join(name_lines) + "\n\n"
-            f"🏷️ **Complete Username History (A to Z Timeline):**\n" + "\n".join(uname_lines) + "\n"
+            f"{phone_str}\n"
+            f"📜 **Name History (SangMata Timeline):**\n" + "\n".join(name_lines) + "\n\n"
+            f"🏷️ **Username History (SangMata Timeline):**\n" + "\n".join(uname_lines) + "\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🛡️ *Kind Doctor Live Sentinel • OSINT Biometrics & Member Protection*"
+            f"🛡️ *Kind Doctor Live Sentinel • SangMata Biometrics*"
         )
         return card
 
@@ -4347,34 +4306,25 @@ class DeviTelegramBot:
 
             extra_intel_str = "\n".join(extra_intel_lines) + "\n" if extra_intel_lines else ""
 
+            phone_line = f"📱 **Phone**: `{phone_val}`\n" if phone_val and phone_val != "Not Shared" else ""
             card = (
-                f"👤 **USER INTELLIGENCE & SANGMATA OSINT DOSSIER** 🩺\n"
+                f"👤 **USER INTELLIGENCE & SANGMATA DOSSIER** 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"{fwd_origin_notice}"
                 f"👤 **Student Name**: [{full_n}](tg://user?id={u_id})\n"
-                f"🏷️ **Username**: @{uname} {'(https://t.me/' + uname + ')' if uname != 'No Username' else ''}\n"
-                f"🆔 **Telegram ID**: <code>{u_id}</code> (Hex: <code>{hex_id}</code>)\n"
-                f"🏢 **Data Center**: `{dc_string}`\n"
+                f"🏷️ **Username**: @{uname}\n"
+                f"🆔 **Telegram ID**: `{u_id}`\n"
                 f"🗓️ **Account Age**: {u_age}\n"
                 f"⭐️ **Telegram Tier**: {prem}\n"
-                f"🤖 **Account Nature**: {bot_status_str}\n"
-                f"🖼️ **Profile Photos**: `{photo_str}`\n"
-                f"🌐 **Language**: `{lang.upper()}`\n"
-                f"📱 **Phone Tracking**: {phone_str}\n"
-                f"{extra_intel_str}"
                 f"🛡️ **Group Status**: {group_role_str}\n"
-                f"💬 **Group Engagement**: `{total_m}` messages sent ({act_tier})\n"
-                f"🕒 **First Seen**: `{first_s}`\n"
-                f"🕒 **Last Active**: `{last_s}`\n"
-                f"🔄 **Shift Velocity**: {velocity_str}\n"
-                f"🛡️ **OSINT Risk Level**: {risk_badge}\n"
-                f"🔗 **Permanent Link**: [Open Profile in Telegram](tg://user?id={u_id})\n\n"
-                f"📜 **Complete Name History (A to Z Timeline):**\n"
+                f"{phone_line}"
+                f"{extra_intel_str}\n"
+                f"📜 **Name History (SangMata Timeline):**\n"
                 f"{name_hist_text}\n\n"
-                f"🏷️ **Complete Username History (A to Z Timeline):**\n"
+                f"🏷️ **Username History (SangMata Timeline):**\n"
                 f"{uname_hist_text}\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🛡️ *Kind Doctor Live Sentinel • OSINT Biometrics & Member Protection*"
+                f"🛡️ *Kind Doctor Live Sentinel • SangMata Biometrics*"
             )
 
 

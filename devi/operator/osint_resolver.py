@@ -325,21 +325,27 @@ class GlobalOSINTResolver:
         }
 
     async def _query_sangmata_bot(self, target_query: str) -> Optional[Dict[str, Any]]:
-        """Queries @SangMata_beta_bot via MTProto conversation using an authorized user session."""
+        """Queries @SangMata_beta_bot / @sangmata_bot / @SangMataInfo_bot via MTProto conversation using an authorized user session."""
         async with self._lock:
             client = await self._get_client(require_user=True)
             if not client:
                 return None
 
-            bots_to_try = ["@SangMata_beta_bot", "@sangmata_bot"]
+            bots_to_try = [
+                "@SangMata_beta_bot", 
+                "@sangmata_bot", 
+                "@SangMataInfo_bot", 
+                "@Sangmatainfobot",
+                "@SangMata_robot"
+            ]
             for bot_handle in bots_to_try:
                 try:
-                    async with client.conversation(bot_handle, timeout=8.0) as conv:
+                    async with client.conversation(bot_handle, timeout=10.0) as conv:
                         await conv.send_message(target_query)
                         resp = await conv.get_response()
                         if resp and resp.text:
                             text = resp.text
-                            if "Invalid ID" in text or "Send \"help\"" in text:
+                            if "Invalid ID" in text or "Send \"help\"" in text or "No data" in text:
                                 continue
                             names, usernames = self.parse_sangmata_raw_text(text)
                             uid_match = re.search(r"History for (\d+)", text)

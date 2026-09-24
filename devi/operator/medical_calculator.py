@@ -252,13 +252,22 @@ def calc_anion_gap(na: float, cl: float, hco3: float, albumin_g_dl: Optional[flo
 
 
 def calc_corrected_sodium(measured_na: float, glucose_mg_dl: float) -> Dict[str, Any]:
-    """Calculates Corrected Sodium in Hyperglycemia (Katz / Hillier formula)."""
-    # Katz: Measured Na + 0.016 * (Glucose - 100)
-    corrected_na = measured_na + 1.6 * ((glucose_mg_dl - 100.0) / 100.0)
+    """Calculates Corrected Sodium in Hyperglycemia (Katz / Hillier formulas)."""
+    # Excess glucose over 100 mg/dL
+    excess_glu_100 = max(0.0, (glucose_mg_dl - 100.0) / 100.0)
+    # Katz formula: Measured Na + 1.6 * ((Glucose - 100) / 100)
+    katz_na = measured_na + (1.6 * excess_glu_100)
+    # Hillier formula: Measured Na + 2.4 * ((Glucose - 100) / 100)
+    hillier_na = measured_na + (2.4 * excess_glu_100)
+    delta = katz_na - measured_na
+
     return {
         "measured_na": measured_na,
         "glucose_mg_dl": glucose_mg_dl,
-        "corrected_na": round(corrected_na, 1)
+        "corrected_na": round(katz_na, 1),
+        "corrected_sodium_katz": round(katz_na, 1),
+        "corrected_sodium_hillier": round(hillier_na, 1),
+        "correction_delta": round(delta, 1)
     }
 
 
@@ -272,12 +281,15 @@ def calc_gcs(eye: int, verbal: int, motor: int) -> Dict[str, Any]:
     else:
         severity = "Mild / Normal 🟢 (Minor Head Injury)"
     return {
+        "score": total,
         "total_score": total,
         "eye": eye,
         "verbal": verbal,
         "motor": motor,
+        "breakdown": f"E:{eye} V:{verbal} M:{motor}",
         "severity": severity
     }
+
 
 
 # ==============================================================================

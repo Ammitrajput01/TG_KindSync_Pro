@@ -3500,10 +3500,12 @@ class TerminalPlatform:
         
         @client.on(events.NewMessage(chats="me"))
         async def handle_remote_command(event):
-            text = (event.raw_text or "").strip().lower()
-            if not text: return
+            raw_t = (event.raw_text or "").strip()
+            if not raw_t: return
+            text = raw_t.lower()
+            clean_cmd = text.lstrip("/!.").strip()
             
-            if text in ("/status", "status", "/stats"):
+            if clean_cmd in ("status", "stats", "engine", "speed", "info"):
                 total_mb = self.metrics.get("bytes_uploaded", 0) / MB
                 data_str = f"{total_mb:.2f} MB" if total_mb < 1024 else f"{total_mb/1024:.2f} GB"
                 uptime_seconds = int(time.monotonic() - self.start_time)
@@ -3534,18 +3536,24 @@ class TerminalPlatform:
                     f"⏱️ **Uptime:** `{time_str}` | **ETA:** `{self.active_file_eta}`\n"
                     f"💻 **Vitals:** `{self.get_system_health()}`\n"
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    "💡 *Commands: `/status`, `/pause`, `/help`*"
+                    "💡 *Commands: `/status`, `/pause`, `/resume`, `/backup`, `/clean`, `/kill`*"
                 )
                 with suppress(Exception):
                     await event.reply(status_card, parse_mode="md")
 
-            elif text in ("/pause", "/stop", "pause", "stop"):
+            elif clean_cmd in ("pause", "stop", "freeze"):
                 self.log("[bold yellow]⏸ Remote Pause Triggered from Saved Messages[/]")
                 with suppress(Exception):
                     await event.reply("⏸ **Forwarding Paused Remotely.** Bookmarks & history saved safely.", parse_mode="md")
                 self.stop_evt.set()
 
-            elif text in ("/kill", "/kill_all", "/killall", "/unlock_db", "/force_stop", "kill"):
+            elif clean_cmd in ("resume", "start", "unpause"):
+                self.log("[bold green]▶ Remote Resume Triggered from Saved Messages[/]")
+                self.stop_evt.clear()
+                with suppress(Exception):
+                    await event.reply("▶ **Forwarding Resumed Remotely.** Transfer loop active.", parse_mode="md")
+
+            elif clean_cmd in ("kill", "kill_all", "killall", "unlock_db", "force_stop"):
                 self.log("[bold red]🛑 Remote Kill & Force Stop Triggered from Saved Messages[/]")
                 with suppress(Exception):
                     await event.reply("🛑 **Emergency Force Stop Received!** Terminating engine and releasing all database locks...", parse_mode="md")
@@ -3558,7 +3566,7 @@ class TerminalPlatform:
                 await asyncio.sleep(0.5)
                 os._exit(0)
 
-            elif text in ("/clean_history", "/clear_history", "/reset_history", "/wipe_history"):
+            elif clean_cmd in ("clean", "clean_history", "clear_history", "reset_history", "wipe_history"):
                 self.log("[bold magenta]🧹 Remote Clean History Triggered from Saved Messages[/]")
                 try:
                     # 1. Safety snapshot first adhering to timestamp rules
@@ -3614,7 +3622,7 @@ class TerminalPlatform:
                     with suppress(Exception):
                         await event.reply(f"❌ Failed to clean history: {ex}", parse_mode="md")
 
-            elif text in ("/backup", "/db", "backup"):
+            elif clean_cmd in ("backup", "db", "snapshot"):
                 try:
                     now_dt = datetime.now()
                     stamp = now_dt.strftime("%A_%d-%B-%Y_%I-%M-%S%p")
@@ -3643,11 +3651,20 @@ class TerminalPlatform:
                     with suppress(Exception):
                         await event.reply(f"❌ Backup failed: {ex}", parse_mode="md")
 
-            elif text in ("/help", "help"):
+            elif clean_cmd in ("help", "cmd", "menu"):
                 help_card = (
                     "📱 **[REMOTE TELEGRAM COMMANDS]**\n"
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    "• `/status` - Live speed, progress & active file\n"
+                    "• `/status` (or `!status`) - Live speed, progress & active file\n"
+                    "• `/pause` (or `!pause`)   - Safe bookmark pause\n"
+                    "• `/resume` (or `!resume`) - Resume forwarding\n"
+                    "• `/backup` (or `!backup`) - Cloud database backup\n"
+                    "• `/clean` (or `!clean`)   - Safety backup + wipe history\n"
+                    "• `/kill` (or `!kill`)     - Emergency stop & unlock DB\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+                with suppress(Exception):
+                    await event.reply(help_card, parse_mode="md")
                     "• `/pause` or `/stop` - Safely pause forwarding\n"
                     "• `/kill` - 🛑 Kill engine & force unlock SQLite database\n"
                     "• `/clean_history` - 🧹 Wipe forwarding history (Auto-backup first)\n"

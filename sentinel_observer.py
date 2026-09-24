@@ -131,14 +131,15 @@ class TelegramReporter:
                 return
 
             # Check if it's a Slash Command or Natural Language to DEVI
-            if txt.startswith("/"):
+            if txt.startswith("/") or txt.startswith("!") or txt.lower().split()[0] in ("status", "help", "backup", "kill", "clean", "report", "errors", "dlq"):
                 await self._handle_slash_command(event, txt)
             else:
                 await self._handle_conversational_query(event, txt)
 
     async def _handle_slash_command(self, event, txt: str):
         cmd_parts = txt.split(maxsplit=1)
-        cmd = cmd_parts[0].lower()
+        raw_cmd = cmd_parts[0].lower()
+        cmd = f"/{raw_cmd.lstrip('/!')}"
         arg = cmd_parts[1].strip() if len(cmd_parts) > 1 else ""
 
         STATE.add_event(f"[bold cyan]📱 Command Received:[/] [yellow]{cmd}[/]")
