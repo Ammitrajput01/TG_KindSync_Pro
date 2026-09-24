@@ -1736,39 +1736,70 @@ class DeviTelegramBot:
             if status in ("member", "administrator"):
                 with get_db_conn() as conn:
                     conn.execute("""
-                        INSERT OR IGNORE INTO member_history (user_id, chat_id, full_name, username, join_date)
+                        INSERT OR REPLACE INTO member_history (user_id, chat_id, full_name, username, join_date)
                         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """, (user_id, chat_id, full_name, username))
                     
             if is_new_join:
                 dossier = self._track_user_dossier(user)
                 g_settings = self._get_group_settings(chat_id)
+                safe_full_name = html.escape(full_name)
+                safe_grp_title = html.escape(grp_title)
+                user_tag = f"<b>@{html.escape(username)}</b>" if username else f'<a href="tg://user?id={user_id}"><b>{safe_full_name}</b></a>'
                 
+                # Fetch live SangMata history from MTProto session pool
+                try:
+                    from devi.operator.osint_resolver import osint_resolver
+                    live_sm = await osint_resolver.fetch_live_sangmata_history(user_id)
+                    if live_sm:
+                        if live_sm.get("names"):
+                            dossier["name_history"] = live_sm["names"]
+                        if live_sm.get("usernames"):
+                            dossier["username_history"] = live_sm["usernames"]
+                        dossier["changes_count"] = live_sm.get("total_shifts", dossier.get("changes_count", 0))
+                except Exception as ex:
+                    logger.debug(f"SangMata fetch error in _handle_chat_member: {ex}")
+
+                # 1. Short & sweet tagged Welcome Message (as requested by user)
                 if g_settings.get("welcome_enabled", 1):
-                    safe_full_name = html.escape(full_name)
-                    safe_grp_title = html.escape(grp_title)
-                    user_tag = f"<b>@{html.escape(username)}</b>" if username else f'<a href="tg://user?id={user_id}"><b>{safe_full_name}</b></a>'
-                    
-                    sangmata_card = self._format_sangmata_dossier(dossier, title_prefix="MEMBER JOIN & SANGMATA OSINT RADAR")
-                    welcome_header = (
-                        f"👋 <b>Welcome to {safe_grp_title}, {user_tag}!</b> 🩺✨\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    welcome_text = (
+                        f"👋 <b>Welcome {user_tag} to {safe_grp_title}!</b> ✨\n\n"
+                        f"🩺 <i>Wishing you all the best for your medical studies! 🌟</i>"
                     )
-                    full_card_text = welcome_header + sangmata_card
                     
-                    card_markup = {
+                    sent_welcome_id = await self._send_message(
+                        session, chat_id, welcome_text, parse_mode="HTML"
+                    )
+                    if sent_welcome_id:
+                        self._log_welcome_message(chat_id, sent_welcome_id)
+                
+                # 2. SangMata / Dossier Intelligence Card
+                if g_settings.get("join_track_enabled", 1):
+                    sangmata_card = self._format_sangmata_dossier(
+                        dossier, 
+                        title_prefix="MEMBER JOIN INTELLIGENCE & SANGMATA OSINT RADAR"
+                    )
+                    admin_markup = {
                         "inline_keyboard": [
                             [
-                                {"text": "🗑️ Purge Card (Admins)", "callback_data": f"purge_card_{user_id}"}
+                                {"text": "👢 Kick Member", "callback_data": f"kick_{chat_id}_{user_id}"},
+                                {"text": "🚫 Ban & Block", "callback_data": f"ban_{chat_id}_{user_id}"}
                             ]
                         ]
                     }
-                    
+                    # Send to Group
                     await self._send_message(
-                        session, chat_id, full_card_text,
-                        reply_markup=card_markup,
-                        parse_mode="Markdown"
+                        session, chat_id, sangmata_card, reply_markup=admin_markup, parse_mode="HTML"
                     )
+                    # Also notify master admins in DM
+                    for adm_id in self.master_admin_ids:
+                        await self._send_message(
+                            session,
+                            adm_id,
+                            f"🏛️ <b>Group:</b> <code>{safe_grp_title}</code> (<code>{chat_id}</code>)\n\n" + sangmata_card,
+                            reply_markup=admin_markup,
+                            parse_mode="HTML"
+                        )
         except Exception as e:
             logger.warning(f"Error in _handle_chat_member: {e}")
 
@@ -2246,24 +2277,25 @@ class DeviTelegramBot:
                         ]
                     }
 
-                    # A. Post in General Topic of the group (if supergroup with topics)
-                    if thread_id:
-                        # Send to General Topic (ID None or 0)
+                    # A. Post in Group
+                    if g_settings.get("join_track_enabled", 1):
                         await self._send_message(
                             session,
                             chat_id,
                             full_osint_card,
-                            message_thread_id=None,
-                            reply_markup=admin_markup
+                            message_thread_id=thread_id,
+                            reply_markup=admin_markup,
+                            parse_mode="HTML"
                         )
 
-                    # B. Also dispatch to Master Bot Admins for that specific group
+                    # B. Also dispatch to Master Bot Admins
                     for adm_id in self.master_admin_ids:
                         await self._send_message(
                             session,
                             adm_id,
-                            f"🏛️ **Group**: `{safe_grp_title}` (`{chat_id}`)\n\n" + full_osint_card,
-                            reply_markup=admin_markup
+                            f"🏛️ <b>Group:</b> <code>{safe_grp_title}</code> (<code>{chat_id}</code>)\n\n" + full_osint_card,
+                            reply_markup=admin_markup,
+                            parse_mode="HTML"
                         )
                 return
 
