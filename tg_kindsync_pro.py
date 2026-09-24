@@ -3665,14 +3665,6 @@ class TerminalPlatform:
                 )
                 with suppress(Exception):
                     await event.reply(help_card, parse_mode="md")
-                    "• `/pause` or `/stop` - Safely pause forwarding\n"
-                    "• `/kill` - 🛑 Kill engine & force unlock SQLite database\n"
-                    "• `/clean_history` - 🧹 Wipe forwarding history (Auto-backup first)\n"
-                    "• `/backup` - 📦 1-Click instant database snapshot\n"
-                    "• `/help` - Show this commands guide"
-                )
-                with suppress(Exception):
-                    await event.reply(help_card, parse_mode="md")
 
     async def scanner(self):
         if self.cfg.run_dlq:
