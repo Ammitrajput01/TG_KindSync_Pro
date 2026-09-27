@@ -16,7 +16,7 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from tg_kind_mode_v14 import (
+from tg_kindsync_pro import (
     smart_clean_and_deduplicate_caption,
     customize_caption,
     _canonical_line_key
@@ -96,20 +96,20 @@ def test_research_dismissal():
         os.remove(DISMISSED_INSIGHTS_FILE)
         
     initial_status = server._build_status_dict()
-    initial_count = initial_status["research_count"]
+    initial_count = initial_status.get("unread_insights_count", 0)
     print(f"Initial unread research count: {initial_count}")
     
     # Dismiss RES-BAN-001
     server._dismiss_insight("RES-BAN-001")
     new_status = server._build_status_dict()
-    print(f"After dismissing 1 item: count = {new_status['research_count']}")
-    assert new_status["research_count"] == max(0, initial_count - 1)
+    print(f"After dismissing 1 item: count = {new_status.get('unread_insights_count', 0)}")
+    assert new_status.get("unread_insights_count", 0) == max(0, initial_count - 1)
     
     # Dismiss All
     server._dismiss_insight(all_flag=True)
     final_status = server._build_status_dict()
-    print(f"After dismiss all: count = {final_status['research_count']}")
-    assert final_status["research_count"] == 0
+    print(f"After dismiss all: count = {final_status.get('unread_insights_count', 0)}")
+    assert final_status.get("unread_insights_count", 0) == 0
     print("✅ Research insights dismissal PASSED!\n")
 
 

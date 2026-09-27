@@ -439,12 +439,14 @@ def apply_clean_rules(text: str) -> str:
         t = re.sub(pat, new_w, t, flags=re.IGNORECASE)
         
     # 3. Apply strip words (case-insensitive, flexible whitespace around @)
-    for w in strip_words:
+    # Sort by length descending to ensure longer phrases are stripped before sub-tokens
+    for w in sorted(strip_words, key=len, reverse=True):
         if not w: continue
         w = w.strip()
         if "@" in w:
             parts = [re.escape(p.strip()) for p in w.split("@")]
-            pat = r"(?i)\b" + r"\s*@\s*".join(parts) if parts[0] else r"(?i)@\s*" + parts[1]
+            prefix = r"\b" if (parts[0] and parts[0][0].isalnum()) else ""
+            pat = r"(?i)" + prefix + r"\s*@\s*".join(parts) if parts[0] else r"(?i)@\s*" + parts[1]
         elif any(ord(c) > 127 for c in w) or any(c in w for c in "/:.?#&=-"):  # Emojis, URLs, or symbols
             pat = re.escape(w)
         else:
@@ -452,13 +454,13 @@ def apply_clean_rules(text: str) -> str:
         t = re.sub(pat, "", t, flags=re.IGNORECASE)
         
     # 4. Clean leftover promotional join/credit lines, admin tags, and uploader watermarks
-    t = re.sub(r"(?i)(?:join|subscribe|credits?|shared\s*by|uploaded\s*by|posted\s*by|managed\s*by|admin|owner|channel|provided\s*by|forwarded\s*from)\s*[:\-]?\s+.*", "", t)
+    t = re.sub(r"(?i)(?:join|subscribe|credits?|extracted\s*by|exᴛʀᴀᴄᴛᴇᴅ\s*ʙʏ|exᴛʀᴀᴄᴛᴇᴅ\s*by|shared\s*by|uploaded\s*by|posted\s*by|managed\s*by|admin|owner|channel|provided\s*by|forwarded\s*from)\s*[:\-]?\s+.*", "", t)
     
-    # 5. Clean lone dots or bullet lines (e.g. leftover from ".\n@Yourwishhere_bot")
+    # 5. Clean lone dots, colons, emojis, or bullet lines
     cleaned_lines = []
     for line in t.splitlines():
         s = line.strip()
-        if re.match(r"^[\s\.\-_*~•:;|]+$", s):
+        if re.match(r"^[\s\.\-_*~•:;|💎📇✦★]+$", s):
             continue
         cleaned_lines.append(line)
     t = "\n".join(cleaned_lines)
@@ -1474,6 +1476,7 @@ class ThumbEnforcer:
     def __init__(self):
         self.raw = os.getenv("THUMB_FILE", "kind_doctor_thumb.jpg").strip()
         self.cache = "tg_thumb_cached.jpg"
+        self._cached_input_files = {}
         self._build()
 
     def _build(self):
@@ -1518,6 +1521,7 @@ class ThumbEnforcer:
             except Exception: pass
 
     def force_regenerate(self):
+        self._cached_input_files.clear()
         if os.path.exists(self.cache):
             with suppress(Exception): os.remove(self.cache)
         self._build()
@@ -1529,6 +1533,21 @@ class ThumbEnforcer:
         if os.path.exists(self.raw):
             return self.raw
         return None
+
+    async def get_input_file(self, client):
+        """Pre-uploads and caches thumbnail as an InputFile to bypass Telethon's upload_file file_size bug."""
+        path = self.get()
+        if not path or not os.path.exists(path):
+            return None
+        c_id = id(client)
+        if c_id in self._cached_input_files:
+            return self._cached_input_files[c_id]
+        try:
+            inp = await client.upload_file(path)
+            self._cached_input_files[c_id] = inp
+            return inp
+        except Exception:
+            return path
 
 # ============================================================
 async def interactive_telegram_login(client):
@@ -2186,29 +2205,70 @@ async def get_account_channels_list(client):
     channels = []
     cache_file = Path("data/channels_cache.json")
     
-    # 1. Try streaming iter_dialogs directly from Telegram
-    for attempt in range(3):
+    # 1. Try using the provided client first
+    if client:
         try:
-            seen_ids = set()
-            async for d in client.iter_dialogs(limit=None):
-                if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
-                    if d.id not in seen_ids:
-                        seen_ids.add(d.id)
-                        name = str(d.name or "Unnamed").strip()
-                        uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
-                        channels.append({"id": d.id, "title": name, "username": uname})
-            
-            if channels:
-                with suppress(Exception):
-                    cache_file.parent.mkdir(parents=True, exist_ok=True)
-                    with open(cache_file, "w", encoding="utf-8") as fc:
-                        json.dump(channels, fc, indent=2)
-                break
+            if not client.is_connected():
+                await client.connect()
+            if await client.is_user_authorized():
+                dialogs = await client.get_dialogs(limit=250)
+                seen_ids = set()
+                for d in dialogs:
+                    if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
+                        if d.id not in seen_ids:
+                            seen_ids.add(d.id)
+                            name = str(d.name or "Unnamed").strip()
+                            uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
+                            channels.append({"id": d.id, "title": name, "username": uname})
         except Exception as e:
-            logger.debug(f"Error listing dialogs (attempt {attempt+1}): {e}")
-            await asyncio.sleep(0.5)
+            logger.debug(f"Direct client dialog fetch failed: {e}")
 
-    # 2. Fallback to cached channels if API call was interrupted or locked
+    # 2. If client failed or was locked (e.g. background bot holding SQLite lock), use ephemeral session clone!
+    if not channels:
+        sess_candidates = [
+            "session_forwarder", "session_user", "session_scanner", "session_primary",
+            "session_account2", "session_account3", "session_account_9081"
+        ]
+        api_id = int(os.getenv("API_ID", 0) or 0)
+        api_hash = (os.getenv("API_HASH", "")).strip().strip("'").strip('"')
+        if not api_id or not api_hash:
+            api_id = 36193727
+            api_hash = "fef19b9b1434a3e66b009fd31053200b"
+
+        for s_name in sess_candidates:
+            s_file = Path(f"{s_name}.session")
+            if s_file.exists() and s_file.stat().st_size > 0:
+                temp_file = Path(f"temp_dialogs_{s_name}_{os.getpid()}.session")
+                try:
+                    shutil.copy2(s_file, temp_file)
+                    t_client = TelegramClient(str(temp_file.with_suffix('')), api_id, api_hash)
+                    await t_client.connect()
+                    if await t_client.is_user_authorized():
+                        dialogs = await t_client.get_dialogs(limit=250)
+                        seen_ids = set()
+                        for d in dialogs:
+                            if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
+                                if d.id not in seen_ids:
+                                    seen_ids.add(d.id)
+                                    name = str(d.name or "Unnamed").strip()
+                                    uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
+                                    channels.append({"id": d.id, "title": name, "username": uname})
+                    await t_client.disconnect()
+                except Exception as ex:
+                    logger.debug(f"Ephemeral clone for {s_name} failed: {ex}")
+                finally:
+                    temp_file.unlink(missing_ok=True)
+                if channels:
+                    break
+
+    # 3. Save to cache
+    if channels:
+        with suppress(Exception):
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_file, "w", encoding="utf-8") as fc:
+                json.dump(channels, fc, indent=2)
+
+    # 4. Fallback to cached channels if all live attempts failed
     if not channels and cache_file.exists():
         with suppress(Exception):
             with open(cache_file, "r", encoding="utf-8") as fc:
@@ -2216,7 +2276,7 @@ async def get_account_channels_list(client):
                 if channels:
                     logger.info(f"Loaded {len(channels)} channels from local cache.")
 
-    # 3. Fallback to channels registered in history_core.sqlite
+    # 5. Fallback to registered groups in SQLite
     if not channels:
         with suppress(Exception):
             with get_db_conn() as conn:
@@ -2290,8 +2350,8 @@ async def interactive_channel_selector(client, prompt_title="Select Channel"):
             return {"id": parsed["CHAT_ID"], "topic": topic_id, "title": str(parsed["CHAT_ID"])}
         return {"id": raw.strip(), "topic": 0, "title": raw.strip()}
     
-    # Default to 100 items per page or full scrollable view
-    PAGE_SIZE = 100
+    # Default to displaying ALL channels on 1 full scrollable screen
+    PAGE_SIZE = max(1000, len(channels))
     current_page = 0
     search_query = ""
     current_list = channels
@@ -2313,7 +2373,7 @@ async def interactive_channel_selector(client, prompt_title="Select Channel"):
         
         # Header Info
         filter_status = f" | [bold yellow]🔍 Filter:[/] [bold white]'{search_query}'[/] ([bold green]{total_items}[/] matches)" if search_query else f" | Total: [bold cyan]{len(channels)} Channels (Full Scrollable)[/]"
-        page_info = f"Page {current_page + 1} of {total_pages} (Showing #{start_idx + 1} to #{end_idx} of {total_items})" if total_pages > 1 else f"Showing ALL {total_items} Channels (Scroll up/down with Mouse Wheel)"
+        page_info = f"Showing ALL {total_items} Channels (Scroll up/down with Mouse Wheel)" if total_pages == 1 else f"Page {current_page + 1} of {total_pages} (Showing #{start_idx + 1} to #{end_idx} of {total_items})"
         
         console.print(Panel(
             f"[bold magenta]📋 {prompt_title.upper()}[/]{filter_status}\n"
@@ -2345,7 +2405,7 @@ async def interactive_channel_selector(client, prompt_title="Select Channel"):
                 nav_hints.append("[bold green][N][/] Next Page")
             if current_page > 0:
                 nav_hints.append("[bold green][B][/] Prev Page")
-            nav_hints.append("[bold cyan][ALL][/] Show All 494 on 1 Screen")
+            nav_hints.append("[bold cyan][ALL][/] Show All on 1 Screen")
         nav_hints.append("[bold cyan][S][/] Search Keyword")
         if search_query:
             nav_hints.append("[bold yellow][CLEAR][/] Reset Filter")
@@ -2354,7 +2414,7 @@ async def interactive_channel_selector(client, prompt_title="Select Channel"):
         
         console.print("  " + "  •  ".join(nav_hints) + "\n")
         
-        choice = await safe_input("👉 Enter # to Select (or scroll & type keyword / ALL / N / B / P / 0)", allow_cancel=True)
+        choice = await safe_input("👉 Enter # to Select (or scroll & type keyword / S / P / 0)", allow_cancel=True)
         if not choice:
             return None
             
@@ -3299,7 +3359,7 @@ class PipelineProcessor:
         global THUMB_MODE
         sig_enabled = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
         # Unified Clean Mode: If signature is disabled, custom branded thumbnail is also disabled
-        t_path = self.thumb.get() if (THUMB_MODE == "custom" and sig_enabled) else None
+        t_path = (await self.thumb.get_input_file(client)) if (THUMB_MODE == "custom" and sig_enabled) else None
 
         resolved_topic = await self.resolve_topic_id(target_chat, target_topic, client)
 
@@ -4978,6 +5038,239 @@ async def prompt_sequence_mode():
         elif ch is None:
             return None
 
+async def run_strip_words_manager():
+    """
+    Dedicated Interactive Studio for Managing Strip Words, Watermarks & Text Replacements.
+    Supports full list viewing, single & multi-word entry with explicit SAVE confirmation,
+    deletion, deduplication, and direct Notepad editing.
+    """
+    strip_file = Path("strip_words.txt")
+    if not strip_file.exists():
+        try:
+            strip_file.write_text("# Permanent Clean Words & Watermarks List\n", encoding="utf-8")
+        except Exception:
+            pass
+
+    while True:
+        strip_words_list, replace_words_map = get_clean_rules()
+        file_words_count = len(strip_words_list)
+        rep_count = len(replace_words_map)
+
+        clear_screen()
+        console.print(get_persistent_header())
+        console.print(Panel(
+            "[bold cyan]📝 WORD & WATERMARK STRIPPING STUDIO (strip_words.txt)[/]\n"
+            "[dim]Manage all keywords, bots, channels & sponsor watermarks to permanently remove from messages.[/]\n\n"
+            f" • [cyan]Active Clean Rules    :[/] [bold green]{file_words_count} words/phrases[/]\n"
+            f" • [cyan]Active Replacements   :[/] [bold yellow]{rep_count} pairs (Old ➔ New)[/]\n"
+            f" • [cyan]Permanent Storage     :[/] [dim]{strip_file.resolve()}[/]\n\n"
+            "[bold green][1][/] 📋 [bold white]View Full Clean Words & Replacements List[/] [dim](Formatted Table & Summary)[/]\n"
+            "[bold green][2][/] ➕ [bold white]Add New Word(s) / Watermarks[/] [bold yellow]⭐[/] [dim](Single or Multi-line with SAVE confirm)[/]\n"
+            "[bold red][3][/] 🗑️ [bold white]Delete a Word / Watermark[/] [dim](Remove by # index or text)[/]\n"
+            "[bold yellow][4][/] 🔄 [bold white]Edit Word Replacements[/] [dim](Configure Old ➔ New pairs)[/]\n"
+            "[bold magenta][5][/] 📂 [bold white]Open strip_words.txt in Notepad[/] [dim](Direct Manual Editing)[/]\n"
+            "[bold blue][6][/] 🧹 [bold white]Deduplicate & Clean strip_words.txt[/] [dim](Auto-clean blank lines & duplicates)[/]\n"
+            "[bold cyan][0][/] ⬅️ [bold white]Back to Caption Studio[/]",
+            title="[bold magenta] 🧹 WATERMARK CLEANER ENGINE [/]",
+            border_style="magenta",
+            box=box.ROUNDED
+        ))
+
+        choice = await safe_input("👉 Select Option [1-6, 0]", valid_options=["1", "2", "3", "4", "5", "6", "0"], default_val="1", allow_cancel=True)
+        if choice is None or choice == "0":
+            break
+
+        # ── [1] View Full Active List ──────────────────────────────────────────
+        if choice == "1":
+            clear_screen()
+            console.print(get_persistent_header())
+            console.print(Panel(
+                f"[bold green]📋 ACTIVE WORD & WATERMARK CLEANING RULES[/] [dim]({file_words_count} Rules Active)[/]",
+                border_style="green", box=box.ROUNDED
+            ))
+            if strip_words_list:
+                table = Table(box=box.ROUNDED, show_header=True, header_style="bold magenta", expand=True)
+                table.add_column("#", style="dim", width=5, justify="right")
+                table.add_column("Word / Watermark / Username Pattern", style="bold yellow", ratio=3)
+                table.add_column("Rule Action", style="bold green", ratio=1)
+                
+                for idx, w in enumerate(strip_words_list, 1):
+                    table.add_row(str(idx), w, "✂️ Strip & Clean")
+                console.print(table)
+            else:
+                console.print("\n[yellow]⚠️ No words found in strip_words.txt yet. Use option [2] to add.[/]\n")
+
+            if replace_words_map:
+                console.print(f"\n[bold cyan]🔄 ACTIVE TEXT REPLACEMENTS ({len(replace_words_map)} Pairs):[/]")
+                rep_table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan", expand=True)
+                rep_table.add_column("#", style="dim", width=5, justify="right")
+                rep_table.add_column("Original Text / Username", style="bold red")
+                rep_table.add_column("➔ Replacement", style="bold green")
+                for r_idx, (ow, nw) in enumerate(replace_words_map.items(), 1):
+                    rep_table.add_row(str(r_idx), ow, nw if nw else "[dim](empty)[/]")
+                console.print(rep_table)
+
+            console.print(f"\n[dim]Total: {file_words_count} clean patterns, {len(replace_words_map)} replacement pairs.[/]")
+            await safe_input("\nPress Enter to return", default_val="")
+
+        # ── [2] Add Word(s) with Save Confirmation ─────────────────────────────
+        elif choice == "2":
+            clear_screen()
+            console.print(get_persistent_header())
+            console.print(Panel(
+                "[bold cyan]➕ ADD NEW WORD(S) / WATERMARKS TO REMOVE[/]\n"
+                "[dim]You can paste a single word, username (@bot), channel link, or multiple words separated by commas or pipes (|).[/]",
+                border_style="cyan", box=box.ROUNDED
+            ))
+            console.print("[yellow]Tip:[/] Type or paste your word(s) below. Example: `@MyBot, Sponsored by XYZ, t.me/joinchat`\n")
+            raw_input_words = await safe_input("Enter word(s) to strip", allow_cancel=True)
+            if not raw_input_words or not raw_input_words.strip():
+                continue
+
+            # Parse input (split by newline, comma, or pipe)
+            raw_tokens = []
+            for chunk in raw_input_words.replace("|", "\n").replace(",", "\n").split("\n"):
+                token = chunk.strip()
+                if token and token not in raw_tokens:
+                    raw_tokens.append(token)
+
+            if not raw_tokens:
+                console.print("[yellow]No valid words entered.[/]")
+                await asyncio.sleep(1.0)
+                continue
+
+            # Preview box
+            console.print(Panel(
+                "[bold yellow]🔍 PREVIEW OF WORDS TO ADD:[/]\n\n" +
+                "\n".join([f"  [bold green]+[/] [yellow]{t}[/]" + (" [dim](already in list)[/]" if t in strip_words_list else "") for t in raw_tokens]),
+                title="[bold cyan] Confirm Add [/]",
+                border_style="yellow",
+                box=box.ROUNDED
+            ))
+
+            save_confirm = await safe_input(f"💾 Save {len(raw_tokens)} word(s) to strip_words.txt permanently? (SAVE / NO)", valid_options=["SAVE", "save", "YES", "yes", "NO", "no"], default_val="SAVE", allow_cancel=True)
+            if save_confirm and save_confirm.upper() in ("SAVE", "YES"):
+                try:
+                    with open(strip_file, "a", encoding="utf-8") as f:
+                        for t in raw_tokens:
+                            f.write(f"{t}\n")
+                    # Invalidate cache
+                    _CLEAN_RULES_CACHE["mtime_txt"] = 0
+                    console.print(f"\n[bold green]✔ Successfully saved {len(raw_tokens)} word(s) to strip_words.txt![/]")
+                    console.print("[bold green]✔ Clean Rules Cache live-reloaded successfully![/]")
+                except Exception as e:
+                    console.print(f"\n[bold red]❌ Failed to save to strip_words.txt:[/] {e}")
+                await asyncio.sleep(1.5)
+            else:
+                console.print("[yellow]Add cancelled. No changes saved.[/]")
+                await asyncio.sleep(1.0)
+
+        # ── [3] Delete a Word from File ─────────────────────────────────────────
+        elif choice == "3":
+            if not strip_words_list:
+                console.print("\n[yellow]⚠️ strip_words.txt is currently empty.[/]")
+                await asyncio.sleep(1.2)
+                continue
+
+            console.print("\n[bold cyan]🗑️ DELETE WORD / WATERMARK FROM strip_words.txt[/]")
+            console.print("[dim]Enter the line number (#) from the list, or type the exact word to delete:[/]\n")
+            
+            del_target = await safe_input("Enter # index or Word to Delete", allow_cancel=True)
+            if not del_target or not del_target.strip():
+                continue
+
+            target_word = None
+            if del_target.strip().isdigit():
+                idx_num = int(del_target.strip())
+                if 1 <= idx_num <= len(strip_words_list):
+                    target_word = strip_words_list[idx_num - 1]
+                else:
+                    console.print(f"[bold red]❌ Index {idx_num} is out of range (1 - {len(strip_words_list)})[/]")
+                    await asyncio.sleep(1.5)
+                    continue
+            else:
+                target_word = del_target.strip()
+
+            del_confirm = await safe_input(f"Are you sure you want to delete '[bold red]{target_word}[/]'? (YES / NO)", valid_options=["YES", "yes", "NO", "no"], default_val="YES", allow_cancel=True)
+            if del_confirm and del_confirm.upper() == "YES":
+                try:
+                    with open(strip_file, "r", encoding="utf-8", errors="ignore") as f:
+                        lines = f.readlines()
+                    new_lines = []
+                    removed = False
+                    for l in lines:
+                        if l.strip() == target_word and not removed:
+                            removed = True
+                            continue
+                        new_lines.append(l)
+                    with open(strip_file, "w", encoding="utf-8") as f:
+                        f.writelines(new_lines)
+                    _CLEAN_RULES_CACHE["mtime_txt"] = 0
+                    if removed:
+                        console.print(f"\n[bold green]✔ Successfully deleted '[yellow]{target_word}[/]' from strip_words.txt![/]")
+                    else:
+                        console.print(f"\n[yellow]⚠️ Pattern '{target_word}' was not found in strip_words.txt (may be from .env).[/]")
+                except Exception as e:
+                    console.print(f"\n[bold red]❌ Error deleting from strip_words.txt:[/] {e}")
+                await asyncio.sleep(1.5)
+
+        # ── [4] Edit Word Replacements ──────────────────────────────────────────
+        elif choice == "4":
+            env_path = ".env"
+            console.print("\n[bold cyan]🔄 TEXT REPLACEMENT PAIRS (Old ➔ New)[/]")
+            console.print("[dim]Format: OldWord:NewWord,OldChannel:NewChannel (or OldWord=>NewWord)[/]")
+            cur_val = os.getenv("REPLACE_WORDS", "").strip()
+            if cur_val:
+                console.print(f"[dim]Current in .env: [yellow]{cur_val}[/][/]\n")
+            val = await safe_input("Enter replacement pairs (or 'CLEAR' to wipe)", default_val=cur_val if cur_val else None, allow_cancel=True)
+            if val is not None:
+                if val.strip().upper() == "CLEAR":
+                    set_key(env_path, "REPLACE_WORDS", "")
+                    console.print("[bold green]✔ Cleared REPLACE_WORDS![/]")
+                else:
+                    set_key(env_path, "REPLACE_WORDS", val.strip())
+                    console.print("[bold green]✔ Word Replacements saved to .env![/]")
+                _CLEAN_RULES_CACHE["mtime_env"] = 0
+                await asyncio.sleep(1.2)
+
+        # ── [5] Open Notepad ────────────────────────────────────────────────────
+        elif choice == "5":
+            console.print("[dim]Opening strip_words.txt in Notepad / System Editor...[/]")
+            if os.name == "nt":
+                os.system("start notepad strip_words.txt")
+            else:
+                os.system("xdg-open strip_words.txt 2>/dev/null || nano strip_words.txt")
+            await asyncio.sleep(1.0)
+
+        # ── [6] Deduplicate & Clean strip_words.txt ─────────────────────────────
+        elif choice == "6":
+            try:
+                if strip_file.exists():
+                    with open(strip_file, "r", encoding="utf-8", errors="ignore") as f:
+                        lines = f.readlines()
+                    seen = set()
+                    cleaned_lines = []
+                    for l in lines:
+                        stripped = l.strip()
+                        if not stripped:
+                            continue
+                        if stripped.startswith("#"):
+                            cleaned_lines.append(l)
+                            continue
+                        if stripped.lower() not in seen:
+                            seen.add(stripped.lower())
+                            cleaned_lines.append(f"{stripped}\n")
+                    with open(strip_file, "w", encoding="utf-8") as f:
+                        f.writelines(cleaned_lines)
+                    _CLEAN_RULES_CACHE["mtime_txt"] = 0
+                    console.print(f"\n[bold green]✔ Deduplicated & Cleaned strip_words.txt![/]")
+                    console.print(f"[bold green]✔ Retained {len(seen)} unique rules (removed {len(lines) - len(cleaned_lines)} redundant lines).[/]")
+                else:
+                    console.print("[yellow]strip_words.txt does not exist yet.[/]")
+            except Exception as e:
+                console.print(f"[bold red]❌ Error cleaning strip_words.txt:[/] {e}")
+            await asyncio.sleep(1.5)
+
 async def interactive_caption_and_filter_wizard():
     global GLOBAL_RUNTIME_FILTER
     env_path = ".env"
@@ -5038,42 +5331,8 @@ async def interactive_caption_and_filter_wizard():
         if choice is None: break
 
         if choice == "1":
-            strip_words_list, replace_words_map = get_clean_rules()
-            console.print("\n[bold cyan]📝 Word & Watermark Cleaner Studio[/]")
-            console.print(f"[dim]Permanent File: [yellow]strip_words.txt[/] ({len(strip_words_list)} words/phrases active)[/]\n")
-            console.print(" [1] 📋 View Active Clean Words List")
-            console.print(" [2] ➕ Add New Word / Tag to Remove Permanently")
-            console.print(" [3] 📂 Open strip_words.txt in Notepad")
-            console.print(" [4] 🔄 Edit REPLACE_WORDS mapping (Old:New)")
-            sub_c = await safe_input("Select Action (1 / 2 / 3 / 4)", valid_options=["1", "2", "3", "4"], allow_cancel=True, default_val="1")
-            if sub_c == "1":
-                console.print("\n[bold green]📋 Active Clean Words (strip_words.txt + .env):[/]")
-                for idx, w in enumerate(strip_words_list, 1):
-                    console.print(f"  [dim]{idx:2d}.[/] [yellow]{w}[/]")
-                if replace_words_map:
-                    console.print("\n[bold cyan]🔄 Active Replacements:[/]")
-                    for ow, nw in replace_words_map.items():
-                        console.print(f"  • [red]{ow}[/] ➔ [green]{nw}[/]")
-                await safe_input("\nPress Enter to return", default_val="")
-            elif sub_c == "2":
-                new_w = await safe_input("Enter new word/tag to remove permanently", allow_cancel=True)
-                if new_w and new_w.strip():
-                    with open("strip_words.txt", "a", encoding="utf-8") as f:
-                        f.write(f"\n{new_w.strip()}\n")
-                    console.print(f"[bold green]✔ Added '{new_w.strip()}' to strip_words.txt permanently![/]")
-                    await asyncio.sleep(1.2)
-            elif sub_c == "3":
-                console.print("[dim]Opening strip_words.txt in Notepad...[/]")
-                if os.name == "nt":
-                    os.system("start notepad strip_words.txt")
-                await asyncio.sleep(1.0)
-            elif sub_c == "4":
-                console.print("[dim]Format: OldWord:NewWord,OldChannel:NewChannel[/]")
-                val = await safe_input("Enter replacement pairs", allow_cancel=True)
-                if val is not None:
-                    set_key(env_path, "REPLACE_WORDS", val.strip())
-                    console.print("[bold green]✔ Word Replacements saved![/]")
-                    await asyncio.sleep(1.0)
+            await run_strip_words_manager()
+            continue
 
         elif choice == "2":
             console.print("\n[bold cyan]🔗 Link Cleaner Configuration[/]")
@@ -5528,10 +5787,10 @@ async def run_single_file_splitter_tool(session_mgr):
 
     client = session_mgr.get_client()
     thumb_enforcer = ThumbEnforcer()
-    t_path = thumb_enforcer.get()
     try:
         if not client.is_connected():
             await client.start()
+        t_path = await thumb_enforcer.get_input_file(client)
         console.print("[green]✔ Connected to Telegram. Verifying destination channel...[/]")
         target_entity, resolved_topic = await resolve_telethon_entity(client, target_chat, target_topic)
         final_topic = resolved_topic if resolved_topic is not None else (int(target_topic) if target_topic and str(target_topic) != "0" else None)
@@ -5747,7 +6006,6 @@ async def run_batch_folder_uploader_tool(session_mgr):
     state = StateManager()
     await state.start()
     thumb_enforcer = ThumbEnforcer()
-    t_path = thumb_enforcer.get()
 
     uploaded_files_count = 0
     skipped_files_count = 0
@@ -5757,6 +6015,7 @@ async def run_batch_folder_uploader_tool(session_mgr):
     try:
         if not client.is_connected():
             await client.start()
+        t_path = await thumb_enforcer.get_input_file(client)
         console.print("\n[bold green]🚀 Connected to Telegram Engine! Initializing batch pipeline...[/]")
         target_entity, resolved_topic = await resolve_telethon_entity(client, target_chat, target_topic)
         final_topic = resolved_topic if resolved_topic is not None else (int(target_topic) if target_topic and str(target_topic) != "0" else None)
@@ -7873,10 +8132,17 @@ async def run_menu(session_mgr):
         cur_direct = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
         direct_tag = "[bold green]FAST DIRECT[/]" if cur_direct else "[bold cyan]STREAM (Safe)[/]"
 
+        # Check active session info for 1-click quick resume
+        cur_src = os.getenv("SOURCE_CHAT", "").strip()
+        cur_tgt = os.getenv("TARGET_CHAT", "").strip()
+        cur_rules = os.getenv("FORWARDING_RULES", "").strip()
+        has_active_session = bool((cur_src and cur_tgt and cur_src != "0" and cur_tgt != "0") or cur_rules)
+
         # ── Card 1: Transmission ──────────────────────────────────────────
         card1_transmission = Panel(
             "[bold cyan]⚡  TRANSMISSION & SPEED ENGINES[/]\n"
             "[dim]─────────────────────────────────────────────────[/]\n"
+            f" [bold green]{LB}0][/] ⚡ [bold white]Instant Auto-Resume[/] [bold yellow]⭐[/] [dim]· Continue Last Session Directly[/]\n"
             f" [bold green]{LB}1][/] 🟢 [bold white]Safe Mode[/] [dim]· 4 Workers (Slow Nets)[/]\n"
             f" [bold blue]{LB}2][/] ⚖️ [bold white]Balanced Mode[/] [bold yellow]⭐[/] [dim]· 12 Workers (Default)[/]\n"
             f" [bold red]{LB}3][/] 🔥 [bold white]God Mode[/] [dim]· 40 Workers (Gigabit Turbo)[/]\n"
@@ -7950,16 +8216,73 @@ async def run_menu(session_mgr):
         console.print(menu_table)
 
         # ── Prompt bar ─────────────────────────────────────────────────────────
+        prompt_lines = []
+        if has_active_session:
+            route_preview = f"{cur_src} ➔ {cur_tgt}" if (cur_src and cur_tgt) else f"{len(cur_rules.split(','))} Topic Rules Configured"
+            prompt_lines.append(f"  [bold green]⚡ Active Route:[/] [yellow]{route_preview}[/]  ·  Press [bold green][0][/] or [bold green][R][/] to [bold green]Resume Instantly[/]")
+        prompt_lines.append("  [dim]Enter[/] [bold cyan]0–19[/] [dim]or[/] [bold green]R[/][dim]  ·  [/][bold green]0 / R[/][dim] = Auto-Resume  ·  Press [bold green][Enter][/] for [/][bold yellow]2[/][dim] = Balanced Mode[/]")
+        
         console.print(Panel(
-            "  [dim]Enter[/] [bold cyan]1–19[/] [dim]to select a tool  ·  [/][bold yellow]2[/][dim] = Balanced Mode (Recommended Default)[/]",
+            "\n".join(prompt_lines),
             border_style="dim",
             box=box.ROUNDED,
             padding=(0, 1)
         ))
-        ch = await safe_input("Choice", valid_options=[str(i) for i in range(1, 20)], allow_cancel=False, default_val="2")
-        
+        ch = await safe_input("👉 Enter Choice [0-19 / R] (Default: 2 - Balanced Mode)", allow_cancel=False, default_val="2")
+        ch_clean = ch.strip().lower()
+
+        # 0 or R: Instant Auto-Resume Previous Session
+        if ch_clean in ("0", "r", "resume", "20"):
+            load_dotenv(override=True)
+            cur_src = os.getenv("SOURCE_CHAT", "").strip()
+            cur_tgt = os.getenv("TARGET_CHAT", "").strip()
+            cur_rules = os.getenv("FORWARDING_RULES", "").strip()
+            cur_src_top = os.getenv("SOURCE_TOPIC", "0").strip()
+            cur_tgt_top = os.getenv("TARGET_TOPIC", "0").strip()
+
+            if not ((cur_src and cur_tgt and cur_src != "0" and cur_tgt != "0") or cur_rules):
+                console.print("\n[yellow]⚠️ No active previous session found in .env. Please configure Source & Target first (Option 5 or 7).[/]")
+                await asyncio.sleep(2.0)
+                continue
+
+            clear_screen()
+            console.print(get_persistent_header())
+            rules_count = len([r for r in cur_rules.split(",") if r.strip() and len(r.split(":")) >= 4]) if cur_rules else 0
+            routing_mode = 2 if rules_count > 0 else 1
+
+            console.print(Panel(
+                "[bold green]⚡ INSTANT AUTO-RESUME PREVIOUS SESSION[/]\n"
+                "[dim]─────────────────────────────────────────────────[/]\n\n"
+                f"• Routing Mode    : [bold cyan]{'Multi-Topic Group Cloner (Mode 2)' if routing_mode == 2 else 'Single Route Stream (Mode 1)'}[/]\n"
+                f"• Source Channel  : [bold yellow]{cur_src}[/] (Topic: `{cur_src_top}`)\n"
+                f"• Target Channel  : [bold yellow]{cur_tgt}[/] (Topic: `{cur_tgt_top}`)\n"
+                + (f"• Mapped Topics   : [bold green]{rules_count} Forum Topics[/]\n" if routing_mode == 2 else "") +
+                f"• Transmission    : [bold cyan]Balanced Mode (12 Workers, 12 Parallel Sockets)[/]\n"
+                f"• Crash-Recovery  : [bold green]SQLite WAL Bookmarks Active (Skips Completed)[/]\n\n"
+                " [bold green][Enter] / [1][/] 🚀 [bold white]Start Streaming Remaining Messages Now[/]\n"
+                " [bold yellow][2][/] ⚙️ [bold white]Change Speed / Transmission Mode (Safe / God / Live)[/]\n"
+                " [bold cyan][0][/] ⬅️ Return to Main Menu",
+                border_style="green", box=box.ROUNDED
+            ))
+            res_c = await safe_input("👉 Press Enter to Resume (or 2 to change speed / 0 to cancel)", default_val="1", allow_cancel=True)
+            if not res_c or res_c == "0":
+                continue
+            elif res_c == "2":
+                console.print("\n[bold cyan]Select Transmission Speed for Resume:[/]")
+                console.print(" [1] 🟢 Safe Mode (4 Workers)")
+                console.print(" [2] ⚖️ Balanced Mode (12 Workers - Recommended)")
+                console.print(" [3] 🔥 God Mode (40 Workers)")
+                console.print(" [4] 🔴 Live 24/7 Mode")
+                spd_c = await safe_input("Choose Speed (1/2/3/4)", valid_options=["1", "2", "3", "4"], default_val="2")
+                if spd_c == "1": return (1, 4, False, "all", routing_mode, False, False)
+                elif spd_c == "2": return (1, 12, False, "all", routing_mode, False, False)
+                elif spd_c == "3": return (1, 40, True, "all", routing_mode, False, False)
+                elif spd_c == "4": return (1, 12, False, "all", routing_mode, False, True)
+            else:
+                return (1, 12, False, "all", routing_mode, False, False)
+
         # 1-4: Transmission Modes
-        if ch in ["1", "2", "3", "4"]:
+        elif ch in ["1", "2", "3", "4"]:
             selected_routing = await prompt_routing_mode()
             if selected_routing is None: continue
             
@@ -8076,13 +8399,35 @@ async def run_menu(session_mgr):
             await run_account_switcher_tool(session_mgr)
             continue
         elif ch == "16":
+            clear_screen()
+            console.print(get_persistent_header())
+            console.print(Panel(
+                "[bold red]❌ SAFE EXIT & SHUTDOWN CONTROL[/]\n"
+                "[dim]─────────────────────────────────────────────────[/]\n\n"
+                " [bold cyan][1][/] 🚪 [bold white]Exit CLI Menu Only[/] [dim](Keep Background Forwarder, Bot & Dashboard running)[/]\n"
+                " [bold red][2][/] 🛑 [bold white]Complete Server & Services Shutdown[/] [dim](Stop All Background Forwarders, Bot & Dashboard)[/]\n"
+                " [dim][0] Cancel / Stay in Menu[/]",
+                border_style="red", box=box.ROUNDED
+            ))
+            exit_choice = await safe_input("Choose Option (1/2/0)", valid_options=["1", "2", "0"], default_val="1", allow_cancel=True)
+            if not exit_choice or exit_choice == "0":
+                continue
+
+            if exit_choice == "2":
+                console.print("\n[bold yellow]🛑 Stopping all background services (tg-forwarder, tg-kinddoc-bot, tg-dashboard)...[/]")
+                if os.name != "nt":
+                    os.system("sudo systemctl stop tg-forwarder tg-kinddoc-bot tg-dashboard 2>/dev/null || true")
+                else:
+                    os.system("taskkill /f /im python.exe /fi \"WINDOWTITLE eq TG KindSync*\" 2>nul || true")
+                console.print("[bold green]✔ Background services stopped.[/]")
+
             AdminTelemetry.dispatch(session_mgr.get_client(), "🔴 [MONITOR] Program Closed / Exit", {
-                "Status": "Terminated Normally by User"
+                "Status": "Terminated Normally by User" if exit_choice == "1" else "Complete Services Shutdown"
             })
             with suppress(Exception):
                 await session_mgr.disconnect_all()
-            console.print("\n[bold green]👋 Program Exited Safely. All sessions closed.[/]")
-            await asyncio.sleep(0.5)
+            console.print("\n[bold green]👋 Program Exited Safely. All sessions closed & WAL flushed.[/]")
+            await asyncio.sleep(0.8)
             release_lock()
             sys.exit(0)
 

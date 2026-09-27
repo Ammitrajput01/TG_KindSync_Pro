@@ -116,17 +116,17 @@ def test_clinical_score_parsing(bot_instance):
 
 def test_signature_toggle_logic():
     """Verify customize_caption respects ENABLE_SIGNATURE."""
-    import tg_kind_mode_v14
+    import tg_kindsync_pro
     
     # When ON (default)
     os.environ["ENABLE_SIGNATURE"] = "true"
-    caption_on = tg_kind_mode_v14.customize_caption("Medical lecture notes")
+    caption_on = tg_kindsync_pro.customize_caption("Medical lecture notes")
     assert "Kind Doctor & Team" in caption_on
     assert "Group Study Help" in caption_on
 
     # When OFF
     os.environ["ENABLE_SIGNATURE"] = "false"
-    caption_off = tg_kind_mode_v14.customize_caption("Medical lecture notes")
+    caption_off = tg_kindsync_pro.customize_caption("Medical lecture notes")
     assert "Kind Doctor & Team" not in caption_off
     assert "Group Study Help" not in caption_off
     assert "Medical lecture notes" in caption_off
@@ -137,14 +137,14 @@ def test_signature_toggle_logic():
 
 def test_fast_direct_mode_toggle():
     """Verify DIRECT_FORWARD flag toggling."""
-    import tg_kind_mode_v14
+    import tg_kindsync_pro
     
     os.environ["DIRECT_FORWARD"] = "false"
-    cfg_stream = tg_kind_mode_v14.AppConfig.load()
+    cfg_stream = tg_kindsync_pro.AppConfig.load()
     assert cfg_stream.direct_forward is False
 
     os.environ["DIRECT_FORWARD"] = "true"
-    cfg_direct = tg_kind_mode_v14.AppConfig.load()
+    cfg_direct = tg_kindsync_pro.AppConfig.load()
     assert cfg_direct.direct_forward is True
 
     # Restore default

@@ -32,8 +32,14 @@ API_ID = int(os.getenv("API_ID", "36193727") or 36193727)
 API_HASH = os.getenv("API_HASH", "fef19b9b1434a3e66b009fd31053200b").strip()
 BOT_TOKEN = os.getenv("DEVI_TELEGRAM_BOT_TOKEN", "").strip().strip("'").strip('"')
 
-def init_tables(conn: sqlite3.Connection):
+def get_db_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH, timeout=60.0)
     conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout=60000;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    return conn
+
+def init_tables(conn: sqlite3.Connection):
     conn.execute("""
         CREATE TABLE IF NOT EXISTS telegram_group_topics (
             chat_id INTEGER,
@@ -86,31 +92,25 @@ async def get_authorized_client():
     for sess_stem in candidate_sessions:
         sess_file = ROOT_DIR / f"{sess_stem}.session"
         if sess_file.exists() and sess_file.stat().st_size > 0:
-            # 1. First try direct connect
+            # Always use isolated ephemeral session clone to ensure zero lock collision with running forwarder
+            temp_sess = None
             try:
-                client = TelegramClient(str(ROOT_DIR / sess_stem), API_ID, API_HASH)
+                temp_stem = f"temp_scan_{sess_stem}_{os.getpid()}_{int(asyncio.get_event_loop().time()*1000)}"
+                temp_sess = ROOT_DIR / f"{temp_stem}.session"
+                shutil.copy2(sess_file, temp_sess)
+                
+                client = TelegramClient(str(ROOT_DIR / temp_stem), API_ID, API_HASH)
                 await client.connect()
                 if await client.is_user_authorized():
-                    print(f"[*] Using authorized user session: {sess_stem}")
-                    return client, "user", None
+                    print(f"[*] Using authorized ephemeral session clone: {sess_stem}")
+                    return client, "user", temp_sess
                 await client.disconnect()
+                if temp_sess.exists():
+                    temp_sess.unlink(missing_ok=True)
             except Exception as e:
-                # 2. If locked by running bot/forwarder, create isolated ephemeral clone
-                try:
-                    temp_stem = f"temp_scan_{sess_stem}_{os.getpid()}"
-                    temp_sess = ROOT_DIR / f"{temp_stem}.session"
-                    shutil.copy2(sess_file, temp_sess)
-                    
-                    client = TelegramClient(str(ROOT_DIR / temp_stem), API_ID, API_HASH)
-                    await client.connect()
-                    if await client.is_user_authorized():
-                        print(f"[*] Using authorized ephemeral session clone: {sess_stem}")
-                        return client, "user", temp_sess
-                    await client.disconnect()
-                    if temp_sess.exists():
-                        temp_sess.unlink(missing_ok=True)
-                except Exception as inner_e:
-                    print(f"[!] Session {sess_stem} fallback clone failed: {inner_e}")
+                print(f"[!] Ephemeral session clone attempt for {sess_stem} note: {e}")
+                if temp_sess and temp_sess.exists():
+                    with suppress(Exception): temp_sess.unlink()
 
     # Fallback to Bot Token Client
     print("[*] No authorized user session found. Initializing Bot Client...")
@@ -144,66 +144,93 @@ def get_topic_icon(title: str) -> str:
 
 async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, topic_title: Optional[str] = None) -> int:
     """Fast-harvests all media and notes under a single specific topic."""
-    with sqlite3.connect(DB_PATH) as conn:
-        init_tables(conn)
-        
-        # Register topic metadata if not present
-        if topic_title:
-            icon = get_topic_icon(topic_title)
-            conn.execute("""
-                INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title, topic_icon, updated_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (target_chat_id, topic_id, topic_title, icon))
-            conn.commit()
-
-        topic_items_count = 0
+    for attempt in range(5):
         try:
-            async for msg in client.iter_messages(peer, reply_to=topic_id, limit=None):
-                title = None
-                icon = "🎬"
-                item_type = "video"
+            with get_db_conn() as conn:
+                init_tables(conn)
+                
+                # Register topic metadata if not present
+                if topic_title:
+                    icon = get_topic_icon(topic_title)
+                    conn.execute("""
+                        INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title, topic_icon, updated_at)
+                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """, (target_chat_id, topic_id, topic_title, icon))
+                    conn.commit()
 
-                if msg.video:
-                    title = msg.file.name if (msg.file and msg.file.name) else (msg.message.split("\n")[0] if msg.message else f"Lecture Video #{msg.id}")
-                    icon = "🎬"
-                    item_type = "video"
-                elif msg.document:
-                    title = msg.file.name if (msg.file and msg.file.name) else (msg.message.split("\n")[0] if msg.message else f"Lecture Notes #{msg.id}")
-                    icon = "📑"
-                    item_type = "document"
-                elif msg.audio:
-                    title = msg.file.name if (msg.file and msg.file.name) else (msg.message.split("\n")[0] if msg.message else f"Audio #{msg.id}")
-                    icon = "🎧"
-                    item_type = "audio"
-                elif msg.message and len(msg.message.strip()) > 2:
-                    first_line = msg.message.strip().split("\n")[0]
-                    if not first_line.startswith("/") and len(first_line) < 120:
-                        title = first_line
-                        icon = "📌"
-                        item_type = "note"
+                topic_items_count = 0
+                BOT_IGNORE_MARKERS = (
+                    "auto-scan", "auto-pinned", "kind doctor", "topic study index", 
+                    "topic index (part", "table of contents", "master topic directory", 
+                    "index items add", "study index card", "auto-pin", "1-click auto-scan",
+                    "topic #", "ke media files auto-scan"
+                )
+                try:
+                    async for msg in client.iter_messages(peer, reply_to=topic_id, limit=None):
+                        # Skip bot messages or status notifications
+                        if getattr(msg.sender, 'bot', False) or getattr(msg, 'via_bot_id', None):
+                            continue
 
-                if title:
-                    clean = title
-                    for ext in [".mp4", ".pdf", ".mkv", ".m4a", ".mp3", ".avi", ".epub"]:
-                        clean = clean.replace(ext, "").replace(ext.upper(), "")
-                    clean = clean.strip()
-                    if clean:
-                        conn.execute("""
-                            INSERT OR REPLACE INTO telegram_topic_items 
-                            (chat_id, topic_id, msg_id, title, icon, item_type)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (target_chat_id, topic_id, msg.id, clean[:100], icon, item_type))
-                        topic_items_count += 1
-                        if topic_items_count % 50 == 0:
-                            conn.commit()
+                        msg_text = (msg.message or "").strip()
+                        if any(m in msg_text.lower() for m in BOT_IGNORE_MARKERS):
+                            continue
 
-            conn.commit()
-            print(f"[+] Harvested {topic_items_count} media items in Topic #{topic_id}")
-            return topic_items_count
-        except Exception as ex:
-            conn.commit()
-            print(f"[!] Error scanning topic #{topic_id}: {ex}")
-            return topic_items_count
+                        title = None
+                        icon = "🎬"
+                        item_type = "video"
+
+                        if msg.video:
+                            title = msg.file.name if (msg.file and msg.file.name) else (msg_text.split("\n")[0] if msg_text else f"Lecture Video #{msg.id}")
+                            icon = "🎬"
+                            item_type = "video"
+                        elif msg.document:
+                            title = msg.file.name if (msg.file and msg.file.name) else (msg_text.split("\n")[0] if msg_text else f"Lecture Notes #{msg.id}")
+                            icon = "📑"
+                            item_type = "document"
+                        elif msg.audio:
+                            title = msg.file.name if (msg.file and msg.file.name) else (msg_text.split("\n")[0] if msg_text else f"Audio #{msg.id}")
+                            icon = "🎧"
+                            item_type = "audio"
+                        elif msg_text and len(msg_text) > 3:
+                            first_line = msg_text.split("\n")[0].strip()
+                            if not first_line.startswith("/") and len(first_line) < 120:
+                                if not any(m in first_line.lower() for m in BOT_IGNORE_MARKERS):
+                                    title = first_line
+                                    icon = "📌"
+                                    item_type = "note"
+
+                        if title:
+                            clean = title
+                            for ext in [".mp4", ".pdf", ".mkv", ".m4a", ".mp3", ".avi", ".epub"]:
+                                clean = clean.replace(ext, "").replace(ext.upper(), "")
+                            clean = clean.strip()
+                            # Also skip if clean text matches bot notification pattern
+                            if any(m in clean.lower() for m in BOT_IGNORE_MARKERS):
+                                continue
+                            if clean:
+                                conn.execute("""
+                                    INSERT OR REPLACE INTO telegram_topic_items 
+                                    (chat_id, topic_id, msg_id, title, icon, item_type)
+                                    VALUES (?, ?, ?, ?, ?, ?)
+                                """, (target_chat_id, topic_id, msg.id, clean[:100], icon, item_type))
+                                topic_items_count += 1
+                                if topic_items_count % 50 == 0:
+                                    conn.commit()
+
+                    conn.commit()
+                    print(f"[+] Harvested {topic_items_count} media items in Topic #{topic_id}")
+                    return topic_items_count
+                except Exception as ex:
+                    conn.commit()
+                    print(f"[!] Error scanning topic #{topic_id}: {ex}")
+                    return topic_items_count
+        except sqlite3.OperationalError as oe:
+            if "locked" in str(oe).lower() and attempt < 4:
+                await asyncio.sleep(1.0 + attempt * 0.5)
+                continue
+            print(f"[!] SQLite error on Topic #{topic_id}: {oe}")
+            return 0
+    return 0
 
 async def scan_group(target_chat_id: int, target_topic_id: Optional[int] = None, scan_messages: bool = True):
     from telethon.tl.functions.messages import GetForumTopicsRequest
@@ -304,7 +331,7 @@ async def scan_group(target_chat_id: int, target_topic_id: Optional[int] = None,
             except Exception as e:
                 print(f"[!] Warning: GetForumTopicsRequest failed ({e})")
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_conn() as conn:
             init_tables(conn)
 
             # If topics_list was retrieved via MTProto user API
@@ -324,18 +351,18 @@ async def scan_group(target_chat_id: int, target_topic_id: Optional[int] = None,
                 rows = conn.execute("SELECT topic_id, topic_title FROM telegram_group_topics WHERE chat_id = ?", (target_chat_id,)).fetchall()
                 topics_list = [{"id": r[0], "title": r[1]} for r in rows]
 
-            # STAGE 2: HARVEST MESSAGES
-            if scan_messages and topics_list:
-                total_harvested = 0
-                for t in topics_list:
-                    t_id = t.id if hasattr(t, 'id') else t["id"]
-                    t_title = getattr(t, 'title', None) or (t.get("title") if isinstance(t, dict) else f"Topic #{t_id}")
-                    if t_id == 1:
-                        continue  # Skip root general topic
-                    cnt = await scan_single_topic(client, peer, target_chat_id, t_id, t_title)
-                    total_harvested += cnt
+        # STAGE 2: HARVEST MESSAGES (outside master connection to avoid long locks)
+        if scan_messages and topics_list:
+            total_harvested = 0
+            for t in topics_list:
+                t_id = t.id if hasattr(t, 'id') else t["id"]
+                t_title = getattr(t, 'title', None) or (t.get("title") if isinstance(t, dict) else f"Topic #{t_id}")
+                if t_id == 1:
+                    continue  # Skip root general topic
+                cnt = await scan_single_topic(client, peer, target_chat_id, t_id, t_title)
+                total_harvested += cnt
 
-                print(f"STAGE 2 COMPLETE: {total_harvested} total media items indexed across all topics!")
+            print(f"STAGE 2 COMPLETE: {total_harvested} total media items indexed across all topics!")
 
         print(f"SUCCESS: Scanned group {target_chat_id}")
 

@@ -13,6 +13,7 @@ import logging
 import sqlite3
 import re
 import time
+import shutil
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 from contextlib import suppress
@@ -59,12 +60,14 @@ class GlobalOSINTResolver:
     def get_candidate_sessions(self) -> List[str]:
         """Dynamically finds all valid .session files in the workspace root."""
         candidates = [
-            "session_bot_scanner",
             "session_forwarder",
+            "session_user",
+            "session_scanner",
+            "session_primary",
             "session_account2",
             "session_account3",
-            "session_scanner",
-            "session_account_9081"
+            "session_account_9081",
+            "session_bot_scanner"
         ]
         found = []
         for c in candidates:
@@ -73,7 +76,7 @@ class GlobalOSINTResolver:
 
         for p in BASE_PROJECT_DIR.glob("*.session"):
             stem = p.stem
-            if stem not in found:
+            if stem not in found and "temp_" not in stem:
                 found.append(stem)
         return found if found else ["session_bot_scanner", "session_forwarder"]
 
@@ -98,9 +101,14 @@ class GlobalOSINTResolver:
             return None
 
         for s_name in self.get_candidate_sessions():
-            s_path = str(BASE_PROJECT_DIR / s_name)
+            s_file = BASE_PROJECT_DIR / f"{s_name}.session" if not s_name.endswith(".session") else BASE_PROJECT_DIR / s_name
+            s_stem = s_file.stem
+            if not s_file.exists() or s_file.stat().st_size == 0:
+                continue
+
+            # 1. Direct connection attempt
             try:
-                c = TelegramClient(s_path, self.api_id, self.api_hash)
+                c = TelegramClient(str(BASE_PROJECT_DIR / s_stem), self.api_id, self.api_hash)
                 await c.connect()
                 if await c.is_user_authorized():
                     me = await c.get_me()
@@ -108,11 +116,33 @@ class GlobalOSINTResolver:
                         await c.disconnect()
                         continue
                     self._client = c
-                    logger.info(f"Connected to MTProto OSINT session: '{s_name}' (bot={me.bot})")
+                    logger.info(f"Connected to MTProto OSINT session: '{s_stem}' (bot={me.bot})")
                     return self._client
                 await c.disconnect()
             except Exception as e:
-                logger.debug(f"Could not use session '{s_name}': {e}")
+                # 2. Ephemeral session clone fallback if session file is locked by live forwarder
+                try:
+                    temp_stem = f"temp_osint_{s_stem}_{os.getpid()}"
+                    temp_sess = BASE_PROJECT_DIR / f"{temp_stem}.session"
+                    shutil.copy2(s_file, temp_sess)
+
+                    c = TelegramClient(str(BASE_PROJECT_DIR / temp_stem), self.api_id, self.api_hash)
+                    await c.connect()
+                    if await c.is_user_authorized():
+                        me = await c.get_me()
+                        if require_user and me.bot:
+                            await c.disconnect()
+                            if temp_sess.exists():
+                                temp_sess.unlink(missing_ok=True)
+                            continue
+                        self._client = c
+                        logger.info(f"Connected to ephemeral MTProto OSINT session clone: '{s_stem}' (bot={me.bot})")
+                        return self._client
+                    await c.disconnect()
+                    if temp_sess.exists():
+                        temp_sess.unlink(missing_ok=True)
+                except Exception as inner_e:
+                    logger.debug(f"Ephemeral clone for '{s_stem}' failed: {inner_e}")
         return None
 
     async def resolve_entity(self, target: str) -> Optional[Dict[str, Any]]:
@@ -488,5 +518,7 @@ class GlobalOSINTResolver:
         }
 
 
-# Global Singleton Instance
+# Global Singleton Instance & Backward-Compatible Aliases
+GlobalOSINTResolver._find_candidate_sessions = GlobalOSINTResolver.get_candidate_sessions
+OSINTResolver = GlobalOSINTResolver
 osint_resolver = GlobalOSINTResolver()

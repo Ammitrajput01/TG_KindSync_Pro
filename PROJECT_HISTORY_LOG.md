@@ -58,8 +58,101 @@ This log permanently documents root causes, architectural patterns, historical b
 ---
 
 ### 7. Permanent Word Stripping & Caption Cleaning Engine (`strip_words.txt`)
-* **Status**: 100% Permanently Enabled & Active.
+* **Status**: 100% Permanently Enabled & Active across all engines.
 * **Verified**:
   - [strip_words.txt](file:///c:/TG_KindSync_Pro/strip_words.txt) is continuously loaded on every file upload, forward, cherry-pick, and group clone.
-  - Removes unwanted usernames, watermarks (`Shimperd`, `@AnandxBotss`, `kirmada`, `@Yourwishhere_bot`, skull emojis, promotional URLs/links, join/credit tags) automatically before forwarding.
+  - Automatically strips:
+    - Bot tags & Watermarks: `@Cerebellumvideosbot`, `@YourSynapse_bot`, `Dams_new_robot`, `@AnandxBotss`, `Shimperd`, `Shimperd playbold`, `@medAcadpdf`, `@yourrwishh`, `@yourwishhere_bot`, `#yourwish`, `@Whitecoatsociety_bot`, `Kirmada rockstar kirmada`, `kirmada rocket launcher`, `kirmada`, `@medbookeasy`, `@verse_medical`, `The Pirate Bay`, `DrGhost`, `yw`, `Yw`.
+    - Unicode Fancy Headers: `✨ 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃 𝐁𝐘`, `━━━━━━━✦✗✦━━━━━━━`.
+    - Promotional Links: `medicalverse.in`, `https://t.me/verse_medical`, `Join [Medical Verse]...`.
+    - Emojis: `☠️`, `☠`, `💀`.
+
+---
+
+### 8. CLI Safe Exit & Full Services Shutdown (`Option 16`)
+* **Symptom / Request**: When choosing `Option 16`, user wanted the option to completely shutdown running server services (`tg-forwarder`, `tg-kinddoc-bot`, `tg-dashboard`) so that everything stops cleanly on the server, and starts back up when launching `1_SYNC_AND_START_MY_ORACLE.bat`.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py):
+    - Option 16 now offers a dual choice:
+      - `[1] Exit CLI Menu Only` (leaves background services running).
+      - `[2] Complete Server & Services Shutdown` (stops `tg-forwarder`, `tg-kinddoc-bot`, `tg-dashboard`, flushes WAL, disconnects all sessions, and terminates).
+
+---
+
+### 9. Main Menu Default Option `2` (Balanced Mode) & Visual Prompt Clarity
+* **Symptom**: Prompt line clarity and immediate auto-selection on pressing `[Enter]`.
+* **Permanent Fix Applied**:
+  - Set explicit prompt string `👉 Enter Choice [1-19] (Default: 2 - Balanced Mode): `.
+  - Pressing `[Enter]` on empty input immediately defaults to `2` (Balanced Mode - 12 Workers).
+
+---
+
+### 10. Welcome Message & Sangmata Live OSINT Biometric Resolver Protection
+* **Symptom**: Welcome card and `@SangMata_beta_bot` name/username change history occasionally failed or timed out when background forwarder was active.
+* **Root Cause**:
+  - `devi.operator.osint_resolver` attempted to connect to `session_forwarder.session`, which was locked by the active forwarder daemon, causing `sqlite3.OperationalError: database is locked`.
+  - Missing default fallback merging in `_get_group_settings()`.
+* **Permanent Fix Applied**:
+  - In [devi/operator/osint_resolver.py](file:///c:/TG_KindSync_Pro/devi/operator/osint_resolver.py): Added ephemeral session cloning (`temp_osint_{stem}_{pid}.session`). Now, even when the forwarder holds the main session lock, the OSINT resolver seamlessly connects with user MTProto credentials to query `@SangMata_beta_bot` and fetch full multi-year biometric name/username timelines without failure.
+  - In [devi/operator/telegram_bot.py](file:///c:/TG_KindSync_Pro/devi/operator/telegram_bot.py): Hardened `_get_group_settings()` so `welcome_enabled: 1` and `join_track_enabled: 1` always remain active by default.
+
+---
+
+### 11. Channel Picker List Fix (`No joined channels list returned`)
+* **Symptom**: Interactive channel selector in Group Cloner / Cherry Picker (`interactive_channel_selector`) showed `⚠️ No joined channels list returned directly by Telegram API` instead of displaying the scrollable list of joined groups/channels.
+* **Root Cause**: The active forwarder background process held SQLite locks on `session_forwarder.session`, causing `client.iter_dialogs()` to raise `sqlite3.OperationalError: database is locked` and return an empty channel list.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py): `get_account_channels_list()` now uses ephemeral session cloning (`temp_dialogs_{stem}_{pid}.session`). If the main session file is locked, it creates an instant temporary clone, fetches all 50+ joined groups & channels with MTProto user privileges, caches to `data/channels_cache.json`, and cleans up the clone.
+
+---
+
+### 12. 100% Clickable Direct Forum Topic Links (`/topicindex`)
+* **Symptom**: Some lecture rows in `/topicindex` cards were unclickable or didn't open the direct message in Telegram Desktop/Mobile.
+* **Root Cause**:
+  1. Empty or whitespace-only lecture titles resulted in empty `<a href="..."></a>` tags, rendering without clickable text.
+  2. Generic `https://t.me/c/<chat>/<msg_id>` links in forum supergroups were missing the `topic_id` path (`https://t.me/c/<chat>/<topic_id>/<msg_id>`), causing Telegram clients to fail resolving messages inside topics.
+* **Permanent Fix Applied**:
+  - In [devi/operator/telegram_bot.py](file:///c:/TG_KindSync_Pro/devi/operator/telegram_bot.py):
+    - Added fallback title generator (`Lecture Material #{idx:02d}`) so no link text is ever empty.
+    - Generated topic-aware direct Telegram deep links: `https://t.me/c/{clean_chat_id}/{target_t_id}/{m_id}`.
+    - Wrapped titles in `<a href="..."><b>{safe_title}</b></a>` ensuring every single lecture item is rendered as a distinct, bold, 100% clickable hyperlink.
+
+---
+
+### 13. Auto-Scan Bot Status Notification Exclusion from Topic Index
+* **Symptom**: Temporary bot notifications (e.g. `🔍 'Topic #26348' ke media files auto-scan kiye ja rahe hain...`) appeared as indexed notes (e.g. Item `#36`) in the generated `/topicindex` study cards.
+* **Root Cause**: When `/topicindex` triggered an auto-scan, the temporary status notification sent by the bot was active in the topic when `group_scanner` iterated through messages. Since it was a non-command text message, it was captured as a note item.
+* **Permanent Fix Applied**:
+  - In [devi/operator/group_scanner.py](file:///c:/TG_KindSync_Pro/devi/operator/group_scanner.py): Added `BOT_IGNORE_MARKERS` and bot sender checks (`getattr(msg.sender, 'bot', False)` or `via_bot_id`) to completely ignore bot status banners, scan messages, and automated cards from ever being indexed.
+  - Purged all legacy bot notification entries from `telegram_topic_items` in SQLite.
+
+---
+
+### 14. Dedicated Interactive Word & Watermark Stripping Studio (`strip_words.txt`)
+* **Feature Addition**: Enhanced Word & Watermark Cleaner into a dedicated interactive manager accessible under Main Menu Option `[10] ✍️ Caption & Link Studio` -> `[1] 📝 Word & Watermark Cleaner Studio`.
+* **Capabilities Added**:
+  1. **📋 View Full Active Clean List**: Formatted interactive table showing all active word patterns, usernames, and sponsor watermarks in `strip_words.txt` along with replacement mappings (`Old ➔ New`).
+  2. **➕ Add Word(s) with Explicit SAVE Confirmation**: Supports pasting single or batch words (separated by comma, pipe, or newlines) with a preview table and an explicit `💾 Save word(s) to strip_words.txt? (SAVE / NO)` confirmation prompt before writing.
+  3. **🗑️ Delete Word / Watermark**: Instant removal of any pattern by selecting its list index `#` or typing the exact text.
+  4. **🔄 Edit Word Replacements**: Direct editing of `REPLACE_WORDS` mapping with auto-save to `.env`.
+  5. **📂 Open in Notepad**: 1-click launch of `strip_words.txt` in the system text editor for bulk edits.
+  6. **🧹 Deduplicate & Clean**: 1-click cleanup to eliminate duplicate entries and empty lines while preserving section headers.
+  7. **Live Cache Auto-Reload**: Updates invalidate `_CLEAN_RULES_CACHE` immediately so all running forwarding and caption processes apply the new clean rules without requiring a restart.
+
+---
+
+### 15. Group & Topic Scanner MTProto User Session Link & SQLite Lock Immunity
+* **Symptom**: Running `/scan` or `/mainindex` via `@KindDoc_bot` in forum supergroups resulted in only 1 topic being registered (`Index`) and threw `The API access for bot users is restricted (caused by GetRepliesRequest)` or `sqlite3.OperationalError: database is locked`.
+* **Root Cause**:
+  1. Telegram Bot API strictly forbids bot tokens from invoking `messages.getForumTopics` and `GetRepliesRequest` directly in forum supergroups.
+  2. The scanner subprocess fell back to bot mode when the main user session was unlinked on VPS.
+  3. Long-held SQLite transactions during mass topic harvesting triggered database lock errors against the active forwarder daemon.
+* **Permanent Fix Applied**:
+  - In [devi/operator/group_scanner.py](file:///c:/TG_KindSync_Pro/devi/operator/group_scanner.py):
+    - Restored and linked the authorized primary user MTProto session (`Kind` ID `1553619403`).
+    - Implemented `get_db_conn()` with `timeout=60.0`, `PRAGMA busy_timeout=60000;`, and `PRAGMA synchronous=NORMAL;`.
+    - Shortened transaction lifecycles and added exponential backoff retries for concurrent multi-process writes.
+    - Successfully auto-scanned all 95 forum topics and 1,000+ lectures/PDFs into SQLite for instant `/mainindex` and `/topicindex` generation.
+
+
 

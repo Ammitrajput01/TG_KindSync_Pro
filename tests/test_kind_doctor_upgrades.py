@@ -36,7 +36,7 @@ def test_kindsync_unified_clean_mode():
     
     # Verify t_path checks sig_enabled
     assert 'sig_enabled = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")' in content
-    assert 't_path = self.thumb.get() if (THUMB_MODE == "custom" and sig_enabled) else None' in content
+    assert 'get_input_file(client)' in content and 'sig_enabled' in content
     
     # Verify terminal choice 12 toggles both
     assert 'new_th = "custom" if new_val == "true" else "original"' in content

@@ -21,10 +21,10 @@ def run_atoz_check():
     print("=" * 60)
 
     # 1. Module Imports
-    import tg_kind_mode_v14
+    import tg_kindsync_pro
     import web_dashboard
     import sentinel_observer
-    print("  [+] Core Engine (tg_kind_mode_v14.py) : OK")
+    print("  [+] Core Engine (tg_kindsync_pro.py) : OK")
     print("  [+] Web Dashboard (web_dashboard.py)  : OK")
     print("  [+] Sentinel (sentinel_observer.py)   : OK")
 
@@ -60,7 +60,7 @@ def run_atoz_check():
 
     # 5. Caption Styler & Formatter Check
     sample_text = "Anesthesia Lecture 01\nBy Janvi Ma'am\nComplete Exam Notes"
-    styled = tg_kind_mode_v14.customize_caption(sample_text)
+    styled = tg_kindsync_pro.customize_caption(sample_text)
     print("  [+] Caption Engine & Deduplication  : OK")
     print("-" * 60)
     print("Sample Styled Output:\n" + styled)

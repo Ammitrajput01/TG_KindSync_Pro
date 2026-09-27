@@ -12,7 +12,7 @@ if hasattr(sys.stdout, "reconfigure"):
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from tg_kind_mode_v14 import (
+from tg_kindsync_pro import (
     sanitize_filename, customize_caption, ThumbEnforcer,
     parse_telegram_link, extract_smart_hashtags
 )

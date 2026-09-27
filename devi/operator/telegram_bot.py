@@ -836,7 +836,11 @@ class DeviTelegramBot:
                 conn.row_factory = sqlite3.Row
                 row = conn.execute("SELECT * FROM telegram_group_settings WHERE chat_id = ?", (chat_id,)).fetchone()
                 if row:
-                    return dict(row)
+                    merged = dict(defaults)
+                    for k, v in dict(row).items():
+                        if v is not None:
+                            merged[k] = v
+                    return merged
         except Exception:
             pass
         return defaults
@@ -1763,6 +1767,21 @@ class DeviTelegramBot:
                 )
                 for m_id in self.master_admin_ids:
                     await self._send_message(session, m_id, admin_alert)
+
+                # Send Automatic Welcome & Setup Guide directly into the new group
+                welcome_group_card = (
+                    f"🎉 **Kind Doctor Bot (@KindDoc_bot) Successfully Activated!** 🩺\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Namaste! **{title}** me study tools aur smart bot features activate ho chuke hain:\n\n"
+                    f"📑 **`/mainindex`** — Master Topic Directory (#A to #Z)\n"
+                    f"📖 **`/topicindex`** — Topic Study Index & Table of Contents\n"
+                    f"⚡ **`/scan`** — 1-Click Auto-Scan All Forum Topics & Lectures\n"
+                    f"🔍 **`/find <keyword>`** — Instant Search across all Notes & PDFs\n"
+                    f"🛡️ **Anti-Spam & Sangmata Radar** — Automatic Security Shield\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💡 *Admin Tip:* Naye topics ya lectures add hone par bas `/scan` type karein auto-indexing ke liye! ✨"
+                )
+                await self._send_message(session, chat_id, welcome_group_card)
         except Exception as e:
             logger.warning(f"Error in _handle_my_chat_member: {e}")
 
@@ -3109,6 +3128,7 @@ class DeviTelegramBot:
             try:
                 proc = await asyncio.create_subprocess_exec(
                     sys.executable, "-m", "devi.operator.group_scanner", str(target_scan_chat),
+                    cwd=str(BASE_PROJECT_DIR),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
@@ -3155,6 +3175,7 @@ class DeviTelegramBot:
                 try:
                     proc = await asyncio.create_subprocess_exec(
                         sys.executable, "-m", "devi.operator.group_scanner", str(target_index_chat),
+                        cwd=str(BASE_PROJECT_DIR),
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE
                     )
@@ -3249,6 +3270,7 @@ class DeviTelegramBot:
                 try:
                     proc = await asyncio.create_subprocess_exec(
                         sys.executable, "-m", "devi.operator.group_scanner", str(target_index_chat), str(target_t_id),
+                        cwd=str(BASE_PROJECT_DIR),
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE
                     )
@@ -3288,17 +3310,25 @@ class DeviTelegramBot:
 
             for idx, itm in enumerate(items, 1):
                 icon = itm.get("icon") or "🎬"
-                title = itm["title"]
+                raw_title = str(itm.get("title") or "").strip()
+                if not raw_title:
+                    raw_title = f"Lecture Material #{idx:02d}"
+                safe_title = html.escape(raw_title)
+
                 if itm.get("custom_link"):
-                    link = itm["custom_link"]
+                    link = itm["custom_link"].strip()
                 elif itm.get("msg_id"):
                     m_id = itm["msg_id"]
-                    link = f"https://t.me/c/{clean_chat_id}/{m_id}" if clean_chat_id.isdigit() else f"https://t.me/{clean_chat_id}/{m_id}"
+                    if target_t_id and target_t_id > 1:
+                        link = f"https://t.me/c/{clean_chat_id}/{target_t_id}/{m_id}" if clean_chat_id.isdigit() else f"https://t.me/{clean_chat_id}/{target_t_id}/{m_id}"
+                    else:
+                        link = f"https://t.me/c/{clean_chat_id}/{m_id}" if clean_chat_id.isdigit() else f"https://t.me/{clean_chat_id}/{m_id}"
+                elif target_t_id and target_t_id > 1:
+                    link = f"https://t.me/c/{clean_chat_id}/{target_t_id}" if clean_chat_id.isdigit() else f"https://t.me/{clean_chat_id}/{target_t_id}"
                 else:
-                    link = f"https://t.me/c/{clean_chat_id}/{target_t_id}"
+                    link = f"https://t.me/c/{clean_chat_id}" if clean_chat_id.isdigit() else f"https://t.me/{clean_chat_id}"
 
-                safe_title = html.escape(title.strip())
-                line = f"{icon} <code>[{idx:02d}]</code> <a href=\"{link}\">{safe_title}</a>"
+                line = f"{icon} <code>[{idx:02d}]</code> <a href=\"{link}\"><b>{safe_title}</b></a>"
                 if sum(len(l) for l in current_card_lines) + len(line) > 3400:
                     current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                     cards.append("\n".join(current_card_lines))

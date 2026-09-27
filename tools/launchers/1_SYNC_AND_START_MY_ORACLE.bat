@@ -60,7 +60,7 @@ if exist "!SESS_PATH!" (
 )
 
 :: Upload updated scripts
-scp -o StrictHostKeyChecking=no -i "!KEY_PATH!" .env tg_kindsync_pro.py web_dashboard.py main.py requirements.txt ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/ 2>nul
+scp -o StrictHostKeyChecking=no -i "!KEY_PATH!" .env tg_kindsync_pro.py web_dashboard.py main.py requirements.txt strip_words.txt ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/ 2>nul
 if exist "tools" scp -o StrictHostKeyChecking=no -i "!KEY_PATH!" -r tools ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/ 2>nul
 if exist "devi" scp -o StrictHostKeyChecking=no -i "!KEY_PATH!" -r devi ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/ 2>nul
 
@@ -99,8 +99,16 @@ if "%POST_CHOICE%"=="1" (
 
 if "%POST_CHOICE%"=="2" (
     cls
-    echo [*] Connecting to Interactive Terminal...
+    echo [*] Preparing Interactive Terminal on Oracle VPS...
+    echo [*] Pausing background forwarder to prevent session locking...
+    ssh -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "sudo systemctl stop tg-forwarder 2>/dev/null || true"
+    echo [*] Opening Interactive Terminal...
     ssh -t -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "cd /home/ubuntu/TG_KindSync_Pro && source .venv/bin/activate 2>/dev/null || true; python3 tg_kindsync_pro.py"
+    echo.
+    echo [*] Interactive session closed. Resuming 24/7 background forwarder...
+    ssh -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "sudo systemctl start tg-forwarder 2>/dev/null || true"
+    echo [OK] 24/7 Background forwarder resumed!
+    echo.
     goto AFTER_SYNC_MENU
 )
 
