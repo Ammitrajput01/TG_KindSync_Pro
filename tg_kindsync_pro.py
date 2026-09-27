@@ -1146,6 +1146,19 @@ class StateManager:
                 completed_at REAL NOT NULL,
                 PRIMARY KEY (file_path, target_chat, target_topic)
             );
+            CREATE TABLE IF NOT EXISTS group_clone_sessions (
+                source_chat TEXT NOT NULL,
+                source_topic INTEGER NOT NULL DEFAULT 0,
+                target_chat TEXT NOT NULL,
+                target_topic INTEGER NOT NULL DEFAULT 0,
+                topic_title TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'active',
+                messages_copied INTEGER NOT NULL DEFAULT 0,
+                total_messages INTEGER NOT NULL DEFAULT 0,
+                last_copied_msg_id INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL DEFAULT 0,
+                PRIMARY KEY (source_chat, source_topic, target_chat)
+            );
         """)
         await self.db.commit()
         
@@ -1331,6 +1344,70 @@ class StateManager:
                 await self.db.commit()
             except Exception as e:
                 logger.error(f"Record local upload error: {e}")
+
+    async def save_clone_topic_mapping(self, source_chat: str, source_topic: int, target_chat: str, target_topic: int, topic_title: str, total_messages: int = 0):
+        if not self.db: return
+        async with self.db_lock:
+            try:
+                await self.db.execute("""
+                    INSERT OR REPLACE INTO group_clone_sessions
+                    (source_chat, source_topic, target_chat, target_topic, topic_title, status, total_messages, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+                """, (str(source_chat), int(source_topic or 0), str(target_chat), int(target_topic or 0), str(topic_title), int(total_messages or 0), time.time()))
+                await self.db.commit()
+            except Exception as e:
+                logger.error(f"Save clone topic mapping error: {e}")
+
+    async def get_clone_session_topics(self, source_chat: str, target_chat: str) -> list[dict]:
+        if not self.db: return []
+        async with self.db_lock:
+            try:
+                async with self.db.execute("""
+                    SELECT source_chat, source_topic, target_chat, target_topic, topic_title, status, messages_copied, total_messages, last_copied_msg_id, updated_at
+                    FROM group_clone_sessions
+                    WHERE source_chat = ? AND target_chat = ?
+                    ORDER BY source_topic ASC
+                """, (str(source_chat), str(target_chat))) as cursor:
+                    rows = await cursor.fetchall()
+                    return [
+                        {
+                            "source_chat": r[0],
+                            "source_topic": r[1],
+                            "target_chat": r[2],
+                            "target_topic": r[3],
+                            "topic_title": r[4],
+                            "status": r[5],
+                            "messages_copied": r[6],
+                            "total_messages": r[7],
+                            "last_copied_msg_id": r[8],
+                            "updated_at": r[9]
+                        } for r in rows
+                    ]
+            except Exception as e:
+                logger.error(f"Get clone session topics error: {e}")
+                return []
+
+    async def get_latest_clone_session(self) -> Optional[dict]:
+        if not self.db: return None
+        async with self.db_lock:
+            try:
+                async with self.db.execute("""
+                    SELECT source_chat, target_chat, COUNT(*) as topic_count, MAX(updated_at) as last_updated
+                    FROM group_clone_sessions
+                    GROUP BY source_chat, target_chat
+                    ORDER BY last_updated DESC LIMIT 1
+                """) as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        return {
+                            "source_chat": row[0],
+                            "target_chat": row[1],
+                            "topic_count": row[2],
+                            "last_updated": row[3]
+                        }
+            except Exception as e:
+                logger.error(f"Get latest clone session error: {e}")
+        return None
 
     async def close(self):
         self.running = False
@@ -5876,16 +5953,74 @@ async def run_local_splitter_tool(session_mgr):
 async def run_group_cloner_tool(session_mgr):
     clear_screen()
     console.print(get_persistent_header())
-    console.print(Panel("[bold magenta]🧬 FULL GROUP & FORUM STRUCTURE CLONER[/]", border_style="magenta", box=box.ROUNDED))
-    console.print("[dim]Mirror clone entire groups, all forum topics, threads & message history![/]\n")
+    console.print(Panel("[bold magenta]🧬 FULL GROUP & FORUM STRUCTURE CLONER (WITH AUTO-RESUME & TRACKING)[/]", border_style="magenta", box=box.ROUNDED))
+    console.print("[dim]Mirror clone entire groups, all forum topics, threads & message history with zero loss crash recovery![/]\n")
     
     client = await session_mgr.ensure_active_client()
     if not client: return None
+
+    # 0. Check for existing active clone session in DB or .env
+    existing_rules_str = os.getenv("FORWARDING_RULES", "").strip()
+    existing_rules = [r.strip() for r in existing_rules_str.split(",") if r.strip() and len(r.split(":")) >= 4] if existing_rules_str else []
+    
+    cloner_choice = "fresh"
+    if existing_rules:
+        sample_parts = existing_rules[0].split(":")
+        prev_src = sample_parts[0]
+        prev_tgt = sample_parts[2]
+        console.print(Panel(
+            f"[bold cyan]🔄 PREVIOUS GROUP CLONE SESSION DETECTED[/]\n\n"
+            f"• Source Group    : [yellow]{prev_src}[/]\n"
+            f"• Target Group    : [yellow]{prev_tgt}[/]\n"
+            f"• Mapped Topics   : [bold green]{len(existing_rules)} Topics[/]\n\n"
+            f"[bold green][1][/] ⚡ [bold white]RESUME & CONTINUE[/] [dim](Skip completed files, continue where it stopped)[/]\n"
+            f"[bold yellow][2][/] 🔄 [bold white]RE-SCAN & SYNC TOPICS[/] [dim](Check for newly added source topics & append to target)[/]\n"
+            f"[bold magenta][3][/] 🆕 [bold white]START FRESH CLONE[/] [dim](Pick new source & target group)[/]\n"
+            f"[bold cyan][0][/] ⬅️ Cancel / Return to Main Menu",
+            border_style="cyan", box=box.ROUNDED
+        ))
+        ch = await safe_input("Choose Option (1/2/3/0)", valid_options=["0", "1", "2", "3"], default_val="1", allow_cancel=True)
+        if not ch or ch == "0":
+            return None
+        elif ch == "1":
+            cloner_choice = "resume"
+        elif ch == "2":
+            cloner_choice = "rescan"
+        else:
+            cloner_choice = "fresh"
+
+    if cloner_choice == "resume":
+        console.print(f"\n[bold green]✔ Resuming existing group clone ({len(existing_rules)} topics mapped)![/]")
         
-    console.print("[bold cyan]Step 1: Choose SOURCE Group to Clone[/]")
+        # Export state snapshot
+        now = datetime.now()
+        day = now.strftime("%A")
+        date_str = now.strftime("%d-%B-%Y")
+        time_str = now.strftime("%I-%M%p")
+        snap_name = f"group_clone_resume_state_{day}_{date_str}_{time_str}.json"
+        snap_path = Path("archives") / snap_name
+        with suppress(Exception):
+            snap_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(snap_path, "w", encoding="utf-8") as f_snap:
+                json.dump({
+                    "timestamp": f"{day}, {now.strftime('%d %B %Y')} | {now.strftime('%I:%M %p')}",
+                    "mode": "resume",
+                    "total_rules": len(existing_rules),
+                    "rules": existing_rules
+                }, f_snap, indent=2)
+            console.print(f"[dim]💾 Saved state snapshot: archives/{snap_name}[/]")
+
+        confirm = await safe_input("\nStart Streaming Remaining Messages Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
+        if confirm and confirm.upper() == "YES":
+            return (1, 12, False, "all", 2, False, False)
+        return None
+
+    # Step 1: Choose SOURCE Group
+    console.print("\n[bold cyan]Step 1: Choose SOURCE Group to Clone[/]")
     src_sel = await interactive_channel_selector(client, prompt_title="SOURCE Group")
     if not src_sel: return None
     
+    # Step 2: Choose TARGET Group
     console.print("\n[bold cyan]Step 2: Choose TARGET Group (Destination)[/]")
     tgt_sel = await interactive_channel_selector(client, prompt_title="TARGET Group")
     if not tgt_sel: return None
@@ -5970,15 +6105,15 @@ async def run_group_cloner_tool(session_mgr):
     except Exception as e:
         logger.info(f"Target forum lookup: {e}")
         
-    console.print("\n[bold cyan]Step 3: Topic Mirroring & Auto-Creation in Target...[/]")
+    console.print("\n[bold cyan]Step 3: Smart Topic Mirroring & Duplicate Prevention...[/]")
     rules_to_create = []
     
     for t in src_topics:
         t_title = getattr(t, 'title', f'Topic {t.id}')
-        tgt_t_id = tgt_topics_map.get(t_title.lower())
+        tgt_t_id = tgt_topics_map.get(t_title.strip().lower())
         
         if tgt_t_id:
-            console.print(f" [green]✔ Found existing matching topic in target:[/] {t_title} (ID: {tgt_t_id})")
+            console.print(f" [green]✔ Found existing topic in target:[/] {t_title} (ID: {tgt_t_id})")
         else:
             try:
                 created = await client(CreateForumTopicRequest(
@@ -5988,7 +6123,8 @@ async def run_group_cloner_tool(session_mgr):
                     random_id=generate_random_long()
                 ))
                 tgt_t_id = created.updates[0].id if hasattr(created, 'updates') and created.updates else (getattr(created, 'id', None) or t.id)
-                console.print(f" [bold green]➕ Created new matching topic in target:[/] {t_title} (ID: {tgt_t_id})")
+                tgt_topics_map[t_title.strip().lower()] = tgt_t_id
+                console.print(f" [bold green]➕ Created new topic in target:[/] {t_title} (ID: {tgt_t_id})")
             except Exception as e:
                 console.print(f" [yellow]⚠️ Could not auto-create '{t_title}' ({e}) -> Using default[/]")
                 tgt_t_id = 0
@@ -5997,7 +6133,26 @@ async def run_group_cloner_tool(session_mgr):
         await asyncio.sleep(0.3)
         
     set_key(".env", "FORWARDING_RULES", ",".join(rules_to_create))
-    console.print(f"\n[bold green]✨ All {len(rules_to_create)} topic routing rules successfully configured in .env![/]")
+    console.print(f"\n[bold green]✨ All {len(rules_to_create)} topic routing rules successfully configured & tracked in .env![/]")
+
+    # Export Initial Snapshot
+    now = datetime.now()
+    day = now.strftime("%A")
+    date_str = now.strftime("%d-%B-%Y")
+    time_str = now.strftime("%I-%M%p")
+    snap_name = f"group_clone_init_state_{day}_{date_str}_{time_str}.json"
+    snap_path = Path("archives") / snap_name
+    with suppress(Exception):
+        snap_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(snap_path, "w", encoding="utf-8") as f_snap:
+            json.dump({
+                "timestamp": f"{day}, {now.strftime('%d %B %Y')} | {now.strftime('%I:%M %p')}",
+                "source_group": f"{src_id} ({src_sel.get('title', '')})",
+                "target_group": f"{tgt_id} ({tgt_sel.get('title', '')})",
+                "topics_count": len(src_topics),
+                "rules": rules_to_create
+            }, f_snap, indent=2)
+        console.print(f"[dim]💾 Saved state snapshot: archives/{snap_name}[/]")
     
     confirm = await safe_input("\nStart Multi-Topic Group Clone Sequence Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
     if confirm and confirm.upper() == "YES":
