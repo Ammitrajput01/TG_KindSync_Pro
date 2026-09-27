@@ -1775,9 +1775,21 @@ class MultiSessionManager:
             
         for sf in session_files:
             name = str(Path(sf).with_suffix(""))
-            self.session_names.append(Path(name).name)
-            self.clients.append(TelegramClient(name, self.api_id, self.api_hash, **TELEGRAM_DEVICE_PARAMS))
+            try:
+                cl = TelegramClient(name, self.api_id, self.api_hash, **TELEGRAM_DEVICE_PARAMS)
+                self.session_names.append(Path(name).name)
+                self.clients.append(cl)
+            except Exception as e:
+                logger.warning(f"Corrupted or invalid session file {sf} skipped: {e}")
+                with suppress(Exception):
+                    if Path(sf).exists():
+                        Path(sf).unlink()
             
+        if not self.clients:
+            name = "session_forwarder"
+            self.session_names.append(name)
+            self.clients.append(TelegramClient(name, self.api_id, self.api_hash, **TELEGRAM_DEVICE_PARAMS))
+
         if self.active_index >= len(self.clients):
             self.active_index = 0
 
