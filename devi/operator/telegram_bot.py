@@ -369,6 +369,27 @@ class DeviTelegramBot:
                         copied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                # SangMata OSINT Cache Table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS sangmata_osint_cache (
+                        user_id INTEGER PRIMARY KEY,
+                        username TEXT,
+                        first_name TEXT,
+                        last_name TEXT,
+                        phone TEXT,
+                        is_premium INTEGER DEFAULT 0,
+                        name_history TEXT DEFAULT '[]',
+                        username_history TEXT DEFAULT '[]',
+                        total_shifts INTEGER DEFAULT 0,
+                        raw_response TEXT,
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_sangmata_uname ON sangmata_osint_cache(username);")
+
+                # Explicitly commit all tables to disk
+                conn.commit()
+
                 # Load persistent co-admins and add to admin pools
                 cursor = conn.execute("SELECT user_id FROM telegram_bot_admins")
                 for row in cursor.fetchall():
@@ -1084,15 +1105,28 @@ class DeviTelegramBot:
             return False
 
     def _save_topic_item(self, chat_id: int, topic_id: int, title: str, msg_id: Optional[int] = None, custom_link: Optional[str] = None, icon: str = "🎬") -> int:
-        """Saves a lecture/file/item under a specific topic."""
+        """Saves a lecture/file/item under a specific topic with auto-table self healing."""
         try:
             with get_db_conn() as conn:
                 cur = conn.execute("""
                     INSERT INTO telegram_topic_items (chat_id, topic_id, title, msg_id, custom_link, icon)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (chat_id, topic_id, title.strip(), msg_id, custom_link, icon))
+                conn.commit()
                 return cur.lastrowid
         except Exception as e:
+            if "no such table" in str(e).lower():
+                try:
+                    self._init_db()
+                    with get_db_conn() as conn:
+                        cur = conn.execute("""
+                            INSERT INTO telegram_topic_items (chat_id, topic_id, title, msg_id, custom_link, icon)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (chat_id, topic_id, title.strip(), msg_id, custom_link, icon))
+                        conn.commit()
+                        return cur.lastrowid
+                except Exception:
+                    pass
             logger.warning(f"Error saving topic item: {e}")
             return 0
 
@@ -1206,6 +1240,7 @@ class DeviTelegramBot:
                             total_messages = ?, name_history = ?, username_history = ?, changes_count = ?
                         WHERE user_id = ?
                     """, (current_fn, current_ln, current_username, active_phone, is_premium, lang_code, total_msgs, json.dumps(name_hist), json.dumps(uname_hist), changes_count, user_id))
+                    conn.commit()
 
                     result["is_new"] = False
                     result["phone"] = active_phone or "Not Shared"
@@ -1216,6 +1251,19 @@ class DeviTelegramBot:
                     result["total_messages"] = total_msgs
                     result["first_seen"] = row["first_seen"]
         except Exception as e:
+            if "no such table" in str(e).lower():
+                try:
+                    self._init_db()
+                    with get_db_conn() as conn:
+                        conn.execute("""
+                            INSERT INTO telegram_users_dossier 
+                            (user_id, first_name, last_name, username, phone_number, is_premium, language_code, first_seen, last_seen, total_messages, name_history, username_history, changes_count)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, '[]', '[]', 0)
+                        """, (user_id, current_fn, current_ln, current_username, detected_phone, is_premium, lang_code))
+                        conn.commit()
+                        result["is_new"] = True
+                except Exception:
+                    pass
             logger.warning(f"Error tracking user dossier: {e}")
 
         return result
@@ -1259,6 +1307,11 @@ class DeviTelegramBot:
             name_val = uname_str if uname_str != "No Username" else "No Username"
             uname_lines.append(f"1. `{name_val}` *(Current Active Username)*")
 
+        shifts_count = dossier.get("changes_count", 0)
+        risk_str = ""
+        if shifts_count >= 3:
+            risk_str = f"⚡ **Shift Velocity:** 🚨 High Velocity ({shifts_count} Identity Shifts Detected)\n"
+
         card = (
             f"👤 **{title_prefix} — USER INTELLIGENCE** 🩺\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1267,6 +1320,7 @@ class DeviTelegramBot:
             f"🆔 **Telegram ID:** `{user_id}`\n"
             f"🗓️ **Account Age:** {acct_age}\n"
             f"⭐️ **Telegram Tier:** {is_prem}\n"
+            f"{risk_str}"
             f"{phone_str}\n"
             f"📜 **Name History (SangMata Timeline):**\n" + "\n".join(name_lines) + "\n\n"
             f"🏷️ **Username History (SangMata Timeline):**\n" + "\n".join(uname_lines) + "\n"
@@ -3161,6 +3215,7 @@ class DeviTelegramBot:
 
         elif cmd in ("/topicindex", "/subindex", "/index"):
             target_index_chat = self._resolve_study_group_id(chat_id)
+            clean_chat_id = str(target_index_chat).replace("-100", "").replace("-", "").lstrip("@")
             target_t_id = thread_id
             sort_mode = "seq"  # Default is natural lecture sequence (1, 2, 3...)
 
@@ -3193,12 +3248,17 @@ class DeviTelegramBot:
                 )
                 try:
                     proc = await asyncio.create_subprocess_exec(
-                        sys.executable, "-m", "devi.operator.group_scanner", str(chat_id),
+                        sys.executable, "-m", "devi.operator.group_scanner", str(target_index_chat), str(target_t_id),
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE
                     )
-                    await asyncio.wait_for(proc.communicate(), timeout=35.0)
-                    items = self._get_topic_items(chat_id, target_t_id)
+                    await asyncio.wait_for(proc.communicate(), timeout=45.0)
+                    # Re-fetch topic title and items
+                    topics = self._get_topics(target_index_chat, sort_mode="seq")
+                    matched_topic = next((t for t in topics if t["topic_id"] == target_t_id), None)
+                    if matched_topic:
+                        topic_title = matched_topic["topic_title"]
+                    items = self._get_topic_items(target_index_chat, target_t_id, sort_mode=sort_mode)
                 except Exception as e:
                     logger.warning(f"Error during auto-healing topic scan: {e}")
                 if scan_notify:
