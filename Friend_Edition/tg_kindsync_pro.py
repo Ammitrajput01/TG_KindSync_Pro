@@ -2184,29 +2184,50 @@ class RPCGuard:
 # ============================================================
 async def get_account_channels_list(client):
     channels = []
+    cache_file = Path("data/channels_cache.json")
+    
+    # 1. Try streaming iter_dialogs directly from Telegram
     for attempt in range(3):
         try:
-            # Fetch ALL dialogs from Telegram without hard limit
-            dialogs = await client.get_dialogs(limit=None)
-            for d in dialogs:
+            seen_ids = set()
+            async for d in client.iter_dialogs(limit=None):
                 if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
-                    name = str(d.name or "Unnamed").strip()
-                    uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
-                    channels.append({"id": d.id, "title": name, "username": uname})
+                    if d.id not in seen_ids:
+                        seen_ids.add(d.id)
+                        name = str(d.name or "Unnamed").strip()
+                        uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
+                        channels.append({"id": d.id, "title": name, "username": uname})
+            
             if channels:
+                with suppress(Exception):
+                    cache_file.parent.mkdir(parents=True, exist_ok=True)
+                    with open(cache_file, "w", encoding="utf-8") as fc:
+                        json.dump(channels, fc, indent=2)
                 break
         except Exception as e:
-            logger.error(f"Error listing dialogs (attempt {attempt+1}): {e}")
-            if "database is locked" in str(e).lower() or "locked" in str(e).lower():
-                if sys.platform.startswith("linux"):
-                    try:
-                        import subprocess
-                        subprocess.run(["sudo", "systemctl", "stop", "tg-forwarder"], capture_output=True, timeout=3)
-                    except Exception:
-                        pass
-                await asyncio.sleep(1.0)
-            else:
-                await asyncio.sleep(0.5)
+            logger.debug(f"Error listing dialogs (attempt {attempt+1}): {e}")
+            await asyncio.sleep(0.5)
+
+    # 2. Fallback to cached channels if API call was interrupted or locked
+    if not channels and cache_file.exists():
+        with suppress(Exception):
+            with open(cache_file, "r", encoding="utf-8") as fc:
+                channels = json.load(fc)
+                if channels:
+                    logger.info(f"Loaded {len(channels)} channels from local cache.")
+
+    # 3. Fallback to channels registered in history_core.sqlite
+    if not channels:
+        with suppress(Exception):
+            with get_db_conn() as conn:
+                rows = conn.execute("SELECT DISTINCT chat_id, topic_title FROM telegram_group_topics").fetchall()
+                seen = set()
+                for r in rows:
+                    cid = r[0]
+                    if cid and cid not in seen:
+                        seen.add(cid)
+                        channels.append({"id": cid, "title": f"Group {cid}", "username": None})
+
     return channels
 
 def _normalize_search_str(text: str) -> str:
@@ -8058,7 +8079,9 @@ async def run_menu(session_mgr):
             AdminTelemetry.dispatch(session_mgr.get_client(), "🔴 [MONITOR] Program Closed / Exit", {
                 "Status": "Terminated Normally by User"
             })
-            console.print("\n[bold green]👋 Program Exited Safely. Have a great day![/]")
+            with suppress(Exception):
+                await session_mgr.disconnect_all()
+            console.print("\n[bold green]👋 Program Exited Safely. All sessions closed.[/]")
             await asyncio.sleep(0.5)
             release_lock()
             sys.exit(0)

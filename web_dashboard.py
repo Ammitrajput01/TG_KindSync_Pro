@@ -2439,26 +2439,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             <!-- Scrollable View Content -->
             <div class="view-content-area">
-                
-                <!-- In-Flight Active File Transfer Progress Panel -->
-                <div class="active-transfer-panel" id="active-transfer-box">
-                    <div class="transfer-header">
-                        <div class="transfer-title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" x2="12" y1="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-                            <span id="active-file-name">Streaming Medical Lecture.mp4</span>
-                        </div>
-                        <div class="transfer-meta">
-                            <span class="tabular" id="active-file-bytes">14.2 MB / 85.0 MB</span>
-                            <span class="tabular" id="active-file-eta">ETA: 00:24</span>
-                            <span class="tabular" style="font-weight: 700; color: var(--accent-primary);" id="active-file-pct">18%</span>
-                        </div>
-                    </div>
-                    <div class="progress-track">
-                        <div class="progress-fill" id="active-file-bar"></div>
-                    </div>
-                </div>
 
-                                <!-- ==============================================================
+                <!-- ==============================================================
                      VIEW 1: MISSION CONTROL (OVERVIEW)
                      ============================================================== -->
                 <section class="tab-view active" id="view-overview">
@@ -2716,44 +2698,48 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>
                     </div>
 
-                    <!-- Active In-Flight Streaming & Permanent Engine State Hub -->
-                    <div class="panel-section" id="active-transfer-box" style="margin-bottom: var(--space-5); background: linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(99, 102, 241, 0.1) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: var(--radius-lg); padding: var(--space-4); box-shadow: 0 4px 20px rgba(56, 189, 248, 0.12);">
-                        <!-- Mode A: File Uploading Active -->
+                    <!-- Dedicated In-Flight Active File Transfer & Live Chunk Stream Card -->
+                    <div class="panel-section" id="active-transfer-box" style="margin-bottom: var(--space-5); background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: var(--radius-lg); padding: var(--space-4); box-shadow: 0 4px 20px rgba(56, 189, 248, 0.08);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: var(--space-2);">
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span style="font-size: 18px;">📡</span>
+                                <span style="font-size: 13px; font-weight: 800; color: #38BDF8; letter-spacing: 0.5px; text-transform: uppercase;">In-Flight Active File Transfer & Live Stream</span>
+                            </div>
+                            <span class="pill pill-success tabular" id="engine-status-pill" style="font-size: 11px;">🟢 MTPROTO SYNC ONLINE</span>
+                        </div>
+
+                        <!-- Active File Transfer Metadata & Progress Bar -->
                         <div id="transfer-mode-busy" style="display: none;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); flex-wrap: wrap; gap: var(--space-2);">
-                                <div style="display: flex; align-items: center; gap: var(--space-3);">
-                                    <span style="font-size: 20px;">📡</span>
-                                    <div>
-                                        <div style="font-size: 11px; font-weight: 700; color: #38BDF8; text-transform: uppercase;">CURRENTLY STREAMING FILE</div>
-                                        <div style="font-size: 14px; font-weight: 800; color: #fff; word-break: break-all;" id="active-file-name">Connecting stream...</div>
-                                    </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); flex-wrap: wrap; gap: var(--space-2);">
+                                <div>
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase;">ACTIVE FILE NAME:</div>
+                                    <div style="font-size: 14px; font-weight: 800; color: #fff; word-break: break-all;" id="active-file-name">Streaming Medical Lecture.mp4</div>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: var(--space-3);">
                                     <span class="tabular" id="active-file-bytes" style="font-size: 13px; font-weight: 700; color: #94A3B8;">0 MB / 0 MB</span>
-                                    <span class="pill pill-success tabular" id="active-file-pct" style="font-size: 13px; font-weight: 800;">0%</span>
+                                    <span class="pill pill-primary tabular" id="active-file-pct" style="font-size: 13px; font-weight: 800;">0%</span>
                                 </div>
                             </div>
-                            <div style="height: 8px; background: rgba(15, 23, 42, 0.8); border-radius: 999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-bottom: var(--space-2);">
+                            <div style="height: 10px; background: rgba(15, 23, 42, 0.8); border-radius: 999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-bottom: var(--space-2);">
                                 <div id="active-file-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #38BDF8, #818CF8); transition: width 0.3s ease;"></div>
                             </div>
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-tertiary);">
-                                <span>Chunk Streaming Protocol: MTProto Parallel Turbo (8x)</span>
+                                <span>Turbo MTProto Chunk Stream</span>
                                 <span class="tabular" id="active-file-eta" style="color: #38BDF8; font-weight: 700;">ETA: Calculating...</span>
                             </div>
                         </div>
 
-                        <!-- Mode B: Standby / Idle / Monitoring (Permanent Active Glow Pulse) -->
-                        <div id="transfer-mode-idle" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
+                        <!-- Standby State (Permanent) -->
+                        <div id="transfer-mode-idle" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-2) 0;">
                             <div style="display: flex; align-items: center; gap: var(--space-3);">
-                                <div style="width: 14px; height: 14px; border-radius: 50%; background: #10B981; box-shadow: 0 0 14px #10B981; animation: pulse-glow 2s infinite;"></div>
+                                <div style="width: 12px; height: 12px; border-radius: 50%; background: #10B981; box-shadow: 0 0 12px #10B981; animation: pulse-glow 2s infinite;"></div>
                                 <div>
-                                    <div style="font-size: 14px; font-weight: 800; color: #fff;" id="engine-live-mode-text">Pipeline Active & Monitoring Telegram Stream</div>
-                                    <div style="font-size: 12px; color: var(--text-secondary);" id="engine-live-mode-sub">Listening on Source Channel (#80184) for incoming lecture media and new posts</div>
+                                    <div style="font-size: 13px; font-weight: 700; color: #fff;" id="engine-live-mode-text">Pipeline Active & Monitoring Telegram Stream</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary);" id="engine-live-mode-sub">No active file chunk upload currently in-flight. Ready for next incoming media.</div>
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <span class="pill pill-success tabular" id="engine-status-pill">🟢 MTPROTO SYNC ONLINE</span>
-                                <span class="pill pill-neutral tabular" id="engine-heartbeat-pill">Heartbeat: Optimal</span>
+                                <span class="pill pill-neutral tabular" id="engine-heartbeat-pill" style="font-size: 11px;">Heartbeat: Optimal</span>
                             </div>
                         </div>
                     </div>
@@ -4549,7 +4535,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         window.addEventListener('DOMContentLoaded', () => {
             checkAuth();
             updateStatus();
-            setInterval(updateStatus, 2500);
+            setInterval(updateStatus, 1000);
         });
     </script>
 
@@ -4774,13 +4760,13 @@ class DashboardServer:
         files_completed = max(self.state.total_transfers, real_db_count)
 
         # Determine realistic total files from topic or whole channel batch
-        if total_db_items > 50:
+        if total_db_items > 0:
             total_files = max(total_db_items, files_completed)
         else:
-            total_files = max(4420, files_completed)
+            total_files = files_completed
 
         files_remaining = max(0, total_files - files_completed)
-        batch_progress_pct = round((files_completed / total_files) * 100.0, 1) if total_files > 0 else 0.0
+        batch_progress_pct = round((files_completed / total_files) * 100.0, 1) if total_files > 0 else (100.0 if files_completed > 0 else 0.0)
         videos_sent = self.state.videos_sent
         docs_sent = self.state.docs_sent
         photos_sent = self.state.photos_sent
@@ -4835,33 +4821,33 @@ class DashboardServer:
         avg_photo_mb = 3.6
         avg_audio_mb = 22.4
 
-        # Detailed Category Breakdown for Permanent Cards
-        tot_videos = max(videos_sent, int(total_files * 0.72)) if total_files > 0 else max(videos_sent, 3182)
-        v_sent = max(videos_sent, int(files_completed * 0.75)) if files_completed > 0 else videos_sent
+        # Real Dynamic Category Breakdown
+        tot_videos = max(videos_sent, int(total_files * 0.72)) if total_files > 0 else videos_sent
+        v_sent = videos_sent
         v_pending = max(0, tot_videos - v_sent)
-        v_pct = min(100.0, round((v_sent / tot_videos) * 100.0, 1)) if tot_videos > 0 else 0.0
+        v_pct = min(100.0, round((v_sent / tot_videos) * 100.0, 1)) if tot_videos > 0 else (100.0 if v_sent > 0 else 0.0)
 
-        tot_docs = max(docs_sent, int(total_files * 0.20)) if total_files > 0 else max(docs_sent, 884)
-        d_sent = max(docs_sent, int(files_completed * 0.20)) if files_completed > 0 else docs_sent
+        tot_docs = max(docs_sent, int(total_files * 0.20)) if total_files > 0 else docs_sent
+        d_sent = docs_sent
         d_pending = max(0, tot_docs - d_sent)
-        d_pct = min(100.0, round((d_sent / tot_docs) * 100.0, 1)) if tot_docs > 0 else 0.0
+        d_pct = min(100.0, round((d_sent / tot_docs) * 100.0, 1)) if tot_docs > 0 else (100.0 if d_sent > 0 else 0.0)
 
-        tot_photos = max(photos_sent, 95)
+        tot_photos = photos_sent
         p_sent = photos_sent
         p_pending = max(0, tot_photos - p_sent)
 
-        total_data_gb = round((total_files * avg_video_mb) / 1024, 1)
-        transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1)
+        total_data_gb = round((total_files * avg_video_mb) / 1024, 1) if total_files > 0 else 0.0
+        transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1) if files_completed > 0 else 0.0
         remaining_data_gb = round(max(0.0, total_data_gb - transferred_data_gb), 1)
 
-        videos_gb = round((max(videos_sent, files_completed) * avg_video_mb) / 1024, 1)
-        docs_gb = round((docs_sent * avg_doc_mb) / 1024, 1)
-        photos_gb = round((photos_sent * avg_photo_mb) / 1024, 1)
-        audios_gb = round(((albums_sent or 0) * avg_audio_mb) / 1024, 1)
+        videos_gb = round((videos_sent * avg_video_mb) / 1024, 1) if videos_sent > 0 else 0.0
+        docs_gb = round((docs_sent * avg_doc_mb) / 1024, 1) if docs_sent > 0 else 0.0
+        photos_gb = round((photos_sent * avg_photo_mb) / 1024, 1) if photos_sent > 0 else 0.0
+        audios_gb = round(((albums_sent or 0) * avg_audio_mb) / 1024, 1) if albums_sent else 0.0
 
         # Batch ETA & Finish Forecast
         remaining_mb = remaining_data_gb * 1024
-        calc_speed = cur_speed if cur_speed > 0.05 else (peak_speed * 0.7 if peak_speed > 0.5 else 8.5)
+        calc_speed = cur_speed if cur_speed > 0.05 else (peak_speed * 0.7 if peak_speed > 0.5 else 0.0)
         eta_seconds = int(remaining_mb / calc_speed) if calc_speed > 0 else 0
         eta_hrs, rem_m = divmod(eta_seconds, 3600)
         eta_mins, _ = divmod(rem_m, 60)
@@ -4871,22 +4857,22 @@ class DashboardServer:
         elif eta_mins > 0:
             batch_eta = f"{eta_mins}m"
         else:
-            batch_eta = "Standby (Ready to resume)" if cur_speed <= 0.001 else "12m 45s"
+            batch_eta = "Standby (Idle)" if cur_speed <= 0.001 else "12m 45s"
 
         finish_dt = datetime.now() + timedelta(seconds=eta_seconds)
-        est_finish_time = finish_dt.strftime("%I:%M %p, %d %b")
+        est_finish_time = finish_dt.strftime("%I:%M %p, %d %b") if calc_speed > 0 else "--:--"
 
         # Route Topology Mapping
-        source_chat_id = os.getenv("SOURCE_CHAT", "-1003968310888").strip("'\"")
-        source_topic_id = os.getenv("SOURCE_TOPIC", "80184").strip("'\"")
-        target_chat_id = os.getenv("TARGET_CHAT", "-1004477528569").strip("'\"")
-        target_topic_id = os.getenv("TARGET_TOPIC", "459").strip("'\"")
+        source_chat_id = os.getenv("SOURCE_CHAT", "").strip("'\"")
+        source_topic_id = os.getenv("SOURCE_TOPIC", "").strip("'\"")
+        target_chat_id = os.getenv("TARGET_CHAT", "").strip("'\"")
+        target_topic_id = os.getenv("TARGET_TOPIC", "").strip("'\"")
 
-        src_top_name = topic_map.get(int(source_topic_id), f"Johari 1st Year (#{source_topic_id})") if source_topic_id.isdigit() else "Johari 1st Year"
+        src_top_name = topic_map.get(int(source_topic_id), f"Topic #{source_topic_id}") if source_topic_id.isdigit() else (source_topic_id or "Active Stream")
         source_route = {
-            "chat_name": "Johari MBBS Stream",
-            "topic_name": src_top_name,
-            "chat_id": source_chat_id
+            "chat_name": f"Source {source_chat_id}" if source_chat_id else "Telegram Channel Stream",
+            "topic_name": src_top_name if source_topic_id else "General / All Topics",
+            "chat_id": source_chat_id or "Not Configured"
         }
 
         target_routes = []
@@ -4899,23 +4885,21 @@ class DashboardServer:
                     tgt_cid = p_items[2]
                     tgt_tid = p_items[3]
                     t_title = topic_map.get(int(tgt_tid), f"Topic #{tgt_tid}") if tgt_tid.isdigit() else f"Topic #{tgt_tid}"
-                    c_label = "Study Help 2.0 😉" if "4477528569" in tgt_cid else ("Kind Doctor Medical Core" if "4493307470" in tgt_cid else "Study Group")
                     target_routes.append({
-                        "chat_name": c_label,
+                        "chat_name": f"Target Group {tgt_cid}",
                         "topic_name": t_title,
                         "target_chat_id": tgt_cid,
                         "target_topic_id": tgt_tid,
                         "status": "Active Synced"
                     })
-        if not target_routes:
-            tgt_top_name = topic_map.get(int(target_topic_id), f"Johari 1st Year Videos (#{target_topic_id})") if target_topic_id.isdigit() else "Johari 1st Year Videos"
-            tgt_group_name = "Study Help 2.0 😉" if "4477528569" in target_chat_id else "Study Help 2.0 😉"
+        if not target_routes and target_chat_id:
+            tgt_top_name = topic_map.get(int(target_topic_id), f"Topic #{target_topic_id}") if target_topic_id.isdigit() else (target_topic_id or "General")
             target_routes = [
                 {
-                    "chat_name": tgt_group_name,
+                    "chat_name": f"Target Group {target_chat_id}",
                     "topic_name": tgt_top_name,
                     "target_chat_id": target_chat_id,
-                    "target_topic_id": target_topic_id,
+                    "target_topic_id": target_topic_id or "0",
                     "status": "Active Synced"
                 }
             ]
@@ -4937,8 +4921,8 @@ class DashboardServer:
 
         db_count = max(real_db_count, getattr(self.state, "db_forwarded_count", 0))
 
-        active_topic_title = topic_map.get(int(target_topic_id), "Johari 1st Year Videos") if target_topic_id.isdigit() else "Johari 1st Year Videos"
-        active_group_title = "Study Help 2.0 😉" if "4477528569" in target_chat_id else "Study Help 2.0 😉"
+        active_topic_title = topic_map.get(int(target_topic_id), f"Topic #{target_topic_id}") if (target_topic_id and target_topic_id.isdigit()) else (target_topic_id or "Standby")
+        active_group_title = f"Group {target_chat_id}" if target_chat_id else "Standby"
 
         # Speed formatter for JSON API
         if cur_speed <= 0.0001:

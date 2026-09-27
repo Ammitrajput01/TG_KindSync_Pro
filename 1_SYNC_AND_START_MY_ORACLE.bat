@@ -80,11 +80,13 @@ echo   [1] View Live 24/7 Journal Log Stream (Press Ctrl+C to stop viewing)
 echo   [2] Open Interactive Terminal Shell (tmux session)
 echo   [3] Open DEVI Sentinel Web Dashboard (Port 8080)
 echo   [4] Re-run Sync
+echo   [5] 🛑 Clean Stop 24/7 Background Services on Oracle
+echo   [6] ▶️ Resume / Restart 24/7 Background Services on Oracle
 echo.
-echo   [0] Close Window (Background service continues running 24/7)
+echo   [0] Close Window
 echo ==============================================================================
 echo.
-set /p "POST_CHOICE=Enter choice [1-4 or 0]: "
+set /p "POST_CHOICE=Enter choice [1-6 or 0]: "
 
 if "%POST_CHOICE%"=="1" (
     cls
@@ -110,6 +112,25 @@ if "%POST_CHOICE%"=="3" (
 )
 
 if "%POST_CHOICE%"=="4" goto SYNC_STEP
+
+if "%POST_CHOICE%"=="5" (
+    cls
+    echo [*] Stopping background services cleanly on Oracle VPS...
+    ssh -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "sudo systemctl stop tg-forwarder tg-kinddoc-bot tg-dashboard 2>/dev/null; echo [OK] All services cleanly stopped!"
+    echo.
+    pause
+    goto AFTER_SYNC_MENU
+)
+
+if "%POST_CHOICE%"=="6" (
+    cls
+    echo [*] Resuming/Starting background services on Oracle VPS...
+    ssh -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "sudo systemctl daemon-reload && sudo systemctl restart tg-forwarder tg-kinddoc-bot tg-dashboard 2>/dev/null; sudo systemctl status tg-forwarder --no-pager"
+    echo.
+    pause
+    goto AFTER_SYNC_MENU
+)
+
 if "%POST_CHOICE%"=="0" exit /b 0
 
 echo [!] Invalid option.

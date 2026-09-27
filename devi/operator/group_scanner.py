@@ -66,7 +66,7 @@ def init_tables(conn: sqlite3.Connection):
     conn.commit()
 
 async def get_authorized_client():
-    """Finds first available authorized user session or falls back to bot token."""
+    """Finds first available authorized user session (with lock bypass) or falls back to bot token."""
     from telethon import TelegramClient
 
     candidate_sessions = [
@@ -80,28 +80,43 @@ async def get_authorized_client():
     # Add any other session files present in directory
     for p in ROOT_DIR.glob("*.session"):
         sname = p.stem
-        if "bot" not in sname and sname not in candidate_sessions:
+        if "bot" not in sname and "temp_scan" not in sname and sname not in candidate_sessions:
             candidate_sessions.append(sname)
 
     for sess_stem in candidate_sessions:
         sess_file = ROOT_DIR / f"{sess_stem}.session"
         if sess_file.exists() and sess_file.stat().st_size > 0:
-            client = TelegramClient(str(ROOT_DIR / sess_stem), API_ID, API_HASH)
+            # 1. First try direct connect
             try:
+                client = TelegramClient(str(ROOT_DIR / sess_stem), API_ID, API_HASH)
                 await client.connect()
                 if await client.is_user_authorized():
                     print(f"[*] Using authorized user session: {sess_stem}")
-                    return client, "user"
+                    return client, "user", None
                 await client.disconnect()
-            except Exception:
-                with suppress(Exception):
+            except Exception as e:
+                # 2. If locked by running bot/forwarder, create isolated ephemeral clone
+                try:
+                    temp_stem = f"temp_scan_{sess_stem}_{os.getpid()}"
+                    temp_sess = ROOT_DIR / f"{temp_stem}.session"
+                    shutil.copy2(sess_file, temp_sess)
+                    
+                    client = TelegramClient(str(ROOT_DIR / temp_stem), API_ID, API_HASH)
+                    await client.connect()
+                    if await client.is_user_authorized():
+                        print(f"[*] Using authorized ephemeral session clone: {sess_stem}")
+                        return client, "user", temp_sess
                     await client.disconnect()
+                    if temp_sess.exists():
+                        temp_sess.unlink(missing_ok=True)
+                except Exception as inner_e:
+                    print(f"[!] Session {sess_stem} fallback clone failed: {inner_e}")
 
     # Fallback to Bot Token Client
     print("[*] No authorized user session found. Initializing Bot Client...")
     bot_client = TelegramClient(str(ROOT_DIR / "session_bot_scanner"), API_ID, API_HASH)
     await bot_client.start(bot_token=BOT_TOKEN)
-    return bot_client, "bot"
+    return bot_client, "bot", None
 
 def get_topic_icon(title: str) -> str:
     t_lower = title.lower()
@@ -193,30 +208,76 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
 async def scan_group(target_chat_id: int, target_topic_id: Optional[int] = None, scan_messages: bool = True):
     from telethon.tl.functions.messages import GetForumTopicsRequest
 
-    client, client_type = await get_authorized_client()
+    client, client_type, temp_sess_file = await get_authorized_client()
     try:
         peer = None
+        # Try direct resolution
         try:
             peer = await client.get_input_entity(target_chat_id)
         except Exception:
+            pass
+
+        if not peer:
+            search_ids = [target_chat_id]
+            raw_id = abs(target_chat_id)
+            search_ids.extend([raw_id, -raw_id])
+            s_raw = str(raw_id)
+            if s_raw.startswith("100"):
+                with suppress(Exception):
+                    short_id = int(s_raw[3:])
+                    search_ids.extend([short_id, -short_id, int(f"-100{short_id}")])
+
+            for sid in search_ids:
+                try:
+                    peer = await client.get_input_entity(sid)
+                    if peer: break
+                except Exception:
+                    pass
+                try:
+                    ent = await client.get_entity(sid)
+                    if ent:
+                        peer = ent
+                        break
+                except Exception:
+                    pass
+
+        if not peer:
             try:
-                async for dialog in client.iter_dialogs(limit=100):
-                    if dialog.id == target_chat_id or getattr(dialog.entity, 'id', None) == abs(target_chat_id) % 10000000000:
+                async for dialog in client.iter_dialogs(limit=None):
+                    d_id = abs(dialog.id)
+                    d_ent_id = abs(getattr(dialog.entity, 'id', 0))
+                    if d_id in search_ids or d_ent_id in search_ids:
                         peer = dialog.input_entity
                         break
             except Exception:
                 pass
-            if not peer:
-                try:
-                    peer = await client.get_entity(target_chat_id)
-                except Exception as e:
-                    print(f"[!] Warning: Could not resolve peer for {target_chat_id}: {e}")
-                    return
+
+        if not peer:
+            try:
+                peer = await client.get_entity(target_chat_id)
+            except Exception as e:
+                print(f"[!] Warning: Could not resolve peer for {target_chat_id}: {e}")
+                return
 
         # Case 1: Targeted Single-Topic Scan (Lightning fast for /topicindex)
         if target_topic_id:
             print(f"[*] Scanning specific topic #{target_topic_id} in chat {target_chat_id}...")
-            count = await scan_single_topic(client, peer, target_chat_id, target_topic_id)
+            # Try to fetch topic title via GetForumTopicsRequest if user client
+            topic_title = None
+            if client_type == "user":
+                with suppress(Exception):
+                    res = await client(GetForumTopicsRequest(
+                        peer=peer,
+                        offset_date=None,
+                        offset_id=0,
+                        offset_topic=0,
+                        limit=100
+                    ))
+                    for t in getattr(res, 'topics', []):
+                        if getattr(t, 'id', 0) == target_topic_id:
+                            topic_title = getattr(t, 'title', None)
+                            break
+            count = await scan_single_topic(client, peer, target_chat_id, target_topic_id, topic_title=topic_title)
             print(f"SUCCESS: Scanned topic #{target_topic_id} ({count} items found)")
             return
 
@@ -281,6 +342,9 @@ async def scan_group(target_chat_id: int, target_topic_id: Optional[int] = None,
     finally:
         with suppress(Exception):
             await client.disconnect()
+        if temp_sess_file and Path(temp_sess_file).exists():
+            with suppress(Exception):
+                Path(temp_sess_file).unlink(missing_ok=True)
 
 if __name__ == "__main__":
     target_chat = int(sys.argv[1]) if len(sys.argv) > 1 else -1003912970546
