@@ -4120,6 +4120,119 @@ class DeviTelegramBot:
                 message_thread_id=thread_id
             )
 
+        elif cmd in ("/send", "/pm", "/msg", "/sendlink", "/reply", "/say", "/dr"):
+            # 1. Admin speaking through bot in Group or DM: /say <msg> or /dr <msg>
+            if cmd in ("/say", "/dr") or (cmd == "/reply" and len(parts) > 1 and not (parts[1].isdigit() or parts[1].startswith("@"))):
+                msg_body = text.split(maxsplit=1)[1] if len(parts) > 1 else ""
+                if not msg_body:
+                    await self._send_message(session, chat_id, "ℹ️ **Usage**: `/say <message>` (Group me student ke message par reply karke type karein)", message_thread_id=thread_id)
+                    return
+                
+                # Delete the admin command message if in a group
+                if message and str(chat_id).startswith("-"):
+                    await self._delete_message(session, chat_id, message.get("message_id"))
+                
+                rep_id = reply_to.get("message_id") if reply_to else None
+                bot_out = f"👨‍⚕️ **Kind Doctor:**\n\n{msg_body}"
+                await self._send_message(session, chat_id, bot_out, reply_to=rep_id, message_thread_id=thread_id)
+                return
+
+            # 2. Direct DM to student: /send <target> <message> or /sendlink <target>
+            if len(parts) < 2:
+                await self._send_message(
+                    session, chat_id,
+                    f"ℹ️ **Kind Doctor Direct Messaging & Replies:**\n\n"
+                    f"• `/send <@username or user_id> <message>` — Student ko bot se direct private message bhejein\n"
+                    f"• `/sendlink <@username or user_id>` — Student ko single-use 30-min invite link bhejein\n"
+                    f"• `/say <message>` — Group me student ke message par reply karke anonymously bolein\n\n"
+                    f"*(Tip: Student ke message card par Telegram ka default 'Reply' karke type karne par bhi direct reply chala jata hai)*",
+                    message_thread_id=thread_id
+                )
+                return
+
+            target_arg = parts[1].strip()
+            target_uid = None
+            target_uname = None
+            
+            if target_arg.lstrip("-").isdigit():
+                target_uid = int(target_arg)
+            else:
+                target_uname = target_arg.lstrip("@")
+
+            # Lookup in DB if needed
+            u_row = None
+            with get_db_conn() as conn:
+                if target_uid:
+                    u_row = conn.execute("SELECT user_id, first_name, username FROM telegram_users_dossier WHERE user_id = ?", (target_uid,)).fetchone()
+                    if not u_row:
+                        u_row = conn.execute("SELECT user_id, full_name, username FROM member_history WHERE user_id = ?", (target_uid,)).fetchone()
+                else:
+                    u_row = conn.execute("SELECT user_id, first_name, username FROM telegram_users_dossier WHERE username = ? COLLATE NOCASE", (target_uname,)).fetchone()
+                    if not u_row:
+                        u_row = conn.execute("SELECT user_id, full_name, username FROM member_history WHERE username = ? COLLATE NOCASE", (target_uname,)).fetchone()
+
+            if u_row:
+                target_uid = u_row[0]
+                user_label = f"{u_row[1]} (@{u_row[2]})" if u_row[2] else f"{u_row[1]}"
+            else:
+                user_label = f"`{target_arg}`"
+
+            if not target_uid:
+                await self._send_message(
+                    session, chat_id,
+                    f"⚠️ User `{target_arg}` not found in bot memory. Kripya unka numeric User ID use karein (e.g. `/send 12345678 message`).",
+                    message_thread_id=thread_id
+                )
+                return
+
+            if cmd == "/sendlink":
+                target_grp = self.target_chat
+                link_url = ""
+                if target_grp:
+                    try:
+                        invite_url = f"https://api.telegram.org/bot{self.token}/createChatInviteLink"
+                        expire_ts = int((datetime.now() + timedelta(minutes=30)).timestamp())
+                        async with session.post(invite_url, json={"chat_id": target_grp, "member_limit": 1, "expire_date": expire_ts}, timeout=10) as resp:
+                            if resp.status == 200:
+                                res_data = await resp.json()
+                                link_url = res_data.get("result", {}).get("invite_link")
+                    except Exception as e:
+                        logger.warning(f"Error creating invite link in sendlink: {e}")
+
+                if link_url:
+                    content_to_send = (
+                        f"👨‍⚕️ **Kind Doctor:**\n\n"
+                        f"Welcome! Here is your exclusive single-use invite link to the study group:\n"
+                        f"{link_url}\n\n"
+                        f"*(Note: Yeh link 30 minutes me expire ho jayega. Happy studying!)*"
+                    )
+                else:
+                    content_to_send = "👨‍⚕️ **Kind Doctor:**\n\nGroup link generation is temporarily busy. Please hold on or contact admin."
+            else:
+                if len(parts) < 3:
+                    await self._send_message(session, chat_id, f"ℹ️ Please include a message: `/send {target_arg} <your message>`", message_thread_id=thread_id)
+                    return
+                body_text = text.split(maxsplit=2)[2].strip()
+                content_to_send = f"👨‍⚕️ **Kind Doctor:**\n\n{body_text}"
+
+            # Attempt delivery to student
+            delivered = await self._send_message(session, target_uid, content_to_send)
+            if delivered:
+                await self._send_message(
+                    session, chat_id,
+                    f"✅ **Message Delivered to {user_label}** (`{target_uid}`)!\n\n*(Sent under anonymous '👨‍⚕️ Kind Doctor' brand)*",
+                    message_thread_id=thread_id
+                )
+            else:
+                await self._send_message(
+                    session, chat_id,
+                    f"⚠️ **Delivery to {user_label} failed.**\n\n"
+                    f"📌 **Reason**: Telegram policy prevents bots from initiating a new private chat if the user has never started the bot in PM (`/start`).\n\n"
+                    f"💡 **Solution**: Agar user group me hai, toh group me unke message par swipe/reply karke `/say <message>` likhein!",
+                    message_thread_id=thread_id
+                )
+            return
+
         elif cmd in ("/userinfo", "/whois", "/info", "/sangmata", "/history"):
             target_user_id = None
             target_username = None
