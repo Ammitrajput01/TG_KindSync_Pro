@@ -3665,7 +3665,10 @@ class TerminalPlatform:
         if getattr(self, "resume_min_id", None) is not None:
             min_id = self.resume_min_id
         else:
-            min_id = await self.state.get_watermark(self.cfg.source_chat)
+            if self.cfg.source_topic:
+                min_id = await self.state.get_topic_watermark(self.cfg.source_chat, self.cfg.source_topic, self.cfg.target_chat, self.cfg.target_topic)
+            else:
+                min_id = await self.state.get_watermark(self.cfg.source_chat)
         src_p = _parse_chat_id(self.cfg.source_chat)
         tgt_p = _parse_chat_id(self.cfg.target_chat)
         tgt_topic = self.cfg.target_topic or 0
@@ -3785,7 +3788,10 @@ class TerminalPlatform:
         gid = None
         batch_count = 0
         
-        min_id = await self.state.get_watermark(rule["source_chat"])
+        if rule.get("source_topic"):
+            min_id = await self.state.get_topic_watermark(rule["source_chat"], rule["source_topic"], rule["target_chat"], rule.get("target_topic", 0))
+        else:
+            min_id = await self.state.get_watermark(rule["source_chat"])
         src_p = _parse_chat_id(rule["source_chat"])
         tgt_p = _parse_chat_id(rule["target_chat"])
         tgt_topic = rule.get("target_topic", 0) or 0
@@ -4359,11 +4365,15 @@ class TerminalPlatform:
         # SMART AUTO-RESUME & CRASH RECOVERY BOOKMARK CHECK
         self.resume_min_id = None
         if not self.cfg.live_mode and not self.cfg.run_dlq and self.cfg.routing_mode == 1:
-            prev_watermark = await self.state.get_watermark(self.cfg.source_chat)
+            if self.cfg.source_topic:
+                prev_watermark = await self.state.get_topic_watermark(self.cfg.source_chat, self.cfg.source_topic, self.cfg.target_chat, self.cfg.target_topic)
+            else:
+                prev_watermark = await self.state.get_watermark(self.cfg.source_chat)
             if prev_watermark > 0:
+                topic_info = f" (Topic #{self.cfg.source_topic})" if self.cfg.source_topic else ""
                 console.print(Panel(
                     f"[bold cyan]🔄 PREVIOUS TRANSFER BOOKMARK DETECTED[/]\n\n"
-                    f"• Source Channel : [yellow]{self.cfg.source_chat}[/]\n"
+                    f"• Source Channel : [yellow]{self.cfg.source_chat}{topic_info}[/]\n"
                     f"• Last Message ID: [bold green]#{prev_watermark}[/]\n\n"
                     f"[dim]You can resume from this exact point without re-scanning old messages.[/]\n"
                     f"[dim]• Press Enter (or YES) to RESUME from #{prev_watermark}\n"
