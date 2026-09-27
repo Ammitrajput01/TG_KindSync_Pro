@@ -154,5 +154,33 @@ This log permanently documents root causes, architectural patterns, historical b
     - Shortened transaction lifecycles and added exponential backoff retries for concurrent multi-process writes.
     - Successfully auto-scanned all 95 forum topics and 1,000+ lectures/PDFs into SQLite for instant `/mainindex` and `/topicindex` generation.
 
+---
 
+### 16. Instant 1-Click Auto-Resume Option `[0]` / `[R]` in Main Menu
+* **Feature Addition**: Added Option `[0]` / `[R]` to `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py`.
+* **Behavior**:
+  - Displays a persistent **⚡ ACTIVE LAST ROUTE** banner at the top of the main menu (`Source ID -> Destination ID`).
+  - Pressing `0` or `R` instantly resumes the previous streaming/forwarding job from the exact last processed message ID without re-prompting for channel IDs or topic configurations.
 
+---
+
+### 17. Telethon Video Upload Freeze / Thumbnail Upload Bug Resolution
+* **Symptom**: Streaming/cloning large videos (500MB+) with custom 16:9 thumbnails froze for hours without progressing or uploading.
+* **Root Cause**: Telethon's internal `_file_to_media` passes `file_size=file_size` (the 500MB video size) when uploading the thumbnail file. Telethon expects 500MB of thumbnail bytes, causing an infinite EOF stall.
+* **Permanent Fix Applied**:
+  - In `ThumbEnforcer`: Implemented `async def get_input_file(client)` with in-memory caching. The thumbnail is uploaded independently as an `InputFile` with its own true byte size, and passed as `thumb=input_file` directly to `client.send_file()`. Large video uploads now proceed at maximum network velocity without stalls.
+
+---
+
+### 18. Watermark Cleaning Engine Unicode & Symbol Support
+* **Feature Addition**: Added support for non-ASCII prefixes and unicode small-caps in `strip_words.txt` (e.g. `📇 Exᴛʀᴀᴄᴛᴇᴅ Bʏ : @medicos_saviourbot 💎`).
+* **Fix**: Updated regex compilation in `apply_clean_rules()` so that `\b` word boundary is only applied to ASCII alphanumeric leading characters, preventing silent matching failures on emoji and unicode symbols.
+
+---
+
+### 19. Kind Doctor Admin Direct Messaging & Anonymous Group Replies
+* **Feature Addition**: Added admin messaging commands to `devi/operator/telegram_bot.py`:
+  1. `/say <message>` & `/dr <message>`: In group chats, when replying to a student, deletes the admin's command and posts an anonymous authoritative response from `👨‍⚕️ Kind Doctor`.
+  2. `/send <@username or user_id> <message>` & `/pm <target> <message>`: Direct DM from the bot to any student with automated database username-to-ID resolution.
+  3. `/sendlink <@username or user_id>`: Automatically delivers a 30-minute single-use disposable invite link directly to the student.
+  4. Added `2_START_KIND_DOCTOR_BOT.bat` 1-click launcher in root and `tools/launchers/`.
