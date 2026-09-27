@@ -1,0 +1,29 @@
+{
+  "session_forwarder": {
+    "id": 1553619403,
+    "first_name": "Kind",
+    "last_name": "Doctor 🩺",
+    "username": "Kinddoctor4u",
+    "phone": "917719599081",
+    "is_premium": false,
+    "verified_at": "2026-09-26T15:15:00.000000"
+  },
+  "session_account_9081": {
+    "id": 1553619403,
+    "first_name": "Kind",
+    "last_name": "Doctor 🩺",
+    "username": "Kinddoctor4u",
+    "phone": "917719599081",
+    "is_premium": false,
+    "verified_at": "2026-09-26T15:15:00.000000"
+  },
+  "session_account_032": {
+    "id": 759038032,
+    "first_name": "Amit",
+    "last_name": "Rajput",
+    "username": "Ammitrajput1",
+    "phone": "",
+    "is_premium": false,
+    "verified_at": "2026-09-26T15:15:00.000000"
+  }
+}

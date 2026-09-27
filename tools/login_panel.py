@@ -820,12 +820,34 @@ class DualLoginServer:
                 self.current_qr_base64 = await self._generate_qr_image(self.qr_login_obj.url)
                 asyncio.create_task(self._wait_for_qr_scan())
             except Exception as e:
-                logger.error(f"Error initiating QR login: {e}")
-                return web.json_response({
-                    "authorized": False,
-                    "qr_missing": True,
-                    "error": f"Telegram QR Login: {e}. Please use Phone Number tab."
-                })
+                err_str = str(e)
+                if "AuthKeyDuplicatedError" in err_str or "authorization key" in err_str.lower() or "used under two different" in err_str.lower():
+                    logger.warning("AuthKeyDuplicatedError in QR init. Purging session file and reconnecting...")
+                    try:
+                        if self.client and self.client.is_connected():
+                            await self.client.disconnect()
+                        sess_file = ROOT_DIR / "session_forwarder.session"
+                        if sess_file.exists():
+                            sess_file.unlink()
+                        self.client = TelegramClient(str(ROOT_DIR / "session_forwarder"), self.api_id, self.api_hash)
+                        await self.client.connect()
+                        self.qr_login_obj = await self.client.qr_login()
+                        self.current_qr_base64 = await self._generate_qr_image(self.qr_login_obj.url)
+                        asyncio.create_task(self._wait_for_qr_scan())
+                    except Exception as re:
+                        logger.error(f"Failed fresh QR recreate: {re}")
+                        return web.json_response({
+                            "authorized": False,
+                            "qr_missing": True,
+                            "error": f"Session refreshed. Please refresh page or use Phone Number tab."
+                        })
+                else:
+                    logger.error(f"Error initiating QR login: {e}")
+                    return web.json_response({
+                        "authorized": False,
+                        "qr_missing": True,
+                        "error": f"Telegram QR Login: {e}. Please use Phone Number tab."
+                    })
         elif self.qr_login_obj and hasattr(self.qr_login_obj, "expires") and self.qr_login_obj.expires:
             if time.time() > self.qr_login_obj.expires.timestamp():
                 try:
@@ -894,11 +916,24 @@ class DualLoginServer:
             sent_code = await self.client.send_code_request(phone)
             self.phone_code_hash = sent_code.phone_code_hash
             return web.json_response({"ok": True, "phone": phone})
-        except PhoneNumberInvalidError:
-            return web.json_response({"ok": False, "error": "Invalid Phone Number. Include country code (e.g. +919876543210)."})
-        except FloodWaitError as fe:
-            return web.json_response({"ok": False, "error": f"Rate limited by Telegram. Wait {fe.seconds} seconds."})
         except Exception as e:
+            err_str = str(e)
+            if "AuthKeyDuplicatedError" in err_str or "authorization key" in err_str.lower() or "used under two different" in err_str.lower():
+                logger.warning("AuthKeyDuplicatedError detected! Auto-rebuilding fresh session file...")
+                try:
+                    if self.client and self.client.is_connected():
+                        await self.client.disconnect()
+                    sess_file = ROOT_DIR / "session_forwarder.session"
+                    if sess_file.exists():
+                        sess_file.unlink()
+                    self.client = TelegramClient(str(ROOT_DIR / "session_forwarder"), self.api_id, self.api_hash)
+                    await self.client.connect()
+                    sent_code = await self.client.send_code_request(phone)
+                    self.phone_code_hash = sent_code.phone_code_hash
+                    return web.json_response({"ok": True, "phone": phone, "refreshed": True})
+                except Exception as rec_err:
+                    logger.error(f"Error during fresh session recovery: {rec_err}")
+                    return web.json_response({"ok": False, "error": f"Session auto-reset! Please click 'Send Official Code' again."})
             return web.json_response({"ok": False, "error": str(e)})
 
     async def handle_submit_code(self, request):

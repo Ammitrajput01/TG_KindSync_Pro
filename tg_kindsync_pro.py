@@ -616,8 +616,66 @@ async def safe_input(prompt_text: str, valid_options: list = None, allow_cancel=
             return None
 
 # ============================================================
-# 4. EMBEDDED TELEGRAM LINK PARSER & UTILS
+# 4. NETWORK SPEED FORMATTER & TELEGRAM LINK PARSER
 # ============================================================
+def format_network_speed(speed_mb: float) -> dict:
+    """
+    Auto-scales network speed into human-friendly metrics across KB/s, MB/s, Gbps & Mbps.
+    Example:
+      0.45 MB/s -> '460.8 KB/s' (3.6 Mbps)
+      18.50 MB/s -> '18.50 MB/s' (148.0 Mbps)
+      125.00 MB/s -> '125.00 MB/s' (1.00 Gbps)
+    """
+    try:
+        speed_mb = float(speed_mb or 0.0)
+    except Exception:
+        speed_mb = 0.0
+        
+    if speed_mb <= 0.0001:
+        return {
+            "formatted": "0.00 KB/s (0.0 Mbps)",
+            "primary": "0.00 KB/s",
+            "secondary": "0.0 Mbps",
+            "unit": "KB/s",
+            "value": 0.0,
+            "speed_kb": 0.0,
+            "speed_mb": 0.0,
+            "mbps": 0.0
+        }
+    
+    speed_kb = speed_mb * 1024.0
+    speed_mbps = speed_mb * 8.0
+    
+    if speed_mb < 1.0:
+        primary = f"{speed_kb:.1f} KB/s"
+        unit = "KB/s"
+        val = round(speed_kb, 1)
+    elif speed_mb >= 1024.0:
+        speed_gb = speed_mb / 1024.0
+        primary = f"{speed_gb:.2f} GB/s"
+        unit = "GB/s"
+        val = round(speed_gb, 2)
+    else:
+        primary = f"{speed_mb:.2f} MB/s"
+        unit = "MB/s"
+        val = round(speed_mb, 2)
+        
+    if speed_mbps >= 1000.0:
+        secondary = f"{speed_mbps/1000.0:.2f} Gbps"
+    else:
+        secondary = f"{speed_mbps:.1f} Mbps"
+        
+    return {
+        "formatted": f"{primary} ({secondary})",
+        "primary": primary,
+        "secondary": secondary,
+        "unit": unit,
+        "value": val,
+        "speed_kb": round(speed_kb, 1),
+        "speed_mb": round(speed_mb, 2),
+        "mbps": round(speed_mbps, 1)
+    }
+
 def parse_telegram_link(link: str) -> dict:
     link = str(link).strip().strip("'").strip('"')
     result = {"CHAT_ID": None, "TOPIC_ID": None, "MESSAGE_ID": None}
@@ -1067,6 +1125,18 @@ class StateManager:
             );
             CREATE INDEX IF NOT EXISTS idx_forwarded_route ON forwarded(source_chat, target_chat, target_topic, msg_id);
             CREATE TABLE IF NOT EXISTS source_watermarks (chat_id TEXT PRIMARY KEY, max_id INTEGER);
+            CREATE TABLE IF NOT EXISTS topic_watermarks (
+                source_chat TEXT NOT NULL,
+                source_topic INTEGER NOT NULL DEFAULT 0,
+                target_chat TEXT NOT NULL,
+                target_topic INTEGER NOT NULL DEFAULT 0,
+                max_id INTEGER NOT NULL DEFAULT 0,
+                completed_files INTEGER NOT NULL DEFAULT 0,
+                total_files INTEGER NOT NULL DEFAULT 0,
+                is_finished INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY (source_chat, source_topic, target_chat, target_topic)
+            );
             CREATE TABLE IF NOT EXISTS local_folder_uploads (
                 file_path TEXT NOT NULL,
                 file_size INTEGER NOT NULL,
@@ -1081,7 +1151,7 @@ class StateManager:
         
         async with self.db.execute("""
             SELECT source_chat, msg_id, target_chat, target_topic
-            FROM forwarded ORDER BY completed_at DESC LIMIT 20000
+            FROM forwarded ORDER BY completed_at DESC LIMIT 50000
         """) as cursor:
             async for row in cursor:
                 self.ram_cache.add(self._key(*row))
@@ -1089,6 +1159,17 @@ class StateManager:
         async with self.db.execute("SELECT chat_id, max_id FROM source_watermarks") as cursor:
             async for row in cursor:
                 self.chat_watermarks[row[0]] = row[1]
+
+        self.topic_watermarks = {}
+        async with self.db.execute("SELECT source_chat, source_topic, target_chat, target_topic, max_id, completed_files, total_files, is_finished FROM topic_watermarks") as cursor:
+            async for row in cursor:
+                tkey = (str(row[0]), int(row[1]), str(row[2]), int(row[3]))
+                self.topic_watermarks[tkey] = {
+                    "max_id": row[4],
+                    "completed_files": row[5],
+                    "total_files": row[6],
+                    "is_finished": bool(row[7])
+                }
 
         self.writer_task = asyncio.create_task(self.daemon_writer())
 
@@ -1132,6 +1213,44 @@ class StateManager:
                     return row[0]
         return 0
 
+    async def get_topic_watermark(self, source_chat, source_topic, target_chat, target_topic) -> int:
+        tkey = (str(source_chat), int(source_topic or 0), str(target_chat), int(target_topic or 0))
+        if hasattr(self, 'topic_watermarks') and tkey in self.topic_watermarks:
+            return self.topic_watermarks[tkey].get("max_id", 0)
+        async with self.db_lock:
+            async with self.db.execute("""
+                SELECT max_id FROM topic_watermarks 
+                WHERE source_chat=? AND source_topic=? AND target_chat=? AND target_topic=?
+            """, (str(source_chat), int(source_topic or 0), str(target_chat), int(target_topic or 0))) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    if not hasattr(self, 'topic_watermarks'): self.topic_watermarks = {}
+                    self.topic_watermarks[tkey] = {"max_id": row[0]}
+                    return row[0]
+        return 0
+
+    async def update_topic_watermark(self, source_chat, source_topic, target_chat, target_topic, max_id, completed_files=0, total_files=0, is_finished=False):
+        tkey = (str(source_chat), int(source_topic or 0), str(target_chat), int(target_topic or 0))
+        if not hasattr(self, 'topic_watermarks'): self.topic_watermarks = {}
+        curr = self.topic_watermarks.get(tkey, {})
+        new_max = max(curr.get("max_id", 0), int(max_id or 0))
+        self.topic_watermarks[tkey] = {
+            "max_id": new_max,
+            "completed_files": completed_files or curr.get("completed_files", 0),
+            "total_files": total_files or curr.get("total_files", 0),
+            "is_finished": is_finished or curr.get("is_finished", False)
+        }
+        async with self.db_lock:
+            try:
+                await self.db.execute("""
+                    INSERT OR REPLACE INTO topic_watermarks
+                    (source_chat, source_topic, target_chat, target_topic, max_id, completed_files, total_files, is_finished, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (str(source_chat), int(source_topic or 0), str(target_chat), int(target_topic or 0), new_max, completed_files, total_files, 1 if is_finished else 0, time.time()))
+                await self.db.commit()
+            except Exception as e:
+                logger.error(f"Failed to persist topic watermark: {e}")
+
     async def mark_completed(self, source_chat, msg_id, target_chat, target_topic=0):
         key = self._key(source_chat, msg_id, target_chat, target_topic)
         self.ram_cache.add(key)
@@ -1170,11 +1289,22 @@ class StateManager:
                 await asyncio.sleep(1.0)
 
     async def persist_watermarks(self):
-        if not self.db or not self.chat_watermarks: return
+        if not self.db: return
         async with self.db_lock:
             try:
-                rows = [(k, v) for k, v in self.chat_watermarks.items()]
-                await self.db.executemany("INSERT OR REPLACE INTO source_watermarks (chat_id, max_id) VALUES (?, ?)", rows)
+                if self.chat_watermarks:
+                    rows = [(k, v) for k, v in self.chat_watermarks.items()]
+                    await self.db.executemany("INSERT OR REPLACE INTO source_watermarks (chat_id, max_id) VALUES (?, ?)", rows)
+                if hasattr(self, 'topic_watermarks') and self.topic_watermarks:
+                    t_rows = [
+                        (k[0], k[1], k[2], k[3], v.get("max_id", 0), v.get("completed_files", 0), v.get("total_files", 0), 1 if v.get("is_finished") else 0, time.time())
+                        for k, v in self.topic_watermarks.items()
+                    ]
+                    await self.db.executemany("""
+                        INSERT OR REPLACE INTO topic_watermarks
+                        (source_chat, source_topic, target_chat, target_topic, max_id, completed_files, total_files, is_finished, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, t_rows)
                 await self.db.commit()
             except Exception as e:
                 logger.error(f"Persist watermarks error: {e}")
@@ -1324,14 +1454,58 @@ class ThumbEnforcer:
         return None
 
 # ============================================================
-# 9. TELEGRAM MULTI-SESSION & DYNAMIC RPC GUARD
-# ============================================================
 async def interactive_telegram_login(client):
-    if not client.is_connected():
-        await client.connect()
-        
-    if await client.is_user_authorized():
-        return client
+    import shutil
+    sess_path = Path("session_forwarder.session")
+    backup_path = Path("session_forwarder.session.auth_backup")
+    
+    # 1. Check if currently loaded session is already authorized
+    try:
+        if not client.is_connected():
+            await client.connect()
+        if await client.is_user_authorized():
+            # Refresh backups immediately
+            with suppress(Exception):
+                if sess_path.exists():
+                    shutil.copy2(str(sess_path), str(backup_path))
+                    Path("data").mkdir(exist_ok=True)
+                    shutil.copy2(str(sess_path), "data/session_forwarder.session.auth_backup")
+            return client
+    except Exception as ce:
+        err_msg = str(ce)
+        logger.warning(f"Initial connection check: {ce}")
+        if "database is locked" in err_msg.lower() or "sqlite" in err_msg.lower():
+            console.print("[yellow]⚠️ Session database busy. Retrying in 2 seconds...[/]")
+            await asyncio.sleep(2.0)
+            try:
+                if not client.is_connected(): await client.connect()
+                if await client.is_user_authorized(): return client
+            except Exception:
+                pass
+
+    # 2. Auto-restore from verified backups if main session is missing or unauthenticated
+    candidate_backups = [
+        backup_path,
+        Path("data/session_forwarder.session.auth_backup"),
+        *sorted(Path(".").glob("session_account_*.session.auth_backup")),
+        *sorted(Path("data").glob("session_account_*.session.auth_backup")),
+        *sorted(Path(".").glob("session_account_*.session")),
+    ]
+    for cand in candidate_backups:
+        if cand.exists() and cand.stat().st_size > 1024:
+            try:
+                shutil.copy2(str(cand), str(sess_path))
+                if not client.is_connected():
+                    await client.connect()
+                if await client.is_user_authorized():
+                    logger.info(f"Successfully auto-restored active Telegram login from {cand.name}")
+                    with suppress(Exception):
+                        shutil.copy2(str(sess_path), str(backup_path))
+                        Path("data").mkdir(exist_ok=True)
+                        shutil.copy2(str(sess_path), "data/session_forwarder.session.auth_backup")
+                    return client
+            except Exception:
+                pass
 
     clear_screen()
     console.print(get_persistent_header())
@@ -1343,80 +1517,159 @@ async def interactive_telegram_login(client):
         border_style="cyan", box=box.ROUNDED
     ))
     
-    # Priority 1: Launch browser dual login panel directly
+    # Start Background Browser Login Dashboard (Port 5005)
+    server = None
+    server_task = None
     try:
-        from tools.login_panel import launch_dual_login_wizard
-        console.print("[bold green]🚀 Opening browser login tab at http://127.0.0.1:5005...[/]")
-        success = await launch_dual_login_wizard(client, port=5005)
-        if success:
-            me = await client.get_me()
-            user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'Telegram User')
-            console.print(f"\n[bold green]🎉 Login Successful! Connected as [bold yellow]{user_name}[/] (ID: {me.id})[/]")
-            await asyncio.sleep(1.0)
-            return client
-    except Exception as le:
-        console.print(f"[yellow]⚠️ Browser panel failed ({le}). Falling back to terminal prompt...[/]")
+        from tools.login_panel import DualLoginServer
+        server = DualLoginServer(client, port=5005)
+        await server.start()
+        console.print("[bold green]🌐 Dual Login Web Dashboard LIVE at: [bold cyan]http://127.0.0.1:5005[/][/]")
+    except Exception as se:
+        console.print(f"[yellow]ℹ️ Browser dashboard init notice: {se}[/]")
 
-    # Fallback Option A: Terminal QR Code
-    try:
-        import qrcode
-        qr = await client.qr_login()
-        qr_gen = qrcode.QRCode(version=1, box_size=1, border=1)
-        qr_gen.add_data(qr.url)
-        qr_gen.make(fit=True)
-        console.print("\n[bold green]📱 Scan this QR Code with your Telegram App:[/]")
-        console.print("[dim]Telegram ➔ Settings ➔ Devices ➔ Link Desktop Device[/]\n")
-        qr_gen.print_ascii(invert=True)
-        with console.status("[bold cyan]Waiting for you to scan QR in Telegram...[/]"):
-            user = await qr.wait(timeout=120)
-            if user:
-                user_name = getattr(user, 'first_name', '') or getattr(user, 'username', 'Telegram User')
-                console.print(f"\n[bold green]🎉 Login Successful! Connected as [bold yellow]{user_name}[/] (ID: {user.id})[/]")
-                await asyncio.sleep(1.0)
-                return client
-    except SessionPasswordNeededError:
-        pwd = getpass.getpass("Enter your Two-Step Verification (2FA) Password: ")
-        me = await client.sign_in(password=pwd)
-        if me: return client
-    except (ImportError, ModuleNotFoundError):
-        console.print("[dim]ℹ️ QR library not found, proceeding directly with phone login...[/]")
-    except Exception as qe:
-        console.print(f"[yellow]⚠️ QR login skipped ({qe}). Falling back to phone...[/]")
+    console.print(Panel(
+        "[bold cyan]📱 CHOOSE LOGIN METHOD (Terminal OR Browser):[/]\n\n"
+        "  [bold green][1][/] 📞 [bold white]Phone Number (OTP)[/] [dim]· Type phone number to receive Telegram OTP[/]\n"
+        "  [bold yellow][2][/] 📷 [bold white]QR Code (Fastest)[/] [dim]· Scan QR with Telegram Mobile App (Settings ➔ Devices)[/]\n"
+        "  [bold blue][3][/] 🌐 [bold white]Web Dashboard[/] [dim]· Open http://127.0.0.1:5005 in your browser[/]\n"
+        "  [bold dim][0][/] ❌ [bold white]Cancel / Back[/]",
+        title="[bold cyan] TELEGRAM AUTHENTICATION [/]",
+        border_style="cyan", box=box.ROUNDED
+    ))
 
-
-    phone_input = await safe_input("Enter Phone Number with Country Code (e.g. +919876543210)", allow_cancel=True)
-    if not phone_input:
+    choice_input = await safe_input("Select Option [1, 2, 3] OR enter Phone Number (+91...)", allow_cancel=True)
+    if not choice_input:
+        if server: await server.stop()
         return client
-        
-    phone = phone_input.strip().replace(" ", "").replace("-", "")
-    if not phone.startswith("+"):
-        phone = "+" + phone
-        
+
+    raw_choice = choice_input.strip().lower()
+
+    if raw_choice in ("0", "cancel", "back", "exit"):
+        if server: await server.stop()
+        return client
+
+    # Handle Option 2 (QR)
+    if raw_choice in ("2", "qr", "qrcode", "scan"):
+        try:
+            import qrcode
+            qr = await client.qr_login()
+            qr_gen = qrcode.QRCode(version=1, box_size=1, border=1)
+            qr_gen.add_data(qr.url)
+            qr_gen.make(fit=True)
+            console.print("\n[bold green]📱 Scan this QR Code with your Telegram App:[/]")
+            console.print("[dim]Telegram ➔ Settings ➔ Devices ➔ Link Desktop Device[/]\n")
+            qr_gen.print_ascii(invert=True)
+            with console.status("[bold cyan]Waiting for you to scan QR in Telegram...[/]"):
+                user = await qr.wait(timeout=120)
+                if user:
+                    if server: await server.stop()
+                    user_name = getattr(user, 'first_name', '') or getattr(user, 'username', 'User')
+                    console.print(f"\n[bold green]🎉 Login Successful! Connected as [bold yellow]{user_name}[/] (ID: {user.id})[/]")
+                    with suppress(Exception):
+                        shutil.copy2(str(sess_path), str(backup_path))
+                        Path("data").mkdir(exist_ok=True)
+                        shutil.copy2(str(sess_path), "data/session_forwarder.session.auth_backup")
+                    await asyncio.sleep(1.0)
+                    return client
+        except SessionPasswordNeededError:
+            pwd = getpass.getpass("Enter your Two-Step Verification (2FA) Password: ")
+            me = await client.sign_in(password=pwd)
+            if server: await server.stop()
+            if me:
+                with suppress(Exception):
+                    shutil.copy2(str(sess_path), str(backup_path))
+                return client
+        except Exception as qe:
+            console.print(f"[yellow]⚠️ QR scan fallback to phone: {qe}[/]")
+            choice_input = "1"
+
+    # Handle Option 3 (Browser)
+    if raw_choice in ("3", "web", "browser", "http"):
+        console.print("\n[bold cyan]🌐 Dual Login Web Dashboard is running at: [bold yellow]http://127.0.0.1:5005[/][/]")
+        console.print("[dim]Open http://127.0.0.1:5005 in your browser and complete login there.[/]")
+        with console.status("[bold cyan]Waiting for Web Dashboard login...[/]"):
+            for _ in range(120):
+                if server and server.is_authorized:
+                    break
+                await asyncio.sleep(1.0)
+        if server and server.is_authorized:
+            if server: await server.stop()
+            me = await client.get_me()
+            user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'User')
+            console.print(f"\n[bold green]🎉 Logged in via Web Dashboard as [bold yellow]{user_name}[/]![/]")
+            with suppress(Exception):
+                shutil.copy2(str(sess_path), str(backup_path))
+            return client
+        else:
+            console.print("[yellow]Web login timed out. Falling back to phone number.[/]")
+            choice_input = "1"
+
+    # Handle Option 1 (Phone)
+    if choice_input.strip() == "1" or raw_choice in ("phone", "otp"):
+        phone_input = await safe_input("Enter Phone Number with Country Code (e.g. +917719599881)", allow_cancel=True)
+    else:
+        phone_input = choice_input
+
+    if server and server.is_authorized:
+        if server: await server.stop()
+        me = await client.get_me()
+        user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'User')
+        console.print(f"\n[bold green]🎉 Logged in via Web Dashboard as [bold yellow]{user_name}[/]![/]")
+        return client
+
+    if not phone_input:
+        if server: await server.stop()
+        return client
+
+    # Clean and normalize phone number
+    raw_digits = re.sub(r"[^\d]", "", phone_input)
+    if len(raw_digits) < 7:
+        console.print("[bold red]❌ Invalid Phone Number:[/] Number is too short.")
+        if server: await server.stop()
+        await safe_input("\nPress Enter to retry", allow_cancel=False)
+        return client
+    phone = "+" + raw_digits
+
     console.print(f"\n[cyan]📡 Contacting Telegram MTProto servers for [bold yellow]{phone}[/]...[/]")
+    sent_code = None
     try:
         sent_code = await client.send_code_request(phone)
-    except PhoneNumberInvalidError:
-        console.print("[bold red]❌ Invalid Phone Number:[/] Please ensure you included your country code (e.g. +91 for India).")
-        await safe_input("\nPress Enter to continue", allow_cancel=False)
-        return client
-    except FloodWaitError as fe:
-        console.print(f"[bold red]❌ Telegram FloodWait limit hit:[/] Telegram has temporarily rate-limited login requests for {fe.seconds} seconds. Please wait before trying again.")
-        await safe_input("\nPress Enter to continue", allow_cancel=False)
-        return client
-    except Exception as e:
-        console.print(f"[bold red]❌ Telegram rejected login request:[/] {e}")
-        await safe_input("\nPress Enter to continue", allow_cancel=False)
-        return client
+    except Exception as ce:
+        err_str = str(ce)
+        if "AuthKeyDuplicatedError" in err_str or "authorization key" in err_str.lower() or "used under two different" in err_str.lower():
+            console.print("[yellow]⚠️ Purging corrupt key and retrying code dispatch...[/]")
+            sess_path = Path("session_forwarder.session")
+            if sess_path.exists(): sess_path.unlink()
+            await client.connect()
+            sent_code = await client.send_code_request(phone)
+        elif isinstance(ce, PhoneNumberInvalidError):
+            console.print("[bold red]❌ Invalid Phone Number:[/] Please include country code (e.g. +91XXXXXXXXXX).")
+            if server: await server.stop()
+            await safe_input("\nPress Enter to retry", allow_cancel=False)
+            return client
+        elif isinstance(ce, FloodWaitError):
+            console.print(f"[bold red]❌ Rate limited by Telegram:[/] Please wait {ce.seconds} seconds.")
+            if server: await server.stop()
+            await safe_input("\nPress Enter to retry", allow_cancel=False)
+            return client
+        else:
+            console.print(f"[bold red]❌ Telegram error:[/] {ce}")
+            if server: await server.stop()
+            await safe_input("\nPress Enter to retry", allow_cancel=False)
+            return client
+
+    if server: await server.stop()
 
     code_type_name = type(getattr(sent_code, 'type', None)).__name__
     if "App" in code_type_name:
-        dest_badge = "📲 [bold green]Telegram Mobile App[/] (Check the 'Telegram' chat with blue verified tick)"
+        dest_badge = "📲 [bold green]Telegram Mobile App[/] (Check the official Telegram Service Notification chat)"
     elif "Sms" in code_type_name:
-        dest_badge = "📩 [bold green]SMS Message[/] (Check your phone's SMS inbox)"
+        dest_badge = "📩 [bold green]SMS Message[/] (Check your mobile SMS inbox)"
     elif "Email" in code_type_name:
         dest_badge = "📧 [bold green]Registered Email[/] (Check your email inbox and spam folder)"
     elif "Call" in code_type_name:
-        dest_badge = "📞 [bold green]Phone Call[/] (Telegram is calling your phone with voice code)"
+        dest_badge = "📞 [bold green]Phone Call[/] (Telegram is calling with voice code)"
     else:
         dest_badge = "📲 [bold green]Telegram App / SMS[/]"
 
@@ -1431,11 +1684,15 @@ async def interactive_telegram_login(client):
     if not code:
         return client
         
-    code_clean = code.strip().replace(" ", "").replace("-", "")
+    code_clean = re.sub(r"[^\d]", "", code)
     
     me = None
     try:
-        me = await client.sign_in(phone=phone, code=code_clean)
+        phone_hash = getattr(sent_code, 'phone_code_hash', None)
+        if phone_hash:
+            me = await client.sign_in(phone=phone, code=code_clean, phone_code_hash=phone_hash)
+        else:
+            me = await client.sign_in(phone=phone, code=code_clean)
     except SessionPasswordNeededError:
         console.print("\n[yellow]🔑 Two-Step Verification (2FA Cloud Password) is enabled on this account.[/]")
         pwd = getpass.getpass("Enter your Two-Step Verification Password: ")
@@ -1453,7 +1710,17 @@ async def interactive_telegram_login(client):
     if me:
         user_name = getattr(me, 'first_name', '') or getattr(me, 'username', 'Telegram User')
         console.print(f"\n[bold green]🎉 Login Successful! Connected as [bold yellow]{user_name}[/] (ID: {me.id})[/]")
-        await asyncio.sleep(1.5)
+        with suppress(Exception):
+            if sess_path.exists():
+                shutil.copy2(str(sess_path), str(backup_path))
+                Path("data").mkdir(exist_ok=True)
+                shutil.copy2(str(sess_path), "data/session_forwarder.session.auth_backup")
+                acc_name = f"session_account_{str(me.id)[-4:]}.session"
+                shutil.copy2(str(sess_path), acc_name)
+                shutil.copy2(str(sess_path), f"{acc_name}.auth_backup")
+                shutil.copy2(str(sess_path), f"data/{acc_name}.auth_backup")
+                logger.info(f"Created persistent session backups for user {me.id}")
+        await asyncio.sleep(1.2)
     return client
 
 TELEGRAM_DEVICE_PARAMS = {
@@ -1586,19 +1853,26 @@ class MultiSessionManager:
         await asyncio.sleep(1.0)
 
     async def _safe_connect(self, client: TelegramClient):
-        """Connects client with automatic self-healing for SQLite database locked errors."""
-        try:
-            await client.connect()
-        except Exception as e:
-            if "database is locked" in str(e).lower() or "sqlite3.operationalerror" in str(e).lower():
-                console.print(f"[bold yellow]⚠️ Session database lock detected. Auto-cleaning stale lock files & retrying...[/]")
-                for pat in ["*.session-journal", "*.session-wal", "*.session-shm"]:
-                    for f in Path(".").glob(pat):
-                        with suppress(Exception): f.unlink(missing_ok=True)
-                await asyncio.sleep(1.0)
+        """Connects client with automatic self-healing for SQLite database locked / readonly errors."""
+        if client.is_connected():
+            return
+        for attempt in range(4):
+            try:
                 await client.connect()
-            else:
-                raise
+                return
+            except Exception as e:
+                err_str = str(e).lower()
+                if "database is locked" in err_str or "readonly" in err_str or "operationalerror" in err_str:
+                    for pat in ["*.session-journal", "*.session-wal", "*.session-shm"]:
+                        for f in Path(".").glob(pat):
+                            with suppress(Exception): f.unlink(missing_ok=True)
+                    if sys.platform.startswith("linux"):
+                        with suppress(Exception):
+                            os.system("chmod 666 *.session *.sqlite 2>/dev/null")
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                else:
+                    if attempt == 3:
+                        raise
 
     async def start_all(self):
         if not self.api_id or not self.api_hash:
@@ -1821,15 +2095,72 @@ class RPCGuard:
 # ============================================================
 async def get_account_channels_list(client):
     channels = []
-    try:
-        dialogs = await client.get_dialogs(limit=None)
-        for d in dialogs:
-            if isinstance(d.entity, (Channel, Chat)):
-                name = str(d.name or "Unnamed").strip()
-                channels.append({"id": d.id, "title": name, "username": getattr(d.entity, "username", None)})
-    except Exception as e:
-        logger.error(f"Error listing dialogs: {e}")
+    for attempt in range(3):
+        try:
+            # Fetch ALL dialogs from Telegram without hard limit
+            dialogs = await client.get_dialogs(limit=None)
+            for d in dialogs:
+                if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
+                    name = str(d.name or "Unnamed").strip()
+                    uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
+                    channels.append({"id": d.id, "title": name, "username": uname})
+            if channels:
+                break
+        except Exception as e:
+            logger.error(f"Error listing dialogs (attempt {attempt+1}): {e}")
+            if "database is locked" in str(e).lower() or "locked" in str(e).lower():
+                if sys.platform.startswith("linux"):
+                    try:
+                        import subprocess
+                        subprocess.run(["sudo", "systemctl", "stop", "tg-forwarder"], capture_output=True, timeout=3)
+                    except Exception:
+                        pass
+                await asyncio.sleep(1.0)
+            else:
+                await asyncio.sleep(0.5)
     return channels
+
+def _normalize_search_str(text: str) -> str:
+    if not text: return ""
+    try:
+        import unicodedata
+        cleaned = str(text).replace("'", "").replace('"', '').replace('`', '').strip()
+        nfkd = unicodedata.normalize('NFKD', cleaned)
+        ascii_text = nfkd.encode('ASCII', 'ignore').decode('utf-8').lower()
+        return re.sub(r'[^a-z0-9\s]', ' ', ascii_text)
+    except Exception:
+        return str(text).lower()
+
+def _match_channel_query(c: dict, raw_query: str) -> bool:
+    if not raw_query: return True
+    q = raw_query.strip().strip("'").strip('"')
+    if not q: return True
+
+    # 1. Chat ID exact or partial match
+    c_id_str = str(c.get('id', ''))
+    if q in c_id_str:
+        return True
+
+    title_raw = str(c.get('title', ''))
+    uname_raw = str(c.get('username') or '')
+    combined_raw = f"{title_raw} {uname_raw}".lower()
+
+    # 2. Case-insensitive substring match
+    if q.lower() in combined_raw:
+        return True
+
+    # 3. Token-based multi-word match (e.g. 'the pirate' matches '[The] Pirate Bay')
+    norm_combined = f"{_normalize_search_str(title_raw)} {_normalize_search_str(uname_raw)}"
+    norm_query = _normalize_search_str(q)
+    
+    if norm_query in norm_combined:
+        return True
+
+    tokens = [t for t in norm_query.split() if len(t) > 1]
+    if tokens and all(t in norm_combined for t in tokens):
+        return True
+
+    return False
 
 async def interactive_channel_selector(client, prompt_title="Select Channel"):
     channels = await get_account_channels_list(client)
@@ -1849,41 +2180,127 @@ async def interactive_channel_selector(client, prompt_title="Select Channel"):
             return {"id": parsed["CHAT_ID"], "topic": topic_id, "title": str(parsed["CHAT_ID"])}
         return {"id": raw.strip(), "topic": 0, "title": raw.strip()}
     
+    # Default to 100 items per page or full scrollable view
+    PAGE_SIZE = 100
+    current_page = 0
+    search_query = ""
     current_list = channels
+    status_msg = ""
+    
     while True:
-        console.print(f"\n[bold cyan]📋 Your Joined Telegram Channels & Groups ({prompt_title}):[/]")
-        table = Table(box=box.ROUNDED, show_header=True, header_style="bold magenta")
-        table.add_column("#", style="dim", width=4)
-        table.add_column("Channel Name", style="bold green")
-        table.add_column("Chat ID", style="yellow")
-        table.add_column("Username / Link", style="cyan")
+        clear_screen()
+        console.print(get_persistent_header())
         
-        for idx, c in enumerate(current_list, 1):
-            uname = f"@{c['username']}" if c['username'] else "[dim]Private[/]"
-            table.add_row(str(idx), c['title'][:32], str(c['id']), uname)
+        # Calculate pagination
+        total_items = len(current_list)
+        total_pages = max(1, math.ceil(total_items / PAGE_SIZE))
+        if current_page >= total_pages:
+            current_page = max(0, total_pages - 1)
+            
+        start_idx = current_page * PAGE_SIZE
+        end_idx = min(start_idx + PAGE_SIZE, total_items)
+        page_items = current_list[start_idx:end_idx]
         
+        # Header Info
+        filter_status = f" | [bold yellow]🔍 Filter:[/] [bold white]'{search_query}'[/] ([bold green]{total_items}[/] matches)" if search_query else f" | Total: [bold cyan]{len(channels)} Channels (Full Scrollable)[/]"
+        page_info = f"Page {current_page + 1} of {total_pages} (Showing #{start_idx + 1} to #{end_idx} of {total_items})" if total_pages > 1 else f"Showing ALL {total_items} Channels (Scroll up/down with Mouse Wheel)"
+        
+        console.print(Panel(
+            f"[bold magenta]📋 {prompt_title.upper()}[/]{filter_status}\n"
+            f"[dim]{page_info}[/]",
+            border_style="magenta", box=box.ROUNDED
+        ))
+        
+        if status_msg:
+            console.print(f"{status_msg}\n")
+            status_msg = ""
+            
+        # Table of items (Scrollable in terminal)
+        table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan", expand=True)
+        table.add_column("#", style="bold yellow", width=6, justify="right")
+        table.add_column("Channel / Group Name", style="bold white", ratio=3)
+        table.add_column("Chat ID", style="dim yellow", ratio=1)
+        table.add_column("Username / Type", style="cyan", ratio=1)
+        
+        for idx, c in enumerate(page_items, start_idx + 1):
+            uname = f"@{c['username']}" if c.get('username') else "[dim]Private[/]"
+            table.add_row(f"[{idx}]", str(c.get('title', 'Unknown')), str(c.get('id', '')), uname)
+            
         console.print(table)
-        console.print("[dim]Enter number to select, 'S' to search by keyword, 'P' to paste link/ID, 'A' for all, or 0 to Cancel.[/]\n")
         
-        choice = await safe_input("Choose Option (# / S / P)", allow_cancel=True)
-        if not choice: return None
-        if choice.upper() == "S":
-            query = await safe_input("Enter search keyword", allow_cancel=True)
-            if query:
-                current_list = [c for c in channels if query.lower() in c['title'].lower() or (c['username'] and query.lower() in c['username'].lower())]
-                if not current_list:
-                    console.print(f"[yellow]No channels matching '{query}'. Showing all.[/]")
-                    current_list = channels
-            continue
-        elif choice.upper() == "A":
+        # Navigation Bar
+        nav_hints = []
+        if total_pages > 1:
+            if current_page < total_pages - 1:
+                nav_hints.append("[bold green][N][/] Next Page")
+            if current_page > 0:
+                nav_hints.append("[bold green][B][/] Prev Page")
+            nav_hints.append("[bold cyan][ALL][/] Show All 494 on 1 Screen")
+        nav_hints.append("[bold cyan][S][/] Search Keyword")
+        if search_query:
+            nav_hints.append("[bold yellow][CLEAR][/] Reset Filter")
+        nav_hints.append("[bold magenta][P][/] Paste Link/ID")
+        nav_hints.append("[bold red][0][/] Cancel")
+        
+        console.print("  " + "  •  ".join(nav_hints) + "\n")
+        
+        choice = await safe_input("👉 Enter # to Select (or scroll & type keyword / ALL / N / B / P / 0)", allow_cancel=True)
+        if not choice:
+            return None
+            
+        choice_clean = choice.strip()
+        choice_upper = choice_clean.upper()
+        
+        # View Controls
+        if choice_upper in ("ALL", "SHOW ALL", "FULL"):
+            PAGE_SIZE = max(500, len(channels))
+            current_page = 0
             current_list = channels
+            search_query = ""
+            status_msg = f"[bold green]✔ Full Scroll Mode Enabled: Displaying all {len(channels)} channels![/]"
             continue
-        elif choice.upper() == "P":
+        elif choice_upper in ("25", "50", "100", "200"):
+            PAGE_SIZE = int(choice_upper)
+            current_page = 0
+            status_msg = f"[green]✔ Showing {PAGE_SIZE} channels per screen.[/]"
+            continue
+        elif choice_upper in ("N", "NEXT", ">", "+"):
+            if current_page < total_pages - 1:
+                current_page += 1
+            else:
+                status_msg = "[yellow]ℹ Already on the last page.[/]"
+            continue
+        elif choice_upper in ("B", "PREV", "<", "-"):
+            if current_page > 0:
+                current_page -= 1
+            else:
+                status_msg = "[yellow]ℹ Already on the first page.[/]"
+            continue
+        elif choice_upper in ("CLEAR", "RESET"):
+            current_list = channels
+            search_query = ""
+            current_page = 0
+            status_msg = f"[green]✔ Filter cleared. Showing all {len(channels)} channels.[/]"
+            continue
+        elif choice_upper in ("S", "SEARCH"):
+            q_input = await safe_input("Enter search keyword / name / ID", allow_cancel=True)
+            if q_input:
+                matched = [c for c in channels if _match_channel_query(c, q_input)]
+                if matched:
+                    current_list = matched
+                    search_query = q_input.strip()
+                    current_page = 0
+                    PAGE_SIZE = max(100, len(matched))
+                    status_msg = f"[bold green]✔ Found {len(matched)} matching channels for '{search_query}'![/]"
+                else:
+                    status_msg = f"[bold red]❌ No channels found matching '{q_input.strip()}'.[/]"
+            continue
+        elif choice_upper == "P":
             raw = await safe_input("Paste Telegram Link / Chat ID", allow_cancel=True)
             if not raw: return None
             parsed = parse_telegram_link(raw)
             if "error" in parsed or not parsed.get("CHAT_ID"):
-                console.print(f"[bold red]❌ Invalid Telegram Link / Chat ID: {parsed.get('error', 'Unknown error')}[/]")
+                status_msg = f"[bold red]❌ Invalid Telegram Link / Chat ID: {parsed.get('error', 'Unknown error')}[/]"
                 continue
             topic_id = parsed.get("TOPIC_ID") or 0
             if not topic_id:
@@ -1892,8 +2309,9 @@ async def interactive_channel_selector(client, prompt_title="Select Channel"):
                     topic_id = int(topic_choice)
             return {"id": parsed["CHAT_ID"], "topic": topic_id, "title": str(parsed["CHAT_ID"])}
 
-        if choice.startswith("-") or choice.startswith("@") or "t.me" in choice or (choice.isdigit() and int(choice) > len(current_list)):
-            parsed = parse_telegram_link(choice)
+        # Direct Paste Link or ID check
+        if choice_clean.startswith("-") or choice_clean.startswith("@") or "t.me" in choice_clean:
+            parsed = parse_telegram_link(choice_clean)
             if "error" not in parsed and parsed.get("CHAT_ID"):
                 topic_id = parsed.get("TOPIC_ID") or 0
                 if not topic_id:
@@ -1901,22 +2319,34 @@ async def interactive_channel_selector(client, prompt_title="Select Channel"):
                     if topic_choice and topic_choice.isdigit():
                         topic_id = int(topic_choice)
                 return {"id": parsed["CHAT_ID"], "topic": topic_id, "title": str(parsed["CHAT_ID"])}
-            elif choice.isdigit() and int(choice) > len(current_list):
-                console.print("[red]Invalid selection number. Try again.[/]")
-                continue
             else:
-                console.print(f"[bold red]❌ Invalid Telegram Link / Chat ID: {parsed.get('error', 'Unknown error')}[/]")
+                status_msg = f"[bold red]❌ Invalid Telegram Link / Chat ID: {parsed.get('error', 'Unknown error')}[/]"
                 continue
-        
-        if choice.isdigit() and 1 <= int(choice) <= len(current_list):
-            sel = current_list[int(choice) - 1]
-            topic_id = 0
-            topic_choice = await safe_input("Enter Topic / Thread ID (if supergroup topic, otherwise 0 for General)", default_val="0")
-            if topic_choice and topic_choice.isdigit():
-                topic_id = int(topic_choice)
-            return {"id": sel["id"], "topic": topic_id, "title": sel["title"]}
-        
-        console.print("[red]Invalid selection. Try again.[/]")
+
+        # Numeric Selection by Global Row Index
+        if choice_clean.isdigit():
+            idx_val = int(choice_clean)
+            if 1 <= idx_val <= len(current_list):
+                sel = current_list[idx_val - 1]
+                topic_id = 0
+                topic_choice = await safe_input(f"Enter Topic ID for '{sel.get('title')}' (or 0 for General)", default_val="0")
+                if topic_choice and topic_choice.isdigit():
+                    topic_id = int(topic_choice)
+                return {"id": sel["id"], "topic": topic_id, "title": sel["title"]}
+            else:
+                status_msg = f"[bold red]❌ Number {idx_val} is out of range (1 - {len(current_list)}).[/]"
+                continue
+
+        # Instant Smart Search on ANY typed text (searches across all channels in account)
+        matched = [c for c in channels if _match_channel_query(c, choice_clean)]
+        if matched:
+            current_list = matched
+            search_query = choice_clean
+            current_page = 0
+            PAGE_SIZE = max(100, len(matched))
+            status_msg = f"[bold green]✔ Search: Found {len(matched)} matching channels for '{search_query}'![/]"
+        else:
+            status_msg = f"[bold red]❌ No channels found matching '{choice_clean}'. Try typing a simpler keyword (e.g. pirate).[/]"
 
 async def preflight_verify_routing(client, cfg: AppConfig) -> bool:
     if cfg.routing_mode == 1:
@@ -2917,19 +3347,19 @@ class PipelineProcessor:
                             self.log(format_media_log_detail(m, prefix="✔ Sent"))
                         else:
                             self.log(f"[dim]⏩ Skipped watermark/empty message (ID: #{m.id})[/]")
-                            success_flag = True
-                    elif getattr(m, 'action', None) or getattr(m, 'poll', None) or getattr(m, 'contact', None):
+                    elif getattr(m, 'poll', None):
                         reconstructed_text = self.reconstruct(m)
                         if reconstructed_text and reconstructed_text.strip():
                             await self.rpc.execute(
                                 lambda c: c.send_message(_parse_chat_id(target_chat), reconstructed_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
                                 client=client
                             )
-                            self.log(format_media_log_detail(m, prefix="✔ Sent System/Action"))
+                            self.log(format_media_log_detail(m, prefix="✔ Sent Poll"))
                             success_flag = True
                         else:
                             success_flag = True
                     else:
+                        self.log(f"[dim]⏩ Skipped service action/stub message (ID: #{m.id})[/]")
                         success_flag = True
 
             except (KeyboardInterrupt, asyncio.CancelledError):
@@ -2974,11 +3404,13 @@ class PipelineProcessor:
                 d_s = self.metrics.get('docs_sent', 0)
                 p_s = self.metrics.get('photos_sent', 0)
                 t_s = self.metrics.get('text_sent', 0)
+                cur_spd_obj = format_network_speed(self.metrics.get('current_speed_mb', 0.0))
+                peak_spd_obj = format_network_speed(self.metrics.get('peak_speed', 0.0))
                 AdminTelemetry.dispatch(client, "⚡ [MONITOR] Milestone Progress", {
                     "Progress": f"{self.metrics['messages_forwarded']} / {self.metrics['discovered']} messages",
                     "Sent Breakdown": f"{v_s} 🎥 Videos | {d_s} 📄 Docs | {p_s} 🖼️ Photos | {t_s} 💬 Text",
-                    "Current Speed": f"{self.metrics['current_speed_mb']:.2f} MB/s",
-                    "Peak Speed": f"{self.metrics['peak_speed']:.2f} MB/s"
+                    "Current Speed": cur_spd_obj['formatted'],
+                    "Peak Speed": peak_spd_obj['formatted']
                 })
 
             # Intelligent Adaptive Velocity: Uncapped Wire Speed for Heavy Media
@@ -3067,6 +3499,11 @@ class TerminalPlatform:
             total_f = self.metrics.get("messages_forwarded", 0)
             remaining_f = max(0, total_d - total_f)
             pct_d = round((total_f / max(1, total_d)) * 100.0, 1) if total_d > 0 else 0.0
+            
+            cur_raw_mb = self.current_speed_mb if not is_done else 0.0
+            spd_obj = format_network_speed(cur_raw_mb)
+            peak_obj = format_network_speed(self.peak_speed_mb)
+            
             data = {
                 "timestamp": time.time(),
                 "active_file_name": self.active_file_name,
@@ -3074,8 +3511,18 @@ class TerminalPlatform:
                 "active_file_transferred": self.active_file_transferred,
                 "active_file_total": self.active_file_total,
                 "active_file_eta": self.active_file_eta,
-                "current_speed_mb": round(self.current_speed_mb, 2) if not is_done else 0.0,
+                "current_speed_mb": round(cur_raw_mb, 2),
+                "speed_mb": round(cur_raw_mb, 2),
+                "current_speed_kb": spd_obj.get("speed_kb", 0.0),
+                "current_speed_mbps": spd_obj.get("mbps", 0.0),
+                "current_speed_formatted": spd_obj.get("formatted", "0.00 KB/s (0.0 Mbps)"),
+                "current_speed_primary": spd_obj.get("primary", "0.00 KB/s"),
+                "current_speed_secondary": spd_obj.get("secondary", "0.0 Mbps"),
+                "current_speed_unit": spd_obj.get("unit", "KB/s"),
                 "peak_speed_mb": round(self.peak_speed_mb, 2),
+                "peak_speed_formatted": peak_obj.get("formatted", "0.00 KB/s (0.0 Mbps)"),
+                "peak_speed_primary": peak_obj.get("primary", "0.00 KB/s"),
+                "peak_speed_secondary": peak_obj.get("secondary", "0.0 Mbps"),
                 "is_transferring": (not is_done and self.active_file_progress < 100.0 and self.active_file_progress > 0.0),
                 "total_files": total_d,
                 "discovered": total_d,
@@ -3395,8 +3842,10 @@ class TerminalPlatform:
             self.log(f"[bold red]❌ Scanner Rule {idx+1} Error:[/] {e}")
 
     async def scanner_multiple(self):
-        tasks = [asyncio.create_task(self._scan_rule(idx, rule)) for idx, rule in enumerate(self.cfg.forwarding_rules)]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        for idx, rule in enumerate(self.cfg.forwarding_rules):
+            if self.stop_evt.is_set():
+                break
+            await self._scan_rule(idx, rule)
 
     async def scanner_dlq(self):
         self.log("[cyan]Initializing DLQ Recovery Engine...[/]")
@@ -3524,12 +3973,14 @@ class TerminalPlatform:
                 
                 speed = self.metrics.get('current_speed_mb', 0.0)
                 peak = self.metrics.get('peak_speed', 0.0)
+                cur_spd_obj = format_network_speed(speed)
+                peak_spd_obj = format_network_speed(peak)
                 
                 status_card = (
                     "📊 **[REMOTE TELEGRAM LIVE STATUS]**\n"
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"📁 **Active File:** `{self.active_file_name}` ({self.active_file_progress:.1f}%)\n"
-                    f"⚡ **Speed:** `{speed:.2f} MB/s` (Peak: `{peak:.2f} MB/s`)\n"
+                    f"⚡ **Speed:** `{cur_spd_obj['formatted']}` (Peak: `{peak_spd_obj['formatted']}`)\n"
                     f"📈 **Progress:** `{completed} / {self.metrics.get('discovered', 0)}` ({pct:.1f}%)\n"
                     f"📦 **Sent:** {v_s} 🎥 | {d_s} 📄 | {p_s} 🖼️ | {t_s} 💬\n"
                     f"💾 **Transferred:** `{data_str}`\n"
@@ -3770,13 +4221,19 @@ class TerminalPlatform:
         pipeline_bar = make_gradient_bar(percent)
         upload_bar = make_gradient_bar(self.active_file_progress)
 
-        cur_speed = self.metrics['current_speed_mb']
+        cur_speed = float(self.metrics.get('current_speed_mb', 0.0))
+        peak_speed = float(self.metrics.get('peak_speed', 0.0))
+        cur_spd_obj = format_network_speed(cur_speed)
+        peak_spd_obj = format_network_speed(peak_speed)
+
         if cur_speed >= 15:
-            speed_badge = f"[bold green]⚡ {cur_speed:.2f} MB/s (Turbo)[/]"
-        elif cur_speed >= 5:
-            speed_badge = f"[bold cyan]⚡ {cur_speed:.2f} MB/s (Fast)[/]"
+            speed_badge = f"[bold green]⚡ {cur_spd_obj['formatted']} (Turbo)[/]"
+        elif cur_speed >= 3:
+            speed_badge = f"[bold cyan]⚡ {cur_spd_obj['formatted']} (Fast)[/]"
+        elif cur_speed > 0.001:
+            speed_badge = f"[bold yellow]⚡ {cur_spd_obj['formatted']} (Paced)[/]"
         else:
-            speed_badge = f"[bold yellow]⚡ {cur_speed:.2f} MB/s (Paced)[/]"
+            speed_badge = f"[dim]⚡ 0.00 KB/s (Standby)[/]"
 
         w = get_terminal_width()
         sub_div = "─" * min(37, max(15, (w // 2) - 8 if w >= 95 else w - 8))
@@ -3831,7 +4288,7 @@ class TerminalPlatform:
             Text.from_markup(
                 f"[bold cyan]⚡ VELOCITY & TELEMETRY[/]\n{sub_div}\n"
                 f"Speed    : {speed_badge}\n"
-                f"Peak     : [cyan]{self.metrics['peak_speed']:.2f} MB/s[/]\n"
+                f"Peak     : [cyan]{peak_spd_obj['formatted']}[/]\n"
                 f"Uploaded : [magenta]{data_str}[/]\n"
                 f"Uptime   : [yellow]{uptime_str}[/]"
             ),
@@ -4054,7 +4511,7 @@ class TerminalPlatform:
                         "Forwarded Output": f"{v_s} 🎥 | {d_s} 📄 | {p_s} 🖼️ | {t_s} 💬",
                         "Albums Grouped": f"{self.metrics.get('albums_forwarded', 0)}",
                         "Data Transferred": data_str,
-                        "Peak Speed": f"{self.metrics.get('peak_speed', 0.0):.2f} MB/s",
+                        "Peak Speed": format_network_speed(self.metrics.get('peak_speed', 0.0))['formatted'],
                         "Total Duration": time_str,
                         "Errors / DLQ": f"{self.metrics.get('errors_count', 0)}"
                     })
@@ -5309,10 +5766,11 @@ async def run_batch_folder_uploader_tool(session_mgr):
                             last_printed_pct = pct
                             elapsed = max(0.1, time.monotonic() - upload_start)
                             speed_mb = (current / MB) / elapsed
+                            spd_obj = format_network_speed(speed_mb)
                             cur_str = f"{current/MB:.1f} MB" if current < GB else f"{current/GB:.2f} GB"
                             tot_str = f"{total/MB:.1f} MB" if total < GB else f"{total/GB:.2f} GB"
                             eta_sec = int((total - current) / max(1, (current / elapsed)))
-                            console.print(f"    [cyan]↳ Uploading:[/] [green]{pct}%[/] [dim]({cur_str}/{tot_str} @ {speed_mb:.1f} MB/s | ETA: {eta_sec}s)[/]")
+                            console.print(f"    [cyan]↳ Uploading:[/] [green]{pct}%[/] [dim]({cur_str}/{tot_str} @ [bold yellow]{spd_obj['formatted']}[/] | ETA: {eta_sec}s)[/]")
 
                     is_vid = fpath.suffix.lower() in (".mp4", ".mkv", ".mov", ".avi", ".webm")
                     file_attrs = [DocumentAttributeFilename(file_name=disp_name)]
@@ -5418,15 +5876,27 @@ async def run_group_cloner_tool(session_mgr):
     src_topics = []
     try:
         src_peer = await client.get_input_entity(_parse_chat_id(src_id))
-        res = await client(GetForumTopicsRequest(
-            peer=src_peer,
-            offset_date=None,
-            offset_id=0,
-            offset_topic=0,
-            limit=100
-        ))
-        if hasattr(res, 'topics'):
-            src_topics = res.topics
+        off_date = None
+        off_id = 0
+        off_top = 0
+        while True:
+            res = await client(GetForumTopicsRequest(
+                peer=src_peer,
+                offset_date=off_date,
+                offset_id=off_id,
+                offset_topic=off_top,
+                limit=100
+            ))
+            if not hasattr(res, 'topics') or not res.topics:
+                break
+            src_topics.extend(res.topics)
+            if len(res.topics) < 100:
+                break
+            last_t = res.topics[-1]
+            off_date = getattr(last_t, 'date', None)
+            off_id = getattr(last_t, 'id', 0)
+            off_top = getattr(last_t, 'id', 0)
+            await asyncio.sleep(0.2)
     except Exception as e:
         logger.info(f"Source forum lookup: {e}")
         
@@ -5453,16 +5923,28 @@ async def run_group_cloner_tool(session_mgr):
     tgt_topics_map = {}
     tgt_peer = await client.get_input_entity(_parse_chat_id(tgt_id))
     try:
-        tgt_res = await client(GetForumTopicsRequest(
-            peer=tgt_peer,
-            offset_date=None,
-            offset_id=0,
-            offset_topic=0,
-            limit=100
-        ))
-        if hasattr(tgt_res, 'topics'):
+        off_date = None
+        off_id = 0
+        off_top = 0
+        while True:
+            tgt_res = await client(GetForumTopicsRequest(
+                peer=tgt_peer,
+                offset_date=off_date,
+                offset_id=off_id,
+                offset_topic=off_top,
+                limit=100
+            ))
+            if not hasattr(tgt_res, 'topics') or not tgt_res.topics:
+                break
             for tt in tgt_res.topics:
-                tgt_topics_map[tt.title.lower()] = tt.id
+                tgt_topics_map[tt.title.strip().lower()] = tt.id
+            if len(tgt_res.topics) < 100:
+                break
+            last_t = tgt_res.topics[-1]
+            off_date = getattr(last_t, 'date', None)
+            off_id = getattr(last_t, 'id', 0)
+            off_top = getattr(last_t, 'id', 0)
+            await asyncio.sleep(0.2)
     except Exception as e:
         logger.info(f"Target forum lookup: {e}")
         

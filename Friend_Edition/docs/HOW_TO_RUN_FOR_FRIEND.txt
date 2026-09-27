@@ -1,0 +1,20 @@
+==============================================================================
+   TG KINDSYNC PRO — FRIEND EDITION (ORACLE CLOUD 24/7 SETUP)
+==============================================================================
+
+Welcome! This folder is specially prepared for Friend's 24/7 Telegram Cloner.
+
+HOW TO START (2 OPTIONS):
+------------------------------------------------------------------------------
+[OPTION 1: Interactive Terminal Setup & Cloner]
+- Double-click: CONNECT_ORACLE_FRIEND.bat
+- It will connect to your isolated workspace on Oracle Cloud.
+- Choose source & target group/topics from the interactive menu.
+
+[OPTION 2: 24/7 Autopilot Background Service]
+- Double-click: START_ORACLE_FRIEND_24_7.bat
+- It will run your cloner 24/7 in background even when your PC is turned OFF!
+
+==============================================================================
+Note: All files here are strictly isolated from Doctor's Master Edition.
+==============================================================================

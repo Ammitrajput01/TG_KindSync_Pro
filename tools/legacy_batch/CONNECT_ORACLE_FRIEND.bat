@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title TG KindSync Pro - Oracle Cloud Friend Instance
+title TG KindSync Pro - Oracle Cloud Friend Instance (24/7 Tunnel)
 color 0a
 cls
 
@@ -14,6 +14,7 @@ cd /d "%~dp0"
 
 set "KEY_PATH=%~dp0oracle_key_latest.key"
 if not exist "!KEY_PATH!" set "KEY_PATH=%~dp0oracle_key.key"
+if not exist "!KEY_PATH!" set "KEY_PATH=C:\TG_KindSync_Pro\oracle_key_latest.key"
 if not exist "!KEY_PATH!" set "KEY_PATH=C:\oracle_key_latest.key"
 if not exist "!KEY_PATH!" set "KEY_PATH=%USERPROFILE%\Downloads\oracle_key_latest.key"
 
@@ -42,9 +43,10 @@ scp -o StrictHostKeyChecking=no -i "!KEY_PATH!" "%~dp0deploy\setup_friend_oracle
 ssh -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "chmod +x /home/ubuntu/setup_friend_oracle.sh"
 
 echo.
-echo [*] Step 2: Connecting to Oracle Cloud Terminal for Setup...
+echo [*] Step 2: Connecting to Oracle Cloud Terminal with Auto Port Forwarding (5005)...
+echo [*] Note: Browser Login (http://127.0.0.1:5005) will work seamlessly!
 echo.
-ssh -t -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "/home/ubuntu/setup_friend_oracle.sh"
+ssh -L 5005:localhost:5005 -t -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "/home/ubuntu/setup_friend_oracle.sh"
 
 echo.
 echo ==============================================================================

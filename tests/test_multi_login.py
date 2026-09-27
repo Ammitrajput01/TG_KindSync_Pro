@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from web_dashboard import DashboardAuthManager
-from tg_kind_mode_v14 import MultiSessionManager
+from tg_kindsync_pro import MultiSessionManager
 
 
 def test_auth_manager_initialization():
