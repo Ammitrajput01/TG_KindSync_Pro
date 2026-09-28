@@ -31,6 +31,8 @@ Whenever generating, creating, saving, or exporting backups, database snapshots,
   *Example*: `history_core_backup_Sunday_13-September-2026_05-22AM.sqlite`
 - **Standard Display/Caption Pattern**:
   `[Day], [Date] [Month] [Year] | [HH]:[MM] [AM/PM]`
-  *Example*: `Sunday, 13 September 2026 | 05:22 AM`
-
-
+  *Example*: `Sunday, 13 September 2026 | 05:22 AM`## Permanent Project History & Regression Guard Rule (MANDATORY RULE)
+- **Always Read [PROJECT_HISTORY_LOG.md](file:///c:/TG_KindSync_Pro/PROJECT_HISTORY_LOG.md) BEFORE making any code changes** to understand historical context, prior bug fixes, and established architectural invariants.
+- **Whenever ANY change is made in the codebase (even a single line)**:
+  - IMMEDIATELY document the root cause, symptoms, affected files, and permanent fix in [PROJECT_HISTORY_LOG.md](file:///c:/TG_KindSync_Pro/PROJECT_HISTORY_LOG.md).
+  - This ensures that past mistakes, regressions, and broken loops are never repeated.

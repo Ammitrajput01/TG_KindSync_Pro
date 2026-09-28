@@ -184,3 +184,26 @@ This log permanently documents root causes, architectural patterns, historical b
   2. `/send <@username or user_id> <message>` & `/pm <target> <message>`: Direct DM from the bot to any student with automated database username-to-ID resolution.
   3. `/sendlink <@username or user_id>`: Automatically delivers a 30-minute single-use disposable invite link directly to the student.
   4. Added `2_START_KIND_DOCTOR_BOT.bat` 1-click launcher in root and `tools/launchers/`.
+
+---
+
+## 📅 Log Entry: Monday, 28 September 2026
+
+### 20. Group Cloner Multi-Topic Routing State Desynchronization & Channel Picker Scope Fix
+* **Symptoms**:
+  1. Group Cloner (Option 7 -> 4) failed to start either fresh clones or resume previous clone sessions; exited immediately or crashed on entity lookup.
+  2. Interactive Channel Picker (`interactive_channel_selector`) was missing many groups/channels and the search function was failing on non-ASCII or multi-token terms.
+* **Root Causes**:
+  1. **Env & State Desynchronization**: `run_group_cloner_tool` updated `.env` via `set_key()`, but `os.environ` was not updated in-memory, and `AppConfig.load()` used `load_dotenv(override=False)` which prevented reloading the newly created `FORWARDING_RULES`, `SOURCE_CHAT`, and `TARGET_CHAT`. `cfg.forwarding_rules` was loaded as an empty list `[]`, causing the scanner to default to `scanner_single` with an unconfigured `SOURCE_CHAT=0`.
+  2. **Entity Access Hash Failure**: Direct calls to `client.get_input_entity(_parse_chat_id(src_id))` without warming entity access hashes threw `ValueError: Could not find the input entity`.
+  3. **Dialog Limit Truncation**: `get_account_channels_list` used a hardcoded `get_dialogs(limit=250)`, which cut off any joined groups or channels past the top 250 recent dialogs.
+  4. **Destructive Search Normalization**: `_normalize_search_str` used ASCII-only stripping (`encode('ASCII', 'ignore')`), completely erasing Hindi / unicode terms and causing search mismatches.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py):
+    1. **Synchronized In-Memory & Disk State**: `update_env_file()` now synchronizes `os.environ` immediately alongside `set_key()`. `AppConfig.load()` now uses `load_dotenv(".env", override=True)` so all config changes on disk are immediately reflected across workers and scanner pipelines.
+    2. **Resilient Forum & Entity Resolution**: `run_group_cloner_tool` now uses `resolve_telethon_entity` to ensure peer access hashes are warm before requesting forum topics via `GetForumTopicsRequest`.
+    3. **SQLite Cloner Session Persistence**: Topic mappings are now mirrored to SQLite table `group_clone_sessions` via `save_clone_topic_mapping()`, ensuring 100% crash recovery and seamless resume across sessions.
+    4. **Uncapped Dialog Streaming**: `get_account_channels_list` now streams ALL dialogs with `iter_dialogs(limit=None)` and includes archived chats (`iter_dialogs(folder=1)`).
+    5. **Unicode & Multi-Token Search**: Rewrote `_match_channel_query` to support multi-token keyword searching, Chat ID matching, case-insensitive substrings, and full Unicode compatibility without ASCII erasure.
+    6. **Documented Permanent Rule**: Added mandatory Project History & Regression Guard rules in [AGENTS.md](file:///c:/TG_KindSync_Pro/AGENTS.md) and [GEMINI.md](file:///c:/TG_KindSync_Pro/GEMINI.md).
+

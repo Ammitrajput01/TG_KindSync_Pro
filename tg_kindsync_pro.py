@@ -830,28 +830,49 @@ def update_env_file(chat_id=None, topic_id=None, mode="1", extra_data=None, filt
     if mode == "1" and chat_id is not None:
         set_key(env_path, "SOURCE_CHAT", str(chat_id))
         set_key(env_path, "SOURCE_TOPIC", str(topic_id or 0))
+        os.environ["SOURCE_CHAT"] = str(chat_id)
+        os.environ["SOURCE_TOPIC"] = str(topic_id or 0)
     elif mode == "2" and chat_id is not None:
         set_key(env_path, "TARGET_CHAT", str(chat_id))
         set_key(env_path, "TARGET_TOPIC", str(topic_id or 0))
+        os.environ["TARGET_CHAT"] = str(chat_id)
+        os.environ["TARGET_TOPIC"] = str(topic_id or 0)
     elif mode == "3" and extra_data:
         current_rules = os.getenv("FORWARDING_RULES", "").strip()
         new_rule = f"{chat_id}:{topic_id or 0}:{extra_data['target_chat']}:{extra_data['target_topic']}"
         updated_rules = f"{current_rules},{new_rule}" if current_rules else new_rule
         set_key(env_path, "FORWARDING_RULES", updated_rules)
+        os.environ["FORWARDING_RULES"] = updated_rules
     elif mode == "filters" and filter_data:
-        set_key(env_path, "FILTER_KEYWORDS", ",".join(filter_data.get("keywords", [])))
-        set_key(env_path, "FILTER_EXCLUDE", ",".join(filter_data.get("exclude", [])))
-        set_key(env_path, "FILTER_SCOPE", filter_data.get("scope", "anywhere"))
+        k_str = ",".join(filter_data.get("keywords", []))
+        e_str = ",".join(filter_data.get("exclude", []))
+        s_str = filter_data.get("scope", "anywhere")
+        set_key(env_path, "FILTER_KEYWORDS", k_str)
+        set_key(env_path, "FILTER_EXCLUDE", e_str)
+        set_key(env_path, "FILTER_SCOPE", s_str)
+        os.environ["FILTER_KEYWORDS"] = k_str
+        os.environ["FILTER_EXCLUDE"] = e_str
+        os.environ["FILTER_SCOPE"] = s_str
     elif mode == "media_filter" and filter_data:
         set_key(env_path, "MEDIA_FILTER", filter_data)
+        os.environ["MEDIA_FILTER"] = filter_data
     elif mode == "thumb" and thumb_data:
         set_key(env_path, "THUMB_MODE", thumb_data)
+        os.environ["THUMB_MODE"] = thumb_data
     elif mode == "perf" and perf_data:
-        set_key(env_path, "WORKERS", str(perf_data.get("workers", 1)))
-        set_key(env_path, "UPLOAD_PARALLELISM", str(perf_data.get("parallelism", 12)))
-        set_key(env_path, "ADAPTIVE_MODE", "1" if perf_data.get("adaptive") else "0")
+        w_val = str(perf_data.get("workers", 1))
+        p_val = str(perf_data.get("parallelism", 12))
+        a_val = "1" if perf_data.get("adaptive") else "0"
+        set_key(env_path, "WORKERS", w_val)
+        set_key(env_path, "UPLOAD_PARALLELISM", p_val)
+        set_key(env_path, "ADAPTIVE_MODE", a_val)
+        os.environ["WORKERS"] = w_val
+        os.environ["UPLOAD_PARALLELISM"] = p_val
+        os.environ["ADAPTIVE_MODE"] = a_val
     elif mode == "direct_forward" and extra_data is not None:
-        set_key(env_path, "DIRECT_FORWARD", "true" if extra_data else "false")
+        df_val = "true" if extra_data else "false"
+        set_key(env_path, "DIRECT_FORWARD", df_val)
+        os.environ["DIRECT_FORWARD"] = df_val
 
 # ============================================================
 # 5. PREMIUM HEADER — STRUCTURED VISUAL HIERARCHY
@@ -996,7 +1017,7 @@ class AppConfig:
 
     @classmethod
     def load(cls, media_filter="all", workers=1, parallelism=12, adaptive=False, routing_mode=1, run_dlq=False, live_mode=False, auto_shutdown=False, direct_forward: Optional[bool] = None):
-        load_dotenv(override=False)
+        load_dotenv(".env", override=True)
         try:
             api_id = int(os.getenv("API_ID", 0) or 0)
         except ValueError:
@@ -2204,6 +2225,7 @@ class RPCGuard:
 async def get_account_channels_list(client):
     channels = []
     cache_file = Path("data/channels_cache.json")
+    seen_ids = set()
     
     # 1. Try using the provided client first
     if client:
@@ -2211,15 +2233,21 @@ async def get_account_channels_list(client):
             if not client.is_connected():
                 await client.connect()
             if await client.is_user_authorized():
-                dialogs = await client.get_dialogs(limit=250)
-                seen_ids = set()
-                for d in dialogs:
+                async for d in client.iter_dialogs(limit=None):
                     if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
                         if d.id not in seen_ids:
                             seen_ids.add(d.id)
                             name = str(d.name or "Unnamed").strip()
                             uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
                             channels.append({"id": d.id, "title": name, "username": uname})
+                with suppress(Exception):
+                    async for d in client.iter_dialogs(folder=1):
+                        if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
+                            if d.id not in seen_ids:
+                                seen_ids.add(d.id)
+                                name = str(d.name or "Unnamed").strip()
+                                uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
+                                channels.append({"id": d.id, "title": name, "username": uname})
         except Exception as e:
             logger.debug(f"Direct client dialog fetch failed: {e}")
 
@@ -2244,15 +2272,21 @@ async def get_account_channels_list(client):
                     t_client = TelegramClient(str(temp_file.with_suffix('')), api_id, api_hash)
                     await t_client.connect()
                     if await t_client.is_user_authorized():
-                        dialogs = await t_client.get_dialogs(limit=250)
-                        seen_ids = set()
-                        for d in dialogs:
+                        async for d in t_client.iter_dialogs(limit=None):
                             if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
                                 if d.id not in seen_ids:
                                     seen_ids.add(d.id)
                                     name = str(d.name or "Unnamed").strip()
                                     uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
                                     channels.append({"id": d.id, "title": name, "username": uname})
+                        with suppress(Exception):
+                            async for d in t_client.iter_dialogs(folder=1):
+                                if getattr(d, 'is_channel', False) or getattr(d, 'is_group', False):
+                                    if d.id not in seen_ids:
+                                        seen_ids.add(d.id)
+                                        name = str(d.name or "Unnamed").strip()
+                                        uname = getattr(d.entity, "username", None) if hasattr(d, 'entity') else None
+                                        channels.append({"id": d.id, "title": name, "username": uname})
                     await t_client.disconnect()
                 except Exception as ex:
                     logger.debug(f"Ephemeral clone for {s_name} failed: {ex}")
@@ -2296,8 +2330,7 @@ def _normalize_search_str(text: str) -> str:
         import unicodedata
         cleaned = str(text).replace("'", "").replace('"', '').replace('`', '').strip()
         nfkd = unicodedata.normalize('NFKD', cleaned)
-        ascii_text = nfkd.encode('ASCII', 'ignore').decode('utf-8').lower()
-        return re.sub(r'[^a-z0-9\s]', ' ', ascii_text)
+        return "".join(c for c in nfkd if c.isalnum() or c.isspace()).lower()
     except Exception:
         return str(text).lower()
 
@@ -2306,29 +2339,33 @@ def _match_channel_query(c: dict, raw_query: str) -> bool:
     q = raw_query.strip().strip("'").strip('"')
     if not q: return True
 
-    # 1. Chat ID exact or partial match
     c_id_str = str(c.get('id', ''))
-    if q in c_id_str:
-        return True
-
     title_raw = str(c.get('title', ''))
     uname_raw = str(c.get('username') or '')
     combined_raw = f"{title_raw} {uname_raw}".lower()
+
+    # 1. Chat ID exact or partial match
+    if q.lstrip("-") in c_id_str.lstrip("-") or q in c_id_str:
+        return True
 
     # 2. Case-insensitive substring match
     if q.lower() in combined_raw:
         return True
 
-    # 3. Token-based multi-word match (e.g. 'the pirate' matches '[The] Pirate Bay')
-    norm_combined = f"{_normalize_search_str(title_raw)} {_normalize_search_str(uname_raw)}"
-    norm_query = _normalize_search_str(q)
-    
-    if norm_query in norm_combined:
+    # 3. Multi-word token match (all words in search string must be found)
+    tokens = [t.lower() for t in q.split() if t.strip()]
+    if tokens and all(t in combined_raw for t in tokens):
         return True
 
-    tokens = [t for t in norm_query.split() if len(t) > 1]
-    if tokens and all(t in norm_combined for t in tokens):
-        return True
+    # 4. Normalized alphanumeric match fallback
+    norm_combined = _normalize_search_str(combined_raw)
+    norm_query = _normalize_search_str(q)
+    if norm_query:
+        if norm_query in norm_combined:
+            return True
+        q_tokens = [t for t in norm_query.split() if len(t) > 0]
+        if q_tokens and all(t in norm_combined for t in q_tokens):
+            return True
 
     return False
 
@@ -6239,20 +6276,30 @@ async def run_group_cloner_tool(session_mgr):
     client = await session_mgr.ensure_active_client()
     if not client: return None
 
+    # Always reload fresh .env configuration
+    load_dotenv(".env", override=True)
+
     # 0. Check for existing active clone session in DB or .env
     existing_rules_str = os.getenv("FORWARDING_RULES", "").strip()
     existing_rules = [r.strip() for r in existing_rules_str.split(",") if r.strip() and len(r.split(":")) >= 4] if existing_rules_str else []
+    prev_src = os.getenv("SOURCE_CHAT", "").strip()
+    prev_tgt = os.getenv("TARGET_CHAT", "").strip()
     
     cloner_choice = "fresh"
-    if existing_rules:
-        sample_parts = existing_rules[0].split(":")
-        prev_src = sample_parts[0]
-        prev_tgt = sample_parts[2]
+    if existing_rules or (prev_src and prev_src != "0" and prev_tgt and prev_tgt != "0"):
+        src_disp = prev_src
+        tgt_disp = prev_tgt
+        if existing_rules:
+            sample_parts = existing_rules[0].split(":")
+            src_disp = sample_parts[0]
+            tgt_disp = sample_parts[2]
+            
+        topics_disp = f"[bold green]{len(existing_rules)} Topics Mapped[/]" if existing_rules else "[bold yellow]Direct 1-to-1 Group Mirror[/]"
         console.print(Panel(
             f"[bold cyan]🔄 PREVIOUS GROUP CLONE SESSION DETECTED[/]\n\n"
-            f"• Source Group    : [yellow]{prev_src}[/]\n"
-            f"• Target Group    : [yellow]{prev_tgt}[/]\n"
-            f"• Mapped Topics   : [bold green]{len(existing_rules)} Topics[/]\n\n"
+            f"• Source Group    : [yellow]{src_disp}[/]\n"
+            f"• Target Group    : [yellow]{tgt_disp}[/]\n"
+            f"• Structure Mode  : {topics_disp}\n\n"
             f"[bold green][1][/] ⚡ [bold white]RESUME & CONTINUE[/] [dim](Skip completed files, continue where it stopped)[/]\n"
             f"[bold yellow][2][/] 🔄 [bold white]RE-SCAN & SYNC TOPICS[/] [dim](Check for newly added source topics & append to target)[/]\n"
             f"[bold magenta][3][/] 🆕 [bold white]START FRESH CLONE[/] [dim](Pick new source & target group)[/]\n"
@@ -6270,7 +6317,8 @@ async def run_group_cloner_tool(session_mgr):
             cloner_choice = "fresh"
 
     if cloner_choice == "resume":
-        console.print(f"\n[bold green]✔ Resuming existing group clone ({len(existing_rules)} topics mapped)![/]")
+        r_mode = 2 if existing_rules else 1
+        console.print(f"\n[bold green]✔ Resuming existing group clone ({len(existing_rules)} topics mapped)![/]" if existing_rules else f"\n[bold green]✔ Resuming direct group clone ({prev_src} ➔ {prev_tgt})![/]")
         
         # Export state snapshot
         now = datetime.now()
@@ -6285,6 +6333,7 @@ async def run_group_cloner_tool(session_mgr):
                 json.dump({
                     "timestamp": f"{day}, {now.strftime('%d %B %Y')} | {now.strftime('%I:%M %p')}",
                     "mode": "resume",
+                    "routing_mode": r_mode,
                     "total_rules": len(existing_rules),
                     "rules": existing_rules
                 }, f_snap, indent=2)
@@ -6292,7 +6341,7 @@ async def run_group_cloner_tool(session_mgr):
 
         confirm = await safe_input("\nStart Streaming Remaining Messages Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
         if confirm and confirm.upper() == "YES":
-            return (1, 12, False, "all", 2, False, False)
+            return (1, 12, False, "all", r_mode, False, False)
         return None
 
     # Step 1: Choose SOURCE Group
@@ -6312,7 +6361,8 @@ async def run_group_cloner_tool(session_mgr):
     
     src_topics = []
     try:
-        src_peer = await client.get_input_entity(_parse_chat_id(src_id))
+        src_entity, _ = await resolve_telethon_entity(client, src_id)
+        src_peer = await client.get_input_entity(src_entity)
         off_date = None
         off_id = 0
         off_top = 0
@@ -6335,14 +6385,25 @@ async def run_group_cloner_tool(session_mgr):
             off_top = getattr(last_t, 'id', 0)
             await asyncio.sleep(0.2)
     except Exception as e:
-        logger.info(f"Source forum lookup: {e}")
+        logger.info(f"Source forum lookup note: {e}")
         
     if not src_topics:
         console.print("[yellow]ℹ️ Source is a Standard Group/Channel (No Forum Topics).[/]")
         console.print(f"[bold green]Configuring direct 1-to-1 mirror clone: {src_id} ➔ {tgt_id}[/]\n")
-        update_env_file(chat_id=src_id, topic_id=0, mode="1")
-        update_env_file(chat_id=tgt_id, topic_id=0, mode="2")
-        confirm = await safe_input("Start Cloning Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
+        
+        env_p = ".env"
+        set_key(env_p, "SOURCE_CHAT", str(src_id))
+        set_key(env_p, "TARGET_CHAT", str(tgt_id))
+        set_key(env_p, "SOURCE_TOPIC", "0")
+        set_key(env_p, "TARGET_TOPIC", "0")
+        set_key(env_p, "FORWARDING_RULES", "")
+        os.environ["SOURCE_CHAT"] = str(src_id)
+        os.environ["TARGET_CHAT"] = str(tgt_id)
+        os.environ["SOURCE_TOPIC"] = "0"
+        os.environ["TARGET_TOPIC"] = "0"
+        os.environ["FORWARDING_RULES"] = ""
+        
+        confirm = await safe_input("Start Direct Group Clone Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
         if confirm and confirm.upper() == "YES":
             return (1, 12, False, "all", 1, False, False)
         return None
@@ -6358,8 +6419,9 @@ async def run_group_cloner_tool(session_mgr):
     console.print(topic_table)
     
     tgt_topics_map = {}
-    tgt_peer = await client.get_input_entity(_parse_chat_id(tgt_id))
     try:
+        tgt_entity, _ = await resolve_telethon_entity(client, tgt_id)
+        tgt_peer = await client.get_input_entity(tgt_entity)
         off_date = None
         off_id = 0
         off_top = 0
@@ -6383,10 +6445,13 @@ async def run_group_cloner_tool(session_mgr):
             off_top = getattr(last_t, 'id', 0)
             await asyncio.sleep(0.2)
     except Exception as e:
-        logger.info(f"Target forum lookup: {e}")
+        logger.info(f"Target forum lookup note: {e}")
         
     console.print("\n[bold cyan]Step 3: Smart Topic Mirroring & Duplicate Prevention...[/]")
     rules_to_create = []
+    
+    state_mgr = StateManager()
+    await state_mgr.start()
     
     for t in src_topics:
         t_title = getattr(t, 'title', f'Topic {t.id}')
@@ -6410,10 +6475,27 @@ async def run_group_cloner_tool(session_mgr):
                 tgt_t_id = 0
                 
         rules_to_create.append(f"{src_id}:{t.id}:{tgt_id}:{tgt_t_id or 0}")
+        with suppress(Exception):
+            await state_mgr.save_clone_topic_mapping(str(src_id), t.id, str(tgt_id), tgt_t_id or 0, t_title)
         await asyncio.sleep(0.3)
         
-    set_key(".env", "FORWARDING_RULES", ",".join(rules_to_create))
-    console.print(f"\n[bold green]✨ All {len(rules_to_create)} topic routing rules successfully configured & tracked in .env![/]")
+    with suppress(Exception):
+        await state_mgr.close()
+
+    env_p = ".env"
+    rules_joined = ",".join(rules_to_create)
+    set_key(env_p, "FORWARDING_RULES", rules_joined)
+    set_key(env_p, "SOURCE_CHAT", str(src_id))
+    set_key(env_p, "TARGET_CHAT", str(tgt_id))
+    set_key(env_p, "SOURCE_TOPIC", "0")
+    set_key(env_p, "TARGET_TOPIC", "0")
+    os.environ["FORWARDING_RULES"] = rules_joined
+    os.environ["SOURCE_CHAT"] = str(src_id)
+    os.environ["TARGET_CHAT"] = str(tgt_id)
+    os.environ["SOURCE_TOPIC"] = "0"
+    os.environ["TARGET_TOPIC"] = "0"
+
+    console.print(f"\n[bold green]✨ All {len(rules_to_create)} topic routing rules successfully configured & tracked in .env & SQLite![/]")
 
     # Export Initial Snapshot
     now = datetime.now()
