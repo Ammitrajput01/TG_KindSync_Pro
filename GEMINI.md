@@ -36,3 +36,14 @@ Whenever generating, creating, saving, or exporting backups, database snapshots,
 - **Whenever ANY change is made in the codebase (even a single line)**:
   - IMMEDIATELY document the root cause, symptoms, affected files, and permanent fix in [PROJECT_HISTORY_LOG.md](file:///c:/TG_KindSync_Pro/PROJECT_HISTORY_LOG.md).
   - This ensures that past mistakes, regressions, and broken loops are never repeated.
+
+## Autonomous Skills & Master Vault Access Policy
+You have access to a 2-tier skill architecture:
+1. **Tier 1 — High-Priority Active Skills (`.agents/skills/`)**:
+   - **Medical & Clinical**: `claude-scientific-skills`, `pubmed-database`, `biopython`, `fda-medtech-compliance-auditor`, `health-trend-analyzer`, `family-health-analyzer`.
+   - **Security & Hardening**: `security-audit`, `threat-modeling-expert`, `threat-mitigation-mapping`, `security-scanning-security-hardening`, `api-security-testing`.
+   - **Visuals & Motion**: `mermaid-expert`, `c4-architecture-c4-architecture`, `impeccable-design`, `ui-ux-pro-max`, `emil-kowalski-motion`.
+   - **Agent Memory & Testing**: `agent-evaluation`, `llm-evaluation`, `multi-agent-patterns`, `agent-memory-systems`, `browser-automation`, `graphify`.
+2. **Tier 2 — Universal Vault (1,600+ Skills in `C:\Users\Ammit\.gemini\config\skills-vault\skills\`)**:
+   - Whenever any specialized task is requested, autonomously read the relevant `SKILL.md` from the vault on-demand without waiting for user commands or cluttering prompt context.
+

@@ -1656,13 +1656,19 @@ class DeviTelegramBot:
             async with session.post(url, json=payload, timeout=10) as resp:
                 if resp.status == 200:
                     return True
+                err_text = await resp.text()
+                if "message is not modified" in err_text.lower():
+                    return True
                 # Fallback to plain text if HTML parsing issues occur
                 clean_plain = re.sub(r'<[^>]+>', '', formatted_text)
                 clean_plain = re.sub(r'[*_`]', '', clean_plain)
                 payload["text"] = clean_plain
                 payload.pop("parse_mode", None)
                 async with session.post(url, json=payload, timeout=10) as r2:
-                    return r2.status == 200
+                    if r2.status == 200:
+                        return True
+                    err_txt2 = await r2.text()
+                    return "message is not modified" in err_txt2.lower()
         except Exception as e:
             logger.warning(f"Failed to edit message {message_id} in {chat_id}: {e}")
             return False
@@ -1995,9 +2001,17 @@ class DeviTelegramBot:
             msg_obj = cb.get("message", {})
             thread_id = msg_obj.get("message_thread_id")
             
-            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Processing request..."})
-            
             if action == "mainindex":
+                target_index_chat = self._resolve_study_group_id(chat_id)
+                cards, reply_markup = self._build_main_index_cards(target_index_chat, sort_mode="az")
+                msg_id = msg_obj.get("message_id")
+                if cards and msg_id:
+                    # In-place edit of the card
+                    edited = await self._edit_message(session, chat_id, msg_id, cards[0], reply_markup=reply_markup, disable_web_page_preview=True)
+                    if edited:
+                        await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "✅ Master Index refreshed in-place!"})
+                        return
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Processing request..."})
                 await self._handle_admin_command(session, chat_id, admin_id, "/mainindex", message=msg_obj)
             elif action == "scan":
                 await self._handle_admin_command(session, chat_id, admin_id, "/scan", message=msg_obj)
@@ -2560,7 +2574,7 @@ class DeviTelegramBot:
             # C. Group Commands, Smart FAQs or Tags
             cur_bot_tag = f"@{self.bot_username}".lower() if getattr(self, "bot_username", None) else "@kinddoc_bot"
             is_tagged = (cur_bot_tag in text.lower()) or ("@kinddoc" in text.lower()) or ("@kinddoctor" in text.lower())
-            is_command = text.startswith("/") or any(text.lower().startswith(c) for c in ("index", "mainindex", "topics", "help", "menu", "stats", "manual", "find", "scan"))
+            is_command = text.startswith("/")
 
             if not (is_tagged or is_command):
                 # Smart FAQ trigger: Check if any keyword matches a saved FAQ
@@ -2584,9 +2598,6 @@ class DeviTelegramBot:
             # Strip any bot username mention (e.g. /mainindex@KindDoc_bot or /mainindex@KindDoctor4u_bot -> /mainindex)
             clean_text = re.sub(r'@[a-zA-Z0-9_]+', '', text).strip()
             first_word = clean_text.split()[0].lower().split("@")[0] if clean_text else ""
-            if not first_word.startswith("/") and (first_word in ("index", "mainindex", "topics", "help", "menu", "stats", "manual", "find", "scan") or f"/{first_word}" in STUDENT_ALLOWED_COMMANDS):
-                first_word = f"/{first_word}"
-                clean_text = f"/{clean_text}"
 
             # Non-admins can use study and search tools (and view indexes)
             if not is_sender_admin:

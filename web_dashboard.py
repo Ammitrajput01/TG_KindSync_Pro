@@ -82,30 +82,37 @@ def get_local_lan_ip() -> str:
 
 
 # ================================================================================
-# MULTI-USER AUTHENTICATION & RBAC MANAGER
+# MULTI-USER AUTHENTICATION & RBAC MANAGER (PBKDF2-HMAC-SHA256)
 # ================================================================================
 class DashboardAuthManager:
     """
     Enterprise Multi-User Authentication & Role-Based Access Control (RBAC) Engine.
-    Provides salt+SHA256 password hashing, bearer session tokens, and user CRUD.
+    Provides NIST SP 800-63B compliant PBKDF2-HMAC-SHA256 password hashing (100k iterations),
+    16-byte cryptographically secure random salts, 192-bit bearer tokens, and session invalidation.
     """
     def __init__(self, db_file=None):
         self.db_file = db_file or AUTH_DB_FILE
         self.tokens = {}  # token -> {"username": str, "role": str, "expires_at": float}
         self._init_db()
 
+    @staticmethod
+    def _hash_pbkdf2(password: str, salt: str) -> str:
+        """Calculates 100,000 iteration PBKDF2-HMAC-SHA256 key."""
+        return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
+
     def _init_db(self):
         try:
             self.db_file.parent.mkdir(parents=True, exist_ok=True)
             if not self.db_file.exists():
-                salt = secrets.token_hex(8)
-                admin_hash = hashlib.sha256(f"{salt}Amit@123".encode("utf-8")).hexdigest()
+                salt = secrets.token_hex(16)
+                admin_hash = self._hash_pbkdf2("Amit@123", salt)
                 initial_data = {
                     "users": {
                         "Amit": {
                             "username": "Amit",
                             "salt": salt,
                             "password_hash": admin_hash,
+                            "algo": "pbkdf2_sha256_100k",
                             "role": "admin",
                             "created_at": datetime.now().isoformat(),
                             "last_login": None
@@ -150,10 +157,27 @@ class DashboardAuthManager:
                     
         if not user:
             return None
+
         salt = user.get("salt", "")
         expected_hash = user.get("password_hash", "")
-        input_hash = hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest()
-        if secrets.compare_digest(expected_hash, input_hash):
+        algo = user.get("algo", "sha256_legacy")
+
+        is_valid = False
+        if algo == "pbkdf2_sha256_100k":
+            calculated_hash = self._hash_pbkdf2(password, salt)
+            is_valid = secrets.compare_digest(expected_hash, calculated_hash)
+        else:
+            # Legacy SHA-256 fallback with automatic on-the-fly PBKDF2 migration
+            legacy_hash = hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest()
+            if secrets.compare_digest(expected_hash, legacy_hash):
+                is_valid = True
+                # Automatically upgrade to PBKDF2-HMAC-SHA256
+                new_salt = secrets.token_hex(16)
+                user["salt"] = new_salt
+                user["password_hash"] = self._hash_pbkdf2(password, new_salt)
+                user["algo"] = "pbkdf2_sha256_100k"
+
+        if is_valid:
             self.purge_expired_tokens()
             token = secrets.token_hex(24)
             expires_at = time.time() + (7 * 24 * 3600)  # 7 days session
@@ -170,6 +194,49 @@ class DashboardAuthManager:
                 "role": user.get("role", "viewer")
             }
         return None
+
+    def change_password(self, username: str, current_pass: str, new_pass: str) -> tuple[bool, str]:
+        if not username or not current_pass or not new_pass:
+            return False, "All fields are required"
+        if len(new_pass) < 6:
+            return False, "New password must be at least 6 characters long"
+
+        data = self._load_data()
+        users = data.get("users", {})
+        user = users.get(username)
+        if not user:
+            for k, v in users.items():
+                if k.lower() == username.lower():
+                    user = v
+                    break
+        if not user:
+            return False, "User not found"
+
+        salt = user.get("salt", "")
+        expected_hash = user.get("password_hash", "")
+        algo = user.get("algo", "sha256_legacy")
+
+        is_valid = False
+        if algo == "pbkdf2_sha256_100k":
+            calc = self._hash_pbkdf2(current_pass, salt)
+            is_valid = secrets.compare_digest(expected_hash, calc)
+        else:
+            legacy = hashlib.sha256(f"{salt}{current_pass}".encode("utf-8")).hexdigest()
+            is_valid = secrets.compare_digest(expected_hash, legacy)
+
+        if not is_valid:
+            return False, "Current password verification failed"
+
+        new_salt = secrets.token_hex(16)
+        user["salt"] = new_salt
+        user["password_hash"] = self._hash_pbkdf2(new_pass, new_salt)
+        user["algo"] = "pbkdf2_sha256_100k"
+        user["password_updated_at"] = datetime.now().isoformat()
+        self._save_data(data)
+
+        # Invalidate all other active tokens for this user for security
+        self.tokens = {k: v for k, v in self.tokens.items() if v.get("username") != username}
+        return True, "Password updated successfully"
 
     def purge_expired_tokens(self):
         now = time.time()
@@ -208,20 +275,21 @@ class DashboardAuthManager:
         username = (username or "").strip()
         if not username or len(username) < 3:
             return False, "Username must be at least 3 characters long"
-        if not password or len(password) < 4:
-            return False, "Password must be at least 4 characters long"
+        if not password or len(password) < 6:
+            return False, "Password must be at least 6 characters long"
         if role not in ("admin", "viewer", "operator"):
             role = "viewer"
         data = self._load_data()
         users = data.get("users", {})
         if username in users:
             return False, f"User '{username}' already exists"
-        salt = secrets.token_hex(8)
-        p_hash = hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest()
+        salt = secrets.token_hex(16)
+        p_hash = self._hash_pbkdf2(password, salt)
         users[username] = {
             "username": username,
             "salt": salt,
             "password_hash": p_hash,
+            "algo": "pbkdf2_sha256_100k",
             "role": role,
             "created_at": datetime.now().isoformat(),
             "last_login": None
@@ -542,18 +610,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TG KindSync Pro — Mission Control</title>
-    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <!-- Google Fonts: Outfit, Plus Jakarta Sans & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
+            /* Typography Families */
+            --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
             /* Palette Architecture - Midnight Obsidian */
-            --bg-canvas: #07090E;
-            --bg-surface: #0E121A;
-            --bg-surface-elevated: #141924;
-            --bg-surface-hover: #1B2130;
-            --bg-subtle: #10141E;
+            --bg-canvas: #05070B;
+            --bg-surface: #0B0E17;
+            --bg-surface-elevated: #111624;
+            --bg-surface-hover: #181F33;
+            --bg-subtle: #080B12;
             
             /* Borders */
             --border-subtle: rgba(255, 255, 255, 0.08);
@@ -623,6 +696,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         html, body {
             height: 100%;
             background-color: var(--bg-canvas);
+            background-image: 
+                radial-gradient(1100px 650px at 50% -80px, rgba(99, 102, 241, 0.12), transparent 70%),
+                radial-gradient(900px 600px at 90% 90%, rgba(56, 189, 248, 0.06), transparent 70%);
+            background-attachment: fixed;
             color: var(--text-primary);
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 14px;
@@ -2262,6 +2339,272 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             .app-header { padding: 0 var(--space-4); }
             .view-content-area { padding: var(--space-4); }
         }
+
+        /* View Transition Animations */
+        .tab-view {
+            display: none;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity var(--duration-base) var(--ease-enter), transform var(--duration-base) var(--ease-enter);
+        }
+        .tab-view.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+            animation: tabFadeSlideIn var(--duration-base) var(--ease-enter) forwards;
+        }
+        @keyframes tabFadeSlideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Floating Shortcut HUD */
+        .floating-shortcut-hud {
+            position: fixed;
+            bottom: var(--space-4);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(11, 14, 23, 0.9);
+            border: 1px solid var(--border-medium);
+            border-radius: var(--radius-full);
+            padding: 6px 18px;
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            box-shadow: 0 12px 36px rgba(0,0,0,0.65), 0 0 20px rgba(99, 102, 241, 0.15);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            z-index: 90;
+            font-size: 11px;
+            color: var(--text-secondary);
+            transition: all var(--duration-base) var(--ease-spring);
+        }
+        .floating-shortcut-hud:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 16px 42px rgba(99, 102, 241, 0.25);
+            transform: translateX(-50%) translateY(-2px);
+        }
+        .hud-kbd {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #F8FAFC;
+            border: 1px solid var(--border-subtle);
+        }
+
+        /* Table Filter & Search Controls */
+        .table-controls-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-3);
+            margin-bottom: var(--space-3);
+            flex-wrap: wrap;
+        }
+        .filter-chips-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .filter-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-full);
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--duration-instant) ease;
+        }
+        .filter-chip:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+        .filter-chip.active {
+            background: var(--accent-primary);
+            color: #FFFFFF;
+            border-color: var(--accent-primary);
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+        }
+        .table-search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .table-search-box input {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--border-medium);
+            border-radius: var(--radius-full);
+            padding: 5px 12px 5px 30px;
+            font-size: 12px;
+            color: var(--text-primary);
+            outline: none;
+            width: 200px;
+            transition: width 0.2s ease, border-color 0.2s ease;
+        }
+        .table-search-box input:focus {
+            width: 260px;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+        .table-search-box svg {
+            position: absolute;
+            left: 10px;
+            color: var(--text-tertiary);
+            pointer-events: none;
+        }
+
+        /* Command Palette Modal (Linear / Raycast Style) */
+        .cmd-palette-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            background: rgba(5, 7, 11, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 10vh;
+            opacity: 0;
+            transition: opacity 0.2s var(--ease-enter);
+        }
+        .cmd-palette-backdrop.open {
+            display: flex;
+            opacity: 1;
+        }
+        .cmd-palette-box {
+            width: 100%;
+            max-width: 620px;
+            background: #0B0E17;
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: var(--radius-xl);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85), 0 0 32px rgba(99, 102, 241, 0.22);
+            overflow: hidden;
+            transform: translateY(-8px) scale(0.98);
+            transition: transform 0.2s var(--ease-enter);
+            display: flex;
+            flex-direction: column;
+        }
+        .cmd-palette-backdrop.open .cmd-palette-box {
+            transform: translateY(0) scale(1);
+        }
+        .cmd-palette-search {
+            display: flex;
+            align-items: center;
+            padding: var(--space-4) var(--space-5);
+            border-bottom: 1px solid var(--border-subtle);
+            gap: var(--space-3);
+            background: rgba(17, 22, 36, 0.7);
+        }
+        .cmd-palette-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 15px;
+            font-family: var(--font-body);
+        }
+        .cmd-palette-results {
+            max-height: 380px;
+            overflow-y: auto;
+            padding: var(--space-3);
+        }
+        .cmd-group-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: var(--space-2) var(--space-3) 4px;
+        }
+        .cmd-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 9px 12px;
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.12s ease, transform 0.12s ease;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        .cmd-item:hover, .cmd-item.selected {
+            background: rgba(99, 102, 241, 0.2);
+            color: #FFFFFF;
+            transform: translateX(3px);
+        }
+        .cmd-item-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .cmd-item-icon {
+            font-size: 16px;
+            width: 22px;
+            text-align: center;
+        }
+        .cmd-item-shortcut {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-tertiary);
+            background: rgba(255, 255, 255, 0.06);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-subtle);
+        }
+        .cmd-palette-footer {
+            padding: 10px 18px;
+            background: rgba(8, 11, 18, 0.95);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        /* High-End Motion & Micro-Interactions */
+        @keyframes tabSlideIn {
+            0% { opacity: 0; transform: translateY(6px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .tab-view.active {
+            display: block;
+            animation: tabSlideIn 220ms var(--ease-enter) forwards;
+        }
+        .modal-backdrop.open .modal-dialog {
+            animation: modalPopIn 220ms var(--ease-spring) forwards;
+        }
+        @keyframes modalPopIn {
+            0% { transform: scale(0.96) translateY(8px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .text-input:focus, select.text-input:focus, textarea.text-input:focus {
+            border-color: var(--accent-primary) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+            background: rgba(15, 23, 42, 0.95) !important;
+        }
+        .toast-notification {
+            animation: toastEntrance 220ms var(--ease-spring) forwards;
+        }
+        @keyframes toastEntrance {
+            0% { opacity: 0; transform: translateY(12px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2278,11 +2621,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <form id="auth-gate-form" onsubmit="handleGateLoginSubmit(event)" style="margin-top: var(--space-5);">
                 <div class="form-group" style="margin-bottom: var(--space-3); text-align: left;">
                     <label class="form-label" style="font-size: 12px; font-weight: 600;">Username</label>
-                    <input type="text" class="text-input" id="gate-username" placeholder="Enter username" required autocomplete="username" value="Amit" style="font-size: 14px; padding: 10px 14px; width: 100%;">
+                    <input type="text" class="text-input" id="gate-username" placeholder="Enter administrative username" required autocomplete="username" autofocus style="font-size: 14px; padding: 10px 14px; width: 100%;">
                 </div>
                 <div class="form-group" style="margin-bottom: var(--space-4); text-align: left;">
                     <label class="form-label" style="font-size: 12px; font-weight: 600;">Password</label>
-                    <input type="password" class="text-input" id="gate-password" placeholder="••••••••" required autocomplete="current-password" value="Amit@123" style="font-size: 14px; padding: 10px 14px; width: 100%;">
+                    <input type="password" class="text-input" id="gate-password" placeholder="••••••••" required autocomplete="current-password" style="font-size: 14px; padding: 10px 14px; width: 100%;">
                 </div>
 
                 <div id="gate-error-banner" style="display: none; font-size: 12px; color: var(--accent-danger); background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.25); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: var(--space-4); text-align: center;"></div>
@@ -2293,7 +2636,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </form>
 
             <div style="margin-top: var(--space-5); font-size: 11px; color: var(--text-tertiary); text-align: center;">
-                Default Credentials: <strong>Amit</strong> / <strong>Amit@123</strong>
+                Protected by <strong>PBKDF2-HMAC-SHA256</strong> & 192-bit Cryptographic Bearer Tokens
             </div>
         </div>
     </div>
@@ -2404,6 +2747,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
 
                 <div class="header-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="openCommandPalette()" title="Open Command Palette (Ctrl + K)" style="border: 1px solid var(--border-medium); background: rgba(255,255,255,0.04); display: flex; align-items: center; gap: 6px;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <span>Command</span>
+                        <kbd class="hud-kbd">Ctrl+K</kbd>
+                    </button>
                     <button class="btn btn-ghost btn-sm" onclick="openRemoteModal()" title="Mobile Phone Access URL">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
                         <span id="header-wifi-label">Wi-Fi Phone URL</span>
@@ -2412,7 +2760,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <span class="status-dot"></span>
                         <span id="header-engine-status">Engine Online (Synced)</span>
                     </div>
-                                        <button class="btn btn-secondary btn-sm" onclick="openRouteMatrixModal()" title="Visual Forwarding Route Matrix">
+                    <button class="btn btn-secondary btn-sm" onclick="handleResetDisplayCounters()" title="Clean and Reset Session Display Counters to Zero (Standby)" style="border-color: rgba(239, 68, 68, 0.4);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        <span>Clean Display</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="openRouteMatrixModal()" title="Visual Forwarding Route Matrix">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
                         <span>Route Matrix</span>
                     </button>
@@ -2796,6 +3148,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </div>
                             <span class="pill pill-neutral tabular" id="ledger-count-pill">Live Database Sync</span>
                         </div>
+                        <div class="table-controls-bar" style="padding: 0 var(--space-4); margin-top: var(--space-3); margin-bottom: var(--space-3);">
+                            <div class="filter-chips-group">
+                                <button class="filter-chip active" id="chip-ledger-all" onclick="filterDispatchedFiles('all', this)">All Media</button>
+                                <button class="filter-chip" id="chip-ledger-video" onclick="filterDispatchedFiles('video', this)">Videos 🎬</button>
+                                <button class="filter-chip" id="chip-ledger-document" onclick="filterDispatchedFiles('document', this)">Documents 📄</button>
+                                <button class="filter-chip" id="chip-ledger-photo" onclick="filterDispatchedFiles('photo', this)">Photos 🖼️</button>
+                                <button class="filter-chip" id="chip-ledger-audio" onclick="filterDispatchedFiles('audio', this)">Audios 🎵</button>
+                            </div>
+                            <div class="table-search-box">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <input type="text" id="ledger-search-input" placeholder="Filter dispatched files..." oninput="handleLedgerSearch(this.value)">
+                            </div>
+                        </div>
                         <table class="data-table" id="sent-files-ledger-table">
                             <thead>
                                 <tr>
@@ -3113,6 +3478,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     Namaste Dr. Amit! Main Devi AI hoon. Aapke Telegram cloud pipeline, speed tuning, ya error triage me main kaise madad kar sakti hoon?
                                 </div>
                             </div>
+                            <!-- Quick Prompt Suggestions Chips -->
+                            <div style="padding: 6px var(--space-4); display: flex; gap: 6px; overflow-x: auto; background: rgba(8,11,18,0.6); border-top: 1px solid var(--border-subtle);">
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Optimize speed and rate pacing for current channel stream')">⚡ Optimize Speed</button>
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Check current system health and floodwait risk')">🛡️ Health Check</button>
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Explain current forward route matrix architecture')">🗺️ Route Audit</button>
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Suggest next evolutionary upgrades for TG KindSync Pro')">💡 Next Upgrades</button>
+                            </div>
                             <form class="chat-input-bar" onsubmit="handleDeviChatSubmit(event)">
                                 <input type="text" class="text-input" id="devi-chat-input" placeholder="Ask Devi AI anything about sync pipeline or architecture..." autocomplete="off">
                                 <button type="submit" class="btn btn-primary">Send</button>
@@ -3128,7 +3500,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <div class="panel-section">
                         <div class="panel-header">
                             <span class="panel-title">Dead Letter Queue (Failed Messages)</span>
-                            <div class="panel-actions">
+                            <div class="panel-actions" style="display: flex; gap: var(--space-3); align-items: center;">
+                                <div class="table-search-box">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    <input type="text" id="dlq-search-input" placeholder="Search failed messages..." oninput="handleDlqSearch(this.value)">
+                                </div>
                                 <button class="btn btn-danger btn-sm" onclick="clearDlqErrors()">Purge DLQ</button>
                             </div>
                         </div>
@@ -3176,7 +3552,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <div class="panel-section">
                         <div class="panel-header">
                             <span class="panel-title">Dashboard Role-Based Access Control (RBAC)</span>
-                            <button class="btn btn-primary btn-sm" onclick="openCreateUserModal()">Add Member</button>
+                            <div style="display: flex; gap: var(--space-2);">
+                                <button class="btn btn-secondary btn-sm" onclick="openChangePasswordModal()" title="Update account password">🔑 Change Password</button>
+                                <button class="btn btn-primary btn-sm" onclick="openCreateUserModal()">➕ Add Member</button>
+                            </div>
                         </div>
                         <table class="data-table">
                             <thead>
@@ -3199,6 +3578,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 </section>
 
+            </div>
+            
+            <!-- Floating Interactive Shortcut HUD -->
+            <div class="floating-shortcut-hud" id="floating-shortcut-hud">
+                <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="openCommandPalette()" title="Open Command Palette (Ctrl+K)">
+                    <span style="color: #818CF8;">⚡</span>
+                    <span style="font-weight: 600; color: #F8FAFC;">Command Palette</span>
+                    <kbd class="hud-kbd">Ctrl+K</kbd>
+                </div>
+                <div style="width: 1px; height: 12px; background: var(--border-medium);"></div>
+                <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="handleResetDisplayCounters()" title="Clean Display (Alt+C)">
+                    <span>Clean:</span>
+                    <kbd class="hud-kbd">Alt+C</kbd>
+                </div>
+                <div style="width: 1px; height: 12px; background: var(--border-medium);"></div>
+                <div style="display: flex; align-items: center; gap: 6px;" title="Switch Views (Keys 1-7)">
+                    <span>Views:</span>
+                    <kbd class="hud-kbd">1-7</kbd>
+                </div>
+                <div style="width: 1px; height: 12px; background: var(--border-medium);"></div>
+                <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="togglePauseEngine()" title="Pause / Resume Engine (Space)">
+                    <span>Pause:</span>
+                    <kbd class="hud-kbd">Space</kbd>
+                </div>
             </div>
         </main>
     </div>
@@ -3280,11 +3683,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="modal-body">
                     <div class="form-group">
                         <label class="form-label">Username</label>
-                        <input type="text" class="text-input" id="login-username" value="Amit" required>
+                        <input type="text" class="text-input" id="login-username" placeholder="Enter username" required autocomplete="username">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Password</label>
-                        <input type="password" class="text-input" id="login-password" value="Amit@123" required>
+                        <input type="password" class="text-input" id="login-password" placeholder="••••••••" required autocomplete="current-password">
                     </div>
                     <div id="login-error-msg" style="font-size: 12px; color: var(--accent-danger); display: none;"></div>
                 </div>
@@ -3307,11 +3710,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="modal-body">
                     <div class="form-group">
                         <label class="form-label">Username</label>
-                        <input type="text" class="text-input" id="new-user-name" required>
+                        <input type="text" class="text-input" id="new-user-name" placeholder="Username (min 3 chars)" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Password</label>
-                        <input type="password" class="text-input" id="new-user-pass" required>
+                        <input type="password" class="text-input" id="new-user-pass" placeholder="••••••••" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Role</label>
@@ -3325,6 +3728,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeCreateUserModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. Change Password Modal -->
+    <div class="modal-backdrop" id="change-password-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Change Account Password</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeChangePasswordModal()">&times;</button>
+            </div>
+            <form onsubmit="handleChangePasswordSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" class="text-input" id="change-pass-current" placeholder="Enter current password" required autocomplete="current-password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">New Password (min. 6 characters)</label>
+                        <input type="password" class="text-input" id="change-pass-new" placeholder="Enter new secure password" required autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password</label>
+                        <input type="password" class="text-input" id="change-pass-confirm" placeholder="Re-enter new password" required autocomplete="new-password">
+                    </div>
+                    <div id="change-pass-error-msg" style="font-size: 12px; color: var(--accent-danger); display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeChangePasswordModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="change-pass-submit-btn">Update Password</button>
                 </div>
             </form>
         </div>
@@ -3703,6 +4137,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
         function openCreateUserModal() { document.getElementById('create-user-modal').classList.add('open'); }
         function closeCreateUserModal() { document.getElementById('create-user-modal').classList.remove('open'); }
+        function openChangePasswordModal() {
+            const m = document.getElementById('change-password-modal');
+            if (m) m.classList.add('open');
+            const cur = document.getElementById('change-pass-current');
+            if (cur) cur.focus();
+            const err = document.getElementById('change-pass-error-msg');
+            if (err) err.style.display = 'none';
+        }
+        function closeChangePasswordModal() {
+            const m = document.getElementById('change-password-modal');
+            if (m) m.classList.remove('open');
+            const form = m ? m.querySelector('form') : null;
+            if (form) form.reset();
+            const err = document.getElementById('change-pass-error-msg');
+            if (err) err.style.display = 'none';
+        }
         function openRemoteModal() {
             document.getElementById('wifi-modal-url').textContent = cachedWifiUrl;
             document.getElementById('remote-modal').classList.add('open');
@@ -3957,19 +4407,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 // Recent Sent Files Ledger Table
                 if (d.recent_dispatched_files && d.recent_dispatched_files.length > 0) {
-                    const ledgerTbody = document.getElementById('sent-files-ledger-tbody');
-                    if (ledgerTbody) {
-                        ledgerTbody.innerHTML = d.recent_dispatched_files.map(file => `
-                            <tr>
-                                <td><strong style="color: #F8FAFC;">${escapeHtml(file.title || 'Lecture Media')}</strong></td>
-                                <td><span class="pill pill-neutral" style="font-size: 11px;">${escapeHtml((file.item_type || 'video').toUpperCase())}</span></td>
-                                <td class="tabular" style="color: #38BDF8;">${file.size_mb ? file.size_mb + ' MB' : '184.2 MB'}</td>
-                                <td style="color: var(--text-secondary); font-size: 12px;">${escapeHtml(file.target_topic || 'Main Lecture Stream')}</td>
-                                <td class="tabular" style="color: var(--text-tertiary); font-size: 11px;">${escapeHtml(file.completed_at || 'Just now')}</td>
-                                <td><span class="pill pill-success tabular" style="font-size: 11px;">Delivered ✅</span></td>
-                            </tr>
-                        `).join('');
-                    }
+                    cachedDispatchedFiles = d.recent_dispatched_files;
+                    renderFilteredLedger();
                 }
 
                 // 2. Active Subject & Uptime
@@ -4531,6 +4970,309 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             } catch(e) {}
         }
 
+        async function handleChangePasswordSubmit(e) {
+            e.preventDefault();
+            const cur = document.getElementById('change-pass-current').value;
+            const newP = document.getElementById('change-pass-new').value;
+            const conf = document.getElementById('change-pass-confirm').value;
+            const errEl = document.getElementById('change-pass-error-msg');
+            const btn = document.getElementById('change-pass-submit-btn');
+
+            if (errEl) errEl.style.display = 'none';
+
+            if (!cur || !newP || !conf) {
+                if (errEl) { errEl.textContent = "All fields are required"; errEl.style.display = 'block'; }
+                return;
+            }
+            if (newP !== conf) {
+                if (errEl) { errEl.textContent = "New passwords do not match"; errEl.style.display = 'block'; }
+                return;
+            }
+            if (newP.length < 6) {
+                if (errEl) { errEl.textContent = "Password must be at least 6 characters long"; errEl.style.display = 'block'; }
+                return;
+            }
+
+            if (btn) { btn.disabled = true; btn.textContent = "Updating..."; }
+
+            try {
+                const res = await fetch('/api/auth/change_password', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ current_password: cur, new_password: newP })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (data.new_token) {
+                        localStorage.setItem('ks_session_token', data.new_token);
+                    }
+                    showToast("Password updated successfully!", "success");
+                    closeChangePasswordModal();
+                } else {
+                    if (errEl) {
+                        errEl.textContent = data.error || data.message || "Password update failed";
+                        errEl.style.display = 'block';
+                    }
+                    playAudioFeedback('warning');
+                }
+            } catch(err) {
+                if (errEl) {
+                    errEl.textContent = "Network error: " + err.message;
+                    errEl.style.display = 'block';
+                }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = "Update Password"; }
+            }
+        }
+
+        // --- COMMAND PALETTE & GLOBAL KEYBOARD ENGINE ---
+        const COMMANDS_CATALOG = [
+            { id: 'view_overview', title: 'Switch to Overview (Mission Control)', icon: '📊', group: 'Navigation', shortcut: '1', action: () => switchView('overview') },
+            { id: 'view_operations', title: 'Switch to Pipeline & Speed Hub', icon: '⚡', group: 'Navigation', shortcut: '2', action: () => switchView('operations') },
+            { id: 'view_telegram', title: 'Manage Telegram Accounts & Workers', icon: '📡', group: 'Navigation', shortcut: '3', action: () => switchView('telegram') },
+            { id: 'view_dlq', title: 'Inspect Dead Letter Queue (DLQ)', icon: '🚨', group: 'Navigation', shortcut: '4', action: () => switchView('dlq') },
+            { id: 'view_devi', title: 'Open Devi AI Copilot Studio', icon: '🤖', group: 'Navigation', shortcut: '5', action: () => switchView('devi') },
+            { id: 'view_research', title: 'View Autonomous Research Insights', icon: '💡', group: 'Navigation', shortcut: '6', action: () => switchView('research') },
+            { id: 'view_security', title: 'Role-Based Access Control & Users', icon: '🔒', group: 'Navigation', shortcut: '7', action: () => switchView('security') },
+            { id: 'act_clean_display', title: 'Clean Display Counters (Reset to Standby)', icon: '🧹', group: 'Actions', shortcut: 'Alt+C', action: () => handleResetDisplayCounters() },
+            { id: 'act_snapshot', title: 'Trigger Instant Database Snapshot', icon: '📸', group: 'Actions', shortcut: 'Alt+S', action: () => triggerCloudBackup() },
+            { id: 'act_pause_engine', title: 'Pause / Resume Pipeline Engine', icon: '⏯️', group: 'Actions', shortcut: 'Space', action: () => togglePauseEngine() },
+            { id: 'act_route_matrix', title: 'Open Visual Forwarding Route Matrix', icon: '🗺️', group: 'Tools', shortcut: 'Alt+M', action: () => openRouteMatrixModal() },
+            { id: 'act_wifi_mobile', title: 'Show Mobile Phone Pairing Wi-Fi URL', icon: '📱', group: 'Tools', shortcut: 'Alt+W', action: () => openRemoteModal() },
+            { id: 'act_voice_brief', title: 'Speak Devi AI Live Voice Briefing', icon: '🔊', group: 'AI & Copilot', shortcut: 'Alt+V', action: () => speakDeviStatus() },
+            { id: 'act_council_debate', title: 'Convene 3-Way AI Council Deliberation', icon: '⚖️', group: 'AI & Copilot', shortcut: 'Alt+D', action: () => runCouncilDebate() },
+            { id: 'act_key_hunt', title: 'Run Autonomous Free AI Key Discovery', icon: '🔑', group: 'AI & Copilot', shortcut: 'Alt+K', action: () => triggerKeyHunt() },
+            { id: 'act_toggle_sound', title: 'Toggle Audio Synthesizer Sound FX', icon: '🔔', group: 'Preferences', shortcut: '', action: () => toggleSoundFX() },
+            { id: 'act_clear_dlq', title: 'Purge Dead Letter Queue Errors', icon: '🗑️', group: 'Actions', shortcut: '', action: () => clearDlqErrors() },
+            { id: 'act_clear_terminal', title: 'Clear Engine Terminal Logs', icon: '🧼', group: 'Actions', shortcut: '', action: () => clearTerminalLogs() },
+        ];
+
+        let selectedCommandIndex = 0;
+        let filteredCommands = [...COMMANDS_CATALOG];
+
+        function openCommandPalette() {
+            const modal = document.getElementById('modal-command-palette');
+            const input = document.getElementById('cmd-palette-input');
+            if (!modal) return;
+            modal.classList.add('open');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+            selectedCommandIndex = 0;
+            renderCommandPaletteResults('');
+            playAudioFeedback('tab');
+        }
+
+        function closeCommandPalette() {
+            const modal = document.getElementById('modal-command-palette');
+            if (modal) modal.classList.remove('open');
+        }
+
+        function renderCommandPaletteResults(query = '') {
+            const container = document.getElementById('cmd-palette-results');
+            if (!container) return;
+            const q = query.trim().toLowerCase();
+            filteredCommands = COMMANDS_CATALOG.filter(cmd => 
+                cmd.title.toLowerCase().includes(q) || 
+                cmd.group.toLowerCase().includes(q) ||
+                cmd.shortcut.toLowerCase().includes(q)
+            );
+
+            if (selectedCommandIndex >= filteredCommands.length) selectedCommandIndex = Math.max(0, filteredCommands.length - 1);
+
+            if (filteredCommands.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: var(--space-6); color: var(--text-tertiary);">No commands match your search</div>';
+                return;
+            }
+
+            // Group commands
+            const groups = {};
+            filteredCommands.forEach((cmd, idx) => {
+                if (!groups[cmd.group]) groups[cmd.group] = [];
+                groups[cmd.group].push({ ...cmd, originalIdx: idx });
+            });
+
+            let html = '';
+            for (const [grpName, items] of Object.entries(groups)) {
+                html += `<div class="cmd-group-title">${escapeHtml(grpName)}</div>`;
+                items.forEach(item => {
+                    const isSelected = item.originalIdx === selectedCommandIndex;
+                    html += `
+                        <div class="cmd-item ${isSelected ? 'selected' : ''}" onclick="executeCommand('${item.id}')" onmouseenter="setCommandHover(${item.originalIdx})">
+                            <div class="cmd-item-left">
+                                <span class="cmd-item-icon">${item.icon}</span>
+                                <span>${escapeHtml(item.title)}</span>
+                            </div>
+                            ${item.shortcut ? `<span class="cmd-item-shortcut">${escapeHtml(item.shortcut)}</span>` : ''}
+                        </div>
+                    `;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        function setCommandHover(idx) {
+            selectedCommandIndex = idx;
+            document.querySelectorAll('.cmd-item').forEach((el, i) => {
+                el.classList.toggle('selected', i === idx);
+            });
+        }
+
+        function handleCommandSearch(query) {
+            selectedCommandIndex = 0;
+            renderCommandPaletteResults(query);
+        }
+
+        function executeCommand(cmdId) {
+            const cmd = COMMANDS_CATALOG.find(c => c.id === cmdId);
+            if (cmd) {
+                closeCommandPalette();
+                cmd.action();
+                playAudioFeedback('click');
+            }
+        }
+
+        // Global Keyboard Shortcut Dispatcher
+        window.addEventListener('keydown', (e) => {
+            const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+            const cmdPalette = document.getElementById('modal-command-palette');
+            const isCmdOpen = cmdPalette && cmdPalette.classList.contains('open');
+
+            // Open Command Palette: Ctrl+K or Cmd+K
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                if (isCmdOpen) closeCommandPalette();
+                else openCommandPalette();
+                return;
+            }
+
+            // Handle keys inside open Command Palette
+            if (isCmdOpen) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeCommandPalette();
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (filteredCommands.length > 0) {
+                        selectedCommandIndex = (selectedCommandIndex + 1) % filteredCommands.length;
+                        renderCommandPaletteResults(document.getElementById('cmd-palette-input')?.value || '');
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (filteredCommands.length > 0) {
+                        selectedCommandIndex = (selectedCommandIndex - 1 + filteredCommands.length) % filteredCommands.length;
+                        renderCommandPaletteResults(document.getElementById('cmd-palette-input')?.value || '');
+                    }
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (filteredCommands[selectedCommandIndex]) {
+                        executeCommand(filteredCommands[selectedCommandIndex].id);
+                    }
+                }
+                return;
+            }
+
+            // Global Shortcuts when NOT typing in form inputs
+            if (!isTyping) {
+                if (e.key === 'Escape') {
+                    closeRouteMatrixModal();
+                    closeLoginModal();
+                    closeCreateUserModal();
+                    closeRemoteModal();
+                    closeTgLoginModal();
+                } else if (e.key === '1') { switchView('overview'); }
+                else if (e.key === '2') { switchView('operations'); }
+                else if (e.key === '3') { switchView('telegram'); }
+                else if (e.key === '4') { switchView('dlq'); }
+                else if (e.key === '5') { switchView('devi'); }
+                else if (e.key === '6') { switchView('research'); }
+                else if (e.key === '7') { switchView('security'); }
+                else if (e.altKey && e.key.toLowerCase() === 'c') { e.preventDefault(); handleResetDisplayCounters(); }
+                else if (e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); triggerCloudBackup(); }
+                else if (e.altKey && e.key.toLowerCase() === 'm') { e.preventDefault(); openRouteMatrixModal(); }
+                else if (e.altKey && e.key.toLowerCase() === 'w') { e.preventDefault(); openRemoteModal(); }
+                else if (e.key === ' ' && !e.target.matches('button, input, textarea')) {
+                    e.preventDefault();
+                    togglePauseEngine();
+                }
+            }
+        });
+
+        // --- TABLE SEARCH & FILTERING UTILITIES ---
+        let currentLedgerCategory = 'all';
+        let currentLedgerSearchQuery = '';
+        let cachedDispatchedFiles = [];
+
+        function filterDispatchedFiles(category, btn) {
+            currentLedgerCategory = category;
+            document.querySelectorAll('#view-overview .filter-chip').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            renderFilteredLedger();
+            playAudioFeedback('click');
+        }
+
+        function handleLedgerSearch(query) {
+            currentLedgerSearchQuery = query.toLowerCase().trim();
+            renderFilteredLedger();
+        }
+
+        function renderFilteredLedger() {
+            const tbody = document.getElementById('sent-files-ledger-tbody');
+            if (!tbody) return;
+            let files = cachedDispatchedFiles;
+            if (currentLedgerCategory !== 'all') {
+                files = files.filter(f => (f.item_type || 'video').toLowerCase() === currentLedgerCategory);
+            }
+            if (currentLedgerSearchQuery) {
+                files = files.filter(f => 
+                    (f.title || '').toLowerCase().includes(currentLedgerSearchQuery) ||
+                    (f.target_topic || '').toLowerCase().includes(currentLedgerSearchQuery)
+                );
+            }
+            if (files.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-tertiary); padding: var(--space-5);">No dispatched files match current category or search filter</td></tr>';
+                return;
+            }
+            tbody.innerHTML = files.map(file => `
+                <tr>
+                    <td><strong style="color: #F8FAFC;">${escapeHtml(file.title || 'Lecture Media')}</strong></td>
+                    <td><span class="pill pill-neutral" style="font-size: 11px;">${escapeHtml((file.item_type || 'video').toUpperCase())}</span></td>
+                    <td class="tabular" style="color: #38BDF8;">${file.size_mb ? file.size_mb + ' MB' : '184.2 MB'}</td>
+                    <td style="color: var(--text-secondary); font-size: 12px;">${escapeHtml(file.target_topic || 'Main Lecture Stream')}</td>
+                    <td class="tabular" style="color: var(--text-tertiary); font-size: 11px;">${escapeHtml(file.completed_at || 'Just now')}</td>
+                    <td><span class="pill pill-success tabular" style="font-size: 11px;">Delivered ✅</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function handleDlqSearch(query) {
+            const q = query.toLowerCase().trim();
+            const rows = document.querySelectorAll('#dlq-tbody tr');
+            rows.forEach(r => {
+                const text = r.textContent.toLowerCase();
+                r.style.display = text.includes(q) ? '' : 'none';
+            });
+        }
+
+        function handleRouteSearch(query) {
+            const q = query.toLowerCase().trim();
+            const cards = document.querySelectorAll('#route-matrix-container .route-card');
+            cards.forEach(c => {
+                const text = c.textContent.toLowerCase();
+                c.style.display = text.includes(q) ? '' : 'none';
+            });
+        }
+
+        function sendQuickPrompt(promptText) {
+            const input = document.getElementById('devi-chat-input');
+            if (input) {
+                input.value = promptText;
+                input.focus();
+                handleDeviChatSubmit(new Event('submit'));
+            }
+        }
+
         // Initialize App
         window.addEventListener('DOMContentLoaded', () => {
             checkAuth();
@@ -4538,6 +5280,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             setInterval(updateStatus, 1000);
         });
     </script>
+
+    <!-- Command Palette Floating Modal (Spotlight Style) -->
+    <div class="cmd-palette-backdrop" id="modal-command-palette" onclick="if (event.target === this) closeCommandPalette()">
+        <div class="cmd-palette-box">
+            <div class="cmd-palette-search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-primary);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="cmd-palette-input" id="cmd-palette-input" placeholder="Type a command or search mission control..." oninput="handleCommandSearch(this.value)">
+                <kbd class="hud-kbd">Esc to close</kbd>
+            </div>
+            <div class="cmd-palette-results" id="cmd-palette-results">
+                <!-- Dynamically rendered by renderCommandPaletteResults -->
+            </div>
+            <div class="cmd-palette-footer">
+                <div style="display: flex; gap: var(--space-4);">
+                    <span>Navigate <kbd class="hud-kbd">↑</kbd> <kbd class="hud-kbd">↓</kbd></span>
+                    <span>Select <kbd class="hud-kbd">↵</kbd></span>
+                </div>
+                <div>KindSync Pro v14.5 Enterprise</div>
+            </div>
+        </div>
+    </div>
 
     <!-- Visual Forwarding Route Matrix Modal -->
     <div class="modal-backdrop" id="modal-route-matrix">
@@ -4575,8 +5338,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 </div>
 
-                <!-- Active Routes Grid -->
-                <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: var(--space-2);">Configured Forwarding Routes</div>
+                <!-- Active Routes Grid Controls & Search -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                    <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Configured Forwarding Routes</div>
+                    <div class="table-search-box">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" placeholder="Search routes..." oninput="handleRouteSearch(this.value)">
+                    </div>
+                </div>
                 <div class="route-grid" id="route-matrix-container">
                     <div style="text-align: center; padding: var(--space-6); color: var(--text-tertiary);">Loading routes...</div>
                 </div>
@@ -4820,44 +5589,70 @@ class DashboardServer:
         avg_doc_mb = 14.8
         avg_photo_mb = 3.6
         avg_audio_mb = 22.4
+        eta_seconds = 0
+        calc_speed = 0.0
 
         # Real Dynamic Category Breakdown
-        tot_videos = max(videos_sent, int(total_files * 0.72)) if total_files > 0 else videos_sent
-        v_sent = videos_sent
-        v_pending = max(0, tot_videos - v_sent)
-        v_pct = min(100.0, round((v_sent / tot_videos) * 100.0, 1)) if tot_videos > 0 else (100.0 if v_sent > 0 else 0.0)
+        if is_transferring and total_files > files_completed:
+            tot_videos = max(videos_sent, int(total_files * 0.72))
+            v_sent = videos_sent
+            v_pending = max(0, tot_videos - v_sent)
+            v_pct = min(100.0, round((v_sent / tot_videos) * 100.0, 1)) if tot_videos > 0 else 0.0
 
-        tot_docs = max(docs_sent, int(total_files * 0.20)) if total_files > 0 else docs_sent
-        d_sent = docs_sent
-        d_pending = max(0, tot_docs - d_sent)
-        d_pct = min(100.0, round((d_sent / tot_docs) * 100.0, 1)) if tot_docs > 0 else (100.0 if d_sent > 0 else 0.0)
+            tot_docs = max(docs_sent, int(total_files * 0.20))
+            d_sent = docs_sent
+            d_pending = max(0, tot_docs - d_sent)
+            d_pct = min(100.0, round((d_sent / tot_docs) * 100.0, 1)) if tot_docs > 0 else 0.0
 
-        tot_photos = photos_sent
-        p_sent = photos_sent
-        p_pending = max(0, tot_photos - p_sent)
+            tot_photos = photos_sent
+            p_sent = photos_sent
+            p_pending = max(0, tot_photos - p_sent)
 
-        total_data_gb = round((total_files * avg_video_mb) / 1024, 1) if total_files > 0 else 0.0
-        transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1) if files_completed > 0 else 0.0
-        remaining_data_gb = round(max(0.0, total_data_gb - transferred_data_gb), 1)
+            total_data_gb = round((total_files * avg_video_mb) / 1024, 1) if total_files > 0 else 0.0
+            transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1) if files_completed > 0 else 0.0
+            remaining_data_gb = round(max(0.0, total_data_gb - transferred_data_gb), 1)
+
+            # Batch ETA & Finish Forecast
+            remaining_mb = remaining_data_gb * 1024
+            calc_speed = cur_speed if cur_speed > 0.05 else (peak_speed * 0.7 if peak_speed > 0.5 else 0.0)
+            eta_seconds = int(remaining_mb / calc_speed) if calc_speed > 0 else 0
+            eta_hrs, rem_m = divmod(eta_seconds, 3600)
+            eta_mins, _ = divmod(rem_m, 60)
+            if eta_hrs > 0:
+                batch_eta = f"{eta_hrs}h {eta_mins:02d}m"
+            elif eta_mins > 0:
+                batch_eta = f"{eta_mins}m"
+            else:
+                batch_eta = "Calculating..."
+        else:
+            # Standby / Idle Mode: Show real transferred stats with 0 pending and clean standby
+            tot_videos = videos_sent
+            v_sent = videos_sent
+            v_pending = 0
+            v_pct = 100.0 if v_sent > 0 else 0.0
+
+            tot_docs = docs_sent
+            d_sent = docs_sent
+            d_pending = 0
+            d_pct = 100.0 if d_sent > 0 else 0.0
+
+            tot_photos = photos_sent
+            p_sent = photos_sent
+            p_pending = 0
+
+            total_files = files_completed
+            files_remaining = 0
+            batch_progress_pct = 100.0 if files_completed > 0 else 0.0
+
+            transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1) if files_completed > 0 else 0.0
+            total_data_gb = transferred_data_gb
+            remaining_data_gb = 0.0
+            batch_eta = "Standby (Idle)"
 
         videos_gb = round((videos_sent * avg_video_mb) / 1024, 1) if videos_sent > 0 else 0.0
         docs_gb = round((docs_sent * avg_doc_mb) / 1024, 1) if docs_sent > 0 else 0.0
         photos_gb = round((photos_sent * avg_photo_mb) / 1024, 1) if photos_sent > 0 else 0.0
         audios_gb = round(((albums_sent or 0) * avg_audio_mb) / 1024, 1) if albums_sent else 0.0
-
-        # Batch ETA & Finish Forecast
-        remaining_mb = remaining_data_gb * 1024
-        calc_speed = cur_speed if cur_speed > 0.05 else (peak_speed * 0.7 if peak_speed > 0.5 else 0.0)
-        eta_seconds = int(remaining_mb / calc_speed) if calc_speed > 0 else 0
-        eta_hrs, rem_m = divmod(eta_seconds, 3600)
-        eta_mins, _ = divmod(rem_m, 60)
-        
-        if eta_hrs > 0:
-            batch_eta = f"{eta_hrs}h {eta_mins:02d}m"
-        elif eta_mins > 0:
-            batch_eta = f"{eta_mins}m"
-        else:
-            batch_eta = "Standby (Idle)" if cur_speed <= 0.001 else "12m 45s"
 
         finish_dt = datetime.now() + timedelta(seconds=eta_seconds)
         est_finish_time = finish_dt.strftime("%I:%M %p, %d %b") if calc_speed > 0 else "--:--"
@@ -5163,6 +5958,25 @@ class DashboardServer:
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=400)
 
+    async def handle_api_auth_change_password(self, request):
+        try:
+            data = await request.json()
+            token = self._extract_token_from_request(request)
+            sess = self.auth_mgr.verify_token(token)
+            if not sess:
+                return web.json_response({"success": False, "error": "Unauthorized session"}, status=401)
+            username = sess.get("username", "")
+            current_pass = data.get("current_password", "")
+            new_pass = data.get("new_password", "")
+            ok, msg = self.auth_mgr.change_password(username, current_pass, new_pass)
+            if ok:
+                login_res = self.auth_mgr.authenticate(username, new_pass)
+                new_token = login_res.get("token") if login_res else None
+                return web.json_response({"success": True, "message": msg, "new_token": new_token})
+            return web.json_response({"success": False, "error": msg}, status=400)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
     async def handle_api_telegram_accounts(self, request):
         accounts = await self.tg_login_mgr.get_accounts_summary()
         return web.json_response({"accounts": accounts})
@@ -5231,7 +6045,25 @@ class DashboardServer:
     async def handle_api_pause(self, request):
         return web.json_response(self._toggle_pause())
 
+    async def handle_api_stats_reset(self, request):
+        try:
+            if hasattr(self.state, "total_transfers"): self.state.total_transfers = 0
+            if hasattr(self.state, "videos_sent"): self.state.videos_sent = 0
+            if hasattr(self.state, "docs_sent"): self.state.docs_sent = 0
+            if hasattr(self.state, "photos_sent"): self.state.photos_sent = 0
+            if hasattr(self.state, "albums_sent"): self.state.albums_sent = 0
+            if hasattr(self.state, "current_subject"): self.state.current_subject = "Standby (Idle — Ready for New Task)"
+            if hasattr(self.state, "peak_speed_mb"): self.state.peak_speed_mb = 0.0
+            
+            if ENGINE_TELEMETRY_FILE.exists():
+                with suppress(Exception):
+                    ENGINE_TELEMETRY_FILE.unlink()
+            return web.json_response({"success": True, "message": "Display session counters reset to zero."})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
     async def handle_api_clear_dlq(self, request):
+
         if DLQ_FILE.exists():
             with suppress(Exception):
                 os.remove(DLQ_FILE)
@@ -5445,6 +6277,22 @@ class DashboardServer:
             elif path == "/api/auth/delete_user" and method == "POST":
                 ok, msg = self.auth_mgr.delete_user(body_dict.get("username", ""))
                 self._send_raw(writer, 200, "application/json", json.dumps({"success": ok, "message": msg}).encode("utf-8"))
+            elif path == "/api/auth/change_password" and method == "POST":
+                token = ""
+                for line in lines:
+                    if line.lower().startswith("authorization: bearer "):
+                        token = line.split(" ", 2)[2].strip()
+                sess = self.auth_mgr.verify_token(token)
+                if not sess:
+                    self._send_raw(writer, 401, "application/json", json.dumps({"success": False, "error": "Unauthorized"}).encode("utf-8"))
+                else:
+                    username = sess.get("username", "")
+                    ok, msg = self.auth_mgr.change_password(username, body_dict.get("current_password", ""), body_dict.get("new_password", ""))
+                    new_token = None
+                    if ok:
+                        login_res = self.auth_mgr.authenticate(username, body_dict.get("new_password", ""))
+                        new_token = login_res.get("token") if login_res else None
+                    self._send_raw(writer, 200, "application/json", json.dumps({"success": ok, "message": msg, "new_token": new_token, "error": msg if not ok else None}).encode("utf-8"))
             elif path == "/api/telegram/accounts":
                 accounts = await self.tg_login_mgr.get_accounts_summary()
                 self._send_raw(writer, 200, "application/json", json.dumps({"accounts": accounts}).encode("utf-8"))
@@ -5542,7 +6390,7 @@ class DashboardServer:
 """)
         print(f" [★] Local PC Access:  http://127.0.0.1:{self.port}")
         print(f" [★] Mobile Phone Wi-Fi: http://{lan_ip}:{self.port}")
-        print(f" [★] Login Credentials:  Amit / Amit@123\n")
+        print(f" [★] Authentication: PBKDF2-HMAC-SHA256 (100k rounds)\n")
 
         if HAS_AIOHTTP:
             self.app = web.Application()
@@ -5555,6 +6403,7 @@ class DashboardServer:
             self.app.router.add_get("/api/auth/users", self.handle_api_auth_users)
             self.app.router.add_post("/api/auth/create_user", self.handle_api_auth_create_user)
             self.app.router.add_post("/api/auth/delete_user", self.handle_api_auth_delete_user)
+            self.app.router.add_post("/api/auth/change_password", self.handle_api_auth_change_password)
             self.app.router.add_get("/api/telegram/accounts", self.handle_api_telegram_accounts)
             self.app.router.add_post("/api/telegram/send_code", self.handle_api_telegram_send_code)
             self.app.router.add_post("/api/telegram/verify_code", self.handle_api_telegram_verify_code)
@@ -5566,6 +6415,7 @@ class DashboardServer:
             self.app.router.add_post("/api/backup", self.handle_api_backup)
 
             self.app.router.add_post("/api/pause", self.handle_api_pause)
+            self.app.router.add_post("/api/stats/reset", self.handle_api_stats_reset)
             self.app.router.add_post("/api/clear_dlq", self.handle_api_clear_dlq)
             self.app.router.add_get("/api/errors", self.handle_api_errors)
             self.app.router.add_get("/api/research_insights", self.handle_api_research_insights)
@@ -5596,27 +6446,28 @@ if __name__ == "__main__":
     class DummyState:
         def __init__(self):
             self.start_time = time.monotonic()
-            self.total_transfers = 248
-            self.videos_sent = 18
-            self.docs_sent = 110
-            self.photos_sent = 95
-            self.albums_sent = 25
-            self.current_subject = "Anatomy & Neuro-Surgery (Kind Doctor Edition)"
+            self.total_transfers = 0
+            self.videos_sent = 0
+            self.docs_sent = 0
+            self.photos_sent = 0
+            self.albums_sent = 0
+            self.current_subject = "Standby (Idle — Ready for Channel Stream or Cloner Task)"
             self.flood_waits_detected = 0
             self.flood_wait_seconds_total = 0.0
-            self.peak_speed_mb = 24.85
-            self.db_forwarded_count = 1420
+            self.peak_speed_mb = 0.0
+            self.db_forwarded_count = 0
             self.recent_events = [
-                "Telemetry Engine started in decoupled mode",
+                "Telemetry Engine active in live monitoring mode",
                 "Connected to Telegram session: session_forwarder",
-                "Idempotency WAL store verified: 100% synced",
-                "Broadcasting speed metrics to local LAN clients"
+                "Idempotency WAL database: Verified healthy",
+                "System Status: Standby — Ready for next task"
             ]
             self.recommendations = [
                 "Sentinel auto-pacer optimal: 0 floodwaits detected",
                 "Multi-part fast parallel chunks enabled",
                 "Telegram SQLite WAL mode healthy"
             ]
+
 
     async def run_standalone():
         server = DashboardServer(DummyState(), port=8080)

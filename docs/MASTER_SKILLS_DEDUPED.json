@@ -1,0 +1,112 @@
+{
+  "canonical_families": {
+    "software_development_lifecycle": {
+      "canonical_project": "obra/superpowers",
+      "canonical_reason": "Most complete, test-driven, subagent-coordinated engineering lifecycle with strict verification before completion.",
+      "candidates": [
+        {
+          "name": "superpowers",
+          "repo": "obra/superpowers",
+          "relationship": "CANONICAL",
+          "status": "ACTIVE"
+        },
+        {
+          "name": "agent-skills (SDLC)",
+          "repo": "addyosmani/agent-skills",
+          "relationship": "COMPLEMENTARY_ALTERNATIVE (Define->Plan->Verify gates)",
+          "status": "ACTIVE"
+        },
+        {
+          "name": "generic-tdd-prompts",
+          "repo": "various-forks",
+          "relationship": "DERIVATIVE / INCOMPLETE",
+          "status": "SUPERSEDED"
+        }
+      ]
+    },
+    "security_and_vulnerability_auditing": {
+      "canonical_project": "trailofbits/skills",
+      "canonical_reason": "Elite, battle-tested security research organization with formal differential review and AST analysis patterns.",
+      "candidates": [
+        {
+          "name": "trailofbits/skills",
+          "repo": "trailofbits/skills",
+          "relationship": "CANONICAL",
+          "status": "ACTIVE"
+        },
+        {
+          "name": "GitGuardian/agent-skills",
+          "repo": "GitGuardian/agent-skills",
+          "relationship": "SPECIALIZED_CANONICAL (Secret Scanning)",
+          "status": "ACTIVE"
+        },
+        {
+          "name": "generic-security-prompts",
+          "repo": "unvetted-community",
+          "relationship": "DERIVATIVE / SHALLOW PROMPT",
+          "status": "SUPERSEDED"
+        }
+      ]
+    },
+    "scientific_and_medical_intelligence": {
+      "canonical_project": "google-deepmind/science-skills",
+      "canonical_reason": "Official DeepMind research tooling with direct NCBI/PubMed E-utilities API grounding and Biopython pipelines.",
+      "candidates": [
+        {
+          "name": "google-deepmind/science-skills",
+          "repo": "google-deepmind/science-skills",
+          "relationship": "CANONICAL",
+          "status": "ACTIVE"
+        },
+        {
+          "name": "biopython-community-skills",
+          "repo": "biopython/biopython",
+          "relationship": "UNDERLYING_ENGINE",
+          "status": "ACTIVE"
+        },
+        {
+          "name": "unverified-pubmed-scrapers",
+          "repo": "unknown/scraped-pubmed",
+          "relationship": "UNVERIFIED / UNRELIABLE",
+          "status": "DISCARDED"
+        }
+      ]
+    },
+    "visual_design_and_ui_ux": {
+      "canonical_project": "adawdani/impeccable",
+      "canonical_reason": "Strict 59-rule deterministic heuristic set preventing AI slop, enforcing 4px/8px rhythm and tactile feedback.",
+      "candidates": [
+        {
+          "name": "impeccable",
+          "repo": "adawdani/impeccable",
+          "relationship": "CANONICAL",
+          "status": "ACTIVE"
+        },
+        {
+          "name": "ui-ux-pro-max",
+          "repo": "local-curated",
+          "relationship": "COMPLEMENTARY (Multi-framework palette & typography matrix)",
+          "status": "ACTIVE"
+        }
+      ]
+    },
+    "codebase_intelligence_and_graph": {
+      "canonical_project": "graphify",
+      "canonical_reason": "Instant AST-based class, method, and dependency knowledge graph builder without burning context tokens.",
+      "candidates": [
+        {
+          "name": "graphify",
+          "repo": "c:/TG_KindSync_Pro/.agents/tools/graphify.py",
+          "relationship": "CANONICAL",
+          "status": "ACTIVE"
+        },
+        {
+          "name": "ctags-naive-wrappers",
+          "repo": "various",
+          "relationship": "INFERIOR",
+          "status": "SUPERSEDED"
+        }
+      ]
+    }
+  }
+}
