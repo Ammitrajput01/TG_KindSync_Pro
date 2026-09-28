@@ -182,5 +182,7 @@ devi/memory/*.sqlite-shm
 
 # Security & Scratch Files
 *.key
+data/session_string.txt
+*.session_string
 scratch/
 

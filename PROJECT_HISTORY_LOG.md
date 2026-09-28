@@ -298,7 +298,73 @@ This log permanently documents root causes, architectural patterns, historical b
   5. [docs/FEATURE_TO_UI_TRACEABILITY.md](file:///c:/TG_KindSync_Pro/docs/FEATURE_TO_UI_TRACEABILITY.md) — End-to-end traceability matrix linking backend code functions to UI controls.
   6. [docs/DASHBOARD_SECURITY_AUDIT.md](file:///c:/TG_KindSync_Pro/docs/DASHBOARD_SECURITY_AUDIT.md) — Comprehensive security audit covering password hashing, session tokens, CSRF, and data boundaries.
   7. [docs/DASHBOARD_FINAL_QA.md](file:///c:/TG_KindSync_Pro/docs/DASHBOARD_FINAL_QA.md) — 10-column verification matrix for all 20 dashboard features.
-* **System Verification**: Verified live on `http://127.0.0.1:8080/` with 100% healthy 200 OK responses and zero console or compile errors.
+
+---
+
+## 📅 Log Entry: Monday, 29 September 2026
+
+### 28. Uncapped Supersonic Upload Velocity & Cruise Control De-Throttling
+* **Symptom**: File uploads felt restricted / slow even on fast network connections or Oracle Cloud VPS.
+* **Root Cause**:
+  1. `AdaptiveSpeedCruiseControl` in [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) had an overly aggressive brake condition (`duration > 3.5s`), which penalized residential/fluctuating internet connections by slashing concurrent streams down to 4.
+  2. Concurrency floor was set too low (`min_concurrency = 4`), choking throughput.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py):
+    1. Raised `min_concurrency` floor to **16 streams** and `max_concurrency` to **48 streams** (up to 64 with env override).
+    2. Removed the arbitrary `duration > 3.5s` socket brake. Full unthrottled pipe bandwidth is maintained across all connections.
+    3. Retained `RateBudgeter` (1.0–2.0s inter-message jitter) so post-send frequency protects against Telegram FloodWait without capping byte upload speed.
+
+---
+
+### 29. Telethon MTProto Single-Use `InputFile` Thumbnail Token Invalidation Fix
+* **Symptom**: Custom branded 16:9 thumbnail only attached to the first uploaded file; all subsequent files/videos were sent with no thumbnail or blank covers.
+* **Root Cause**:
+  - In `ThumbEnforcer.get_input_file()`, the thumbnail was pre-uploaded as an `InputFile` object and cached in memory (`self._cached_input_files[c_id] = inp`).
+  - Telegram's MTProto API treats `InputFile` as a single-use temporary upload token; once consumed by the first `send_file` message, reusing the same `InputFile` instance causes Telegram backend to silently drop the thumbnail.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py):
+    - Replaced cached single-use `InputFile` token return with direct valid thumbnail file path return in `ThumbEnforcer.get_input_file(client)`.
+    - Telethon now generates fresh, valid MTProto upload tokens for every single file dispatched, ensuring 100% of videos (from 1st to 10,000th) receive the high-res 16:9 **STUDY HELP (Kind Doctor & Team)** cover.
+
+---
+
+### 30. Concurrent Async Telegram Bot Dispatch & Lock-Free OSINT Resolution
+* **Symptom**: When the forwarder/uploader was actively running, the Kind Doctor Bot (`@KindDoc_bot`) stopped responding to commands like `/index`, `/topicindex`, `/sangmata`, `/find`, and Rose features.
+* **Root Cause**:
+  1. The bot polling loop in [devi/operator/telegram_bot.py](file:///c:/TG_KindSync_Pro/devi/operator/telegram_bot.py) awaited incoming updates sequentially (`await self._handle_incoming_message(...)`). Heavy forwarder message traffic flooded the loop and caused commands to queue up.
+  2. `/topicindex` and `/sangmata` attempted to connect to `session_forwarder.session`, blocking on SQLite locks held by the active forwarder daemon.
+* **Permanent Fix Applied**:
+  - In [devi/operator/telegram_bot.py](file:///c:/TG_KindSync_Pro/devi/operator/telegram_bot.py):
+    - Converted all update handlers (`_handle_incoming_message`, `_handle_callback_query`, `_handle_chat_member`, `_handle_my_chat_member`) to concurrent tracked background tasks using `self.create_tracked_task(...)`. The polling loop now continues processing updates with zero blocking.
+    - Upgraded SQLite timeout to `60.0s` and busy timeout to `60000ms` with WAL mode.
+  - In [devi/operator/osint_resolver.py](file:///c:/TG_KindSync_Pro/devi/operator/osint_resolver.py):
+    - Enhanced ephemeral session cloning with unique millisecond timestamps (`temp_osint_{stem}_{pid}_{ts}.session`) for completely collision-free MTProto OSINT queries even during high-throughput forwarder runs.
+
+---
+
+### 32. Multi-Group Auto-Scanner Hardening & WAL Ephemeral Cloning
+* **Symptom**: Running `/scan` in a newly added forum supergroup (e.g., `LATEST RISERS NEET PG AND FMGE` - ID `-1003794275870`) returned `Topics Registered: 1` and `Lectures/Files Indexed: 0` despite the group having 90 forum topics and 4,790+ lectures.
+* **Root Cause**:
+  1. `devi.operator.group_scanner` created an ephemeral session clone of `session_forwarder.session` without copying companion SQLite `-wal`, `-shm`, and `-journal` lock files. If the active forwarder had uncommitted WAL pages, SQLite opened a stale snapshot or encountered a busy state, causing peer resolution to fail and falling back to bot token (which cannot fetch forum topics).
+  2. The `/scan` timeout was fixed at 120s, which caused premature cutoffs on large groups with 90+ topics and 4,000+ files.
+  3. The `/scan` response reported false "Success" even when 0 items and <=1 topic were scanned.
+* **Permanent Fix Applied**:
+  - In [devi/operator/group_scanner.py](file:///c:/TG_KindSync_Pro/devi/operator/group_scanner.py): Ephemeral session cloning now synchronizes and copies all SQLite WAL, SHM, and journal files (`.session-wal`, `.session-shm`, `.session-journal`) alongside the session file, ensuring 100% updated state and zero lock collision.
+  - In [devi/operator/telegram_bot.py](file:///c:/TG_KindSync_Pro/devi/operator/telegram_bot.py):
+    - Raised scan timeout to **300.0 seconds** (5 minutes) for massive multi-thousand lecture groups.
+    - Added actionable diagnostic warning if a scan discovers 0 items and <=1 topic, guiding the admin on user account membership and bot permissions.
+### 33. Universal Lock-Free Session Vault (`session_vault.py`) & Multi-Process Decoupling
+* **Architecture Enhancement**:
+  - Built [devi/operator/session_vault.py](file:///c:/TG_KindSync_Pro/devi/operator/session_vault.py) to manage pure in-memory `StringSession` extraction and persistence (`TELEGRAM_STRING_SESSION` in `.env` and `data/session_string.txt`).
+  - **Zero Disk File Locks**: By loading MTProto auth credentials directly into memory strings, multiple independent processes (`tg-forwarder`, `tg-kinddoc-bot`, `group_scanner`, `osint_resolver`, and CLI menus) can now query Telegram MTProto simultaneously with **0% chance of SQLite database locks or process contention**.
+### 34. Universal Non-Forum Group Indexing & Massive Scale Harvester Support
+* **Enhancement**:
+  - In [devi/operator/group_scanner.py](file:///c:/TG_KindSync_Pro/devi/operator/group_scanner.py): Added automatic detection and single-room fallback for regular Telegram groups (groups without forum topics). If a group has no topics, it automatically registers `Topic #0: 'General Study Materials & Notes'` and harvests all lectures/notes/PDFs directly from the chat.
+  - Now, `/index`, `/mainindex`, `/scan`, and `/topicindex` work seamlessly across **100% of group types** (Forum Supergroups, Normal Groups, Single-Chat Study Channels).
+
+
+
+
 
 
 

@@ -71,10 +71,10 @@ ENV_PATH = BASE_PROJECT_DIR / ".env"
 load_dotenv(ENV_PATH)
 
 def get_db_conn() -> sqlite3.Connection:
-    """Thread-safe, locked-resistant SQLite connection with 30s timeout and WAL pragma."""
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    """Thread-safe, locked-resistant SQLite connection with 60s timeout and WAL pragma."""
+    conn = sqlite3.connect(DB_PATH, timeout=60.0)
     conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA busy_timeout = 30000")
+    conn.execute("PRAGMA busy_timeout = 60000")
     conn.execute("PRAGMA synchronous = NORMAL")
     return conn
 
@@ -1510,13 +1510,13 @@ class DeviTelegramBot:
                             for update in data.get("result", []):
                                 self.offset = update["update_id"] + 1
                                 if "callback_query" in update:
-                                    await self._handle_callback_query(session, update["callback_query"])
+                                    self.create_tracked_task(self._handle_callback_query(session, update["callback_query"]))
                                 elif "my_chat_member" in update:
-                                    await self._handle_my_chat_member(session, update["my_chat_member"])
+                                    self.create_tracked_task(self._handle_my_chat_member(session, update["my_chat_member"]))
                                 elif "chat_member" in update:
-                                    await self._handle_chat_member(session, update["chat_member"])
+                                    self.create_tracked_task(self._handle_chat_member(session, update["chat_member"]))
                                 elif "message" in update:
-                                    await self._handle_incoming_message(session, update["message"])
+                                    self.create_tracked_task(self._handle_incoming_message(session, update["message"]))
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
@@ -3143,7 +3143,7 @@ class DeviTelegramBot:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
-                await asyncio.wait_for(proc.communicate(), timeout=120.0)
+                await asyncio.wait_for(proc.communicate(), timeout=300.0)
             except Exception as e:
                 logger.warning(f"Error executing group scanner: {e}")
 
@@ -3156,13 +3156,24 @@ class DeviTelegramBot:
             except Exception:
                 pass
 
-            done_msg = (
-                f"✅ **Auto-Scan & Indexing Successful!** 🎯\n\n"
-                f"📊 **Scan Summary:**\n"
-                f"• **Topics Registered:** `{len(topics)}`\n"
-                f"• **Lectures/Files Indexed:** `{total_items}`\n\n"
-                f"👉 Ab aap `/mainindex` tap karein Master Hub dekhne ke liye, ya kisi topic me `/topicindex` bhejein!"
-            )
+            if total_items == 0 and len(topics) <= 1:
+                done_msg = (
+                    f"⚠️ <b>Auto-Scan Notice:</b>\n\n"
+                    f"• <b>Topics Found:</b> <code>{len(topics)}</code>\n"
+                    f"• <b>Lectures/Files:</b> <code>0</code>\n\n"
+                    f"💡 <b>Kripya Check Karein:</b>\n"
+                    f"1️⃣ Main user account (session) is group me member hona chahiye.\n"
+                    f"2️⃣ Bot ke paas group me <b>Admin Rights (Pin Messages & Read Messages)</b> active honi chahiye.\n"
+                    f"3️⃣ Ya fir topic ke andar <code>/settopic &lt;Title&gt;</code> aur files par reply karke <code>/additem</code> se manual add karein."
+                )
+            else:
+                done_msg = (
+                    f"✅ <b>Auto-Scan &amp; Indexing Successful!</b> 🎯\n\n"
+                    f"📊 <b>Scan Summary:</b>\n"
+                    f"• <b>Topics Registered:</b> <code>{len(topics)}</code>\n"
+                    f"• <b>Lectures/Files Indexed:</b> <code>{total_items}</code>\n\n"
+                    f"👉 Ab aap <code>/mainindex</code> tap karein Master Hub dekhne ke liye, ya kisi topic me <code>/topicindex</code> bhejein!"
+                )
             if status_msg_id:
                 self.create_tracked_task(self._auto_delete_message(session, chat_id, status_msg_id, 2))
             await self._send_message(session, chat_id, done_msg, message_thread_id=thread_id)

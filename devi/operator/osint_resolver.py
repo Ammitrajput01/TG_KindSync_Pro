@@ -97,52 +97,19 @@ class GlobalOSINTResolver:
             except Exception:
                 pass
 
-        if not self.api_id or not self.api_hash:
-            return None
-
-        for s_name in self.get_candidate_sessions():
-            s_file = BASE_PROJECT_DIR / f"{s_name}.session" if not s_name.endswith(".session") else BASE_PROJECT_DIR / s_name
-            s_stem = s_file.stem
-            if not s_file.exists() or s_file.stat().st_size == 0:
-                continue
-
-            # 1. Direct connection attempt
-            try:
-                c = TelegramClient(str(BASE_PROJECT_DIR / s_stem), self.api_id, self.api_hash)
-                await c.connect()
-                if await c.is_user_authorized():
-                    me = await c.get_me()
-                    if require_user and me.bot:
-                        await c.disconnect()
-                        continue
-                    self._client = c
-                    logger.info(f"Connected to MTProto OSINT session: '{s_stem}' (bot={me.bot})")
-                    return self._client
-                await c.disconnect()
-            except Exception as e:
-                # 2. Ephemeral session clone fallback if session file is locked by live forwarder
-                try:
-                    temp_stem = f"temp_osint_{s_stem}_{os.getpid()}"
-                    temp_sess = BASE_PROJECT_DIR / f"{temp_stem}.session"
-                    shutil.copy2(s_file, temp_sess)
-
-                    c = TelegramClient(str(BASE_PROJECT_DIR / temp_stem), self.api_id, self.api_hash)
-                    await c.connect()
-                    if await c.is_user_authorized():
-                        me = await c.get_me()
-                        if require_user and me.bot:
-                            await c.disconnect()
-                            if temp_sess.exists():
-                                temp_sess.unlink(missing_ok=True)
-                            continue
-                        self._client = c
-                        logger.info(f"Connected to ephemeral MTProto OSINT session clone: '{s_stem}' (bot={me.bot})")
-                        return self._client
-                    await c.disconnect()
-                    if temp_sess.exists():
-                        temp_sess.unlink(missing_ok=True)
-                except Exception as inner_e:
-                    logger.debug(f"Ephemeral clone for '{s_stem}' failed: {inner_e}")
+        try:
+            from devi.operator.session_vault import get_vault_client
+            client, client_type = await get_vault_client(preferred_type="user" if require_user else "any")
+            if client and await client.is_user_authorized():
+                if require_user:
+                    me = await client.get_me()
+                    if me.bot:
+                        await client.disconnect()
+                        return None
+                self._client = client
+                return self._client
+        except Exception as e:
+            logger.warning(f"Error getting client from session vault for OSINT: {e}")
         return None
 
     async def resolve_entity(self, target: str) -> Optional[Dict[str, Any]]:

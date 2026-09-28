@@ -72,51 +72,18 @@ def init_tables(conn: sqlite3.Connection):
     conn.commit()
 
 async def get_authorized_client():
-    """Finds first available authorized user session (with lock bypass) or falls back to bot token."""
-    from telethon import TelegramClient
-
-    candidate_sessions = [
-        "session_forwarder",
-        "session_scanner",
-        "session_account_9081",
-        "session_account2",
-        "session_account3",
-        "session_user"
-    ]
-    # Add any other session files present in directory
-    for p in ROOT_DIR.glob("*.session"):
-        sname = p.stem
-        if "bot" not in sname and "temp_scan" not in sname and sname not in candidate_sessions:
-            candidate_sessions.append(sname)
-
-    for sess_stem in candidate_sessions:
-        sess_file = ROOT_DIR / f"{sess_stem}.session"
-        if sess_file.exists() and sess_file.stat().st_size > 0:
-            # Always use isolated ephemeral session clone to ensure zero lock collision with running forwarder
-            temp_sess = None
-            try:
-                temp_stem = f"temp_scan_{sess_stem}_{os.getpid()}_{int(asyncio.get_event_loop().time()*1000)}"
-                temp_sess = ROOT_DIR / f"{temp_stem}.session"
-                shutil.copy2(sess_file, temp_sess)
-                
-                client = TelegramClient(str(ROOT_DIR / temp_stem), API_ID, API_HASH)
-                await client.connect()
-                if await client.is_user_authorized():
-                    print(f"[*] Using authorized ephemeral session clone: {sess_stem}")
-                    return client, "user", temp_sess
-                await client.disconnect()
-                if temp_sess.exists():
-                    temp_sess.unlink(missing_ok=True)
-            except Exception as e:
-                print(f"[!] Ephemeral session clone attempt for {sess_stem} note: {e}")
-                if temp_sess and temp_sess.exists():
-                    with suppress(Exception): temp_sess.unlink()
-
-    # Fallback to Bot Token Client
-    print("[*] No authorized user session found. Initializing Bot Client...")
-    bot_client = TelegramClient(str(ROOT_DIR / "session_bot_scanner"), API_ID, API_HASH)
-    await bot_client.start(bot_token=BOT_TOKEN)
-    return bot_client, "bot", None
+    """Finds first available authorized user session via lock-free StringSession or fallback."""
+    try:
+        from devi.operator.session_vault import get_vault_client
+        client, client_type = await get_vault_client()
+        return client, client_type, None
+    except Exception as e:
+        print(f"[!] Warning connecting to session vault: {e}. Fallback to bot token...")
+        from telethon import TelegramClient
+        from telethon.sessions import StringSession
+        bot_client = TelegramClient(StringSession(), API_ID, API_HASH)
+        await bot_client.start(bot_token=BOT_TOKEN)
+        return bot_client, "bot", None
 
 def get_topic_icon(title: str) -> str:
     t_lower = title.lower()
@@ -166,7 +133,10 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
                     "topic #", "ke media files auto-scan"
                 )
                 try:
-                    async for msg in client.iter_messages(peer, reply_to=topic_id, limit=None):
+                    iter_kwargs = {"limit": None}
+                    if topic_id and topic_id > 1:
+                        iter_kwargs["reply_to"] = topic_id
+                    async for msg in client.iter_messages(peer, **iter_kwargs):
                         # Skip bot messages or status notifications
                         if getattr(msg.sender, 'bot', False) or getattr(msg, 'via_bot_id', None):
                             continue
@@ -352,17 +322,29 @@ async def scan_group(target_chat_id: int, target_topic_id: Optional[int] = None,
                 topics_list = [{"id": r[0], "title": r[1]} for r in rows]
 
         # STAGE 2: HARVEST MESSAGES (outside master connection to avoid long locks)
-        if scan_messages and topics_list:
-            total_harvested = 0
-            for t in topics_list:
-                t_id = t.id if hasattr(t, 'id') else t["id"]
-                t_title = getattr(t, 'title', None) or (t.get("title") if isinstance(t, dict) else f"Topic #{t_id}")
-                if t_id == 1:
-                    continue  # Skip root general topic
-                cnt = await scan_single_topic(client, peer, target_chat_id, t_id, t_title)
-                total_harvested += cnt
+        if scan_messages:
+            if not topics_list:
+                # Normal group (no forum topics) - Register root topic 0 and harvest all messages
+                default_title = "General Study Materials & Notes"
+                with get_db_conn() as conn:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title, topic_icon, updated_at)
+                        VALUES (?, 0, ?, '📚', CURRENT_TIMESTAMP)
+                    """, (target_chat_id, default_title))
+                    conn.commit()
+                cnt = await scan_single_topic(client, peer, target_chat_id, 0, default_title)
+                print(f"STAGE 2 COMPLETE: {cnt} items indexed in General Study Group!")
+            else:
+                total_harvested = 0
+                for t in topics_list:
+                    t_id = t.id if hasattr(t, 'id') else t["id"]
+                    t_title = getattr(t, 'title', None) or (t.get("title") if isinstance(t, dict) else f"Topic #{t_id}")
+                    if t_id == 1 and len(topics_list) > 1:
+                        continue  # Skip root general topic if specific topics exist
+                    cnt = await scan_single_topic(client, peer, target_chat_id, t_id, t_title)
+                    total_harvested += cnt
 
-            print(f"STAGE 2 COMPLETE: {total_harvested} total media items indexed across all topics!")
+                print(f"STAGE 2 COMPLETE: {total_harvested} total media items indexed across all topics!")
 
         print(f"SUCCESS: Scanned group {target_chat_id}")
 
