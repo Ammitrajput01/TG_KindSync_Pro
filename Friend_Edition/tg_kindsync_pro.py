@@ -382,7 +382,11 @@ def get_clean_rules():
             with open(strip_file, "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.strip()
-                    if not line or line.startswith("#"):
+                    if not line:
+                        continue
+                    if line.startswith(r"\#"):
+                        line = line[1:]
+                    elif line.startswith("#") and len(line) > 1 and line != "#":
                         continue
                     if "=>" in line:
                         ow, nw = line.split("=>", 1)

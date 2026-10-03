@@ -9,7 +9,7 @@
 # 📝 KAISE USE KAREIN:
 # 1. Naya word hatane ke liye: Nayi line pe word likhein (e.g. kirmada rockstar)
 # 2. Word REPLACE karne ke liye: OldWord => NewWord (ya Old:New) likhein.
-# 3. '#' se shuru hone wali lines comment/notes hoti hain.
+# 3. '#' se shuru hone wali lines comment/notes hoti hain (single '#' strips hashtags).
 # ==============================================================================
 
 # --- [User Specific Watermarks & Brands] ---
@@ -17,8 +17,14 @@ Uploaded By 👉 @Cerebellumvideosbot
 Uploaded By @Cerebellumvideosbot
 @Cerebellumvideosbot
 Cerebellumvideosbot
+The Pirate Bay 🏴☠️
+The Pirate Bay 🏴‍☠️
+The Pirate Bay 🏴
 The Pirate Bay
 DrGhost
+Kirmada rockstar launcher ❤️
+Kirmada rockstar launcher
+kirmada rockstar launcher
 Kirmada rockstar kirmada
 kirmada rocket launcher
 kirmada rockstar
@@ -29,14 +35,22 @@ Shimperd @AnandxBotss
 Shimperd
 @AnandxBotss
 AnandxBotss
+Yw @gatekeeperbasbot
+YW @gatekeeperbasbot
+yw @gatekeeperbasbot
+@gatekeeperbasbot
+gatekeeperbasbot
 yw
 Yw
+YW
 
 # --- [Spam Bots & Usernames] ---
 @YourSynapse_bot
 YourSynapse_bot
-Dams_new_robot
+@Dams_new_robot.pdf
+Dams_new_robot.pdf
 @Dams_new_robot
+Dams_new_robot
 @medAcadpdf
 medAcadpdf
 @yourrwishh
@@ -59,10 +73,14 @@ DOWNLOADED BY
 ━━━━━━━✦✗✦━━━━━━━
 ✦✗✦
 
-# --- [Spam / Watermark Emojis] ---
+# --- [Spam / Watermark Emojis & Symbols] ---
+🏴☠️
+🏴‍☠️
+🏴
 ☠️
 ☠
 💀
+#
 
 # --- [Promotional Links & Text] ---
 Join [Medical Verse](https://t.me/verse_medical) For more
@@ -74,7 +92,7 @@ medicalverse.in
 
 # --- [Extracted By Bot Watermarks] ---
 📇 Exᴛʀᴀᴄᴛᴇᴅ Bʏ : @medicos_saviourbot 💎
-📇 Exᴛʀᴀᴄᴛᴇᴅ Bʏ : @medicos_saviourbot
+📇 ExᴛʀᴀᴄᴛET Bʏ : @medicos_saviourbot
 Exᴛʀᴀᴄᴛᴇᴅ Bʏ : @medicos_saviourbot 💎
 Exᴛʀᴀᴄᴛᴇᴅ Bʏ : @medicos_saviourbot
 Extracted By : @medicos_saviourbot 💎
@@ -82,6 +100,5 @@ Extracted By : @medicos_saviourbot
 Extracted By @medicos_saviourbot
 @medicos_saviourbot
 medicos_saviourbot
-📇 Exᴛʀᴀᴄᴛᴇᴅ Bʏ
-Exᴛʀᴀᴄᴛᴇᴅ Bʏ
-
+📇 ExᴛʀᴀᴄᴛET Bʏ
+ExᴛʀᴀᴄᴛET Bʏ
