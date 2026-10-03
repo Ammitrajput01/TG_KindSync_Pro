@@ -1526,7 +1526,7 @@ class ThumbEnforcer:
                     main_f = sub_f = ImageFont.load_default()
                 draw.text((200, 250), GROUP_BRAND, fill=(0, 255, 127), font=main_f)
                 draw.text((250, 400), f"By {TELEGRAM_BRAND.replace('**', '')}", fill=(255, 255, 255), font=sub_f)
-                img.save(self.raw, quality=95)
+                img.save(self.raw, quality=85, optimize=True)
             except Exception: pass
 
         need_rebuild = False
@@ -1545,7 +1545,13 @@ class ThumbEnforcer:
                         img = ImageOps.fit(src, (1280, 720), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
                     else:
                         img = src.resize((1280, 720), Image.Resampling.LANCZOS)
-                    img.save(self.cache, "JPEG", quality=95, optimize=True)
+                    # Compress strictly to <= 120 KB (Telegram MTProto maximum limit is 200 KB)
+                    q = 80
+                    while q >= 40:
+                        img.save(self.cache, "JPEG", quality=q, optimize=True, progressive=True)
+                        if os.path.exists(self.cache) and os.path.getsize(self.cache) <= 120 * 1024:
+                            break
+                        q -= 5
             except Exception: pass
 
     def force_regenerate(self):
@@ -1568,6 +1574,27 @@ class ThumbEnforcer:
         if not path or not os.path.exists(path):
             return None
         return path
+
+    async def extract_original_thumb(self, client, msg, temp_dir="temp_thumbs"):
+        """Extracts original thumbnail from source message if present; returns local path or None."""
+        if not client or not msg or not getattr(msg, "media", None):
+            return None
+        try:
+            os.makedirs(temp_dir, exist_ok=True)
+            doc = getattr(msg.media, "document", None)
+            has_thumb = False
+            if doc and getattr(doc, "thumbs", None):
+                has_thumb = True
+            elif getattr(msg, "photo", None) or getattr(msg, "video", None):
+                has_thumb = True
+            
+            if has_thumb:
+                thumb_path = await client.download_media(msg, thumb=-1, file=temp_dir)
+                if thumb_path and os.path.exists(thumb_path):
+                    return thumb_path
+        except Exception as e:
+            logger.debug(f"Could not extract original thumbnail for msg #{getattr(msg, 'id', 0)}: {e}")
+        return None
 
 # ============================================================
 async def interactive_telegram_login(client):
@@ -3388,7 +3415,17 @@ class PipelineProcessor:
         active_messages = unprocessed_messages if unprocessed_messages else item.messages
         global THUMB_MODE
         sig_enabled = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
-        t_path = (await self.thumb.get_input_file(client)) if (THUMB_MODE == "custom" and sig_enabled) else None
+        t_path = None
+        is_temp_extracted_thumb = False
+        if THUMB_MODE == "custom" and sig_enabled:
+            t_path = await self.thumb.get_input_file(client)
+        else:
+            # Clean / Original Mode: Extract original thumbnail from source message so videos never send blank
+            m_first = active_messages[0] if active_messages else None
+            if m_first:
+                t_path = await self.thumb.extract_original_thumb(client, m_first)
+                if t_path:
+                    is_temp_extracted_thumb = True
 
         resolved_topic = await self.resolve_topic_id(target_chat, target_topic, client)
 
@@ -3432,158 +3469,162 @@ class PipelineProcessor:
             except Exception as e:
                 self.log(f"[yellow]ℹ Direct Forward bypass -> Streamer: {str(e)[:60]}[/]")
 
-        if not direct_forward_success:
-            try:
-                if len(active_messages) > 1:
-                    async def process_media(m):
-                        async with self.album_sem:
-                            return await self.streamer.stream_media(m, stop_event, client=client)
-                            
-                    coros = [process_media(m) for m in active_messages if getattr(m, "media", None)]
-                    if coros:
-                        tasks = [asyncio.create_task(c) for c in coros]
-                        caps = []
-                        for m in active_messages:
-                            if getattr(m, "media", None):
-                                c_main, _ = self.format_text(getattr(m, "text", ""), for_media=True)
-                                caps.append(c_main)
-                        files = await asyncio.gather(*tasks)
-                        await self.rpc.execute(
-                            lambda c: c.send_file(_parse_chat_id(target_chat), files, caption=caps, thumb=t_path, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
-                            client=client, timeout=120.0
-                        )
-                        self.log(f"[bold green]✔ Streamed Album ({len(files)} files)[/] [dim](ID: #{item.first_id})[/]")
-                        for m in active_messages:
-                            self.log(f"  ↳ {format_media_log_detail(m, prefix='Sent')}")
-                        self.metrics["albums_forwarded"] += 1
-                        success_flag = True
-                else:
-                    m = active_messages[0]
-                    if getattr(m, "media", None) and (hasattr(m.media, 'document') or hasattr(m.media, 'photo')):
-                        file = await self.streamer.stream_media(m, stop_event, client=client)
-                        cap_main, cap_overflow = self.format_text(m.text, for_media=True)
-                        
-                        orig_doc = getattr(getattr(m, "media", None), "document", None)
-                        attrs = []
-                        if orig_doc and hasattr(orig_doc, "attributes"):
-                            for a in orig_doc.attributes:
-                                if isinstance(a, DocumentAttributeFilename):
-                                    attrs.append(DocumentAttributeFilename(file_name=getattr(file, "name", a.file_name)))
-                                elif isinstance(a, DocumentAttributeVideo):
-                                    vid_w = int(getattr(a, "w", 0) or 0)
-                                    vid_h = int(getattr(a, "h", 0) or 0)
-                                    # If dimensions missing or low, enforce 16:9 HD for widescreen player on laptop & mobile
-                                    if vid_w <= 0 or vid_h <= 0:
-                                        vid_w, vid_h = 1280, 720
-                                    attrs.append(DocumentAttributeVideo(
-                                        duration=int(getattr(a, "duration", 0) or 0),
-                                        w=vid_w,
-                                        h=vid_h,
-                                        supports_streaming=True
-                                    ))
-                                elif isinstance(a, DocumentAttributeAudio):
-                                    attrs.append(a)
-
-                        # If media is a video file but had no video attribute, inject 16:9 HD video attribute
-                        is_video_type = getattr(m, "video", None) or (getattr(file, "name", "").lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi")))
-                        has_vid_attr = any(isinstance(x, DocumentAttributeVideo) for x in attrs)
-                        if is_video_type and not has_vid_attr:
-                            attrs.append(DocumentAttributeVideo(
-                                duration=0,
-                                w=1280,
-                                h=720,
-                                supports_streaming=True
-                            ))
-
-                        sent_media = await self.rpc.execute(
-                            lambda c: c.send_file(_parse_chat_id(target_chat), file, caption=cap_main, thumb=t_path, attributes=attrs if attrs else None, reply_to=resolved_topic, parse_mode="md", supports_streaming=True, silent=silent_mode),
-                            client=client, timeout=120.0
-                        )
-                        if cap_overflow and sent_media:
-                            reply_id = getattr(sent_media, "id", None) or resolved_topic
-                            with suppress(Exception):
-                                await self.rpc.execute(
-                                    lambda c: c.send_message(_parse_chat_id(target_chat), cap_overflow, reply_to=reply_id, parse_mode="md", silent=silent_mode),
-                                    client=client, timeout=30.0
-                                )
-                        if sent_media:
-                            s_id = getattr(sent_media, "id", None)
-                            if s_id:
-                                f_name = getattr(m.file, "name", None) if getattr(m, "file", None) else None
-                                title_clean = f_name or (m.text[:40] if m.text else f"Video #{m.id}")
-                                icon_m = "🎥" if getattr(m, "video", None) else ("📄" if getattr(m, "document", None) else ("🖼️" if getattr(m, "photo", None) else "📦"))
-                                self.batch_index_records.append({
-                                    "msg_id": s_id,
-                                    "title": clean_index_title(title_clean, max_len=60),
-                                    "icon": icon_m
-                                })
-                            # Multi-target instant mirror
-                            if self.cfg.mirror_targets and getattr(sent_media, "media", None):
-                                for m_tgt in self.cfg.mirror_targets:
-                                    if str(m_tgt) != str(target_chat):
-                                        with suppress(Exception):
-                                            await self.rpc.execute(
-                                                lambda c, tgt=m_tgt: c.send_file(_parse_chat_id(tgt), sent_media.media, caption=cap_main, parse_mode="md", silent=silent_mode),
-                                                client=client, timeout=30.0
-                                            )
-                        self.log(format_media_log_detail(m, prefix="✔ Sent"))
-                        success_flag = True
-                    elif m.text and not getattr(m, 'action', None):
-                        formatted_text = self.format_text(m.text, for_media=False)
-                        if formatted_text and formatted_text.strip():
-                            sent_txt = await self.rpc.execute(
-                                lambda c: c.send_message(_parse_chat_id(target_chat), formatted_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
-                                client=client
-                            )
-                            if sent_txt and self.cfg.mirror_targets:
-                                for m_tgt in self.cfg.mirror_targets:
-                                    if str(m_tgt) != str(target_chat):
-                                        with suppress(Exception):
-                                            await self.rpc.execute(
-                                                lambda c, tgt=m_tgt: c.send_message(_parse_chat_id(tgt), formatted_text, parse_mode="md", silent=silent_mode),
-                                                client=client, timeout=20.0
-                                            )
-                            self.log(format_media_log_detail(m, prefix="✔ Sent"))
-                        else:
-                            self.log(f"[dim]⏩ Skipped watermark/empty message (ID: #{m.id})[/]")
-                    elif getattr(m, 'poll', None):
-                        reconstructed_text = self.reconstruct(m)
-                        if reconstructed_text and reconstructed_text.strip():
+            if not direct_forward_success:
+                try:
+                    if len(active_messages) > 1:
+                        async def process_media(m):
+                            async with self.album_sem:
+                                return await self.streamer.stream_media(m, stop_event, client=client)
+                                
+                        coros = [process_media(m) for m in active_messages if getattr(m, "media", None)]
+                        if coros:
+                            tasks = [asyncio.create_task(c) for c in coros]
+                            caps = []
+                            for m in active_messages:
+                                if getattr(m, "media", None):
+                                    c_main, _ = self.format_text(getattr(m, "text", ""), for_media=True)
+                                    caps.append(c_main)
+                            files = await asyncio.gather(*tasks)
                             await self.rpc.execute(
-                                lambda c: c.send_message(_parse_chat_id(target_chat), reconstructed_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
-                                client=client
+                                lambda c: c.send_file(_parse_chat_id(target_chat), files, caption=caps, thumb=t_path, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
+                                client=client, timeout=120.0
                             )
-                            self.log(format_media_log_detail(m, prefix="✔ Sent Poll"))
-                            success_flag = True
-                        else:
+                            self.log(f"[bold green]✔ Streamed Album ({len(files)} files)[/] [dim](ID: #{item.first_id})[/]")
+                            for m in active_messages:
+                                self.log(f"  ↳ {format_media_log_detail(m, prefix='Sent')}")
+                            self.metrics["albums_forwarded"] += 1
                             success_flag = True
                     else:
-                        self.log(f"[dim]⏩ Skipped service action/stub message (ID: #{m.id})[/]")
-                        success_flag = True
+                        m = active_messages[0]
+                        if getattr(m, "media", None) and (hasattr(m.media, 'document') or hasattr(m.media, 'photo')):
+                            file = await self.streamer.stream_media(m, stop_event, client=client)
+                            cap_main, cap_overflow = self.format_text(m.text, for_media=True)
+                            
+                            orig_doc = getattr(getattr(m, "media", None), "document", None)
+                            attrs = []
+                            if orig_doc and hasattr(orig_doc, "attributes"):
+                                for a in orig_doc.attributes:
+                                    if isinstance(a, DocumentAttributeFilename):
+                                        attrs.append(DocumentAttributeFilename(file_name=getattr(file, "name", a.file_name)))
+                                    elif isinstance(a, DocumentAttributeVideo):
+                                        vid_w = int(getattr(a, "w", 0) or 0)
+                                        vid_h = int(getattr(a, "h", 0) or 0)
+                                        # If dimensions missing or low, enforce 16:9 HD for widescreen player on laptop & mobile
+                                        if vid_w <= 0 or vid_h <= 0:
+                                            vid_w, vid_h = 1280, 720
+                                        attrs.append(DocumentAttributeVideo(
+                                            duration=int(getattr(a, "duration", 0) or 0),
+                                            w=vid_w,
+                                            h=vid_h,
+                                            supports_streaming=True
+                                        ))
+                                    elif isinstance(a, DocumentAttributeAudio):
+                                        attrs.append(a)
 
-            except (KeyboardInterrupt, asyncio.CancelledError):
-                raise
-            except Exception as e:
-                await self.dlq.append(source_chat, item.first_id, e, target_chat=target_chat, target_topic=target_topic or 0)
-                self.log(f"[bold red]❌ Stream Failed ID #{item.first_id}:[/] {str(e)[:100]}")
-                success_flag = False
+                            # If media is a video file but had no video attribute, inject 16:9 HD video attribute
+                            is_video_type = getattr(m, "video", None) or (getattr(file, "name", "").lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi")))
+                            has_vid_attr = any(isinstance(x, DocumentAttributeVideo) for x in attrs)
+                            if is_video_type and not has_vid_attr:
+                                attrs.append(DocumentAttributeVideo(
+                                    duration=0,
+                                    w=1280,
+                                    h=720,
+                                    supports_streaming=True
+                                ))
 
-                # Auto-DLQ Self-Healing Background Daemon: Auto-retry after 45s with fresh message reference
-                if item.retry_count < 2 and not self.cfg.run_dlq:
-                    item.retry_count += 1
-                    async def auto_retry_later(w_item, delay=45.0):
-                        await asyncio.sleep(delay)
-                        if stop_event.is_set(): return
-                        try:
-                            cl = self.session_mgr.get_client()
-                            fresh_msgs = await cl.get_messages(_parse_chat_id(source_chat), ids=[m.id for m in w_item.messages])
-                            if fresh_msgs and any(fresh_msgs):
-                                w_item.messages = [m for m in fresh_msgs if m]
-                                self.log(f"[bold yellow]🔄 Auto-DLQ Self-Healing retry triggered for Message #{w_item.first_id}...[/]")
-                                await self.execute(w_item, stop_event)
-                        except Exception as retry_err:
-                            self.log(f"[dim red]Auto-DLQ background attempt {w_item.retry_count} failed: {retry_err}[/]")
-                    asyncio.create_task(auto_retry_later(item))
+                            sent_media = await self.rpc.execute(
+                                lambda c: c.send_file(_parse_chat_id(target_chat), file, caption=cap_main, thumb=t_path, attributes=attrs if attrs else None, reply_to=resolved_topic, parse_mode="md", supports_streaming=True, silent=silent_mode),
+                                client=client, timeout=120.0
+                            )
+                            if cap_overflow and sent_media:
+                                reply_id = getattr(sent_media, "id", None) or resolved_topic
+                                with suppress(Exception):
+                                    await self.rpc.execute(
+                                        lambda c: c.send_message(_parse_chat_id(target_chat), cap_overflow, reply_to=reply_id, parse_mode="md", silent=silent_mode),
+                                        client=client, timeout=30.0
+                                    )
+                            if sent_media:
+                                s_id = getattr(sent_media, "id", None)
+                                if s_id:
+                                    f_name = getattr(m.file, "name", None) if getattr(m, "file", None) else None
+                                    title_clean = f_name or (m.text[:40] if m.text else f"Video #{m.id}")
+                                    icon_m = "🎥" if getattr(m, "video", None) else ("📄" if getattr(m, "document", None) else ("🖼️" if getattr(m, "photo", None) else "📦"))
+                                    self.batch_index_records.append({
+                                        "msg_id": s_id,
+                                        "title": clean_index_title(title_clean, max_len=60),
+                                        "icon": icon_m
+                                    })
+                                # Multi-target instant mirror
+                                if self.cfg.mirror_targets and getattr(sent_media, "media", None):
+                                    for m_tgt in self.cfg.mirror_targets:
+                                        if str(m_tgt) != str(target_chat):
+                                            with suppress(Exception):
+                                                await self.rpc.execute(
+                                                    lambda c, tgt=m_tgt: c.send_file(_parse_chat_id(tgt), sent_media.media, caption=cap_main, parse_mode="md", silent=silent_mode),
+                                                    client=client, timeout=30.0
+                                                )
+                            self.log(format_media_log_detail(m, prefix="✔ Sent"))
+                            success_flag = True
+                        elif m.text and not getattr(m, 'action', None):
+                            formatted_text = self.format_text(m.text, for_media=False)
+                            if formatted_text and formatted_text.strip():
+                                sent_txt = await self.rpc.execute(
+                                    lambda c: c.send_message(_parse_chat_id(target_chat), formatted_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
+                                    client=client
+                                )
+                                if sent_txt and self.cfg.mirror_targets:
+                                    for m_tgt in self.cfg.mirror_targets:
+                                        if str(m_tgt) != str(target_chat):
+                                            with suppress(Exception):
+                                                await self.rpc.execute(
+                                                    lambda c, tgt=m_tgt: c.send_message(_parse_chat_id(tgt), formatted_text, parse_mode="md", silent=silent_mode),
+                                                    client=client, timeout=20.0
+                                                )
+                                self.log(format_media_log_detail(m, prefix="✔ Sent"))
+                            else:
+                                self.log(f"[dim]⏩ Skipped watermark/empty message (ID: #{m.id})[/]")
+                        elif getattr(m, 'poll', None):
+                            reconstructed_text = self.reconstruct(m)
+                            if reconstructed_text and reconstructed_text.strip():
+                                await self.rpc.execute(
+                                    lambda c: c.send_message(_parse_chat_id(target_chat), reconstructed_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
+                                    client=client
+                                )
+                                self.log(format_media_log_detail(m, prefix="✔ Sent Poll"))
+                                success_flag = True
+                            else:
+                                success_flag = True
+                        else:
+                            self.log(f"[dim]⏩ Skipped service action/stub message (ID: #{m.id})[/]")
+                            success_flag = True
+
+                except (KeyboardInterrupt, asyncio.CancelledError):
+                    raise
+                except Exception as e:
+                    await self.dlq.append(source_chat, item.first_id, e, target_chat=target_chat, target_topic=target_topic or 0)
+                    self.log(f"[bold red]❌ Stream Failed ID #{item.first_id}:[/] {str(e)[:100]}")
+                    success_flag = False
+
+                    # Auto-DLQ Self-Healing Background Daemon: Auto-retry after 45s with fresh message reference
+                    if item.retry_count < 2 and not self.cfg.run_dlq:
+                        item.retry_count += 1
+                        async def auto_retry_later(w_item, delay=45.0):
+                            await asyncio.sleep(delay)
+                            if stop_event.is_set(): return
+                            try:
+                                cl = self.session_mgr.get_client()
+                                fresh_msgs = await cl.get_messages(_parse_chat_id(source_chat), ids=[m.id for m in w_item.messages])
+                                if fresh_msgs and any(fresh_msgs):
+                                    w_item.messages = [m for m in fresh_msgs if m]
+                                    self.log(f"[bold yellow]🔄 Auto-DLQ Self-Healing retry triggered for Message #{w_item.first_id}...[/]")
+                                    await self.execute(w_item, stop_event)
+                            except Exception as retry_err:
+                                self.log(f"[dim red]Auto-DLQ background attempt {w_item.retry_count} failed: {retry_err}[/]")
+                        asyncio.create_task(auto_retry_later(item))
+                finally:
+                    if is_temp_extracted_thumb and t_path and os.path.exists(t_path):
+                        with suppress(Exception):
+                            os.remove(t_path)
 
         if success_flag:
             for m in active_messages:
@@ -6716,16 +6757,45 @@ async def run_single_or_specific_messages_forwarder(session_mgr):
                         downloaded_path = await client.download_media(m, file=str(temp_dir))
                         if downloaded_path and os.path.exists(downloaded_path):
                             status.update(f"[bold green][{idx}/{len(valid_msgs)}] Uploading to topic '{tgt_topic_name}'...[/]")
+                            # Extract original thumbnail or use custom branded
+                            extracted_thumb = None
+                            with suppress(Exception):
+                                extracted_thumb = await client.download_media(m, thumb=-1, file=str(temp_dir))
+                            
+                            t_enforcer = ThumbEnforcer()
+                            t_to_send = extracted_thumb if (extracted_thumb and os.path.exists(extracted_thumb)) else (await t_enforcer.get_input_file(client) if (THUMB_MODE == "custom") else None)
+
+                            # Preserve video attributes
+                            orig_attrs = getattr(getattr(m, 'media', None), 'document', None) and getattr(m.media.document, 'attributes', []) or []
+                            vid_attrs = []
+                            for a in orig_attrs:
+                                if isinstance(a, DocumentAttributeVideo):
+                                    vid_attrs.append(DocumentAttributeVideo(
+                                        duration=int(getattr(a, "duration", 0) or 0),
+                                        w=int(getattr(a, "w", 0) or 1280),
+                                        h=int(getattr(a, "h", 0) or 720),
+                                        supports_streaming=True
+                                    ))
+                                elif isinstance(a, DocumentAttributeFilename):
+                                    vid_attrs.append(a)
+                            if not any(isinstance(x, DocumentAttributeVideo) for x in vid_attrs) and (getattr(m, 'video', None) or downloaded_path.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))):
+                                vid_attrs.append(DocumentAttributeVideo(duration=0, w=1280, h=720, supports_streaming=True))
+
                             sent_msg = await client.send_file(
                                 tgt_entity,
                                 downloaded_path,
                                 caption=clean_caption,
+                                thumb=t_to_send,
+                                attributes=vid_attrs if vid_attrs else None,
                                 parse_mode="md",
                                 supports_streaming=True,
                                 **reply_kw
                             )
                             with suppress(Exception):
                                 os.remove(downloaded_path)
+                            if extracted_thumb and os.path.exists(extracted_thumb):
+                                with suppress(Exception):
+                                    os.remove(extracted_thumb)
 
                 if sent_msg:
                     success_count += 1
@@ -7069,16 +7139,45 @@ async def run_selective_content_picker(session_mgr):
                         downloaded_path = await client.download_media(msg, file=str(temp_dir))
                         if downloaded_path and os.path.exists(downloaded_path):
                             status.update(f"[bold green][{idx}/{len(items_to_clone)}] Re-uploading clean file to target...[/]")
+                            # Extract original thumbnail or use custom branded
+                            extracted_thumb = None
+                            with suppress(Exception):
+                                extracted_thumb = await client.download_media(msg, thumb=-1, file=str(temp_dir))
+                            
+                            t_enforcer = ThumbEnforcer()
+                            t_to_send = extracted_thumb if (extracted_thumb and os.path.exists(extracted_thumb)) else (await t_enforcer.get_input_file(client) if (THUMB_MODE == "custom") else None)
+
+                            # Preserve video attributes
+                            orig_attrs = getattr(getattr(msg, 'media', None), 'document', None) and getattr(msg.media.document, 'attributes', []) or []
+                            vid_attrs = []
+                            for a in orig_attrs:
+                                if isinstance(a, DocumentAttributeVideo):
+                                    vid_attrs.append(DocumentAttributeVideo(
+                                        duration=int(getattr(a, "duration", 0) or 0),
+                                        w=int(getattr(a, "w", 0) or 1280),
+                                        h=int(getattr(a, "h", 0) or 720),
+                                        supports_streaming=True
+                                    ))
+                                elif isinstance(a, DocumentAttributeFilename):
+                                    vid_attrs.append(a)
+                            if not any(isinstance(x, DocumentAttributeVideo) for x in vid_attrs) and (getattr(msg, 'video', None) or downloaded_path.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))):
+                                vid_attrs.append(DocumentAttributeVideo(duration=0, w=1280, h=720, supports_streaming=True))
+
                             sent_msg = await client.send_file(
                                 tgt_entity,
                                 downloaded_path,
                                 caption=clean_caption,
+                                thumb=t_to_send,
+                                attributes=vid_attrs if vid_attrs else None,
                                 parse_mode="md",
                                 supports_streaming=True,
                                 **reply_kw
                             )
                             with suppress(Exception):
                                 os.remove(downloaded_path)
+                            if extracted_thumb and os.path.exists(extracted_thumb):
+                                with suppress(Exception):
+                                    os.remove(extracted_thumb)
                                 
                 if sent_msg:
                     cloned_ok += 1

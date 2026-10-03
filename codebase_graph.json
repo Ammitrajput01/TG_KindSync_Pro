@@ -182,7 +182,7 @@
             },
             {
               "name": "dispatch",
-              "line": 233,
+              "line": 240,
               "args": [
                 "client",
                 "title",
@@ -194,16 +194,16 @@
           "bases": []
         },
         "PerformanceConfig": {
-          "line": 985,
+          "line": 992,
           "methods": [],
           "bases": []
         },
         "AppConfig": {
-          "line": 997,
+          "line": 1004,
           "methods": [
             {
               "name": "load",
-              "line": 1019,
+              "line": 1026,
               "args": [
                 "cls",
                 "media_filter",
@@ -222,11 +222,11 @@
           "bases": []
         },
         "WorkItem": {
-          "line": 1089,
+          "line": 1096,
           "methods": [
             {
               "name": "first_id",
-              "line": 1095,
+              "line": 1102,
               "args": [
                 "self"
               ],
@@ -234,7 +234,7 @@
             },
             {
               "name": "is_album",
-              "line": 1097,
+              "line": 1104,
               "args": [
                 "self"
               ],
@@ -244,11 +244,11 @@
           "bases": []
         },
         "BoundedLRUCache": {
-          "line": 1102,
+          "line": 1109,
           "methods": [
             {
               "name": "__init__",
-              "line": 1103,
+              "line": 1110,
               "args": [
                 "self",
                 "max_size"
@@ -257,7 +257,7 @@
             },
             {
               "name": "add",
-              "line": 1106,
+              "line": 1113,
               "args": [
                 "self",
                 "item"
@@ -266,7 +266,7 @@
             },
             {
               "name": "__contains__",
-              "line": 1111,
+              "line": 1118,
               "args": [
                 "self",
                 "item"
@@ -275,7 +275,7 @@
             },
             {
               "name": "__len__",
-              "line": 1113,
+              "line": 1120,
               "args": [
                 "self"
               ],
@@ -285,11 +285,11 @@
           "bases": []
         },
         "StateManager": {
-          "line": 1116,
+          "line": 1123,
           "methods": [
             {
               "name": "__init__",
-              "line": 1117,
+              "line": 1124,
               "args": [
                 "self",
                 "db_path"
@@ -298,7 +298,7 @@
             },
             {
               "name": "_key",
-              "line": 1129,
+              "line": 1136,
               "args": [
                 "source_chat",
                 "msg_id",
@@ -309,7 +309,7 @@
             },
             {
               "name": "start",
-              "line": 1132,
+              "line": 1139,
               "args": [
                 "self"
               ],
@@ -317,7 +317,7 @@
             },
             {
               "name": "is_processed",
-              "line": 1212,
+              "line": 1219,
               "args": [
                 "self",
                 "source_chat",
@@ -329,7 +329,7 @@
             },
             {
               "name": "claim",
-              "line": 1225,
+              "line": 1232,
               "args": [
                 "self",
                 "source_chat",
@@ -341,7 +341,7 @@
             },
             {
               "name": "release_claim",
-              "line": 1235,
+              "line": 1242,
               "args": [
                 "self",
                 "source_chat",
@@ -353,7 +353,7 @@
             },
             {
               "name": "get_watermark",
-              "line": 1240,
+              "line": 1247,
               "args": [
                 "self",
                 "chat_id"
@@ -362,7 +362,7 @@
             },
             {
               "name": "get_topic_watermark",
-              "line": 1252,
+              "line": 1259,
               "args": [
                 "self",
                 "source_chat",
@@ -374,7 +374,7 @@
             },
             {
               "name": "update_topic_watermark",
-              "line": 1268,
+              "line": 1275,
               "args": [
                 "self",
                 "source_chat",
@@ -390,7 +390,7 @@
             },
             {
               "name": "mark_completed",
-              "line": 1290,
+              "line": 1297,
               "args": [
                 "self",
                 "source_chat",
@@ -402,7 +402,7 @@
             },
             {
               "name": "daemon_writer",
-              "line": 1300,
+              "line": 1307,
               "args": [
                 "self"
               ],
@@ -410,7 +410,7 @@
             },
             {
               "name": "persist_watermarks",
-              "line": 1327,
+              "line": 1334,
               "args": [
                 "self"
               ],
@@ -418,7 +418,7 @@
             },
             {
               "name": "is_local_file_uploaded",
-              "line": 1348,
+              "line": 1355,
               "args": [
                 "self",
                 "file_path",
@@ -429,7 +429,7 @@
             },
             {
               "name": "record_local_file_upload",
-              "line": 1359,
+              "line": 1366,
               "args": [
                 "self",
                 "file_path",
@@ -442,7 +442,7 @@
             },
             {
               "name": "save_clone_topic_mapping",
-              "line": 1371,
+              "line": 1378,
               "args": [
                 "self",
                 "source_chat",
@@ -456,7 +456,7 @@
             },
             {
               "name": "get_clone_session_topics",
-              "line": 1384,
+              "line": 1391,
               "args": [
                 "self",
                 "source_chat",
@@ -466,7 +466,7 @@
             },
             {
               "name": "get_latest_clone_session",
-              "line": 1413,
+              "line": 1420,
               "args": [
                 "self"
               ],
@@ -474,7 +474,7 @@
             },
             {
               "name": "close",
-              "line": 1435,
+              "line": 1442,
               "args": [
                 "self"
               ],
@@ -484,11 +484,11 @@
           "bases": []
         },
         "AsyncDLQ": {
-          "line": 1447,
+          "line": 1454,
           "methods": [
             {
               "name": "__init__",
-              "line": 1448,
+              "line": 1455,
               "args": [
                 "self",
                 "path"
@@ -497,7 +497,7 @@
             },
             {
               "name": "append",
-              "line": 1451,
+              "line": 1458,
               "args": [
                 "self",
                 "chat_id",
@@ -510,7 +510,7 @@
             },
             {
               "name": "_write",
-              "line": 1463,
+              "line": 1470,
               "args": [
                 "self",
                 "line"
@@ -519,7 +519,7 @@
             },
             {
               "name": "export_json_report",
-              "line": 1468,
+              "line": 1475,
               "args": [
                 "self",
                 "export_path"
@@ -530,11 +530,11 @@
           "bases": []
         },
         "ThumbEnforcer": {
-          "line": 1496,
+          "line": 1503,
           "methods": [
             {
               "name": "__init__",
-              "line": 1497,
+              "line": 1504,
               "args": [
                 "self"
               ],
@@ -542,7 +542,7 @@
             },
             {
               "name": "_build",
-              "line": 1503,
+              "line": 1510,
               "args": [
                 "self"
               ],
@@ -550,7 +550,7 @@
             },
             {
               "name": "force_regenerate",
-              "line": 1544,
+              "line": 1551,
               "args": [
                 "self"
               ],
@@ -558,7 +558,7 @@
             },
             {
               "name": "get",
-              "line": 1550,
+              "line": 1557,
               "args": [
                 "self"
               ],
@@ -566,7 +566,7 @@
             },
             {
               "name": "get_input_file",
-              "line": 1558,
+              "line": 1565,
               "args": [
                 "self",
                 "client"
@@ -577,11 +577,11 @@
           "bases": []
         },
         "MultiSessionManager": {
-          "line": 1855,
+          "line": 1854,
           "methods": [
             {
               "name": "__init__",
-              "line": 1861,
+              "line": 1860,
               "args": [
                 "self",
                 "api_id",
@@ -591,7 +591,7 @@
             },
             {
               "name": "_discover_sessions",
-              "line": 1872,
+              "line": 1871,
               "args": [
                 "self"
               ],
@@ -599,7 +599,7 @@
             },
             {
               "name": "add_session",
-              "line": 1913,
+              "line": 1912,
               "args": [
                 "self",
                 "session_name"
@@ -608,7 +608,7 @@
             },
             {
               "name": "set_active_session",
-              "line": 1924,
+              "line": 1923,
               "args": [
                 "self",
                 "target"
@@ -617,7 +617,7 @@
             },
             {
               "name": "mark_flood_wait",
-              "line": 1936,
+              "line": 1935,
               "args": [
                 "self",
                 "session_name",
@@ -627,7 +627,7 @@
             },
             {
               "name": "is_session_cooling_down",
-              "line": 1940,
+              "line": 1939,
               "args": [
                 "self",
                 "session_name"
@@ -636,7 +636,7 @@
             },
             {
               "name": "_prompt_credentials",
-              "line": 1945,
+              "line": 1944,
               "args": [
                 "self"
               ],
@@ -644,7 +644,7 @@
             },
             {
               "name": "_safe_connect",
-              "line": 1984,
+              "line": 1983,
               "args": [
                 "self",
                 "client"
@@ -653,7 +653,7 @@
             },
             {
               "name": "start_all",
-              "line": 2006,
+              "line": 2005,
               "args": [
                 "self"
               ],
@@ -661,7 +661,7 @@
             },
             {
               "name": "ensure_active_client",
-              "line": 2024,
+              "line": 2023,
               "args": [
                 "self"
               ],
@@ -669,7 +669,7 @@
             },
             {
               "name": "disconnect_all",
-              "line": 2040,
+              "line": 2039,
               "args": [
                 "self"
               ],
@@ -677,7 +677,7 @@
             },
             {
               "name": "get_client",
-              "line": 2044,
+              "line": 2043,
               "args": [
                 "self"
               ],
@@ -685,7 +685,7 @@
             },
             {
               "name": "get_sessions_status",
-              "line": 2061,
+              "line": 2060,
               "args": [
                 "self"
               ],
@@ -695,11 +695,11 @@
           "bases": []
         },
         "RateBudgeter": {
-          "line": 2092,
+          "line": 2091,
           "methods": [
             {
               "name": "__init__",
-              "line": 2097,
+              "line": 2096,
               "args": [
                 "self",
                 "max_per_minute"
@@ -708,7 +708,7 @@
             },
             {
               "name": "record_flood_wait",
-              "line": 2102,
+              "line": 2101,
               "args": [
                 "self",
                 "seconds"
@@ -717,7 +717,7 @@
             },
             {
               "name": "pace",
-              "line": 2105,
+              "line": 2104,
               "args": [
                 "self"
               ],
@@ -727,11 +727,11 @@
           "bases": []
         },
         "AdaptiveSpeedCruiseControl": {
-          "line": 2124,
+          "line": 2123,
           "methods": [
             {
               "name": "__init__",
-              "line": 2133,
+              "line": 2130,
               "args": [
                 "self",
                 "min_concurrency",
@@ -742,7 +742,7 @@
             },
             {
               "name": "get_concurrency",
-              "line": 2140,
+              "line": 2137,
               "args": [
                 "self"
               ],
@@ -750,7 +750,7 @@
             },
             {
               "name": "apply_brake",
-              "line": 2148,
+              "line": 2145,
               "args": [
                 "self",
                 "reason",
@@ -760,7 +760,7 @@
             },
             {
               "name": "report_chunk_done",
-              "line": 2157,
+              "line": 2154,
               "args": [
                 "self",
                 "duration"
@@ -771,11 +771,11 @@
           "bases": []
         },
         "RPCGuard": {
-          "line": 2205,
+          "line": 2198,
           "methods": [
             {
               "name": "__init__",
-              "line": 2206,
+              "line": 2199,
               "args": [
                 "self",
                 "session_mgr",
@@ -786,7 +786,7 @@
             },
             {
               "name": "execute",
-              "line": 2211,
+              "line": 2204,
               "args": [
                 "self",
                 "func",
@@ -797,7 +797,7 @@
             },
             {
               "name": "execute_chunk",
-              "line": 2217,
+              "line": 2210,
               "args": [
                 "self",
                 "func",
@@ -810,11 +810,11 @@
           "bases": []
         },
         "MemoryStreamer": {
-          "line": 2618,
+          "line": 2611,
           "methods": [
             {
               "name": "__init__",
-              "line": 2619,
+              "line": 2612,
               "args": [
                 "self",
                 "rpc",
@@ -826,7 +826,7 @@
             },
             {
               "name": "_send_chunk",
-              "line": 2627,
+              "line": 2620,
               "args": [
                 "self",
                 "client",
@@ -840,7 +840,7 @@
             },
             {
               "name": "stream_media",
-              "line": 2645,
+              "line": 2638,
               "args": [
                 "self",
                 "msg",
@@ -853,11 +853,11 @@
           "bases": []
         },
         "PipelineProcessor": {
-          "line": 3108,
+          "line": 3101,
           "methods": [
             {
               "name": "__init__",
-              "line": 3109,
+              "line": 3102,
               "args": [
                 "self",
                 "rpc",
@@ -873,7 +873,7 @@
             },
             {
               "name": "check_and_send_subject_header",
-              "line": 3125,
+              "line": 3118,
               "args": [
                 "self",
                 "active_messages",
@@ -886,7 +886,7 @@
             },
             {
               "name": "format_text",
-              "line": 3182,
+              "line": 3175,
               "args": [
                 "self",
                 "text",
@@ -896,7 +896,7 @@
             },
             {
               "name": "post_batch_index_card",
-              "line": 3186,
+              "line": 3179,
               "args": [
                 "self",
                 "target_chat",
@@ -907,7 +907,7 @@
             },
             {
               "name": "reconstruct",
-              "line": 3255,
+              "line": 3248,
               "args": [
                 "self",
                 "msg"
@@ -916,7 +916,7 @@
             },
             {
               "name": "send_session_headers",
-              "line": 3270,
+              "line": 3263,
               "args": [
                 "self",
                 "source_chat",
@@ -929,7 +929,7 @@
             },
             {
               "name": "resolve_topic_id",
-              "line": 3324,
+              "line": 3317,
               "args": [
                 "self",
                 "chat_id",
@@ -940,7 +940,7 @@
             },
             {
               "name": "get_topic_title",
-              "line": 3338,
+              "line": 3331,
               "args": [
                 "self",
                 "chat_id",
@@ -951,7 +951,7 @@
             },
             {
               "name": "execute",
-              "line": 3372,
+              "line": 3365,
               "args": [
                 "self",
                 "item",
@@ -963,11 +963,11 @@
           "bases": []
         },
         "TerminalPlatform": {
-          "line": 3650,
+          "line": 3642,
           "methods": [
             {
               "name": "__init__",
-              "line": 3651,
+              "line": 3643,
               "args": [
                 "self",
                 "cfg",
@@ -977,7 +977,7 @@
             },
             {
               "name": "log",
-              "line": 3698,
+              "line": 3690,
               "args": [
                 "self",
                 "text"
@@ -986,7 +986,7 @@
             },
             {
               "name": "_write_engine_telemetry",
-              "line": 3701,
+              "line": 3693,
               "args": [
                 "self",
                 "is_done"
@@ -995,7 +995,7 @@
             },
             {
               "name": "update_upload_progress",
-              "line": 3751,
+              "line": 3743,
               "args": [
                 "self",
                 "filename",
@@ -1006,7 +1006,7 @@
             },
             {
               "name": "matches_keywords",
-              "line": 3784,
+              "line": 3776,
               "args": [
                 "self",
                 "msg"
@@ -1015,7 +1015,7 @@
             },
             {
               "name": "_get_topic_name",
-              "line": 3811,
+              "line": 3803,
               "args": [
                 "self",
                 "chat_id",
@@ -1026,7 +1026,7 @@
             },
             {
               "name": "fetch_names",
-              "line": 3833,
+              "line": 3825,
               "args": [
                 "self"
               ],
@@ -1034,7 +1034,7 @@
             },
             {
               "name": "scanner_single",
-              "line": 3866,
+              "line": 3858,
               "args": [
                 "self"
               ],
@@ -1042,7 +1042,7 @@
             },
             {
               "name": "_scan_rule",
-              "line": 3991,
+              "line": 3983,
               "args": [
                 "self",
                 "idx",
@@ -1052,7 +1052,7 @@
             },
             {
               "name": "scanner_multiple",
-              "line": 4057,
+              "line": 4049,
               "args": [
                 "self"
               ],
@@ -1060,7 +1060,7 @@
             },
             {
               "name": "scanner_dlq",
-              "line": 4063,
+              "line": 4055,
               "args": [
                 "self"
               ],
@@ -1068,7 +1068,7 @@
             },
             {
               "name": "setup_live_listeners",
-              "line": 4107,
+              "line": 4099,
               "args": [
                 "self"
               ],
@@ -1076,7 +1076,7 @@
             },
             {
               "name": "setup_remote_control_listener",
-              "line": 4159,
+              "line": 4151,
               "args": [
                 "self"
               ],
@@ -1084,7 +1084,7 @@
             },
             {
               "name": "scanner",
-              "line": 4333,
+              "line": 4325,
               "args": [
                 "self"
               ],
@@ -1092,7 +1092,7 @@
             },
             {
               "name": "worker_supervisor",
-              "line": 4347,
+              "line": 4339,
               "args": [
                 "self",
                 "wid",
@@ -1102,7 +1102,7 @@
             },
             {
               "name": "get_system_health",
-              "line": 4384,
+              "line": 4376,
               "args": [
                 "self"
               ],
@@ -1110,7 +1110,7 @@
             },
             {
               "name": "update_live_metrics",
-              "line": 4390,
+              "line": 4382,
               "args": [
                 "self"
               ],
@@ -1118,7 +1118,7 @@
             },
             {
               "name": "render_dashboard",
-              "line": 4407,
+              "line": 4399,
               "args": [
                 "self"
               ],
@@ -1126,7 +1126,7 @@
             },
             {
               "name": "boot",
-              "line": 4553,
+              "line": 4545,
               "args": [
                 "self"
               ],
@@ -1138,29 +1138,29 @@
       },
       "functions": {
         "optimize_runtime": {
-          "line": 239,
+          "line": 246,
           "args": [],
           "is_async": false
         },
         "release_lock": {
-          "line": 244,
+          "line": 251,
           "args": [],
           "is_async": false
         },
         "acquire_instance_lock": {
-          "line": 249,
+          "line": 256,
           "args": [],
           "is_async": false
         },
         "_active_db_sidecars": {
-          "line": 281,
+          "line": 288,
           "args": [
             "db_path"
           ],
           "is_async": false
         },
         "backup_active_database": {
-          "line": 284,
+          "line": 291,
           "args": [
             "reason",
             "db_path"
@@ -1168,31 +1168,31 @@
           "is_async": false
         },
         "validate_active_database": {
-          "line": 307,
+          "line": 314,
           "args": [
             "db_path"
           ],
           "is_async": false
         },
         "safe_remove_active_database_files": {
-          "line": 324,
+          "line": 331,
           "args": [
             "db_path"
           ],
           "is_async": false
         },
         "clear_screen": {
-          "line": 332,
+          "line": 339,
           "args": [],
           "is_async": false
         },
         "get_terminal_width": {
-          "line": 335,
+          "line": 342,
           "args": [],
           "is_async": false
         },
         "shorten_middle": {
-          "line": 338,
+          "line": 345,
           "args": [
             "text",
             "max_len"
@@ -1200,19 +1200,19 @@
           "is_async": false
         },
         "get_clean_rules": {
-          "line": 351,
+          "line": 358,
           "args": [],
           "is_async": false
         },
         "apply_clean_rules": {
-          "line": 417,
+          "line": 424,
           "args": [
             "text"
           ],
           "is_async": false
         },
         "_smart_replace_word": {
-          "line": 473,
+          "line": 480,
           "args": [
             "text",
             "old_w",
@@ -1221,7 +1221,7 @@
           "is_async": false
         },
         "sanitize_filename": {
-          "line": 485,
+          "line": 492,
           "args": [
             "filename",
             "fallback_ext"
@@ -1229,14 +1229,14 @@
           "is_async": false
         },
         "_parse_chat_id": {
-          "line": 524,
+          "line": 531,
           "args": [
             "val"
           ],
           "is_async": false
         },
         "clean_index_title": {
-          "line": 539,
+          "line": 546,
           "args": [
             "raw_text",
             "max_len"
@@ -1244,14 +1244,14 @@
           "is_async": false
         },
         "clean_sort_key": {
-          "line": 580,
+          "line": 587,
           "args": [
             "title"
           ],
           "is_async": false
         },
         "make_telegram_link": {
-          "line": 587,
+          "line": 594,
           "args": [
             "chat_id",
             "msg_id",
@@ -1261,7 +1261,7 @@
           "is_async": false
         },
         "safe_input": {
-          "line": 602,
+          "line": 609,
           "args": [
             "prompt_text",
             "valid_options",
@@ -1271,21 +1271,21 @@
           "is_async": true
         },
         "format_network_speed": {
-          "line": 623,
+          "line": 630,
           "args": [
             "speed_mb"
           ],
           "is_async": false
         },
         "parse_telegram_link": {
-          "line": 681,
+          "line": 688,
           "args": [
             "link"
           ],
           "is_async": false
         },
         "resolve_telethon_entity": {
-          "line": 727,
+          "line": 734,
           "args": [
             "client",
             "target_input",
@@ -1294,7 +1294,7 @@
           "is_async": true
         },
         "update_env_file": {
-          "line": 824,
+          "line": 831,
           "args": [
             "chat_id",
             "topic_id",
@@ -1307,24 +1307,24 @@
           "is_async": false
         },
         "get_persistent_header": {
-          "line": 880,
+          "line": 887,
           "args": [],
           "is_async": false
         },
         "startup_animation": {
-          "line": 962,
+          "line": 969,
           "args": [],
           "is_async": false
         },
         "interactive_telegram_login": {
-          "line": 1574,
+          "line": 1573,
           "args": [
             "client"
           ],
           "is_async": true
         },
         "with_retry_call": {
-          "line": 2177,
+          "line": 2170,
           "args": [
             "client",
             "func"
@@ -1332,21 +1332,21 @@
           "is_async": true
         },
         "get_account_channels_list": {
-          "line": 2225,
+          "line": 2218,
           "args": [
             "client"
           ],
           "is_async": true
         },
         "_normalize_search_str": {
-          "line": 2327,
+          "line": 2320,
           "args": [
             "text"
           ],
           "is_async": false
         },
         "_match_channel_query": {
-          "line": 2337,
+          "line": 2330,
           "args": [
             "c",
             "raw_query"
@@ -1354,7 +1354,7 @@
           "is_async": false
         },
         "interactive_channel_selector": {
-          "line": 2372,
+          "line": 2365,
           "args": [
             "client",
             "prompt_title"
@@ -1362,7 +1362,7 @@
           "is_async": true
         },
         "preflight_verify_routing": {
-          "line": 2558,
+          "line": 2551,
           "args": [
             "client",
             "cfg"
@@ -1370,14 +1370,14 @@
           "is_async": true
         },
         "extract_smart_hashtags": {
-          "line": 2755,
+          "line": 2748,
           "args": [
             "text"
           ],
           "is_async": false
         },
         "check_media_filter": {
-          "line": 2782,
+          "line": 2775,
           "args": [
             "msg",
             "media_filter"
@@ -1385,14 +1385,14 @@
           "is_async": false
         },
         "_canonical_line_key": {
-          "line": 2798,
+          "line": 2791,
           "args": [
             "text"
           ],
           "is_async": false
         },
         "smart_clean_and_deduplicate_caption": {
-          "line": 2807,
+          "line": 2800,
           "args": [
             "raw_text",
             "custom_header",
@@ -1401,7 +1401,7 @@
           "is_async": false
         },
         "customize_caption": {
-          "line": 2859,
+          "line": 2852,
           "args": [
             "caption",
             "for_media",
@@ -1410,7 +1410,7 @@
           "is_async": false
         },
         "format_media_log_detail": {
-          "line": 3007,
+          "line": 3000,
           "args": [
             "m",
             "prefix"
@@ -1418,7 +1418,7 @@
           "is_async": false
         },
         "detect_subject": {
-          "line": 3096,
+          "line": 3089,
           "args": [
             "text",
             "filename"
@@ -1426,181 +1426,181 @@
           "is_async": false
         },
         "run_quick_env_extractor": {
-          "line": 4774,
+          "line": 4766,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_extractor_tool": {
-          "line": 4842,
+          "line": 4834,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "prompt_routing_mode": {
-          "line": 5038,
+          "line": 5030,
           "args": [],
           "is_async": true
         },
         "prompt_sequence_mode": {
-          "line": 5053,
+          "line": 5045,
           "args": [],
           "is_async": true
         },
         "run_strip_words_manager": {
-          "line": 5078,
+          "line": 5070,
           "args": [],
           "is_async": true
         },
         "interactive_caption_and_filter_wizard": {
-          "line": 5311,
+          "line": 5303,
           "args": [],
           "is_async": true
         },
         "interactive_filter_setup": {
-          "line": 5502,
+          "line": 5494,
           "args": [],
           "is_async": true
         },
         "advanced_cleaner_menu": {
-          "line": 5536,
+          "line": 5528,
           "args": [],
           "is_async": true
         },
         "filter_menu": {
-          "line": 5603,
+          "line": 5595,
           "args": [],
           "is_async": true
         },
         "thumbnail_menu": {
-          "line": 5630,
+          "line": 5622,
           "args": [],
           "is_async": true
         },
         "mode_toggle_menu": {
-          "line": 5686,
+          "line": 5678,
           "args": [],
           "is_async": true
         },
         "wipe_memory": {
-          "line": 5726,
+          "line": 5718,
           "args": [],
           "is_async": true
         },
         "natural_sort_key": {
-          "line": 5747,
+          "line": 5739,
           "args": [
             "s"
           ],
           "is_async": false
         },
         "generate_folder_hashtags": {
-          "line": 5750,
+          "line": 5742,
           "args": [
             "subject_name"
           ],
           "is_async": false
         },
         "run_single_file_splitter_tool": {
-          "line": 5776,
+          "line": 5768,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_batch_folder_uploader_tool": {
-          "line": 5879,
+          "line": 5871,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_local_splitter_tool": {
-          "line": 6251,
+          "line": 6243,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_group_cloner_tool": {
-          "line": 6270,
+          "line": 6262,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_single_or_specific_messages_forwarder": {
-          "line": 6531,
+          "line": 6523,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_selective_content_picker": {
-          "line": 6773,
+          "line": 6765,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_member_scraper_and_adder": {
-          "line": 7129,
+          "line": 7121,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_single_topic_files_indexer": {
-          "line": 7409,
+          "line": 7401,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_master_group_indexer": {
-          "line": 7843,
+          "line": 7835,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_indexer_menu": {
-          "line": 8059,
+          "line": 8051,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_diagnostics": {
-          "line": 8084,
+          "line": 8076,
           "args": [],
           "is_async": true
         },
         "run_account_switcher_tool": {
-          "line": 8119,
+          "line": 8111,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_menu": {
-          "line": 8207,
+          "line": 8199,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "start_platform": {
-          "line": 8516,
+          "line": 8508,
           "args": [
             "auto_start"
           ],
           "is_async": true
         },
         "main_async": {
-          "line": 8594,
+          "line": 8586,
           "args": [],
           "is_async": true
         }
@@ -1674,7 +1674,7 @@
         "telethon.tl.functions.messages.CreateForumTopicRequest",
         "telethon.tl.functions.channels.InviteToChannelRequest"
       ],
-      "line_count": 8600
+      "line_count": 8592
     },
     "web_dashboard.py": {
       "classes": {
@@ -1683,7 +1683,7 @@
           "methods": [
             {
               "name": "__init__",
-              "line": 92,
+              "line": 93,
               "args": [
                 "self",
                 "db_file"
@@ -1691,8 +1691,17 @@
               "is_async": false
             },
             {
+              "name": "_hash_pbkdf2",
+              "line": 99,
+              "args": [
+                "password",
+                "salt"
+              ],
+              "is_async": false
+            },
+            {
               "name": "_init_db",
-              "line": 97,
+              "line": 103,
               "args": [
                 "self"
               ],
@@ -1700,7 +1709,7 @@
             },
             {
               "name": "_load_data",
-              "line": 120,
+              "line": 127,
               "args": [
                 "self"
               ],
@@ -1708,7 +1717,7 @@
             },
             {
               "name": "_save_data",
-              "line": 129,
+              "line": 136,
               "args": [
                 "self",
                 "data"
@@ -1717,7 +1726,7 @@
             },
             {
               "name": "authenticate",
-              "line": 137,
+              "line": 144,
               "args": [
                 "self",
                 "username",
@@ -1726,8 +1735,19 @@
               "is_async": false
             },
             {
+              "name": "change_password",
+              "line": 198,
+              "args": [
+                "self",
+                "username",
+                "current_pass",
+                "new_pass"
+              ],
+              "is_async": false
+            },
+            {
               "name": "purge_expired_tokens",
-              "line": 174,
+              "line": 241,
               "args": [
                 "self"
               ],
@@ -1735,7 +1755,7 @@
             },
             {
               "name": "verify_token",
-              "line": 178,
+              "line": 245,
               "args": [
                 "self",
                 "token"
@@ -1744,7 +1764,7 @@
             },
             {
               "name": "logout",
-              "line": 189,
+              "line": 256,
               "args": [
                 "self",
                 "token"
@@ -1753,7 +1773,7 @@
             },
             {
               "name": "list_users",
-              "line": 195,
+              "line": 262,
               "args": [
                 "self"
               ],
@@ -1761,7 +1781,7 @@
             },
             {
               "name": "create_user",
-              "line": 207,
+              "line": 274,
               "args": [
                 "self",
                 "username",
@@ -1772,7 +1792,7 @@
             },
             {
               "name": "delete_user",
-              "line": 232,
+              "line": 300,
               "args": [
                 "self",
                 "username"
@@ -1783,11 +1803,11 @@
           "bases": []
         },
         "TelegramWebLoginManager": {
-          "line": 248,
+          "line": 316,
           "methods": [
             {
               "name": "__init__",
-              "line": 253,
+              "line": 321,
               "args": [
                 "self",
                 "base_dir"
@@ -1796,7 +1816,7 @@
             },
             {
               "name": "_load_cached_profiles",
-              "line": 258,
+              "line": 326,
               "args": [
                 "self"
               ],
@@ -1804,7 +1824,7 @@
             },
             {
               "name": "_save_cached_profile",
-              "line": 267,
+              "line": 335,
               "args": [
                 "self",
                 "session_name",
@@ -1814,7 +1834,7 @@
             },
             {
               "name": "cleanup_stale_logins",
-              "line": 277,
+              "line": 345,
               "args": [
                 "self",
                 "max_age_seconds"
@@ -1823,7 +1843,7 @@
             },
             {
               "name": "send_login_code",
-              "line": 287,
+              "line": 355,
               "args": [
                 "self",
                 "phone",
@@ -1833,7 +1853,7 @@
             },
             {
               "name": "verify_login_code",
-              "line": 350,
+              "line": 418,
               "args": [
                 "self",
                 "login_id",
@@ -1844,7 +1864,7 @@
             },
             {
               "name": "import_string_session",
-              "line": 422,
+              "line": 490,
               "args": [
                 "self",
                 "raw_session_str"
@@ -1853,7 +1873,7 @@
             },
             {
               "name": "set_active_session",
-              "line": 486,
+              "line": 554,
               "args": [
                 "self",
                 "session_name"
@@ -1862,7 +1882,7 @@
             },
             {
               "name": "get_accounts_summary",
-              "line": 499,
+              "line": 567,
               "args": [
                 "self"
               ],
@@ -1872,11 +1892,11 @@
           "bases": []
         },
         "DashboardServer": {
-          "line": 4597,
+          "line": 5366,
           "methods": [
             {
               "name": "__init__",
-              "line": 4598,
+              "line": 5367,
               "args": [
                 "self",
                 "state",
@@ -1888,7 +1908,7 @@
             },
             {
               "name": "_get_dismissed_insights",
-              "line": 4610,
+              "line": 5379,
               "args": [
                 "self"
               ],
@@ -1896,7 +1916,7 @@
             },
             {
               "name": "_toggle_insight_read",
-              "line": 4619,
+              "line": 5388,
               "args": [
                 "self",
                 "item_id",
@@ -1907,7 +1927,7 @@
             },
             {
               "name": "_dismiss_insight",
-              "line": 4647,
+              "line": 5416,
               "args": [
                 "self",
                 "item_id",
@@ -1917,7 +1937,7 @@
             },
             {
               "name": "_get_active_telegram_account_info",
-              "line": 4651,
+              "line": 5420,
               "args": [
                 "self"
               ],
@@ -1925,7 +1945,7 @@
             },
             {
               "name": "_build_status_dict",
-              "line": 4669,
+              "line": 5438,
               "args": [
                 "self"
               ],
@@ -1933,7 +1953,7 @@
             },
             {
               "name": "_get_forward_routes",
-              "line": 5019,
+              "line": 5814,
               "args": [
                 "self"
               ],
@@ -1941,7 +1961,7 @@
             },
             {
               "name": "_create_forward_route",
-              "line": 5043,
+              "line": 5838,
               "args": [
                 "self",
                 "src_chat",
@@ -1954,7 +1974,7 @@
             },
             {
               "name": "_toggle_forward_route",
-              "line": 5056,
+              "line": 5851,
               "args": [
                 "self",
                 "route_id"
@@ -1963,7 +1983,7 @@
             },
             {
               "name": "_delete_forward_route",
-              "line": 5066,
+              "line": 5861,
               "args": [
                 "self",
                 "route_id"
@@ -1972,7 +1992,7 @@
             },
             {
               "name": "_get_dlq_errors_list",
-              "line": 5076,
+              "line": 5871,
               "args": [
                 "self"
               ],
@@ -1980,7 +2000,7 @@
             },
             {
               "name": "_toggle_pause",
-              "line": 5097,
+              "line": 5892,
               "args": [
                 "self"
               ],
@@ -1988,7 +2008,7 @@
             },
             {
               "name": "_extract_token_from_request",
-              "line": 5109,
+              "line": 5904,
               "args": [
                 "self",
                 "request"
@@ -1997,7 +2017,7 @@
             },
             {
               "name": "handle_index",
-              "line": 5116,
+              "line": 5911,
               "args": [
                 "self",
                 "request"
@@ -2006,7 +2026,7 @@
             },
             {
               "name": "handle_api_auth_login",
-              "line": 5119,
+              "line": 5914,
               "args": [
                 "self",
                 "request"
@@ -2015,7 +2035,7 @@
             },
             {
               "name": "handle_api_auth_logout",
-              "line": 5131,
+              "line": 5926,
               "args": [
                 "self",
                 "request"
@@ -2024,7 +2044,7 @@
             },
             {
               "name": "handle_api_auth_me",
-              "line": 5136,
+              "line": 5931,
               "args": [
                 "self",
                 "request"
@@ -2033,7 +2053,7 @@
             },
             {
               "name": "handle_api_auth_users",
-              "line": 5143,
+              "line": 5938,
               "args": [
                 "self",
                 "request"
@@ -2042,7 +2062,7 @@
             },
             {
               "name": "handle_api_auth_create_user",
-              "line": 5146,
+              "line": 5941,
               "args": [
                 "self",
                 "request"
@@ -2051,7 +2071,16 @@
             },
             {
               "name": "handle_api_auth_delete_user",
-              "line": 5157,
+              "line": 5952,
+              "args": [
+                "self",
+                "request"
+              ],
+              "is_async": true
+            },
+            {
+              "name": "handle_api_auth_change_password",
+              "line": 5961,
               "args": [
                 "self",
                 "request"
@@ -2060,7 +2089,7 @@
             },
             {
               "name": "handle_api_telegram_accounts",
-              "line": 5166,
+              "line": 5980,
               "args": [
                 "self",
                 "request"
@@ -2069,7 +2098,7 @@
             },
             {
               "name": "handle_api_telegram_send_code",
-              "line": 5170,
+              "line": 5984,
               "args": [
                 "self",
                 "request"
@@ -2078,7 +2107,7 @@
             },
             {
               "name": "handle_api_telegram_verify_code",
-              "line": 5180,
+              "line": 5994,
               "args": [
                 "self",
                 "request"
@@ -2087,7 +2116,7 @@
             },
             {
               "name": "handle_api_telegram_set_active",
-              "line": 5191,
+              "line": 6005,
               "args": [
                 "self",
                 "request"
@@ -2096,7 +2125,7 @@
             },
             {
               "name": "handle_api_telegram_import_string",
-              "line": 5200,
+              "line": 6014,
               "args": [
                 "self",
                 "request"
@@ -2105,7 +2134,7 @@
             },
             {
               "name": "handle_api_status",
-              "line": 5209,
+              "line": 6023,
               "args": [
                 "self",
                 "request"
@@ -2114,7 +2143,7 @@
             },
             {
               "name": "handle_api_backup",
-              "line": 5212,
+              "line": 6026,
               "args": [
                 "self",
                 "request"
@@ -2123,7 +2152,16 @@
             },
             {
               "name": "handle_api_pause",
-              "line": 5231,
+              "line": 6045,
+              "args": [
+                "self",
+                "request"
+              ],
+              "is_async": true
+            },
+            {
+              "name": "handle_api_stats_reset",
+              "line": 6048,
               "args": [
                 "self",
                 "request"
@@ -2132,7 +2170,7 @@
             },
             {
               "name": "handle_api_clear_dlq",
-              "line": 5234,
+              "line": 6065,
               "args": [
                 "self",
                 "request"
@@ -2141,7 +2179,7 @@
             },
             {
               "name": "handle_api_errors",
-              "line": 5240,
+              "line": 6072,
               "args": [
                 "self",
                 "request"
@@ -2150,7 +2188,7 @@
             },
             {
               "name": "handle_api_research_insights",
-              "line": 5243,
+              "line": 6075,
               "args": [
                 "self",
                 "request"
@@ -2159,7 +2197,7 @@
             },
             {
               "name": "handle_api_dismiss_insight",
-              "line": 5265,
+              "line": 6097,
               "args": [
                 "self",
                 "request"
@@ -2168,7 +2206,7 @@
             },
             {
               "name": "handle_api_devi_status",
-              "line": 5276,
+              "line": 6108,
               "args": [
                 "self",
                 "request"
@@ -2177,7 +2215,7 @@
             },
             {
               "name": "handle_api_routes",
-              "line": 5280,
+              "line": 6112,
               "args": [
                 "self",
                 "request"
@@ -2186,7 +2224,7 @@
             },
             {
               "name": "handle_api_create_route",
-              "line": 5283,
+              "line": 6115,
               "args": [
                 "self",
                 "request"
@@ -2195,7 +2233,7 @@
             },
             {
               "name": "handle_api_toggle_route",
-              "line": 5298,
+              "line": 6130,
               "args": [
                 "self",
                 "request"
@@ -2204,7 +2242,7 @@
             },
             {
               "name": "handle_api_delete_route",
-              "line": 5307,
+              "line": 6139,
               "args": [
                 "self",
                 "request"
@@ -2213,7 +2251,7 @@
             },
             {
               "name": "handle_api_devi_hunt",
-              "line": 5316,
+              "line": 6148,
               "args": [
                 "self",
                 "request"
@@ -2222,7 +2260,7 @@
             },
             {
               "name": "handle_api_devi_chat",
-              "line": 5325,
+              "line": 6157,
               "args": [
                 "self",
                 "request"
@@ -2231,7 +2269,7 @@
             },
             {
               "name": "handle_api_devi_council",
-              "line": 5356,
+              "line": 6188,
               "args": [
                 "self",
                 "request"
@@ -2240,7 +2278,7 @@
             },
             {
               "name": "_handle_raw_client",
-              "line": 5394,
+              "line": 6226,
               "args": [
                 "self",
                 "reader",
@@ -2250,7 +2288,7 @@
             },
             {
               "name": "_send_raw",
-              "line": 5523,
+              "line": 6371,
               "args": [
                 "self",
                 "writer",
@@ -2262,7 +2300,7 @@
             },
             {
               "name": "start",
-              "line": 5535,
+              "line": 6383,
               "args": [
                 "self"
               ],
@@ -2270,7 +2308,7 @@
             },
             {
               "name": "stop",
-              "line": 5586,
+              "line": 6436,
               "args": [
                 "self"
               ],
@@ -2302,7 +2340,7 @@
         "datetime.timedelta",
         "contextlib.suppress"
       ],
-      "line_count": 5635
+      "line_count": 6486
     },
     ".agents/free_ai_hub/cli.py": {
       "classes": {},
@@ -4175,14 +4213,14 @@
           "is_async": true
         },
         "get_topic_icon": {
-          "line": 121,
+          "line": 88,
           "args": [
             "title"
           ],
           "is_async": false
         },
         "scan_single_topic": {
-          "line": 145,
+          "line": 112,
           "args": [
             "client",
             "peer",
@@ -4193,7 +4231,7 @@
           "is_async": true
         },
         "scan_group": {
-          "line": 235,
+          "line": 205,
           "args": [
             "target_chat_id",
             "target_topic_id",
@@ -4214,7 +4252,7 @@
         "contextlib.suppress",
         "dotenv.load_dotenv"
       ],
-      "line_count": 379
+      "line_count": 361
     },
     "devi/operator/medical_calculator.py": {
       "classes": {},
@@ -4463,7 +4501,7 @@
             },
             {
               "name": "resolve_entity",
-              "line": 148,
+              "line": 115,
               "args": [
                 "self",
                 "target"
@@ -4472,7 +4510,7 @@
             },
             {
               "name": "resolve_from_local_db",
-              "line": 206,
+              "line": 173,
               "args": [
                 "self",
                 "target"
@@ -4481,7 +4519,7 @@
             },
             {
               "name": "parse_sangmata_raw_text",
-              "line": 261,
+              "line": 228,
               "args": [
                 "raw_text"
               ],
@@ -4489,7 +4527,7 @@
             },
             {
               "name": "fetch_live_sangmata_history",
-              "line": 316,
+              "line": 283,
               "args": [
                 "self",
                 "target"
@@ -4498,7 +4536,7 @@
             },
             {
               "name": "_query_sangmata_bot",
-              "line": 357,
+              "line": 324,
               "args": [
                 "self",
                 "target_query"
@@ -4507,7 +4545,7 @@
             },
             {
               "name": "_get_cached_sangmata",
-              "line": 397,
+              "line": 364,
               "args": [
                 "self",
                 "user_id",
@@ -4517,7 +4555,7 @@
             },
             {
               "name": "_save_cached_sangmata",
-              "line": 426,
+              "line": 393,
               "args": [
                 "self",
                 "data"
@@ -4526,7 +4564,7 @@
             },
             {
               "name": "get_sangmata_history",
-              "line": 459,
+              "line": 426,
               "args": [
                 "self",
                 "user_id"
@@ -4564,7 +4602,53 @@
         "telethon.TelegramClient",
         "telethon.tl.functions.users.GetFullUserRequest"
       ],
-      "line_count": 524
+      "line_count": 491
+    },
+    "devi/operator/session_vault.py": {
+      "classes": {},
+      "functions": {
+        "get_persisted_session_string": {
+          "line": 31,
+          "args": [],
+          "is_async": false
+        },
+        "save_persisted_session_string": {
+          "line": 45,
+          "args": [
+            "s_str"
+          ],
+          "is_async": false
+        },
+        "export_session_file_to_string": {
+          "line": 58,
+          "args": [
+            "session_file_path"
+          ],
+          "is_async": true
+        },
+        "get_vault_client": {
+          "line": 91,
+          "args": [
+            "preferred_type"
+          ],
+          "is_async": true
+        }
+      },
+      "imports": [
+        "os",
+        "sys",
+        "asyncio",
+        "shutil",
+        "pathlib.Path",
+        "typing.Tuple",
+        "typing.Optional",
+        "contextlib.suppress",
+        "dotenv.load_dotenv",
+        "dotenv.set_key",
+        "telethon.TelegramClient",
+        "telethon.sessions.StringSession"
+      ],
+      "line_count": 133
     },
     "devi/operator/task_executor.py": {
       "classes": {
@@ -5258,7 +5342,7 @@
             },
             {
               "name": "_handle_devi_ai_chat",
-              "line": 6234,
+              "line": 6245,
               "args": [
                 "self",
                 "session",
@@ -5270,7 +5354,7 @@
             },
             {
               "name": "_handle_admin_voice_note",
-              "line": 6271,
+              "line": 6282,
               "args": [
                 "self",
                 "session",
@@ -5344,7 +5428,7 @@
         "devi.operator.medical_calculator.calc_curb65",
         "devi.operator.medical_calculator.calc_wells_pe"
       ],
-      "line_count": 6354
+      "line_count": 6365
     },
     "devi/operator/telegram_bridge.py": {
       "classes": {
@@ -5909,7 +5993,7 @@
             },
             {
               "name": "dispatch",
-              "line": 233,
+              "line": 240,
               "args": [
                 "client",
                 "title",
@@ -5921,16 +6005,16 @@
           "bases": []
         },
         "PerformanceConfig": {
-          "line": 985,
+          "line": 992,
           "methods": [],
           "bases": []
         },
         "AppConfig": {
-          "line": 997,
+          "line": 1004,
           "methods": [
             {
               "name": "load",
-              "line": 1019,
+              "line": 1026,
               "args": [
                 "cls",
                 "media_filter",
@@ -5949,11 +6033,11 @@
           "bases": []
         },
         "WorkItem": {
-          "line": 1089,
+          "line": 1096,
           "methods": [
             {
               "name": "first_id",
-              "line": 1095,
+              "line": 1102,
               "args": [
                 "self"
               ],
@@ -5961,7 +6045,7 @@
             },
             {
               "name": "is_album",
-              "line": 1097,
+              "line": 1104,
               "args": [
                 "self"
               ],
@@ -5971,11 +6055,11 @@
           "bases": []
         },
         "BoundedLRUCache": {
-          "line": 1102,
+          "line": 1109,
           "methods": [
             {
               "name": "__init__",
-              "line": 1103,
+              "line": 1110,
               "args": [
                 "self",
                 "max_size"
@@ -5984,7 +6068,7 @@
             },
             {
               "name": "add",
-              "line": 1106,
+              "line": 1113,
               "args": [
                 "self",
                 "item"
@@ -5993,7 +6077,7 @@
             },
             {
               "name": "__contains__",
-              "line": 1111,
+              "line": 1118,
               "args": [
                 "self",
                 "item"
@@ -6002,7 +6086,7 @@
             },
             {
               "name": "__len__",
-              "line": 1113,
+              "line": 1120,
               "args": [
                 "self"
               ],
@@ -6012,11 +6096,11 @@
           "bases": []
         },
         "StateManager": {
-          "line": 1116,
+          "line": 1123,
           "methods": [
             {
               "name": "__init__",
-              "line": 1117,
+              "line": 1124,
               "args": [
                 "self",
                 "db_path"
@@ -6025,7 +6109,7 @@
             },
             {
               "name": "_key",
-              "line": 1129,
+              "line": 1136,
               "args": [
                 "source_chat",
                 "msg_id",
@@ -6036,7 +6120,7 @@
             },
             {
               "name": "start",
-              "line": 1132,
+              "line": 1139,
               "args": [
                 "self"
               ],
@@ -6044,7 +6128,7 @@
             },
             {
               "name": "is_processed",
-              "line": 1212,
+              "line": 1219,
               "args": [
                 "self",
                 "source_chat",
@@ -6056,7 +6140,7 @@
             },
             {
               "name": "claim",
-              "line": 1225,
+              "line": 1232,
               "args": [
                 "self",
                 "source_chat",
@@ -6068,7 +6152,7 @@
             },
             {
               "name": "release_claim",
-              "line": 1235,
+              "line": 1242,
               "args": [
                 "self",
                 "source_chat",
@@ -6080,7 +6164,7 @@
             },
             {
               "name": "get_watermark",
-              "line": 1240,
+              "line": 1247,
               "args": [
                 "self",
                 "chat_id"
@@ -6089,7 +6173,7 @@
             },
             {
               "name": "get_topic_watermark",
-              "line": 1252,
+              "line": 1259,
               "args": [
                 "self",
                 "source_chat",
@@ -6101,7 +6185,7 @@
             },
             {
               "name": "update_topic_watermark",
-              "line": 1268,
+              "line": 1275,
               "args": [
                 "self",
                 "source_chat",
@@ -6117,7 +6201,7 @@
             },
             {
               "name": "mark_completed",
-              "line": 1290,
+              "line": 1297,
               "args": [
                 "self",
                 "source_chat",
@@ -6129,7 +6213,7 @@
             },
             {
               "name": "daemon_writer",
-              "line": 1300,
+              "line": 1307,
               "args": [
                 "self"
               ],
@@ -6137,7 +6221,7 @@
             },
             {
               "name": "persist_watermarks",
-              "line": 1327,
+              "line": 1334,
               "args": [
                 "self"
               ],
@@ -6145,7 +6229,7 @@
             },
             {
               "name": "is_local_file_uploaded",
-              "line": 1348,
+              "line": 1355,
               "args": [
                 "self",
                 "file_path",
@@ -6156,7 +6240,7 @@
             },
             {
               "name": "record_local_file_upload",
-              "line": 1359,
+              "line": 1366,
               "args": [
                 "self",
                 "file_path",
@@ -6169,7 +6253,7 @@
             },
             {
               "name": "save_clone_topic_mapping",
-              "line": 1371,
+              "line": 1378,
               "args": [
                 "self",
                 "source_chat",
@@ -6183,7 +6267,7 @@
             },
             {
               "name": "get_clone_session_topics",
-              "line": 1384,
+              "line": 1391,
               "args": [
                 "self",
                 "source_chat",
@@ -6193,7 +6277,7 @@
             },
             {
               "name": "get_latest_clone_session",
-              "line": 1413,
+              "line": 1420,
               "args": [
                 "self"
               ],
@@ -6201,7 +6285,7 @@
             },
             {
               "name": "close",
-              "line": 1435,
+              "line": 1442,
               "args": [
                 "self"
               ],
@@ -6211,11 +6295,11 @@
           "bases": []
         },
         "AsyncDLQ": {
-          "line": 1447,
+          "line": 1454,
           "methods": [
             {
               "name": "__init__",
-              "line": 1448,
+              "line": 1455,
               "args": [
                 "self",
                 "path"
@@ -6224,7 +6308,7 @@
             },
             {
               "name": "append",
-              "line": 1451,
+              "line": 1458,
               "args": [
                 "self",
                 "chat_id",
@@ -6237,7 +6321,7 @@
             },
             {
               "name": "_write",
-              "line": 1463,
+              "line": 1470,
               "args": [
                 "self",
                 "line"
@@ -6246,7 +6330,7 @@
             },
             {
               "name": "export_json_report",
-              "line": 1468,
+              "line": 1475,
               "args": [
                 "self",
                 "export_path"
@@ -6257,11 +6341,11 @@
           "bases": []
         },
         "ThumbEnforcer": {
-          "line": 1496,
+          "line": 1503,
           "methods": [
             {
               "name": "__init__",
-              "line": 1497,
+              "line": 1504,
               "args": [
                 "self"
               ],
@@ -6269,7 +6353,7 @@
             },
             {
               "name": "_build",
-              "line": 1503,
+              "line": 1510,
               "args": [
                 "self"
               ],
@@ -6277,7 +6361,7 @@
             },
             {
               "name": "force_regenerate",
-              "line": 1544,
+              "line": 1551,
               "args": [
                 "self"
               ],
@@ -6285,7 +6369,7 @@
             },
             {
               "name": "get",
-              "line": 1550,
+              "line": 1557,
               "args": [
                 "self"
               ],
@@ -6293,7 +6377,7 @@
             },
             {
               "name": "get_input_file",
-              "line": 1558,
+              "line": 1565,
               "args": [
                 "self",
                 "client"
@@ -6304,11 +6388,11 @@
           "bases": []
         },
         "MultiSessionManager": {
-          "line": 1855,
+          "line": 1854,
           "methods": [
             {
               "name": "__init__",
-              "line": 1861,
+              "line": 1860,
               "args": [
                 "self",
                 "api_id",
@@ -6318,7 +6402,7 @@
             },
             {
               "name": "_discover_sessions",
-              "line": 1872,
+              "line": 1871,
               "args": [
                 "self"
               ],
@@ -6326,7 +6410,7 @@
             },
             {
               "name": "add_session",
-              "line": 1913,
+              "line": 1912,
               "args": [
                 "self",
                 "session_name"
@@ -6335,7 +6419,7 @@
             },
             {
               "name": "set_active_session",
-              "line": 1924,
+              "line": 1923,
               "args": [
                 "self",
                 "target"
@@ -6344,7 +6428,7 @@
             },
             {
               "name": "mark_flood_wait",
-              "line": 1936,
+              "line": 1935,
               "args": [
                 "self",
                 "session_name",
@@ -6354,7 +6438,7 @@
             },
             {
               "name": "is_session_cooling_down",
-              "line": 1940,
+              "line": 1939,
               "args": [
                 "self",
                 "session_name"
@@ -6363,7 +6447,7 @@
             },
             {
               "name": "_prompt_credentials",
-              "line": 1945,
+              "line": 1944,
               "args": [
                 "self"
               ],
@@ -6371,7 +6455,7 @@
             },
             {
               "name": "_safe_connect",
-              "line": 1984,
+              "line": 1983,
               "args": [
                 "self",
                 "client"
@@ -6380,7 +6464,7 @@
             },
             {
               "name": "start_all",
-              "line": 2006,
+              "line": 2005,
               "args": [
                 "self"
               ],
@@ -6388,7 +6472,7 @@
             },
             {
               "name": "ensure_active_client",
-              "line": 2024,
+              "line": 2023,
               "args": [
                 "self"
               ],
@@ -6396,7 +6480,7 @@
             },
             {
               "name": "disconnect_all",
-              "line": 2040,
+              "line": 2039,
               "args": [
                 "self"
               ],
@@ -6404,7 +6488,7 @@
             },
             {
               "name": "get_client",
-              "line": 2044,
+              "line": 2043,
               "args": [
                 "self"
               ],
@@ -6412,7 +6496,7 @@
             },
             {
               "name": "get_sessions_status",
-              "line": 2061,
+              "line": 2060,
               "args": [
                 "self"
               ],
@@ -6422,11 +6506,11 @@
           "bases": []
         },
         "RateBudgeter": {
-          "line": 2092,
+          "line": 2091,
           "methods": [
             {
               "name": "__init__",
-              "line": 2097,
+              "line": 2096,
               "args": [
                 "self",
                 "max_per_minute"
@@ -6435,7 +6519,7 @@
             },
             {
               "name": "record_flood_wait",
-              "line": 2102,
+              "line": 2101,
               "args": [
                 "self",
                 "seconds"
@@ -6444,7 +6528,7 @@
             },
             {
               "name": "pace",
-              "line": 2105,
+              "line": 2104,
               "args": [
                 "self"
               ],
@@ -6454,11 +6538,11 @@
           "bases": []
         },
         "AdaptiveSpeedCruiseControl": {
-          "line": 2124,
+          "line": 2123,
           "methods": [
             {
               "name": "__init__",
-              "line": 2133,
+              "line": 2130,
               "args": [
                 "self",
                 "min_concurrency",
@@ -6469,7 +6553,7 @@
             },
             {
               "name": "get_concurrency",
-              "line": 2140,
+              "line": 2137,
               "args": [
                 "self"
               ],
@@ -6477,7 +6561,7 @@
             },
             {
               "name": "apply_brake",
-              "line": 2148,
+              "line": 2145,
               "args": [
                 "self",
                 "reason",
@@ -6487,7 +6571,7 @@
             },
             {
               "name": "report_chunk_done",
-              "line": 2157,
+              "line": 2154,
               "args": [
                 "self",
                 "duration"
@@ -6498,11 +6582,11 @@
           "bases": []
         },
         "RPCGuard": {
-          "line": 2205,
+          "line": 2198,
           "methods": [
             {
               "name": "__init__",
-              "line": 2206,
+              "line": 2199,
               "args": [
                 "self",
                 "session_mgr",
@@ -6513,7 +6597,7 @@
             },
             {
               "name": "execute",
-              "line": 2211,
+              "line": 2204,
               "args": [
                 "self",
                 "func",
@@ -6524,7 +6608,7 @@
             },
             {
               "name": "execute_chunk",
-              "line": 2217,
+              "line": 2210,
               "args": [
                 "self",
                 "func",
@@ -6537,11 +6621,11 @@
           "bases": []
         },
         "MemoryStreamer": {
-          "line": 2618,
+          "line": 2611,
           "methods": [
             {
               "name": "__init__",
-              "line": 2619,
+              "line": 2612,
               "args": [
                 "self",
                 "rpc",
@@ -6553,7 +6637,7 @@
             },
             {
               "name": "_send_chunk",
-              "line": 2627,
+              "line": 2620,
               "args": [
                 "self",
                 "client",
@@ -6567,7 +6651,7 @@
             },
             {
               "name": "stream_media",
-              "line": 2645,
+              "line": 2638,
               "args": [
                 "self",
                 "msg",
@@ -6580,11 +6664,11 @@
           "bases": []
         },
         "PipelineProcessor": {
-          "line": 3108,
+          "line": 3101,
           "methods": [
             {
               "name": "__init__",
-              "line": 3109,
+              "line": 3102,
               "args": [
                 "self",
                 "rpc",
@@ -6600,7 +6684,7 @@
             },
             {
               "name": "check_and_send_subject_header",
-              "line": 3125,
+              "line": 3118,
               "args": [
                 "self",
                 "active_messages",
@@ -6613,7 +6697,7 @@
             },
             {
               "name": "format_text",
-              "line": 3182,
+              "line": 3175,
               "args": [
                 "self",
                 "text",
@@ -6623,7 +6707,7 @@
             },
             {
               "name": "post_batch_index_card",
-              "line": 3186,
+              "line": 3179,
               "args": [
                 "self",
                 "target_chat",
@@ -6634,7 +6718,7 @@
             },
             {
               "name": "reconstruct",
-              "line": 3255,
+              "line": 3248,
               "args": [
                 "self",
                 "msg"
@@ -6643,7 +6727,7 @@
             },
             {
               "name": "send_session_headers",
-              "line": 3270,
+              "line": 3263,
               "args": [
                 "self",
                 "source_chat",
@@ -6656,7 +6740,7 @@
             },
             {
               "name": "resolve_topic_id",
-              "line": 3324,
+              "line": 3317,
               "args": [
                 "self",
                 "chat_id",
@@ -6667,7 +6751,7 @@
             },
             {
               "name": "get_topic_title",
-              "line": 3338,
+              "line": 3331,
               "args": [
                 "self",
                 "chat_id",
@@ -6678,7 +6762,7 @@
             },
             {
               "name": "execute",
-              "line": 3372,
+              "line": 3365,
               "args": [
                 "self",
                 "item",
@@ -6690,11 +6774,11 @@
           "bases": []
         },
         "TerminalPlatform": {
-          "line": 3650,
+          "line": 3642,
           "methods": [
             {
               "name": "__init__",
-              "line": 3651,
+              "line": 3643,
               "args": [
                 "self",
                 "cfg",
@@ -6704,7 +6788,7 @@
             },
             {
               "name": "log",
-              "line": 3698,
+              "line": 3690,
               "args": [
                 "self",
                 "text"
@@ -6713,7 +6797,7 @@
             },
             {
               "name": "_write_engine_telemetry",
-              "line": 3701,
+              "line": 3693,
               "args": [
                 "self",
                 "is_done"
@@ -6722,7 +6806,7 @@
             },
             {
               "name": "update_upload_progress",
-              "line": 3751,
+              "line": 3743,
               "args": [
                 "self",
                 "filename",
@@ -6733,7 +6817,7 @@
             },
             {
               "name": "matches_keywords",
-              "line": 3784,
+              "line": 3776,
               "args": [
                 "self",
                 "msg"
@@ -6742,7 +6826,7 @@
             },
             {
               "name": "_get_topic_name",
-              "line": 3811,
+              "line": 3803,
               "args": [
                 "self",
                 "chat_id",
@@ -6753,7 +6837,7 @@
             },
             {
               "name": "fetch_names",
-              "line": 3833,
+              "line": 3825,
               "args": [
                 "self"
               ],
@@ -6761,7 +6845,7 @@
             },
             {
               "name": "scanner_single",
-              "line": 3866,
+              "line": 3858,
               "args": [
                 "self"
               ],
@@ -6769,7 +6853,7 @@
             },
             {
               "name": "_scan_rule",
-              "line": 3991,
+              "line": 3983,
               "args": [
                 "self",
                 "idx",
@@ -6779,7 +6863,7 @@
             },
             {
               "name": "scanner_multiple",
-              "line": 4057,
+              "line": 4049,
               "args": [
                 "self"
               ],
@@ -6787,7 +6871,7 @@
             },
             {
               "name": "scanner_dlq",
-              "line": 4063,
+              "line": 4055,
               "args": [
                 "self"
               ],
@@ -6795,7 +6879,7 @@
             },
             {
               "name": "setup_live_listeners",
-              "line": 4107,
+              "line": 4099,
               "args": [
                 "self"
               ],
@@ -6803,7 +6887,7 @@
             },
             {
               "name": "setup_remote_control_listener",
-              "line": 4159,
+              "line": 4151,
               "args": [
                 "self"
               ],
@@ -6811,7 +6895,7 @@
             },
             {
               "name": "scanner",
-              "line": 4333,
+              "line": 4325,
               "args": [
                 "self"
               ],
@@ -6819,7 +6903,7 @@
             },
             {
               "name": "worker_supervisor",
-              "line": 4347,
+              "line": 4339,
               "args": [
                 "self",
                 "wid",
@@ -6829,7 +6913,7 @@
             },
             {
               "name": "get_system_health",
-              "line": 4384,
+              "line": 4376,
               "args": [
                 "self"
               ],
@@ -6837,7 +6921,7 @@
             },
             {
               "name": "update_live_metrics",
-              "line": 4390,
+              "line": 4382,
               "args": [
                 "self"
               ],
@@ -6845,7 +6929,7 @@
             },
             {
               "name": "render_dashboard",
-              "line": 4407,
+              "line": 4399,
               "args": [
                 "self"
               ],
@@ -6853,7 +6937,7 @@
             },
             {
               "name": "boot",
-              "line": 4553,
+              "line": 4545,
               "args": [
                 "self"
               ],
@@ -6865,29 +6949,29 @@
       },
       "functions": {
         "optimize_runtime": {
-          "line": 239,
+          "line": 246,
           "args": [],
           "is_async": false
         },
         "release_lock": {
-          "line": 244,
+          "line": 251,
           "args": [],
           "is_async": false
         },
         "acquire_instance_lock": {
-          "line": 249,
+          "line": 256,
           "args": [],
           "is_async": false
         },
         "_active_db_sidecars": {
-          "line": 281,
+          "line": 288,
           "args": [
             "db_path"
           ],
           "is_async": false
         },
         "backup_active_database": {
-          "line": 284,
+          "line": 291,
           "args": [
             "reason",
             "db_path"
@@ -6895,31 +6979,31 @@
           "is_async": false
         },
         "validate_active_database": {
-          "line": 307,
+          "line": 314,
           "args": [
             "db_path"
           ],
           "is_async": false
         },
         "safe_remove_active_database_files": {
-          "line": 324,
+          "line": 331,
           "args": [
             "db_path"
           ],
           "is_async": false
         },
         "clear_screen": {
-          "line": 332,
+          "line": 339,
           "args": [],
           "is_async": false
         },
         "get_terminal_width": {
-          "line": 335,
+          "line": 342,
           "args": [],
           "is_async": false
         },
         "shorten_middle": {
-          "line": 338,
+          "line": 345,
           "args": [
             "text",
             "max_len"
@@ -6927,19 +7011,19 @@
           "is_async": false
         },
         "get_clean_rules": {
-          "line": 351,
+          "line": 358,
           "args": [],
           "is_async": false
         },
         "apply_clean_rules": {
-          "line": 417,
+          "line": 424,
           "args": [
             "text"
           ],
           "is_async": false
         },
         "_smart_replace_word": {
-          "line": 473,
+          "line": 480,
           "args": [
             "text",
             "old_w",
@@ -6948,7 +7032,7 @@
           "is_async": false
         },
         "sanitize_filename": {
-          "line": 485,
+          "line": 492,
           "args": [
             "filename",
             "fallback_ext"
@@ -6956,14 +7040,14 @@
           "is_async": false
         },
         "_parse_chat_id": {
-          "line": 524,
+          "line": 531,
           "args": [
             "val"
           ],
           "is_async": false
         },
         "clean_index_title": {
-          "line": 539,
+          "line": 546,
           "args": [
             "raw_text",
             "max_len"
@@ -6971,14 +7055,14 @@
           "is_async": false
         },
         "clean_sort_key": {
-          "line": 580,
+          "line": 587,
           "args": [
             "title"
           ],
           "is_async": false
         },
         "make_telegram_link": {
-          "line": 587,
+          "line": 594,
           "args": [
             "chat_id",
             "msg_id",
@@ -6988,7 +7072,7 @@
           "is_async": false
         },
         "safe_input": {
-          "line": 602,
+          "line": 609,
           "args": [
             "prompt_text",
             "valid_options",
@@ -6998,21 +7082,21 @@
           "is_async": true
         },
         "format_network_speed": {
-          "line": 623,
+          "line": 630,
           "args": [
             "speed_mb"
           ],
           "is_async": false
         },
         "parse_telegram_link": {
-          "line": 681,
+          "line": 688,
           "args": [
             "link"
           ],
           "is_async": false
         },
         "resolve_telethon_entity": {
-          "line": 727,
+          "line": 734,
           "args": [
             "client",
             "target_input",
@@ -7021,7 +7105,7 @@
           "is_async": true
         },
         "update_env_file": {
-          "line": 824,
+          "line": 831,
           "args": [
             "chat_id",
             "topic_id",
@@ -7034,24 +7118,24 @@
           "is_async": false
         },
         "get_persistent_header": {
-          "line": 880,
+          "line": 887,
           "args": [],
           "is_async": false
         },
         "startup_animation": {
-          "line": 962,
+          "line": 969,
           "args": [],
           "is_async": false
         },
         "interactive_telegram_login": {
-          "line": 1574,
+          "line": 1573,
           "args": [
             "client"
           ],
           "is_async": true
         },
         "with_retry_call": {
-          "line": 2177,
+          "line": 2170,
           "args": [
             "client",
             "func"
@@ -7059,21 +7143,21 @@
           "is_async": true
         },
         "get_account_channels_list": {
-          "line": 2225,
+          "line": 2218,
           "args": [
             "client"
           ],
           "is_async": true
         },
         "_normalize_search_str": {
-          "line": 2327,
+          "line": 2320,
           "args": [
             "text"
           ],
           "is_async": false
         },
         "_match_channel_query": {
-          "line": 2337,
+          "line": 2330,
           "args": [
             "c",
             "raw_query"
@@ -7081,7 +7165,7 @@
           "is_async": false
         },
         "interactive_channel_selector": {
-          "line": 2372,
+          "line": 2365,
           "args": [
             "client",
             "prompt_title"
@@ -7089,7 +7173,7 @@
           "is_async": true
         },
         "preflight_verify_routing": {
-          "line": 2558,
+          "line": 2551,
           "args": [
             "client",
             "cfg"
@@ -7097,14 +7181,14 @@
           "is_async": true
         },
         "extract_smart_hashtags": {
-          "line": 2755,
+          "line": 2748,
           "args": [
             "text"
           ],
           "is_async": false
         },
         "check_media_filter": {
-          "line": 2782,
+          "line": 2775,
           "args": [
             "msg",
             "media_filter"
@@ -7112,14 +7196,14 @@
           "is_async": false
         },
         "_canonical_line_key": {
-          "line": 2798,
+          "line": 2791,
           "args": [
             "text"
           ],
           "is_async": false
         },
         "smart_clean_and_deduplicate_caption": {
-          "line": 2807,
+          "line": 2800,
           "args": [
             "raw_text",
             "custom_header",
@@ -7128,7 +7212,7 @@
           "is_async": false
         },
         "customize_caption": {
-          "line": 2859,
+          "line": 2852,
           "args": [
             "caption",
             "for_media",
@@ -7137,7 +7221,7 @@
           "is_async": false
         },
         "format_media_log_detail": {
-          "line": 3007,
+          "line": 3000,
           "args": [
             "m",
             "prefix"
@@ -7145,7 +7229,7 @@
           "is_async": false
         },
         "detect_subject": {
-          "line": 3096,
+          "line": 3089,
           "args": [
             "text",
             "filename"
@@ -7153,181 +7237,181 @@
           "is_async": false
         },
         "run_quick_env_extractor": {
-          "line": 4774,
+          "line": 4766,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_extractor_tool": {
-          "line": 4842,
+          "line": 4834,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "prompt_routing_mode": {
-          "line": 5038,
+          "line": 5030,
           "args": [],
           "is_async": true
         },
         "prompt_sequence_mode": {
-          "line": 5053,
+          "line": 5045,
           "args": [],
           "is_async": true
         },
         "run_strip_words_manager": {
-          "line": 5078,
+          "line": 5070,
           "args": [],
           "is_async": true
         },
         "interactive_caption_and_filter_wizard": {
-          "line": 5311,
+          "line": 5303,
           "args": [],
           "is_async": true
         },
         "interactive_filter_setup": {
-          "line": 5502,
+          "line": 5494,
           "args": [],
           "is_async": true
         },
         "advanced_cleaner_menu": {
-          "line": 5536,
+          "line": 5528,
           "args": [],
           "is_async": true
         },
         "filter_menu": {
-          "line": 5603,
+          "line": 5595,
           "args": [],
           "is_async": true
         },
         "thumbnail_menu": {
-          "line": 5630,
+          "line": 5622,
           "args": [],
           "is_async": true
         },
         "mode_toggle_menu": {
-          "line": 5686,
+          "line": 5678,
           "args": [],
           "is_async": true
         },
         "wipe_memory": {
-          "line": 5726,
+          "line": 5718,
           "args": [],
           "is_async": true
         },
         "natural_sort_key": {
-          "line": 5747,
+          "line": 5739,
           "args": [
             "s"
           ],
           "is_async": false
         },
         "generate_folder_hashtags": {
-          "line": 5750,
+          "line": 5742,
           "args": [
             "subject_name"
           ],
           "is_async": false
         },
         "run_single_file_splitter_tool": {
-          "line": 5776,
+          "line": 5768,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_batch_folder_uploader_tool": {
-          "line": 5879,
+          "line": 5871,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_local_splitter_tool": {
-          "line": 6251,
+          "line": 6243,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_group_cloner_tool": {
-          "line": 6270,
+          "line": 6262,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_single_or_specific_messages_forwarder": {
-          "line": 6531,
+          "line": 6523,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_selective_content_picker": {
-          "line": 6773,
+          "line": 6765,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_member_scraper_and_adder": {
-          "line": 7129,
+          "line": 7121,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_single_topic_files_indexer": {
-          "line": 7409,
+          "line": 7401,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_master_group_indexer": {
-          "line": 7843,
+          "line": 7835,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_indexer_menu": {
-          "line": 8059,
+          "line": 8051,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_diagnostics": {
-          "line": 8084,
+          "line": 8076,
           "args": [],
           "is_async": true
         },
         "run_account_switcher_tool": {
-          "line": 8119,
+          "line": 8111,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "run_menu": {
-          "line": 8207,
+          "line": 8199,
           "args": [
             "session_mgr"
           ],
           "is_async": true
         },
         "start_platform": {
-          "line": 8452,
+          "line": 8444,
           "args": [
             "auto_start"
           ],
           "is_async": true
         },
         "main_async": {
-          "line": 8530,
+          "line": 8522,
           "args": [],
           "is_async": true
         }
@@ -7401,7 +7485,7 @@
         "telethon.tl.functions.messages.CreateForumTopicRequest",
         "telethon.tl.functions.channels.InviteToChannelRequest"
       ],
-      "line_count": 8536
+      "line_count": 8528
     },
     "scratch/analyze_original_html.py": {
       "classes": {},
@@ -12035,7 +12119,7 @@
     "AdminTelemetry.dispatch": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 233,
+      "line": 240,
       "args": [
         "client",
         "title",
@@ -12045,13 +12129,13 @@
     "PerformanceConfig": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 985,
+      "line": 992,
       "methods": []
     },
     "AppConfig": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 997,
+      "line": 1004,
       "methods": [
         "load"
       ]
@@ -12059,7 +12143,7 @@
     "AppConfig.load": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1019,
+      "line": 1026,
       "args": [
         "cls",
         "media_filter",
@@ -12076,7 +12160,7 @@
     "WorkItem": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1089,
+      "line": 1096,
       "methods": [
         "first_id",
         "is_album"
@@ -12085,7 +12169,7 @@
     "WorkItem.first_id": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1095,
+      "line": 1102,
       "args": [
         "self"
       ]
@@ -12093,7 +12177,7 @@
     "WorkItem.is_album": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1097,
+      "line": 1104,
       "args": [
         "self"
       ]
@@ -12101,7 +12185,7 @@
     "BoundedLRUCache": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1102,
+      "line": 1109,
       "methods": [
         "__init__",
         "add",
@@ -12112,7 +12196,7 @@
     "BoundedLRUCache.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1103,
+      "line": 1110,
       "args": [
         "self",
         "max_size"
@@ -12121,7 +12205,7 @@
     "BoundedLRUCache.add": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1106,
+      "line": 1113,
       "args": [
         "self",
         "item"
@@ -12130,7 +12214,7 @@
     "BoundedLRUCache.__contains__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1111,
+      "line": 1118,
       "args": [
         "self",
         "item"
@@ -12139,7 +12223,7 @@
     "BoundedLRUCache.__len__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1113,
+      "line": 1120,
       "args": [
         "self"
       ]
@@ -12147,7 +12231,7 @@
     "StateManager": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1116,
+      "line": 1123,
       "methods": [
         "__init__",
         "_key",
@@ -12172,7 +12256,7 @@
     "StateManager.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1117,
+      "line": 1124,
       "args": [
         "self",
         "db_path"
@@ -12181,7 +12265,7 @@
     "StateManager._key": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1129,
+      "line": 1136,
       "args": [
         "source_chat",
         "msg_id",
@@ -12192,7 +12276,7 @@
     "StateManager.start": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1132,
+      "line": 1139,
       "args": [
         "self"
       ]
@@ -12200,7 +12284,7 @@
     "StateManager.is_processed": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1212,
+      "line": 1219,
       "args": [
         "self",
         "source_chat",
@@ -12212,7 +12296,7 @@
     "StateManager.claim": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1225,
+      "line": 1232,
       "args": [
         "self",
         "source_chat",
@@ -12224,7 +12308,7 @@
     "StateManager.release_claim": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1235,
+      "line": 1242,
       "args": [
         "self",
         "source_chat",
@@ -12236,7 +12320,7 @@
     "StateManager.get_watermark": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1240,
+      "line": 1247,
       "args": [
         "self",
         "chat_id"
@@ -12245,7 +12329,7 @@
     "StateManager.get_topic_watermark": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1252,
+      "line": 1259,
       "args": [
         "self",
         "source_chat",
@@ -12257,7 +12341,7 @@
     "StateManager.update_topic_watermark": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1268,
+      "line": 1275,
       "args": [
         "self",
         "source_chat",
@@ -12273,7 +12357,7 @@
     "StateManager.mark_completed": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1290,
+      "line": 1297,
       "args": [
         "self",
         "source_chat",
@@ -12285,7 +12369,7 @@
     "StateManager.daemon_writer": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1300,
+      "line": 1307,
       "args": [
         "self"
       ]
@@ -12293,7 +12377,7 @@
     "StateManager.persist_watermarks": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1327,
+      "line": 1334,
       "args": [
         "self"
       ]
@@ -12301,7 +12385,7 @@
     "StateManager.is_local_file_uploaded": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1348,
+      "line": 1355,
       "args": [
         "self",
         "file_path",
@@ -12312,7 +12396,7 @@
     "StateManager.record_local_file_upload": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1359,
+      "line": 1366,
       "args": [
         "self",
         "file_path",
@@ -12325,7 +12409,7 @@
     "StateManager.save_clone_topic_mapping": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1371,
+      "line": 1378,
       "args": [
         "self",
         "source_chat",
@@ -12339,7 +12423,7 @@
     "StateManager.get_clone_session_topics": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1384,
+      "line": 1391,
       "args": [
         "self",
         "source_chat",
@@ -12349,7 +12433,7 @@
     "StateManager.get_latest_clone_session": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1413,
+      "line": 1420,
       "args": [
         "self"
       ]
@@ -12357,7 +12441,7 @@
     "StateManager.close": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1435,
+      "line": 1442,
       "args": [
         "self"
       ]
@@ -12365,7 +12449,7 @@
     "AsyncDLQ": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1447,
+      "line": 1454,
       "methods": [
         "__init__",
         "append",
@@ -12376,7 +12460,7 @@
     "AsyncDLQ.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1448,
+      "line": 1455,
       "args": [
         "self",
         "path"
@@ -12385,7 +12469,7 @@
     "AsyncDLQ.append": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1451,
+      "line": 1458,
       "args": [
         "self",
         "chat_id",
@@ -12398,7 +12482,7 @@
     "AsyncDLQ._write": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1463,
+      "line": 1470,
       "args": [
         "self",
         "line"
@@ -12407,7 +12491,7 @@
     "AsyncDLQ.export_json_report": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1468,
+      "line": 1475,
       "args": [
         "self",
         "export_path"
@@ -12416,7 +12500,7 @@
     "ThumbEnforcer": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1496,
+      "line": 1503,
       "methods": [
         "__init__",
         "_build",
@@ -12428,7 +12512,7 @@
     "ThumbEnforcer.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1497,
+      "line": 1504,
       "args": [
         "self"
       ]
@@ -12436,7 +12520,7 @@
     "ThumbEnforcer._build": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1503,
+      "line": 1510,
       "args": [
         "self"
       ]
@@ -12444,7 +12528,7 @@
     "ThumbEnforcer.force_regenerate": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1544,
+      "line": 1551,
       "args": [
         "self"
       ]
@@ -12452,7 +12536,7 @@
     "ThumbEnforcer.get": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1550,
+      "line": 1557,
       "args": [
         "self"
       ]
@@ -12460,7 +12544,7 @@
     "ThumbEnforcer.get_input_file": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1558,
+      "line": 1565,
       "args": [
         "self",
         "client"
@@ -12469,7 +12553,7 @@
     "MultiSessionManager": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1855,
+      "line": 1854,
       "methods": [
         "__init__",
         "_discover_sessions",
@@ -12489,7 +12573,7 @@
     "MultiSessionManager.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1861,
+      "line": 1860,
       "args": [
         "self",
         "api_id",
@@ -12499,7 +12583,7 @@
     "MultiSessionManager._discover_sessions": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1872,
+      "line": 1871,
       "args": [
         "self"
       ]
@@ -12507,7 +12591,7 @@
     "MultiSessionManager.add_session": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1913,
+      "line": 1912,
       "args": [
         "self",
         "session_name"
@@ -12516,7 +12600,7 @@
     "MultiSessionManager.set_active_session": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1924,
+      "line": 1923,
       "args": [
         "self",
         "target"
@@ -12525,7 +12609,7 @@
     "MultiSessionManager.mark_flood_wait": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1936,
+      "line": 1935,
       "args": [
         "self",
         "session_name",
@@ -12535,7 +12619,7 @@
     "MultiSessionManager.is_session_cooling_down": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1940,
+      "line": 1939,
       "args": [
         "self",
         "session_name"
@@ -12544,7 +12628,7 @@
     "MultiSessionManager._prompt_credentials": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1945,
+      "line": 1944,
       "args": [
         "self"
       ]
@@ -12552,7 +12636,7 @@
     "MultiSessionManager._safe_connect": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1984,
+      "line": 1983,
       "args": [
         "self",
         "client"
@@ -12561,7 +12645,7 @@
     "MultiSessionManager.start_all": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2006,
+      "line": 2005,
       "args": [
         "self"
       ]
@@ -12569,7 +12653,7 @@
     "MultiSessionManager.ensure_active_client": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2024,
+      "line": 2023,
       "args": [
         "self"
       ]
@@ -12577,7 +12661,7 @@
     "MultiSessionManager.disconnect_all": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2040,
+      "line": 2039,
       "args": [
         "self"
       ]
@@ -12585,7 +12669,7 @@
     "MultiSessionManager.get_client": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2044,
+      "line": 2043,
       "args": [
         "self"
       ]
@@ -12593,7 +12677,7 @@
     "MultiSessionManager.get_sessions_status": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2061,
+      "line": 2060,
       "args": [
         "self"
       ]
@@ -12601,7 +12685,7 @@
     "RateBudgeter": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2092,
+      "line": 2091,
       "methods": [
         "__init__",
         "record_flood_wait",
@@ -12611,7 +12695,7 @@
     "RateBudgeter.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2097,
+      "line": 2096,
       "args": [
         "self",
         "max_per_minute"
@@ -12620,7 +12704,7 @@
     "RateBudgeter.record_flood_wait": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2102,
+      "line": 2101,
       "args": [
         "self",
         "seconds"
@@ -12629,7 +12713,7 @@
     "RateBudgeter.pace": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2105,
+      "line": 2104,
       "args": [
         "self"
       ]
@@ -12637,7 +12721,7 @@
     "AdaptiveSpeedCruiseControl": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2124,
+      "line": 2123,
       "methods": [
         "__init__",
         "get_concurrency",
@@ -12648,7 +12732,7 @@
     "AdaptiveSpeedCruiseControl.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2133,
+      "line": 2130,
       "args": [
         "self",
         "min_concurrency",
@@ -12659,7 +12743,7 @@
     "AdaptiveSpeedCruiseControl.get_concurrency": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2140,
+      "line": 2137,
       "args": [
         "self"
       ]
@@ -12667,7 +12751,7 @@
     "AdaptiveSpeedCruiseControl.apply_brake": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2148,
+      "line": 2145,
       "args": [
         "self",
         "reason",
@@ -12677,7 +12761,7 @@
     "AdaptiveSpeedCruiseControl.report_chunk_done": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2157,
+      "line": 2154,
       "args": [
         "self",
         "duration"
@@ -12686,7 +12770,7 @@
     "RPCGuard": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2205,
+      "line": 2198,
       "methods": [
         "__init__",
         "execute",
@@ -12696,7 +12780,7 @@
     "RPCGuard.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2206,
+      "line": 2199,
       "args": [
         "self",
         "session_mgr",
@@ -12707,7 +12791,7 @@
     "RPCGuard.execute": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2211,
+      "line": 2204,
       "args": [
         "self",
         "func",
@@ -12718,7 +12802,7 @@
     "RPCGuard.execute_chunk": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2217,
+      "line": 2210,
       "args": [
         "self",
         "func",
@@ -12729,7 +12813,7 @@
     "MemoryStreamer": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2618,
+      "line": 2611,
       "methods": [
         "__init__",
         "_send_chunk",
@@ -12739,7 +12823,7 @@
     "MemoryStreamer.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2619,
+      "line": 2612,
       "args": [
         "self",
         "rpc",
@@ -12751,7 +12835,7 @@
     "MemoryStreamer._send_chunk": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2627,
+      "line": 2620,
       "args": [
         "self",
         "client",
@@ -12765,7 +12849,7 @@
     "MemoryStreamer.stream_media": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2645,
+      "line": 2638,
       "args": [
         "self",
         "msg",
@@ -12776,7 +12860,7 @@
     "PipelineProcessor": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3108,
+      "line": 3101,
       "methods": [
         "__init__",
         "check_and_send_subject_header",
@@ -12792,7 +12876,7 @@
     "PipelineProcessor.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3109,
+      "line": 3102,
       "args": [
         "self",
         "rpc",
@@ -12808,7 +12892,7 @@
     "PipelineProcessor.check_and_send_subject_header": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3125,
+      "line": 3118,
       "args": [
         "self",
         "active_messages",
@@ -12821,7 +12905,7 @@
     "PipelineProcessor.format_text": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3182,
+      "line": 3175,
       "args": [
         "self",
         "text",
@@ -12831,7 +12915,7 @@
     "PipelineProcessor.post_batch_index_card": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3186,
+      "line": 3179,
       "args": [
         "self",
         "target_chat",
@@ -12842,7 +12926,7 @@
     "PipelineProcessor.reconstruct": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3255,
+      "line": 3248,
       "args": [
         "self",
         "msg"
@@ -12851,7 +12935,7 @@
     "PipelineProcessor.send_session_headers": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3270,
+      "line": 3263,
       "args": [
         "self",
         "source_chat",
@@ -12864,7 +12948,7 @@
     "PipelineProcessor.resolve_topic_id": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3324,
+      "line": 3317,
       "args": [
         "self",
         "chat_id",
@@ -12875,7 +12959,7 @@
     "PipelineProcessor.get_topic_title": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3338,
+      "line": 3331,
       "args": [
         "self",
         "chat_id",
@@ -12886,7 +12970,7 @@
     "PipelineProcessor.execute": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3372,
+      "line": 3365,
       "args": [
         "self",
         "item",
@@ -12896,7 +12980,7 @@
     "TerminalPlatform": {
       "type": "class",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3650,
+      "line": 3642,
       "methods": [
         "__init__",
         "log",
@@ -12922,7 +13006,7 @@
     "TerminalPlatform.__init__": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3651,
+      "line": 3643,
       "args": [
         "self",
         "cfg",
@@ -12932,7 +13016,7 @@
     "TerminalPlatform.log": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3698,
+      "line": 3690,
       "args": [
         "self",
         "text"
@@ -12941,7 +13025,7 @@
     "TerminalPlatform._write_engine_telemetry": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3701,
+      "line": 3693,
       "args": [
         "self",
         "is_done"
@@ -12950,7 +13034,7 @@
     "TerminalPlatform.update_upload_progress": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3751,
+      "line": 3743,
       "args": [
         "self",
         "filename",
@@ -12961,7 +13045,7 @@
     "TerminalPlatform.matches_keywords": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3784,
+      "line": 3776,
       "args": [
         "self",
         "msg"
@@ -12970,7 +13054,7 @@
     "TerminalPlatform._get_topic_name": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3811,
+      "line": 3803,
       "args": [
         "self",
         "chat_id",
@@ -12981,7 +13065,7 @@
     "TerminalPlatform.fetch_names": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3833,
+      "line": 3825,
       "args": [
         "self"
       ]
@@ -12989,7 +13073,7 @@
     "TerminalPlatform.scanner_single": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3866,
+      "line": 3858,
       "args": [
         "self"
       ]
@@ -12997,7 +13081,7 @@
     "TerminalPlatform._scan_rule": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3991,
+      "line": 3983,
       "args": [
         "self",
         "idx",
@@ -13007,7 +13091,7 @@
     "TerminalPlatform.scanner_multiple": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4057,
+      "line": 4049,
       "args": [
         "self"
       ]
@@ -13015,7 +13099,7 @@
     "TerminalPlatform.scanner_dlq": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4063,
+      "line": 4055,
       "args": [
         "self"
       ]
@@ -13023,7 +13107,7 @@
     "TerminalPlatform.setup_live_listeners": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4107,
+      "line": 4099,
       "args": [
         "self"
       ]
@@ -13031,7 +13115,7 @@
     "TerminalPlatform.setup_remote_control_listener": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4159,
+      "line": 4151,
       "args": [
         "self"
       ]
@@ -13039,7 +13123,7 @@
     "TerminalPlatform.scanner": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4333,
+      "line": 4325,
       "args": [
         "self"
       ]
@@ -13047,7 +13131,7 @@
     "TerminalPlatform.worker_supervisor": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4347,
+      "line": 4339,
       "args": [
         "self",
         "wid",
@@ -13057,7 +13141,7 @@
     "TerminalPlatform.get_system_health": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4384,
+      "line": 4376,
       "args": [
         "self"
       ]
@@ -13065,7 +13149,7 @@
     "TerminalPlatform.update_live_metrics": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4390,
+      "line": 4382,
       "args": [
         "self"
       ]
@@ -13073,7 +13157,7 @@
     "TerminalPlatform.render_dashboard": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4407,
+      "line": 4399,
       "args": [
         "self"
       ]
@@ -13081,7 +13165,7 @@
     "TerminalPlatform.boot": {
       "type": "method",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4553,
+      "line": 4545,
       "args": [
         "self"
       ]
@@ -13089,25 +13173,25 @@
     "optimize_runtime": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 239,
+      "line": 246,
       "args": []
     },
     "release_lock": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 244,
+      "line": 251,
       "args": []
     },
     "acquire_instance_lock": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 249,
+      "line": 256,
       "args": []
     },
     "_active_db_sidecars": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 281,
+      "line": 288,
       "args": [
         "db_path"
       ]
@@ -13115,7 +13199,7 @@
     "backup_active_database": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 284,
+      "line": 291,
       "args": [
         "reason",
         "db_path"
@@ -13124,7 +13208,7 @@
     "validate_active_database": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 307,
+      "line": 314,
       "args": [
         "db_path"
       ]
@@ -13132,7 +13216,7 @@
     "safe_remove_active_database_files": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 324,
+      "line": 331,
       "args": [
         "db_path"
       ]
@@ -13140,19 +13224,19 @@
     "clear_screen": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 332,
+      "line": 339,
       "args": []
     },
     "get_terminal_width": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 335,
+      "line": 342,
       "args": []
     },
     "shorten_middle": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 338,
+      "line": 345,
       "args": [
         "text",
         "max_len"
@@ -13161,13 +13245,13 @@
     "get_clean_rules": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 351,
+      "line": 358,
       "args": []
     },
     "apply_clean_rules": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 417,
+      "line": 424,
       "args": [
         "text"
       ]
@@ -13175,7 +13259,7 @@
     "_smart_replace_word": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 473,
+      "line": 480,
       "args": [
         "text",
         "old_w",
@@ -13185,7 +13269,7 @@
     "sanitize_filename": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 485,
+      "line": 492,
       "args": [
         "filename",
         "fallback_ext"
@@ -13202,7 +13286,7 @@
     "clean_index_title": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 539,
+      "line": 546,
       "args": [
         "raw_text",
         "max_len"
@@ -13211,7 +13295,7 @@
     "clean_sort_key": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 580,
+      "line": 587,
       "args": [
         "title"
       ]
@@ -13219,7 +13303,7 @@
     "make_telegram_link": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 587,
+      "line": 594,
       "args": [
         "chat_id",
         "msg_id",
@@ -13230,7 +13314,7 @@
     "safe_input": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 602,
+      "line": 609,
       "args": [
         "prompt_text",
         "valid_options",
@@ -13241,7 +13325,7 @@
     "format_network_speed": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 623,
+      "line": 630,
       "args": [
         "speed_mb"
       ]
@@ -13249,7 +13333,7 @@
     "parse_telegram_link": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 681,
+      "line": 688,
       "args": [
         "link"
       ]
@@ -13257,7 +13341,7 @@
     "resolve_telethon_entity": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 727,
+      "line": 734,
       "args": [
         "client",
         "target_input",
@@ -13267,7 +13351,7 @@
     "update_env_file": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 824,
+      "line": 831,
       "args": [
         "chat_id",
         "topic_id",
@@ -13281,19 +13365,19 @@
     "get_persistent_header": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 880,
+      "line": 887,
       "args": []
     },
     "startup_animation": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 962,
+      "line": 969,
       "args": []
     },
     "interactive_telegram_login": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 1574,
+      "line": 1573,
       "args": [
         "client"
       ]
@@ -13301,7 +13385,7 @@
     "with_retry_call": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2177,
+      "line": 2170,
       "args": [
         "client",
         "func"
@@ -13310,7 +13394,7 @@
     "get_account_channels_list": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2225,
+      "line": 2218,
       "args": [
         "client"
       ]
@@ -13318,7 +13402,7 @@
     "_normalize_search_str": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2327,
+      "line": 2320,
       "args": [
         "text"
       ]
@@ -13326,7 +13410,7 @@
     "_match_channel_query": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2337,
+      "line": 2330,
       "args": [
         "c",
         "raw_query"
@@ -13335,7 +13419,7 @@
     "interactive_channel_selector": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2372,
+      "line": 2365,
       "args": [
         "client",
         "prompt_title"
@@ -13344,7 +13428,7 @@
     "preflight_verify_routing": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2558,
+      "line": 2551,
       "args": [
         "client",
         "cfg"
@@ -13353,7 +13437,7 @@
     "extract_smart_hashtags": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2755,
+      "line": 2748,
       "args": [
         "text"
       ]
@@ -13361,7 +13445,7 @@
     "check_media_filter": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2782,
+      "line": 2775,
       "args": [
         "msg",
         "media_filter"
@@ -13370,7 +13454,7 @@
     "_canonical_line_key": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2798,
+      "line": 2791,
       "args": [
         "text"
       ]
@@ -13378,7 +13462,7 @@
     "smart_clean_and_deduplicate_caption": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2807,
+      "line": 2800,
       "args": [
         "raw_text",
         "custom_header",
@@ -13388,7 +13472,7 @@
     "customize_caption": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 2859,
+      "line": 2852,
       "args": [
         "caption",
         "for_media",
@@ -13398,7 +13482,7 @@
     "format_media_log_detail": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3007,
+      "line": 3000,
       "args": [
         "m",
         "prefix"
@@ -13407,7 +13491,7 @@
     "detect_subject": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 3096,
+      "line": 3089,
       "args": [
         "text",
         "filename"
@@ -13416,7 +13500,7 @@
     "run_quick_env_extractor": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4774,
+      "line": 4766,
       "args": [
         "session_mgr"
       ]
@@ -13424,7 +13508,7 @@
     "run_extractor_tool": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 4842,
+      "line": 4834,
       "args": [
         "session_mgr"
       ]
@@ -13432,67 +13516,67 @@
     "prompt_routing_mode": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5038,
+      "line": 5030,
       "args": []
     },
     "prompt_sequence_mode": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5053,
+      "line": 5045,
       "args": []
     },
     "run_strip_words_manager": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5078,
+      "line": 5070,
       "args": []
     },
     "interactive_caption_and_filter_wizard": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5311,
+      "line": 5303,
       "args": []
     },
     "interactive_filter_setup": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5502,
+      "line": 5494,
       "args": []
     },
     "advanced_cleaner_menu": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5536,
+      "line": 5528,
       "args": []
     },
     "filter_menu": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5603,
+      "line": 5595,
       "args": []
     },
     "thumbnail_menu": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5630,
+      "line": 5622,
       "args": []
     },
     "mode_toggle_menu": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5686,
+      "line": 5678,
       "args": []
     },
     "wipe_memory": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5726,
+      "line": 5718,
       "args": []
     },
     "natural_sort_key": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5747,
+      "line": 5739,
       "args": [
         "s"
       ]
@@ -13500,7 +13584,7 @@
     "generate_folder_hashtags": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5750,
+      "line": 5742,
       "args": [
         "subject_name"
       ]
@@ -13508,7 +13592,7 @@
     "run_single_file_splitter_tool": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5776,
+      "line": 5768,
       "args": [
         "session_mgr"
       ]
@@ -13516,7 +13600,7 @@
     "run_batch_folder_uploader_tool": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 5879,
+      "line": 5871,
       "args": [
         "session_mgr"
       ]
@@ -13524,7 +13608,7 @@
     "run_local_splitter_tool": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 6251,
+      "line": 6243,
       "args": [
         "session_mgr"
       ]
@@ -13532,7 +13616,7 @@
     "run_group_cloner_tool": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 6270,
+      "line": 6262,
       "args": [
         "session_mgr"
       ]
@@ -13540,7 +13624,7 @@
     "run_single_or_specific_messages_forwarder": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 6531,
+      "line": 6523,
       "args": [
         "session_mgr"
       ]
@@ -13548,7 +13632,7 @@
     "run_selective_content_picker": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 6773,
+      "line": 6765,
       "args": [
         "session_mgr"
       ]
@@ -13556,7 +13640,7 @@
     "run_member_scraper_and_adder": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 7129,
+      "line": 7121,
       "args": [
         "session_mgr"
       ]
@@ -13564,7 +13648,7 @@
     "run_single_topic_files_indexer": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 7409,
+      "line": 7401,
       "args": [
         "session_mgr"
       ]
@@ -13572,7 +13656,7 @@
     "run_master_group_indexer": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 7843,
+      "line": 7835,
       "args": [
         "session_mgr"
       ]
@@ -13580,7 +13664,7 @@
     "run_indexer_menu": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 8059,
+      "line": 8051,
       "args": [
         "session_mgr"
       ]
@@ -13588,13 +13672,13 @@
     "run_diagnostics": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 8084,
+      "line": 8076,
       "args": []
     },
     "run_account_switcher_tool": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 8119,
+      "line": 8111,
       "args": [
         "session_mgr"
       ]
@@ -13602,7 +13686,7 @@
     "run_menu": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 8207,
+      "line": 8199,
       "args": [
         "session_mgr"
       ]
@@ -13610,7 +13694,7 @@
     "start_platform": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 8452,
+      "line": 8444,
       "args": [
         "auto_start"
       ]
@@ -13618,7 +13702,7 @@
     "main_async": {
       "type": "function",
       "file": "Friend_Edition/tg_kindsync_pro.py",
-      "line": 8530,
+      "line": 8522,
       "args": []
     },
     "DashboardAuthManager": {
@@ -13646,6 +13730,15 @@
       "args": [
         "self",
         "db_file"
+      ]
+    },
+    "DashboardAuthManager._hash_pbkdf2": {
+      "type": "method",
+      "file": "web_dashboard.py",
+      "line": 99,
+      "args": [
+        "password",
+        "salt"
       ]
     },
     "DashboardAuthManager._init_db": {
@@ -13681,6 +13774,17 @@
         "self",
         "username",
         "password"
+      ]
+    },
+    "DashboardAuthManager.change_password": {
+      "type": "method",
+      "file": "web_dashboard.py",
+      "line": 198,
+      "args": [
+        "self",
+        "username",
+        "current_pass",
+        "new_pass"
       ]
     },
     "DashboardAuthManager.purge_expired_tokens": {
@@ -13812,7 +13916,7 @@
     "TelegramWebLoginManager.import_string_session": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 422,
+      "line": 490,
       "args": [
         "self",
         "raw_session_str"
@@ -13938,7 +14042,7 @@
     "DashboardServer._get_forward_routes": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5019,
+      "line": 5814,
       "args": [
         "self"
       ]
@@ -13946,7 +14050,7 @@
     "DashboardServer._create_forward_route": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5043,
+      "line": 5838,
       "args": [
         "self",
         "src_chat",
@@ -13959,7 +14063,7 @@
     "DashboardServer._toggle_forward_route": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5056,
+      "line": 5851,
       "args": [
         "self",
         "route_id"
@@ -13968,7 +14072,7 @@
     "DashboardServer._delete_forward_route": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5066,
+      "line": 5861,
       "args": [
         "self",
         "route_id"
@@ -14062,6 +14166,15 @@
         "request"
       ]
     },
+    "DashboardServer.handle_api_auth_change_password": {
+      "type": "method",
+      "file": "web_dashboard.py",
+      "line": 5961,
+      "args": [
+        "self",
+        "request"
+      ]
+    },
     "DashboardServer.handle_api_telegram_accounts": {
       "type": "method",
       "file": "scratch/web_dashboard_backup_Friday_18-September-2026_10-43PM.py",
@@ -14101,7 +14214,7 @@
     "DashboardServer.handle_api_telegram_import_string": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5200,
+      "line": 6014,
       "args": [
         "self",
         "request"
@@ -14129,6 +14242,15 @@
       "type": "method",
       "file": "scratch/web_dashboard_backup_Friday_18-September-2026_10-43PM.py",
       "line": 2997,
+      "args": [
+        "self",
+        "request"
+      ]
+    },
+    "DashboardServer.handle_api_stats_reset": {
+      "type": "method",
+      "file": "web_dashboard.py",
+      "line": 6048,
       "args": [
         "self",
         "request"
@@ -14182,7 +14304,7 @@
     "DashboardServer.handle_api_routes": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5280,
+      "line": 6112,
       "args": [
         "self",
         "request"
@@ -14191,7 +14313,7 @@
     "DashboardServer.handle_api_create_route": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5283,
+      "line": 6115,
       "args": [
         "self",
         "request"
@@ -14200,7 +14322,7 @@
     "DashboardServer.handle_api_toggle_route": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5298,
+      "line": 6130,
       "args": [
         "self",
         "request"
@@ -14209,7 +14331,7 @@
     "DashboardServer.handle_api_delete_route": {
       "type": "method",
       "file": "web_dashboard.py",
-      "line": 5307,
+      "line": 6139,
       "args": [
         "self",
         "request"
@@ -15582,7 +15704,7 @@
     "get_topic_icon": {
       "type": "function",
       "file": "devi/operator/group_scanner.py",
-      "line": 121,
+      "line": 88,
       "args": [
         "title"
       ]
@@ -15590,7 +15712,7 @@
     "scan_single_topic": {
       "type": "function",
       "file": "devi/operator/group_scanner.py",
-      "line": 145,
+      "line": 112,
       "args": [
         "client",
         "peer",
@@ -15602,7 +15724,7 @@
     "scan_group": {
       "type": "function",
       "file": "devi/operator/group_scanner.py",
-      "line": 235,
+      "line": 205,
       "args": [
         "target_chat_id",
         "target_topic_id",
@@ -15875,7 +15997,7 @@
     "GlobalOSINTResolver.resolve_entity": {
       "type": "method",
       "file": "devi/operator/osint_resolver.py",
-      "line": 148,
+      "line": 115,
       "args": [
         "self",
         "target"
@@ -15884,7 +16006,7 @@
     "GlobalOSINTResolver.resolve_from_local_db": {
       "type": "method",
       "file": "devi/operator/osint_resolver.py",
-      "line": 206,
+      "line": 173,
       "args": [
         "self",
         "target"
@@ -15893,7 +16015,7 @@
     "GlobalOSINTResolver.parse_sangmata_raw_text": {
       "type": "method",
       "file": "devi/operator/osint_resolver.py",
-      "line": 261,
+      "line": 228,
       "args": [
         "raw_text"
       ]
@@ -15901,7 +16023,7 @@
     "GlobalOSINTResolver.fetch_live_sangmata_history": {
       "type": "method",
       "file": "devi/operator/osint_resolver.py",
-      "line": 316,
+      "line": 283,
       "args": [
         "self",
         "target"
@@ -15910,7 +16032,7 @@
     "GlobalOSINTResolver._query_sangmata_bot": {
       "type": "method",
       "file": "devi/operator/osint_resolver.py",
-      "line": 357,
+      "line": 324,
       "args": [
         "self",
         "target_query"
@@ -15919,7 +16041,7 @@
     "GlobalOSINTResolver._get_cached_sangmata": {
       "type": "method",
       "file": "devi/operator/osint_resolver.py",
-      "line": 397,
+      "line": 364,
       "args": [
         "self",
         "user_id",
@@ -15929,7 +16051,7 @@
     "GlobalOSINTResolver._save_cached_sangmata": {
       "type": "method",
       "file": "devi/operator/osint_resolver.py",
-      "line": 426,
+      "line": 393,
       "args": [
         "self",
         "data"
@@ -15938,10 +16060,40 @@
     "GlobalOSINTResolver.get_sangmata_history": {
       "type": "method",
       "file": "devi/operator/osint_resolver.py",
-      "line": 459,
+      "line": 426,
       "args": [
         "self",
         "user_id"
+      ]
+    },
+    "get_persisted_session_string": {
+      "type": "function",
+      "file": "devi/operator/session_vault.py",
+      "line": 31,
+      "args": []
+    },
+    "save_persisted_session_string": {
+      "type": "function",
+      "file": "devi/operator/session_vault.py",
+      "line": 45,
+      "args": [
+        "s_str"
+      ]
+    },
+    "export_session_file_to_string": {
+      "type": "function",
+      "file": "devi/operator/session_vault.py",
+      "line": 58,
+      "args": [
+        "session_file_path"
+      ]
+    },
+    "get_vault_client": {
+      "type": "function",
+      "file": "devi/operator/session_vault.py",
+      "line": 91,
+      "args": [
+        "preferred_type"
       ]
     },
     "TaskExecutor": {
@@ -16691,7 +16843,7 @@
     "DeviTelegramBot._handle_devi_ai_chat": {
       "type": "method",
       "file": "devi/operator/telegram_bot.py",
-      "line": 6234,
+      "line": 6245,
       "args": [
         "self",
         "session",
@@ -16703,7 +16855,7 @@
     "DeviTelegramBot._handle_admin_voice_note": {
       "type": "method",
       "file": "devi/operator/telegram_bot.py",
-      "line": 6271,
+      "line": 6282,
       "args": [
         "self",
         "session",
