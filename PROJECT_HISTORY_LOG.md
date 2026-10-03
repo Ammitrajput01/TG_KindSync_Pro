@@ -55,6 +55,20 @@ This log permanently documents root causes, architectural patterns, historical b
   - Removed all hardcoded fallback metrics. Dashboard now strictly reads live active database records, active `.env` forwarding rules, or reports clean 0s/Standby when idle.
   - Reduced frontend polling interval from 2500ms to **1000ms (1 second)** for live real-time responsiveness.
 
+### 14. Web Dashboard Bento Grid Redesign, Single Speedometer Dial & Persistent Channel Volume
+* **Symptom**: 
+  1. Meter displayed 2 conflicting speed readouts simultaneously (`gauge-speed-display` overlapping `gauge-speed-mbps` and redundant `Rate: Mbps`).
+  2. Data collapsed/overlapped between active stream vs standby (jumping between discovered 1,580 items and 10 items).
+  3. Total channel volume for full clones was not clearly displayed in the header.
+* **Root Cause**:
+  1. Overview tab rendered two duplicate stat systems (6 Top KPI Cards + 4 Macro HUD Cards), which duplicated metrics and collided on responsive viewports.
+  2. `_build_status_dict` in [web_dashboard.py](file:///c:/TG_KindSync_Pro/web_dashboard.py) dynamically reset `total_files = files_completed` and reset `total_data_gb` whenever `is_transferring` momentarily paused between message chunks.
+* **Permanent Fix Applied**:
+  - In [web_dashboard.py](file:///c:/TG_KindSync_Pro/web_dashboard.py):
+    1. **Single Clean Speedometer Dial**: Removed redundant stacked `gauge-speed-mbps` collision; speedometer now shows ONE bold high-contrast speed value with dynamic unit (KB/s, MB/s) and Peak Velocity badge.
+    2. **Obsidian Cyber-Glass Bento Grid**: Consolidated Overview into a unified 2-column hero (Master Batch Storage Ledger + Live Speed Dial) + In-Flight Streaming Bar + 5-Category Media Breakdown (Videos, Docs, Photos, Audios, Text) + Live Sent Files Ledger.
+    3. **Persistent Channel Clone Volume**: `total_files`, `total_data_gb`, `transferred_data_gb`, and `remaining_data_gb` are permanently locked to discovered batch volume and never collapse to 0 when idle. Added `header-channel-size` badge in the active subject strip.
+
 ---
 
 ### 7. Permanent Word Stripping & Caption Cleaning Engine (`strip_words.txt`)

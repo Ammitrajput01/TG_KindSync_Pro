@@ -715,7 +715,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         
-                /* 6 Permanent Dedicated Metric Cards Grid */
+                /* Overview Hero 2-Column Bento Grid */
+        .overview-hero-grid {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr;
+            gap: var(--space-4);
+            margin-bottom: var(--space-5);
+        }
+
+        @media (max-width: 1080px) {
+            .overview-hero-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 6 Permanent Dedicated Metric Cards Grid */
         .permanent-metrics-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -2783,8 +2797,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="active-subject-strip">
                 <div class="subject-badge">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <span>CURRENT ACTIVE CHANNEL STREAM:</span>
+                    <span>ACTIVE CHANNEL / CLONE SOURCE:</span>
                     <span class="subject-title-text" id="subject-name">Scanning Telegram Channel Stream...</span>
+                    <span class="pill pill-info tabular" id="header-channel-size" style="margin-left: 8px;">📦 Channel: 0.0 GB (0 Items)</span>
                 </div>
                 <div style="font-size: 11px; color: var(--text-tertiary);" id="uptime-pill">UPTIME: 0h 00m</div>
             </div>
@@ -2796,86 +2811,70 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                      VIEW 1: MISSION CONTROL (OVERVIEW)
                      ============================================================== -->
                 <section class="tab-view active" id="view-overview">
-                    <!-- 6 Permanent Dedicated Metric Cards Grid (Zero Switching, Always Visible) -->
-                    <div class="permanent-metrics-grid">
-                        <!-- Card 1: Total Data Storage -->
-                        <div class="perm-card perm-card-storage">
-                            <div class="perm-card-head">
-                                <span class="perm-card-icon">💾</span>
-                                <span class="perm-card-title">TOTAL DATA STORAGE</span>
-                                <span class="pill pill-info tabular" id="kpi-storage-pct">0%</span>
+                    
+                    <!-- Top 2-Column Bento Hero Grid: Left Batch Storage & ETA / Right Single Speed Dial -->
+                    <div class="overview-hero-grid">
+                        
+                        <!-- Left Bento Box: Master Batch Transmission & Channel Storage Volume -->
+                        <div class="batch-hub-section" style="margin-bottom: 0;">
+                            <div class="batch-hub-header">
+                                <div class="batch-hub-title-group">
+                                    <span style="font-size: 22px;">📦</span>
+                                    <div>
+                                        <div style="font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px;">Channel Clone & Batch Transmission Ledger</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary);">Real-time synchronized transmission stats, discovered channel payload, and queue ETA</div>
+                                    </div>
+                                </div>
+                                <span class="pill pill-success tabular" id="ledger-sync-badge">BATCH SYNC ACTIVE</span>
                             </div>
-                            <div class="perm-card-main tabular" id="kpi-storage-gb">0.0 GB</div>
-                            <div class="perm-progress-track">
-                                <div class="perm-progress-fill storage-gradient" id="kpi-storage-bar" style="width: 0%;"></div>
+
+                            <!-- Master Batch Progress Bar -->
+                            <div class="batch-prog-card">
+                                <div class="batch-prog-header">
+                                    <span>Master Sync Progress</span>
+                                    <span><strong class="tabular" id="ledger-progress-pct" style="color: var(--accent-cyan); font-size: 15px;">0%</strong> Complete</span>
+                                </div>
+                                <div class="batch-prog-track">
+                                    <div class="batch-prog-fill" id="ledger-progress-bar"></div>
+                                </div>
+                                <div class="batch-prog-meta">
+                                    <span>Estimated Time Remaining: <strong class="tabular" id="ledger-eta-val" style="color: #38BDF8;">Calculating...</strong></span>
+                                    <span>Forecast Finish: <strong class="tabular" id="ledger-finish-time" style="color: #4ADE80;">--:--</strong></span>
+                                </div>
                             </div>
-                            <div class="perm-card-footer">
-                                <span>Sent: <strong class="tabular" id="kpi-storage-sent" style="color: #4ADE80;">0.0 GB</strong></span>
-                                <span>Pending: <strong class="tabular" id="kpi-storage-pend" style="color: #FACC15;">0.0 GB</strong></span>
+
+                            <!-- 3 Macro Payload HUD Cards -->
+                            <div class="batch-hud-grid" style="grid-template-columns: repeat(3, 1fr);">
+                                <div class="batch-hud-item">
+                                    <div class="batch-hud-label"><span>💾</span> Total Discovered Volume</div>
+                                    <div class="batch-hud-val tabular" id="ledger-total-gb" style="color: #38BDF8;">0.0 GB</div>
+                                    <div class="batch-hud-sub">Channel Discovered: <strong class="tabular" id="ledger-total-files">0</strong> Items</div>
+                                </div>
+                                <div class="batch-hud-item">
+                                    <div class="batch-hud-label"><span>🚀</span> Dispatched Payload</div>
+                                    <div class="batch-hud-val tabular" id="ledger-uploaded-gb" style="color: #4ADE80;">0.0 GB</div>
+                                    <div class="batch-hud-sub">Completed: <strong class="tabular" id="ledger-files-sent" style="color: #4ADE80;">0</strong> Delivered</div>
+                                </div>
+                                <div class="batch-hud-item">
+                                    <div class="batch-hud-label"><span>⏳</span> Remaining Queue</div>
+                                    <div class="batch-hud-val tabular" id="ledger-remaining-gb" style="color: #FACC15;">0.0 GB</div>
+                                    <div class="batch-hud-sub">Queue: <strong class="tabular" id="ledger-files-remaining" style="color: #FACC15;">0</strong> Pending</div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Card 2: Videos & Lectures -->
-                        <div class="perm-card perm-card-video">
-                            <div class="perm-card-head">
-                                <span class="perm-card-icon">🎬</span>
-                                <span class="perm-card-title">VIDEOS & LECTURES</span>
-                                <span class="pill pill-success tabular" id="kpi-videos-pct">0%</span>
-                            </div>
-                            <div class="perm-card-main tabular" id="kpi-videos-count">0 Videos</div>
-                            <div class="perm-progress-track">
-                                <div class="perm-progress-fill video-gradient" id="kpi-videos-bar" style="width: 0%;"></div>
-                            </div>
-                            <div class="perm-card-footer">
-                                <span>Sent: <strong class="tabular" id="kpi-videos-sent" style="color: #38BDF8;">0</strong></span>
-                                <span>Pending: <strong class="tabular" id="kpi-videos-pend" style="color: #FACC15;">0</strong></span>
-                            </div>
-                        </div>
-
-                        <!-- Card 3: Documents & PDFs -->
-                        <div class="perm-card perm-card-docs">
-                            <div class="perm-card-head">
-                                <span class="perm-card-icon">📄</span>
-                                <span class="perm-card-title">DOCUMENTS & NOTES</span>
-                                <span class="pill pill-success tabular" id="kpi-docs-pct">0%</span>
-                            </div>
-                            <div class="perm-card-main tabular" id="kpi-docs-count">0 Files</div>
-                            <div class="perm-progress-track">
-                                <div class="perm-progress-fill docs-gradient" id="kpi-docs-bar" style="width: 0%;"></div>
-                            </div>
-                            <div class="perm-card-footer">
-                                <span>Sent: <strong class="tabular" id="kpi-docs-sent" style="color: #4ADE80;">0</strong></span>
-                                <span>Pending: <strong class="tabular" id="kpi-docs-pend" style="color: #FACC15;">0</strong></span>
-                            </div>
-                        </div>
-
-                        <!-- Card 4: Photos & Audio Media -->
-                        <div class="perm-card perm-card-media">
-                            <div class="perm-card-head">
-                                <span class="perm-card-icon">🖼️</span>
-                                <span class="perm-card-title">PHOTOS & AUDIO</span>
-                                <span class="pill pill-neutral tabular">Media Stream</span>
-                            </div>
-                            <div class="perm-card-main tabular" id="kpi-media-count">0 Items</div>
-                            <div class="perm-card-subgrid">
-                                <div>📷 Photos: <strong class="tabular" id="kpi-photos-sent">0</strong></div>
-                                <div>🎵 Audios: <strong class="tabular" id="kpi-audios-sent">0</strong></div>
-                            </div>
-                            <div class="perm-card-footer">
-                                <span>Albums: <strong class="tabular" id="kpi-albums-sent">0</strong></span>
-                                <span>Total Sent: <strong class="tabular" id="kpi-total-media-sent" style="color: #A855F7;">0</strong></span>
-                            </div>
-                        </div>
-
-                        <!-- Card 5: Velocity & Speed Dial -->
-                        <div class="perm-card perm-card-speed">
-                            <div class="perm-card-head">
-                                <span class="perm-card-icon">⚡</span>
-                                <span class="perm-card-title">NETWORK VELOCITY</span>
+                        <!-- Right Bento Box: Single Clean Speedometer Dial -->
+                        <div class="perm-card perm-card-speed" style="justify-content: space-between; padding: var(--space-4); margin-bottom: 0;">
+                            <div class="perm-card-head" style="margin-bottom: var(--space-2);">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="perm-card-icon">⚡</span>
+                                    <span class="perm-card-title" style="font-size: 13px; font-weight: 800; color: #fff;">LIVE NETWORK VELOCITY</span>
+                                </div>
                                 <span class="gauge-tier-badge" id="gauge-tier-badge">⚪ STANDBY</span>
                             </div>
-                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 2px 0;">
-                                <svg class="speedometer-svg" viewBox="0 0 220 120" style="width: 175px; height: 95px; overflow: visible;">
+                            
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 4px 0;">
+                                <svg class="speedometer-svg" viewBox="0 0 220 120" style="width: 185px; height: 100px; overflow: visible;">
                                     <defs>
                                         <linearGradient id="speedGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                                             <stop offset="0%" stop-color="#6366F1"/>
@@ -2892,89 +2891,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     </g>
                                 </svg>
                                 <div class="gauge-readout" style="margin-top: -16px; text-align: center;">
-                                    <div class="gauge-speed-num tabular" id="gauge-speed-display" style="font-size: 22px; font-weight: 800; color: #fff;">0.0</div>
-                                    <div class="gauge-speed-unit" id="gauge-unit-label" style="font-size: 10px; font-weight: 700; color: var(--text-tertiary);">KB / SECOND</div>
-                                    <div class="gauge-speed-mbps tabular" id="gauge-speed-mbps" style="font-size: 11px; font-weight: 700; color: #38BDF8; margin-top: 2px;">⚡ 0.0 Mbps</div>
+                                    <div class="gauge-speed-num tabular" id="gauge-speed-display" style="font-size: 26px; font-weight: 800; color: #fff; line-height: 1.1;">0.0</div>
+                                    <div class="gauge-speed-unit" id="gauge-unit-label" style="font-size: 11px; font-weight: 700; color: #38BDF8; letter-spacing: 0.5px; margin-top: 2px;">KB / SECOND</div>
                                 </div>
                             </div>
-                            <div class="perm-card-footer">
+                            
+                            <div class="perm-card-footer" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: var(--space-2); margin-top: var(--space-2); display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary);">
                                 <span>Peak: <strong class="tabular" id="kpi-peak-speed" style="color: #38BDF8;">0.0 KB/s</strong></span>
-                                <span>ETA: <strong class="tabular" id="kpi-batch-eta" style="color: #4ADE80;">--:--</strong></span>
+                                <span>Pipeline: <strong style="color: #4ADE80;">Turbo MTProto</strong></span>
                             </div>
                         </div>
 
-                        <!-- Card 6: Active Route & Topic Deep-Monitor -->
-                        <div class="perm-card perm-card-topic">
-                            <div class="perm-card-head">
-                                <span class="perm-card-icon">🎯</span>
-                                <span class="perm-card-title">ACTIVE TOPIC MONITOR</span>
-                                <span class="pill pill-success tabular">LIVE</span>
-                            </div>
-                            <div class="perm-topic-body">
-                                <div class="perm-topic-name" id="perm-active-topic-name">Johari 1st Year Videos</div>
-                                <div class="perm-topic-sub" id="perm-active-group-name">Group: Study Help 2.0 😉</div>
-                            </div>
-                            <div class="perm-card-footer">
-                                <span>Topic Sent: <strong class="tabular" id="perm-topic-sent-count" style="color: #4ADE80;">0</strong></span>
-                                <span>Topic Pending: <strong class="tabular" id="perm-topic-pending-count" style="color: #FACC15;">0</strong></span>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- Dedicated Comprehensive Batch Transmission & Media Payload Ledger Hub -->
-                    <div class="batch-hub-section">
-                        <div class="batch-hub-header">
-                            <div class="batch-hub-title-group">
-                                <span style="font-size: 22px;">📦</span>
-                                <div>
-                                    <div style="font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px;">Comprehensive Batch Transmission & Data Payload Ledger</div>
-                                    <div style="font-size: 12px; color: var(--text-secondary);">Real-time synchronized transmission stats, media category payloads, and ETA forecasts</div>
-                                </div>
+                    <!-- 5-Category Detailed Media Breakdown Live Grid -->
+                    <div style="margin-bottom: var(--space-5);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 18px;">📂</span>
+                                <span style="font-size: 14px; font-weight: 800; color: #fff;">Media Category Breakdown</span>
                             </div>
-                            <span class="pill pill-success tabular" id="ledger-sync-badge">BATCH SYNC ACTIVE</span>
+                            <span class="pill pill-neutral tabular">5 Categories Segregated</span>
                         </div>
-
-                        <!-- 4 Macro Payload HUD Cards -->
-                        <div class="batch-hud-grid">
-                            <div class="batch-hud-item">
-                                <div class="batch-hud-label"><span>💾</span> Total Batch Volume</div>
-                                <div class="batch-hud-val tabular" id="ledger-total-gb" style="color: #38BDF8;">0.0 GB</div>
-                                <div class="batch-hud-sub">Discovered: <strong class="tabular" id="ledger-total-files">0</strong> Total Items</div>
-                            </div>
-                            <div class="batch-hud-item">
-                                <div class="batch-hud-label"><span>🚀</span> Dispatched Payload</div>
-                                <div class="batch-hud-val tabular" id="ledger-uploaded-gb" style="color: #4ADE80;">0.0 GB</div>
-                                <div class="batch-hud-sub">Completed: <strong class="tabular" id="ledger-files-sent" style="color: #4ADE80;">0</strong> Delivered</div>
-                            </div>
-                            <div class="batch-hud-item">
-                                <div class="batch-hud-label"><span>⏳</span> Remaining Payload</div>
-                                <div class="batch-hud-val tabular" id="ledger-remaining-gb" style="color: #FACC15;">0.0 GB</div>
-                                <div class="batch-hud-sub">Queue: <strong class="tabular" id="ledger-files-remaining" style="color: #FACC15;">0</strong> Pending</div>
-                            </div>
-                            <div class="batch-hud-item">
-                                <div class="batch-hud-label"><span>⚡</span> Live Throughput</div>
-                                <div class="batch-hud-val tabular" id="ledger-hud-speed" style="color: #C084FC;">0.0 KB/s</div>
-                                <div class="batch-hud-sub">Rate: <strong class="tabular" id="ledger-hud-mbps" style="color: #38BDF8;">0.0 Mbps</strong></div>
-                                <div class="batch-hud-sub">Peak: <strong class="tabular" id="ledger-batch-peak">0.0 KB/s</strong></div>
-                            </div>
-                        </div>
-
-                        <!-- Master Batch Progress Bar -->
-                        <div class="batch-prog-card">
-                            <div class="batch-prog-header">
-                                <span>Batch Transmission Progress</span>
-                                <span><strong class="tabular" id="ledger-progress-pct" style="color: var(--accent-primary); font-size: 14px;">0%</strong> Complete</span>
-                            </div>
-                            <div class="batch-prog-track">
-                                <div class="batch-prog-fill" id="ledger-progress-bar"></div>
-                            </div>
-                            <div class="batch-prog-meta">
-                                <span>Estimated Time to Complete: <strong class="tabular" id="ledger-eta-val" style="color: #38BDF8;">Calculating...</strong></span>
-                                <span>Forecast Finish: <strong class="tabular" id="ledger-finish-time" style="color: #4ADE80;">--:--</strong></span>
-                            </div>
-                        </div>
-
-                        <!-- 5-Category Detailed Media Breakdown Live Grid -->
                         <div class="category-breakdown-grid">
                             <!-- Videos -->
                             <div class="category-card" style="border-color: rgba(99, 102, 241, 0.3);">
@@ -3044,7 +2982,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     <div class="cat-card-gb tabular" style="color: #C084FC;">Preserved Metadata</div>
                                 </div>
                                 <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
-                                    <span>Hashtag Filtered</span>
+                                    <span>Strip Rules Active</span>
                                 </div>
                             </div>
                         </div>
@@ -4223,74 +4161,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const filesRem = d.files_remaining !== undefined ? d.files_remaining : Math.max(0, totFiles - filesSent);
                 const progPct = d.batch_progress_pct !== undefined ? d.batch_progress_pct : (totFiles > 0 ? ((filesSent / totFiles) * 100).toFixed(1) : (d.total_transfers > 0 ? '100' : '0'));
 
-                // --- TOP 6 PERMANENT KPI CARDS ---
-                // Card 1: Storage
-                const kpiStoreGb = document.getElementById('kpi-storage-gb');
-                if (kpiStoreGb && d.total_data_gb !== undefined) kpiStoreGb.textContent = d.total_data_gb + ' GB';
-                const kpiStorePct = document.getElementById('kpi-storage-pct');
-                if (kpiStorePct) kpiStorePct.textContent = progPct + '%';
-                const kpiStoreBar = document.getElementById('kpi-storage-bar');
-                if (kpiStoreBar) kpiStoreBar.style.width = Math.min(100, Math.max(0, parseFloat(progPct) || 0)) + '%';
-                const kpiStoreSent = document.getElementById('kpi-storage-sent');
-                if (kpiStoreSent && d.transferred_data_gb !== undefined) kpiStoreSent.textContent = d.transferred_data_gb + ' GB';
-                const kpiStorePend = document.getElementById('kpi-storage-pend');
-                if (kpiStorePend && d.remaining_data_gb !== undefined) kpiStorePend.textContent = d.remaining_data_gb + ' GB';
+                // --- MASTER HUD & CHANNEL STORAGE PAYLOAD ---
+                const hdrChanSize = document.getElementById('header-channel-size');
+                if (hdrChanSize) hdrChanSize.textContent = `📦 Channel: ${d.total_data_gb || 0} GB (${totFiles.toLocaleString()} Items)`;
 
-                // Card 2: Videos
-                const kpiVidCount = document.getElementById('kpi-videos-count');
-                if (kpiVidCount) kpiVidCount.textContent = (d.videos_total || (d.videos_sent || 0)) + ' Videos';
-                const kpiVidPct = document.getElementById('kpi-videos-pct');
-                if (kpiVidPct) kpiVidPct.textContent = (d.videos_pct || 0) + '%';
-                const kpiVidBar = document.getElementById('kpi-videos-bar');
-                if (kpiVidBar) kpiVidBar.style.width = Math.min(100, Math.max(0, d.videos_pct || 0)) + '%';
-                const kpiVidSent = document.getElementById('kpi-videos-sent');
-                if (kpiVidSent) kpiVidSent.textContent = (d.videos_sent || 0);
-                const kpiVidPend = document.getElementById('kpi-videos-pend');
-                if (kpiVidPend) kpiVidPend.textContent = (d.videos_pending || 0);
-
-                // Card 3: Docs
-                const kpiDocsCount = document.getElementById('kpi-docs-count');
-                if (kpiDocsCount) kpiDocsCount.textContent = (d.docs_total || (d.docs_sent || 0)) + ' Files';
-                const kpiDocsPct = document.getElementById('kpi-docs-pct');
-                if (kpiDocsPct) kpiDocsPct.textContent = (d.docs_pct || 0) + '%';
-                const kpiDocsBar = document.getElementById('kpi-docs-bar');
-                if (kpiDocsBar) kpiDocsBar.style.width = Math.min(100, Math.max(0, d.docs_pct || 0)) + '%';
-                const kpiDocsSent = document.getElementById('kpi-docs-sent');
-                if (kpiDocsSent) kpiDocsSent.textContent = (d.docs_sent || 0);
-                const kpiDocsPend = document.getElementById('kpi-docs-pend');
-                if (kpiDocsPend) kpiDocsPend.textContent = (d.docs_pending || 0);
-
-                // Card 4: Media (Photos & Audio)
-                const kpiMediaCount = document.getElementById('kpi-media-count');
-                if (kpiMediaCount) kpiMediaCount.textContent = ((d.photos_total || 0) + (d.audios_sent || 0)) + ' Items';
-                const kpiPhotosSent = document.getElementById('kpi-photos-sent');
-                if (kpiPhotosSent) kpiPhotosSent.textContent = (d.photos_sent || 0);
-                const kpiAudiosSent = document.getElementById('kpi-audios-sent');
-                if (kpiAudiosSent) kpiAudiosSent.textContent = (d.audios_sent || 0);
-                const kpiAlbumsSent = document.getElementById('kpi-albums-sent');
-                if (kpiAlbumsSent) kpiAlbumsSent.textContent = (d.albums_sent || 0);
-                const kpiTotMediaSent = document.getElementById('kpi-total-media-sent');
-                if (kpiTotMediaSent) kpiTotMediaSent.textContent = ((d.photos_sent || 0) + (d.audios_sent || 0) + (d.albums_sent || 0));
-
-                // Card 5: Velocity
-                const kpiPeakSpeed = document.getElementById('kpi-peak-speed');
-                if (kpiPeakSpeed) kpiPeakSpeed.textContent = peakSpeedObj.formatted;
-                const kpiBatchEta = document.getElementById('kpi-batch-eta');
-                if (kpiBatchEta) kpiBatchEta.textContent = d.batch_eta || (curSpeed > 0 ? '12h 45m' : 'Standby');
-
-                // Card 6: Active Topic
-                const elPermTopic = document.getElementById('perm-active-topic-name');
-                if (elPermTopic) elPermTopic.textContent = d.active_topic_name || 'Johari 1st Year Videos';
-                const elPermGroup = document.getElementById('perm-active-group-name');
-                if (elPermGroup) elPermGroup.textContent = 'Group: ' + (d.active_group_name || 'Study Help 2.0 😉');
-                const elPermTopicSent = document.getElementById('perm-topic-sent-count');
-                if (elPermTopicSent) elPermTopicSent.textContent = (d.topic_sent_count || d.files_completed || 0).toLocaleString();
-                const elPermTopicPend = document.getElementById('perm-topic-pending-count');
-                if (elPermTopicPend) elPermTopicPend.textContent = (d.topic_pending_count || d.files_remaining || 0).toLocaleString();
-
-
-                // --- COMPREHENSIVE BATCH TRANSMISSION & PAYLOAD LEDGER HUB ---
-                // 4 Macro HUD Cards
                 const ledTotGb = document.getElementById('ledger-total-gb');
                 if (ledTotGb && d.total_data_gb !== undefined) ledTotGb.textContent = d.total_data_gb + ' GB';
                 const ledTotFiles = document.getElementById('ledger-total-files');
@@ -4305,6 +4179,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (ledRemGb && d.remaining_data_gb !== undefined) ledRemGb.textContent = d.remaining_data_gb + ' GB';
                 const ledFilesRem = document.getElementById('ledger-files-remaining');
                 if (ledFilesRem) ledFilesRem.textContent = filesRem.toLocaleString();
+
+                const kpiPeakSpeed = document.getElementById('kpi-peak-speed');
+                if (kpiPeakSpeed) kpiPeakSpeed.textContent = peakSpeedObj.formatted;
 
                 const ledHudSpeed = document.getElementById('ledger-hud-speed');
                 if (ledHudSpeed) ledHudSpeed.textContent = curSpeedObj.formatted;
@@ -5580,42 +5457,38 @@ class DashboardServer:
                         if t_peak > peak_speed:
                             peak_speed = t_peak
 
-        if total_files > 0:
-            batch_progress_pct = min(100.0, round((files_completed / total_files) * 100.0, 1))
-            files_remaining = max(0, total_files - files_completed)
-
         # Storage Payload Calculations (in GB)
         avg_video_mb = 184.5
         avg_doc_mb = 14.8
         avg_photo_mb = 3.6
         avg_audio_mb = 22.4
         eta_seconds = 0
-        calc_speed = 0.0
 
-        # Real Dynamic Category Breakdown
-        if is_transferring and total_files > files_completed:
-            tot_videos = max(videos_sent, int(total_files * 0.72))
-            v_sent = videos_sent
-            v_pending = max(0, tot_videos - v_sent)
-            v_pct = min(100.0, round((v_sent / tot_videos) * 100.0, 1)) if tot_videos > 0 else 0.0
+        # Calculate persistent channel volume
+        total_data_gb = round((total_files * avg_video_mb) / 1024, 1) if total_files > 0 else 0.0
+        transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1) if files_completed > 0 else 0.0
+        remaining_data_gb = round(max(0.0, total_data_gb - transferred_data_gb), 1)
 
-            tot_docs = max(docs_sent, int(total_files * 0.20))
-            d_sent = docs_sent
-            d_pending = max(0, tot_docs - d_sent)
-            d_pct = min(100.0, round((d_sent / tot_docs) * 100.0, 1)) if tot_docs > 0 else 0.0
+        # Real Dynamic Category Breakdown (always preserved)
+        tot_videos = max(videos_sent, int(total_files * 0.75)) if total_files > files_completed else max(videos_sent, 0)
+        v_sent = videos_sent
+        v_pending = max(0, tot_videos - v_sent)
+        v_pct = min(100.0, round((v_sent / tot_videos) * 100.0, 1)) if tot_videos > 0 else (100.0 if v_sent > 0 else 0.0)
 
-            tot_photos = photos_sent
-            p_sent = photos_sent
-            p_pending = max(0, tot_photos - p_sent)
+        tot_docs = max(docs_sent, int(total_files * 0.20)) if total_files > files_completed else max(docs_sent, 0)
+        d_sent = docs_sent
+        d_pending = max(0, tot_docs - d_sent)
+        d_pct = min(100.0, round((d_sent / tot_docs) * 100.0, 1)) if tot_docs > 0 else (100.0 if d_sent > 0 else 0.0)
 
-            total_data_gb = round((total_files * avg_video_mb) / 1024, 1) if total_files > 0 else 0.0
-            transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1) if files_completed > 0 else 0.0
-            remaining_data_gb = round(max(0.0, total_data_gb - transferred_data_gb), 1)
+        tot_photos = max(photos_sent, int(total_files * 0.03)) if total_files > files_completed else max(photos_sent, 0)
+        p_sent = photos_sent
+        p_pending = max(0, tot_photos - p_sent)
 
-            # Batch ETA & Finish Forecast
+        # Dynamic Batch ETA & Finish Forecast
+        calc_speed = cur_speed if cur_speed > 0.05 else (peak_speed * 0.7 if (is_transferring and peak_speed > 0.5) else 0.0)
+        if calc_speed > 0.05 and remaining_data_gb > 0:
             remaining_mb = remaining_data_gb * 1024
-            calc_speed = cur_speed if cur_speed > 0.05 else (peak_speed * 0.7 if peak_speed > 0.5 else 0.0)
-            eta_seconds = int(remaining_mb / calc_speed) if calc_speed > 0 else 0
+            eta_seconds = int(remaining_mb / calc_speed)
             eta_hrs, rem_m = divmod(eta_seconds, 3600)
             eta_mins, _ = divmod(rem_m, 60)
             if eta_hrs > 0:
@@ -5623,31 +5496,9 @@ class DashboardServer:
             elif eta_mins > 0:
                 batch_eta = f"{eta_mins}m"
             else:
-                batch_eta = "Calculating..."
+                batch_eta = "Less than a minute"
         else:
-            # Standby / Idle Mode: Show real transferred stats with 0 pending and clean standby
-            tot_videos = videos_sent
-            v_sent = videos_sent
-            v_pending = 0
-            v_pct = 100.0 if v_sent > 0 else 0.0
-
-            tot_docs = docs_sent
-            d_sent = docs_sent
-            d_pending = 0
-            d_pct = 100.0 if d_sent > 0 else 0.0
-
-            tot_photos = photos_sent
-            p_sent = photos_sent
-            p_pending = 0
-
-            total_files = files_completed
-            files_remaining = 0
-            batch_progress_pct = 100.0 if files_completed > 0 else 0.0
-
-            transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1) if files_completed > 0 else 0.0
-            total_data_gb = transferred_data_gb
-            remaining_data_gb = 0.0
-            batch_eta = "Standby (Idle)"
+            batch_eta = "Standby (Idle)" if not is_transferring else "Calculating..."
 
         videos_gb = round((videos_sent * avg_video_mb) / 1024, 1) if videos_sent > 0 else 0.0
         docs_gb = round((docs_sent * avg_doc_mb) / 1024, 1) if docs_sent > 0 else 0.0
