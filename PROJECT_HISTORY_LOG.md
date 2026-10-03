@@ -4,6 +4,47 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ---
 
+## 📅 Log Entry: Saturday, 03 October 2026
+
+### 1. Media Streamer Fallback Execution & Text Message Status Bug
+* **Symptom**: In RAM streaming mode (`DIRECT_FORWARD=false`), during topic / channel cloning, only subject header messages (`✨ 👂 ENT ✨`, `✨ 🫀 ANATOMY ✨`, and welcome cards) were posted into Telegram, while 100% of videos/media files were skipped, yielding 0 transferred files and escalating error counts (e.g. `Errors: 67`, `0 / 219 completed`).
+* **Root Cause**:
+  1. In `PipelineProcessor.execute()`, the entire `if not direct_forward_success:` fallback block (which handles RAM streaming of single videos, photos, docs, albums, and text messages) was accidentally nested *inside* the `if attempt_direct:` conditional indentation level.
+  2. Consequently, when `direct_forward` was `False`, the engine evaluated `if attempt_direct:` as `False` and bypassed the streaming pipeline entirely without transferring the media payload.
+  3. Because `success_flag` remained `False`, every item was marked as an error in metrics (`errors_count += len(active_messages)`).
+  4. Additionally, pure text messages and stripped empty stubs lacked an explicit `success_flag = True` assignment.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py):
+    1. Unindented the `if not direct_forward_success:` block so it executes unconditionally whenever direct MTProto forwarding is disabled or encounters channel forward restrictions.
+    2. Added explicit `success_flag = True` to text messages, polls, and stripped stub handlers.
+    3. Created regression test suite in [tests/test_pipeline_processor_media.py](file:///c:/TG_KindSync_Pro/tests/test_pipeline_processor_media.py) verifying full RAM streaming execution and metrics integrity.
+
+### 2. 100% Reliable Non-Destructive Pause/Resume Architecture & Topic Watermark Recovery
+* **Symptom**: When forwarding was paused (via `/pause`, Web Dashboard, or system break) and subsequently resumed (via `/resume`), the engine failed, raised errors, or restarted scans from message 0 instead of resuming smoothly.
+* **Root Cause**:
+  1. `/pause` invoked `self.stop_evt.set()`. Because `stop_evt` was the terminal shutdown flag, all worker coroutines (`worker_supervisor`) and scanner tasks (`iter_messages`) permanently exited and died. When `/resume` called `self.stop_evt.clear()`, the terminated tasks could not be revived.
+  2. `StateManager.mark_completed()` updated `chat_watermarks` but omitted updating `topic_watermarks` in memory and SQLite. When resuming topic-routed forwarding or Group Cloner runs, `get_topic_watermark()` returned `0`, causing 50,000+ message re-scans.
+  3. `StateManager.close()` lacked an explicit `PRAGMA wal_checkpoint(TRUNCATE)`, occasionally leaving uncommitted WAL journals and locks on restart.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py):
+    1. **Dedicated `pause_evt` (`asyncio.Event`)**: Separated pause suspension from terminal shutdown. `/pause` clears `pause_evt`, putting workers, scanner, and `stream_media` into non-destructive idle wait (`await self.pause_evt.wait()`). `/resume` sets `pause_evt`, instantly resuming chunk transfers from the exact in-flight byte/message sequence without task destruction.
+    2. **Topic-Wise Watermark Sync**: `StateManager.mark_completed()` now records and persists both chat-level and topic-level watermarks (`source_chat:source_topic:target_chat:target_topic`), guaranteeing instant crash recovery and bookmark resume from the exact last message ID.
+    3. **WAL Checkpoint on Close**: Added `PRAGMA wal_checkpoint(TRUNCATE)` in `StateManager.close()` to ensure zero SQLite locks upon stopping and restarting.
+    4. **100% Strict Sequence Preservation**: Retained ordered chronological and lecture-curriculum dispatch barriers so messages are always delivered in exact source sequence without race conditions.
+
+### 2. Advanced Hashtag & Watermark Stripping (`strip_words.txt`)
+* **Symptom**: Hashtag watermarks (such as `#The Pirate Bay`, `#ThePirateBay`, `#yourwish`, `#medAcadpdf`) were either treated as comment lines in `strip_words.txt` or left behind dangling `#` characters in captions.
+* **Root Cause**:
+  1. `get_clean_rules()` skipped any line starting with `#` as a comment, preventing explicit `#tag` patterns from being loaded.
+  2. `apply_clean_rules()` matched words with word boundaries (`\b`), leaving `#` behind when stripping `#The Pirate Bay`.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py), [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py), [strip_words.txt](file:///c:/TG_KindSync_Pro/strip_words.txt), and [Friend_Edition/strip_words.txt](file:///c:/TG_KindSync_Pro/Friend_Edition/strip_words.txt):
+    1. Updated `get_clean_rules()` to distinguish actual comment headers (`##`, `# ===`, `# ---`, `# [User`) from valid hashtag strip rules (`#ThePirateBay`, `#yourwish`).
+    2. Updated `apply_clean_rules()` to automatically strip all hashtag variations (`#word`, `# word`, concatenated `#WordNoSpace`, `#word_underscore`) and purge any lone dangling `#` symbols.
+    3. Verified via dedicated test suite [tests/test_pause_resume_watermark_hashtags.py](file:///c:/TG_KindSync_Pro/tests/test_pause_resume_watermark_hashtags.py).
+
+---
+
 ## 📅 Log Entry: Sunday, 27 September 2026
 
 ### 1. Group & Topic Scanner Zero-Item Scan Issue (`/scan` & `/topicindex`)

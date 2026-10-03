@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 import pytest
 
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent / "tools" / "legacy_batch"))
 from build_oracle_friend_package import get_timestamp_filename, main as build_friend_package
 
 

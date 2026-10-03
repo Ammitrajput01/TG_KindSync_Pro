@@ -386,8 +386,13 @@ def get_clean_rules():
                         continue
                     if line.startswith(r"\#"):
                         line = line[1:]
-                    elif line.startswith("#") and len(line) > 1 and line != "#":
-                        continue
+                    elif line.startswith("#"):
+                        # Only skip genuine comment header lines, descriptions, or separators
+                        rem = line.lstrip("#").strip()
+                        if not rem or line.startswith("##") or rem.startswith("---") or rem.startswith("===") or rem.startswith("📝") or rem.startswith("🛡️") or rem.startswith("1.") or rem.startswith("2.") or rem.startswith("3.") or " " in line[:4]:
+                            continue
+                        # Valid hashtag rule like #ThePirateBay, #yourwish, #medAcadpdf
+                        line = line
                     if "=>" in line:
                         ow, nw = line.split("=>", 1)
                         if ow.strip(): replace_words[ow.strip()] = nw.strip()
@@ -428,7 +433,7 @@ def get_clean_rules():
 def apply_clean_rules(text: str) -> str:
     """
     Cleans unwanted words, creator signatures, bot mentions, skull emojis,
-    and promotional links while preserving core title / educational content.
+    hashtags (#ThePirateBay, #yourwish), and promotional links while preserving core title / educational content.
     """
     if not text:
         return ""
@@ -449,11 +454,23 @@ def apply_clean_rules(text: str) -> str:
             pat = re.escape(old_w)
         t = re.sub(pat, new_w, t, flags=re.IGNORECASE)
         
-    # 3. Apply strip words (case-insensitive, flexible whitespace around @)
+    # 3. Apply strip words (case-insensitive, flexible whitespace around @, and automatic hashtag variants)
     # Sort by length descending to ensure longer phrases are stripped before sub-tokens
     for w in sorted(strip_words, key=len, reverse=True):
         if not w: continue
         w = w.strip()
+        
+        # 3a. Strip hashtag variants if word is not already starting with #
+        if not w.startswith("#"):
+            # Strip "#The Pirate Bay" or "# The Pirate Bay"
+            t = re.sub(r"(?i)#\s*" + re.escape(w), "", t)
+            # Strip concatenated hashtag "#ThePirateBay"
+            no_space = w.replace(" ", "")
+            if no_space != w and len(no_space) > 2:
+                t = re.sub(r"(?i)#" + re.escape(no_space) + r"\b", "", t)
+                t = re.sub(r"(?i)#" + re.escape(w.replace(" ", "_")) + r"\b", "", t)
+
+        # 3b. Standard phrase / token stripping
         if "@" in w:
             parts = [re.escape(p.strip()) for p in w.split("@")]
             prefix = r"\b" if (parts[0] and parts[0][0].isalnum()) else ""
@@ -467,11 +484,14 @@ def apply_clean_rules(text: str) -> str:
     # 4. Clean leftover promotional join/credit lines, admin tags, and uploader watermarks
     t = re.sub(r"(?i)(?:join|subscribe|credits?|extracted\s*by|exᴛʀᴀᴄᴛᴇᴅ\s*ʙʏ|exᴛʀᴀᴄᴛᴇᴅ\s*by|shared\s*by|uploaded\s*by|posted\s*by|managed\s*by|admin|owner|channel|provided\s*by|forwarded\s*from)\s*[:\-]?\s+.*", "", t)
     
-    # 5. Clean lone dots, colons, emojis, or bullet lines
+    # 5. Clean lone hashes, dots, colons, emojis, or bullet lines
+    t = re.sub(r"(?m)^\s*#\s*$", "", t)
+    t = re.sub(r"(?<=\s)#(?=\s|$)", "", t)
+    
     cleaned_lines = []
     for line in t.splitlines():
         s = line.strip()
-        if re.match(r"^[\s\.\-_*~•:;|💎📇✦★]+$", s):
+        if re.match(r"^[\s\.\-_*~•:;|💎📇✦★#]+$", s):
             continue
         cleaned_lines.append(line)
     t = "\n".join(cleaned_lines)
@@ -1298,7 +1318,7 @@ class StateManager:
             except Exception as e:
                 logger.error(f"Failed to persist topic watermark: {e}")
 
-    async def mark_completed(self, source_chat, msg_id, target_chat, target_topic=0):
+    async def mark_completed(self, source_chat, msg_id, target_chat, target_topic=0, source_topic=0):
         key = self._key(source_chat, msg_id, target_chat, target_topic)
         self.ram_cache.add(key)
         await self.write_queue.put(key)
@@ -1307,6 +1327,18 @@ class StateManager:
             self.chat_watermarks[c_key] = max(self.chat_watermarks[c_key], msg_id)
         else:
             self.chat_watermarks[c_key] = msg_id
+
+        if source_topic or target_topic:
+            tkey = (str(source_chat), int(source_topic or 0), str(target_chat), int(target_topic or 0))
+            if not hasattr(self, 'topic_watermarks'): self.topic_watermarks = {}
+            curr = self.topic_watermarks.get(tkey, {})
+            new_max = max(curr.get("max_id", 0), int(msg_id or 0))
+            self.topic_watermarks[tkey] = {
+                "max_id": new_max,
+                "completed_files": curr.get("completed_files", 0) + 1,
+                "total_files": curr.get("total_files", 0),
+                "is_finished": curr.get("is_finished", False)
+            }
 
     async def daemon_writer(self):
         while self.running or not self.write_queue.empty():
@@ -1453,6 +1485,9 @@ class StateManager:
         await self.persist_watermarks()
         if self.db:
             async with self.db_lock:
+                with suppress(Exception):
+                    await self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    await self.db.commit()
                 with suppress(Exception): await self.db.close()
 
 class AsyncDLQ:
@@ -2723,6 +2758,18 @@ class MemoryStreamer:
                     buffer.extend(chunk)
                     self.metrics["bytes_downloaded"] += len(chunk)
 
+                    ctrl_p = Path("engine_control.json")
+                    if ctrl_p.exists():
+                        with suppress(Exception):
+                            with open(ctrl_p, "r", encoding="utf-8") as cf:
+                                if json.load(cf).get("paused", False):
+                                    while not stop_event.is_set():
+                                        await asyncio.sleep(1.0)
+                                        with suppress(Exception):
+                                            with open(ctrl_p, "r", encoding="utf-8") as cf2:
+                                                if not json.load(cf2).get("paused", False):
+                                                    break
+
                     while len(buffer) >= UP_CHUNK_SIZE:
                         payload = bytes(buffer[:UP_CHUNK_SIZE])
                         del buffer[:UP_CHUNK_SIZE]
@@ -3473,166 +3520,168 @@ class PipelineProcessor:
             except Exception as e:
                 self.log(f"[yellow]ℹ Direct Forward bypass -> Streamer: {str(e)[:60]}[/]")
 
-            if not direct_forward_success:
-                try:
-                    if len(active_messages) > 1:
-                        async def process_media(m):
-                            async with self.album_sem:
-                                return await self.streamer.stream_media(m, stop_event, client=client)
-                                
-                        coros = [process_media(m) for m in active_messages if getattr(m, "media", None)]
-                        if coros:
-                            tasks = [asyncio.create_task(c) for c in coros]
-                            caps = []
-                            for m in active_messages:
-                                if getattr(m, "media", None):
-                                    c_main, _ = self.format_text(getattr(m, "text", ""), for_media=True)
-                                    caps.append(c_main)
-                            files = await asyncio.gather(*tasks)
-                            await self.rpc.execute(
-                                lambda c: c.send_file(_parse_chat_id(target_chat), files, caption=caps, thumb=t_path, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
-                                client=client, timeout=120.0
-                            )
-                            self.log(f"[bold green]✔ Streamed Album ({len(files)} files)[/] [dim](ID: #{item.first_id})[/]")
-                            for m in active_messages:
-                                self.log(f"  ↳ {format_media_log_detail(m, prefix='Sent')}")
-                            self.metrics["albums_forwarded"] += 1
-                            success_flag = True
-                    else:
-                        m = active_messages[0]
-                        if getattr(m, "media", None) and (hasattr(m.media, 'document') or hasattr(m.media, 'photo')):
-                            file = await self.streamer.stream_media(m, stop_event, client=client)
-                            cap_main, cap_overflow = self.format_text(m.text, for_media=True)
+        if not direct_forward_success:
+            try:
+                if len(active_messages) > 1:
+                    async def process_media(m):
+                        async with self.album_sem:
+                            return await self.streamer.stream_media(m, stop_event, client=client)
                             
-                            orig_doc = getattr(getattr(m, "media", None), "document", None)
-                            attrs = []
-                            if orig_doc and hasattr(orig_doc, "attributes"):
-                                for a in orig_doc.attributes:
-                                    if isinstance(a, DocumentAttributeFilename):
-                                        attrs.append(DocumentAttributeFilename(file_name=getattr(file, "name", a.file_name)))
-                                    elif isinstance(a, DocumentAttributeVideo):
-                                        vid_w = int(getattr(a, "w", 0) or 0)
-                                        vid_h = int(getattr(a, "h", 0) or 0)
-                                        # If dimensions missing or low, enforce 16:9 HD for widescreen player on laptop & mobile
-                                        if vid_w <= 0 or vid_h <= 0:
-                                            vid_w, vid_h = 1280, 720
-                                        attrs.append(DocumentAttributeVideo(
-                                            duration=int(getattr(a, "duration", 0) or 0),
-                                            w=vid_w,
-                                            h=vid_h,
-                                            supports_streaming=True
-                                        ))
-                                    elif isinstance(a, DocumentAttributeAudio):
-                                        attrs.append(a)
+                    coros = [process_media(m) for m in active_messages if getattr(m, "media", None)]
+                    if coros:
+                        tasks = [asyncio.create_task(c) for c in coros]
+                        caps = []
+                        for m in active_messages:
+                            if getattr(m, "media", None):
+                                c_main, _ = self.format_text(getattr(m, "text", ""), for_media=True)
+                                caps.append(c_main)
+                        files = await asyncio.gather(*tasks)
+                        await self.rpc.execute(
+                            lambda c: c.send_file(_parse_chat_id(target_chat), files, caption=caps, thumb=t_path, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
+                            client=client, timeout=120.0
+                        )
+                        self.log(f"[bold green]✔ Streamed Album ({len(files)} files)[/] [dim](ID: #{item.first_id})[/]")
+                        for m in active_messages:
+                            self.log(f"  ↳ {format_media_log_detail(m, prefix='Sent')}")
+                        self.metrics["albums_forwarded"] += 1
+                        success_flag = True
+                else:
+                    m = active_messages[0]
+                    if getattr(m, "media", None) and (hasattr(m.media, 'document') or hasattr(m.media, 'photo')):
+                        file = await self.streamer.stream_media(m, stop_event, client=client)
+                        cap_main, cap_overflow = self.format_text(m.text, for_media=True)
+                        
+                        orig_doc = getattr(getattr(m, "media", None), "document", None)
+                        attrs = []
+                        if orig_doc and hasattr(orig_doc, "attributes"):
+                            for a in orig_doc.attributes:
+                                if isinstance(a, DocumentAttributeFilename):
+                                    attrs.append(DocumentAttributeFilename(file_name=getattr(file, "name", a.file_name)))
+                                elif isinstance(a, DocumentAttributeVideo):
+                                    vid_w = int(getattr(a, "w", 0) or 0)
+                                    vid_h = int(getattr(a, "h", 0) or 0)
+                                    # If dimensions missing or low, enforce 16:9 HD for widescreen player on laptop & mobile
+                                    if vid_w <= 0 or vid_h <= 0:
+                                        vid_w, vid_h = 1280, 720
+                                    attrs.append(DocumentAttributeVideo(
+                                        duration=int(getattr(a, "duration", 0) or 0),
+                                        w=vid_w,
+                                        h=vid_h,
+                                        supports_streaming=True
+                                    ))
+                                elif isinstance(a, DocumentAttributeAudio):
+                                    attrs.append(a)
 
-                            # If media is a video file but had no video attribute, inject 16:9 HD video attribute
-                            is_video_type = getattr(m, "video", None) or (getattr(file, "name", "").lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi")))
-                            has_vid_attr = any(isinstance(x, DocumentAttributeVideo) for x in attrs)
-                            if is_video_type and not has_vid_attr:
-                                attrs.append(DocumentAttributeVideo(
-                                    duration=0,
-                                    w=1280,
-                                    h=720,
-                                    supports_streaming=True
-                                ))
+                        # If media is a video file but had no video attribute, inject 16:9 HD video attribute
+                        is_video_type = getattr(m, "video", None) or (getattr(file, "name", "").lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi")))
+                        has_vid_attr = any(isinstance(x, DocumentAttributeVideo) for x in attrs)
+                        if is_video_type and not has_vid_attr:
+                            attrs.append(DocumentAttributeVideo(
+                                duration=0,
+                                w=1280,
+                                h=720,
+                                supports_streaming=True
+                            ))
 
-                            sent_media = await self.rpc.execute(
-                                lambda c: c.send_file(_parse_chat_id(target_chat), file, caption=cap_main, thumb=t_path, attributes=attrs if attrs else None, reply_to=resolved_topic, parse_mode="md", supports_streaming=True, silent=silent_mode),
-                                client=client, timeout=120.0
+                        sent_media = await self.rpc.execute(
+                            lambda c: c.send_file(_parse_chat_id(target_chat), file, caption=cap_main, thumb=t_path, attributes=attrs if attrs else None, reply_to=resolved_topic, parse_mode="md", supports_streaming=True, silent=silent_mode),
+                            client=client, timeout=120.0
+                        )
+                        if cap_overflow and sent_media:
+                            reply_id = getattr(sent_media, "id", None) or resolved_topic
+                            with suppress(Exception):
+                                await self.rpc.execute(
+                                    lambda c: c.send_message(_parse_chat_id(target_chat), cap_overflow, reply_to=reply_id, parse_mode="md", silent=silent_mode),
+                                    client=client, timeout=30.0
+                                )
+                        if sent_media:
+                            s_id = getattr(sent_media, "id", None)
+                            if s_id:
+                                f_name = getattr(m.file, "name", None) if getattr(m, "file", None) else None
+                                title_clean = f_name or (m.text[:40] if m.text else f"Video #{m.id}")
+                                icon_m = "🎥" if getattr(m, "video", None) else ("📄" if getattr(m, "document", None) else ("🖼️" if getattr(m, "photo", None) else "📦"))
+                                self.batch_index_records.append({
+                                    "msg_id": s_id,
+                                    "title": clean_index_title(title_clean, max_len=60),
+                                    "icon": icon_m
+                                })
+                            # Multi-target instant mirror
+                            if self.cfg.mirror_targets and getattr(sent_media, "media", None):
+                                for m_tgt in self.cfg.mirror_targets:
+                                    if str(m_tgt) != str(target_chat):
+                                        with suppress(Exception):
+                                            await self.rpc.execute(
+                                                lambda c, tgt=m_tgt: c.send_file(_parse_chat_id(tgt), sent_media.media, caption=cap_main, parse_mode="md", silent=silent_mode),
+                                                client=client, timeout=30.0
+                                            )
+                        self.log(format_media_log_detail(m, prefix="✔ Sent"))
+                        success_flag = True
+                    elif m.text and not getattr(m, 'action', None):
+                        formatted_text = self.format_text(m.text, for_media=False)
+                        if formatted_text and formatted_text.strip():
+                            sent_txt = await self.rpc.execute(
+                                lambda c: c.send_message(_parse_chat_id(target_chat), formatted_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
+                                client=client
                             )
-                            if cap_overflow and sent_media:
-                                reply_id = getattr(sent_media, "id", None) or resolved_topic
-                                with suppress(Exception):
-                                    await self.rpc.execute(
-                                        lambda c: c.send_message(_parse_chat_id(target_chat), cap_overflow, reply_to=reply_id, parse_mode="md", silent=silent_mode),
-                                        client=client, timeout=30.0
-                                    )
-                            if sent_media:
-                                s_id = getattr(sent_media, "id", None)
-                                if s_id:
-                                    f_name = getattr(m.file, "name", None) if getattr(m, "file", None) else None
-                                    title_clean = f_name or (m.text[:40] if m.text else f"Video #{m.id}")
-                                    icon_m = "🎥" if getattr(m, "video", None) else ("📄" if getattr(m, "document", None) else ("🖼️" if getattr(m, "photo", None) else "📦"))
-                                    self.batch_index_records.append({
-                                        "msg_id": s_id,
-                                        "title": clean_index_title(title_clean, max_len=60),
-                                        "icon": icon_m
-                                    })
-                                # Multi-target instant mirror
-                                if self.cfg.mirror_targets and getattr(sent_media, "media", None):
-                                    for m_tgt in self.cfg.mirror_targets:
-                                        if str(m_tgt) != str(target_chat):
-                                            with suppress(Exception):
-                                                await self.rpc.execute(
-                                                    lambda c, tgt=m_tgt: c.send_file(_parse_chat_id(tgt), sent_media.media, caption=cap_main, parse_mode="md", silent=silent_mode),
-                                                    client=client, timeout=30.0
-                                                )
+                            if sent_txt and self.cfg.mirror_targets:
+                                for m_tgt in self.cfg.mirror_targets:
+                                    if str(m_tgt) != str(target_chat):
+                                        with suppress(Exception):
+                                            await self.rpc.execute(
+                                                lambda c, tgt=m_tgt: c.send_message(_parse_chat_id(tgt), formatted_text, parse_mode="md", silent=silent_mode),
+                                                client=client, timeout=20.0
+                                            )
                             self.log(format_media_log_detail(m, prefix="✔ Sent"))
                             success_flag = True
-                        elif m.text and not getattr(m, 'action', None):
-                            formatted_text = self.format_text(m.text, for_media=False)
-                            if formatted_text and formatted_text.strip():
-                                sent_txt = await self.rpc.execute(
-                                    lambda c: c.send_message(_parse_chat_id(target_chat), formatted_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
-                                    client=client
-                                )
-                                if sent_txt and self.cfg.mirror_targets:
-                                    for m_tgt in self.cfg.mirror_targets:
-                                        if str(m_tgt) != str(target_chat):
-                                            with suppress(Exception):
-                                                await self.rpc.execute(
-                                                    lambda c, tgt=m_tgt: c.send_message(_parse_chat_id(tgt), formatted_text, parse_mode="md", silent=silent_mode),
-                                                    client=client, timeout=20.0
-                                                )
-                                self.log(format_media_log_detail(m, prefix="✔ Sent"))
-                            else:
-                                self.log(f"[dim]⏩ Skipped watermark/empty message (ID: #{m.id})[/]")
-                        elif getattr(m, 'poll', None):
-                            reconstructed_text = self.reconstruct(m)
-                            if reconstructed_text and reconstructed_text.strip():
-                                await self.rpc.execute(
-                                    lambda c: c.send_message(_parse_chat_id(target_chat), reconstructed_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
-                                    client=client
-                                )
-                                self.log(format_media_log_detail(m, prefix="✔ Sent Poll"))
-                                success_flag = True
-                            else:
-                                success_flag = True
                         else:
-                            self.log(f"[dim]⏩ Skipped service action/stub message (ID: #{m.id})[/]")
+                            self.log(f"[dim]⏩ Skipped watermark/empty message (ID: #{m.id})[/]")
                             success_flag = True
+                    elif getattr(m, 'poll', None):
+                        reconstructed_text = self.reconstruct(m)
+                        if reconstructed_text and reconstructed_text.strip():
+                            await self.rpc.execute(
+                                lambda c: c.send_message(_parse_chat_id(target_chat), reconstructed_text, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
+                                client=client
+                            )
+                            self.log(format_media_log_detail(m, prefix="✔ Sent Poll"))
+                            success_flag = True
+                        else:
+                            success_flag = True
+                    else:
+                        self.log(f"[dim]⏩ Skipped service action/stub message (ID: #{m.id})[/]")
+                        success_flag = True
 
-                except (KeyboardInterrupt, asyncio.CancelledError):
-                    raise
-                except Exception as e:
-                    await self.dlq.append(source_chat, item.first_id, e, target_chat=target_chat, target_topic=target_topic or 0)
-                    self.log(f"[bold red]❌ Stream Failed ID #{item.first_id}:[/] {str(e)[:100]}")
-                    success_flag = False
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                raise
+            except Exception as e:
+                await self.dlq.append(source_chat, item.first_id, e, target_chat=target_chat, target_topic=target_topic or 0)
+                self.log(f"[bold red]❌ Stream Failed ID #{item.first_id}:[/] {str(e)[:100]}")
+                success_flag = False
 
-                    # Auto-DLQ Self-Healing Background Daemon: Auto-retry after 45s with fresh message reference
-                    if item.retry_count < 2 and not self.cfg.run_dlq:
-                        item.retry_count += 1
-                        async def auto_retry_later(w_item, delay=45.0):
-                            await asyncio.sleep(delay)
-                            if stop_event.is_set(): return
-                            try:
-                                cl = self.session_mgr.get_client()
-                                fresh_msgs = await cl.get_messages(_parse_chat_id(source_chat), ids=[m.id for m in w_item.messages])
-                                if fresh_msgs and any(fresh_msgs):
-                                    w_item.messages = [m for m in fresh_msgs if m]
-                                    self.log(f"[bold yellow]🔄 Auto-DLQ Self-Healing retry triggered for Message #{w_item.first_id}...[/]")
-                                    await self.execute(w_item, stop_event)
-                            except Exception as retry_err:
-                                self.log(f"[dim red]Auto-DLQ background attempt {w_item.retry_count} failed: {retry_err}[/]")
-                        asyncio.create_task(auto_retry_later(item))
-                finally:
-                    if is_temp_extracted_thumb and t_path and os.path.exists(t_path):
-                        with suppress(Exception):
-                            os.remove(t_path)
+                # Auto-DLQ Self-Healing Background Daemon: Auto-retry after 45s with fresh message reference
+                if item.retry_count < 2 and not self.cfg.run_dlq:
+                    item.retry_count += 1
+                    async def auto_retry_later(w_item, delay=45.0):
+                        await asyncio.sleep(delay)
+                        if stop_event.is_set(): return
+                        try:
+                            cl = self.session_mgr.get_client()
+                            fresh_msgs = await cl.get_messages(_parse_chat_id(source_chat), ids=[m.id for m in w_item.messages])
+                            if fresh_msgs and any(fresh_msgs):
+                                w_item.messages = [m for m in fresh_msgs if m]
+                                self.log(f"[bold yellow]🔄 Auto-DLQ Self-Healing retry triggered for Message #{w_item.first_id}...[/]")
+                                await self.execute(w_item, stop_event)
+                        except Exception as retry_err:
+                            self.log(f"[dim red]Auto-DLQ background attempt {w_item.retry_count} failed: {retry_err}[/]")
+                    asyncio.create_task(auto_retry_later(item))
+            finally:
+                if is_temp_extracted_thumb and t_path and os.path.exists(t_path):
+                    with suppress(Exception):
+                        os.remove(t_path)
 
         if success_flag:
             for m in active_messages:
-                await self.state.mark_completed(source_chat, m.id, target_chat, target_topic or 0)
+                await self.state.mark_completed(source_chat, m.id, target_chat, target_topic or 0, source_topic=source_topic or 0)
                 if getattr(m, "video", None):
                     self.metrics["videos_sent"] = self.metrics.get("videos_sent", 0) + 1
                 elif getattr(m, "document", None):
@@ -3720,6 +3769,8 @@ class TerminalPlatform:
 
         self.queue = asyncio.Queue(self.cfg.perf.queue_size)
         self.stop_evt = asyncio.Event()
+        self.pause_evt = asyncio.Event()
+        self.pause_evt.set()
         self.logs = deque(maxlen=25)
         
         self.start_time = time.monotonic()
@@ -3947,6 +3998,8 @@ class TerminalPlatform:
             # Telethon iterator with safe fallback for forum topic
             async for msg in client.iter_messages(src_p, reply_to=src_topic_id, reverse=True, min_id=min_id):
                 if self.stop_evt.is_set(): break
+                while not self.pause_evt.is_set() and not self.stop_evt.is_set():
+                    await asyncio.sleep(1.0)
                 if await self.state.is_processed(self.cfg.source_chat, msg.id, tgt_p, tgt_topic):
                     if group and gid and getattr(msg, "grouped_id", None) == gid:
                         await push()
@@ -4060,6 +4113,8 @@ class TerminalPlatform:
         try:
             async for msg in client.iter_messages(src_p, reply_to=rule.get("source_topic", 0) or None, reverse=True, min_id=min_id):
                 if self.stop_evt.is_set(): break
+                while not self.pause_evt.is_set() and not self.stop_evt.is_set():
+                    await asyncio.sleep(1.0)
                 if await self.state.is_processed(rule["source_chat"], msg.id, tgt_p, tgt_topic):
                     if group and gid and getattr(msg, "grouped_id", None) == gid:
                         await push_rule()
@@ -4242,17 +4297,31 @@ class TerminalPlatform:
                 with suppress(Exception):
                     await event.reply(status_card, parse_mode="md")
 
-            elif clean_cmd in ("pause", "stop", "freeze"):
+            elif clean_cmd in ("pause", "freeze", "hold"):
                 self.log("[bold yellow]⏸ Remote Pause Triggered from Saved Messages[/]")
+                self.pause_evt.clear()
+                ctrl_p = Path("engine_control.json")
                 with suppress(Exception):
-                    await event.reply("⏸ **Forwarding Paused Remotely.** Bookmarks & history saved safely.", parse_mode="md")
-                self.stop_evt.set()
+                    with open(ctrl_p, "w", encoding="utf-8") as cf:
+                        json.dump({"paused": True, "ts": time.time()}, cf)
+                with suppress(Exception):
+                    await event.reply("⏸ **Forwarding Paused Remotely.**\n• Pipeline suspended in standby.\n• Bookmarks & sequence preserved safely.\n• Send `/resume` to continue immediately.", parse_mode="md")
 
-            elif clean_cmd in ("resume", "start", "unpause"):
+            elif clean_cmd in ("resume", "start", "unpause", "play"):
                 self.log("[bold green]▶ Remote Resume Triggered from Saved Messages[/]")
-                self.stop_evt.clear()
+                self.pause_evt.set()
+                ctrl_p = Path("engine_control.json")
                 with suppress(Exception):
-                    await event.reply("▶ **Forwarding Resumed Remotely.** Transfer loop active.", parse_mode="md")
+                    with open(ctrl_p, "w", encoding="utf-8") as cf:
+                        json.dump({"paused": False, "ts": time.time()}, cf)
+                with suppress(Exception):
+                    await event.reply("▶ **Forwarding Resumed Remotely.**\n• Fast streaming pipeline active.\n• Resuming from exact sequence position.", parse_mode="md")
+
+            elif clean_cmd in ("stop", "exit", "terminate"):
+                self.log("[bold yellow]⏹ Remote Stop Received from Saved Messages[/]")
+                with suppress(Exception):
+                    await event.reply("⏹ **Forwarding Stopped Remotely.** Safely shutting down engine and flushing database...", parse_mode="md")
+                self.stop_evt.set()
 
             elif clean_cmd in ("kill", "kill_all", "killall", "unlock_db", "force_stop"):
                 self.log("[bold red]🛑 Remote Kill & Force Stop Triggered from Saved Messages[/]")
@@ -4384,28 +4453,49 @@ class TerminalPlatform:
     async def worker_supervisor(self, wid: int, proc: PipelineProcessor):
         items_processed = 0
         while not self.stop_evt.is_set():
+            # Check pause event before fetching item
+            while not self.pause_evt.is_set() and not self.stop_evt.is_set():
+                await asyncio.sleep(0.5)
+
+            # Dynamic remote pause/resume check from Web Dashboard / Mobile
+            ctrl_p = Path("engine_control.json")
+            if ctrl_p.exists():
+                with suppress(Exception):
+                    with open(ctrl_p, "r", encoding="utf-8") as cf:
+                        c_state = json.load(cf)
+                        if c_state.get("paused", False):
+                            self.pause_evt.clear()
+                        while c_state.get("paused", False) and not self.stop_evt.is_set():
+                            await asyncio.sleep(1.0)
+                            if ctrl_p.exists():
+                                with open(ctrl_p, "r", encoding="utf-8") as cf2:
+                                    c_state = json.load(cf2)
+                        if not c_state.get("paused", False):
+                            self.pause_evt.set()
+
+            if self.stop_evt.is_set():
+                break
+
             item = None
             try:
-                item = await self.queue.get()
+                try:
+                    item = await asyncio.wait_for(self.queue.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
+
                 if item is None:
                     self.queue.task_done()
                     break
 
-                # Dynamic remote pause/resume check from Web Dashboard / Mobile
-                ctrl_p = Path("engine_control.json")
-                if ctrl_p.exists():
+                # Re-check pause event before starting heavy item execution
+                while not self.pause_evt.is_set() and not self.stop_evt.is_set():
+                    await asyncio.sleep(0.5)
+
+                if self.stop_evt.is_set():
                     with suppress(Exception):
-                        with open(ctrl_p, "r", encoding="utf-8") as cf:
-                            c_state = json.load(cf)
-                            if c_state.get("paused", False):
-                                self.log("[bold yellow]⏸ Forwarding Paused via Web Dashboard[/]")
-                            while c_state.get("paused", False) and not self.stop_evt.is_set():
-                                await asyncio.sleep(1.0)
-                                if ctrl_p.exists():
-                                    with open(ctrl_p, "r", encoding="utf-8") as cf2:
-                                        c_state = json.load(cf2)
-                            if not c_state.get("paused", False):
-                                pass
+                        await self.queue.put(item)
+                    self.queue.task_done()
+                    break
 
                 await proc.execute(item, self.stop_evt)
                 
@@ -4415,7 +4505,7 @@ class TerminalPlatform:
             except Exception as e:
                 self.log(f"[red]Worker {wid} Crash: {e}[/]")
             finally:
-                if item is not None:
+                if item is not None and not self.stop_evt.is_set():
                     self.queue.task_done()
 
     def get_system_health(self):
