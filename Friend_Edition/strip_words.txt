@@ -47,8 +47,6 @@ YW
 # --- [Spam Bots & Usernames] ---
 @YourSynapse_bot
 YourSynapse_bot
-@Dams_new_robot.pdf
-Dams_new_robot.pdf
 @Dams_new_robot
 Dams_new_robot
 @medAcadpdf

@@ -372,9 +372,18 @@ This log permanently documents root causes, architectural patterns, historical b
 * **Permanent Fix Applied**:
   - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py):
     1. **MTProto Size Compression Loop**: Enhanced `ThumbEnforcer._build()` with an automated PIL progressive compression loop (`quality=80` down to `40`, `optimize=True`, `progressive=True`) guaranteeing `tg_thumb_cached.jpg` is always strictly **<= 120 KB** (tested at 114.59 KB), fully compliant with Telegram MTProto standards.
-    2. **Fresh Token Dispatch**: `ThumbEnforcer.get_input_file()` provides direct local file path references, allowing Telethon to generate fresh valid MTProto upload handles per file dispatch without single-use token expiration.
-    3. **Original Thumbnail Extraction**: Implemented `extract_original_thumb(client, msg)` to download `msg.download_media(thumb=-1)` on-the-fly when `THUMB_MODE='original'`, ensuring 100% of videos (whether custom branded or original mode) receive valid thumbnail covers.
-    4. **Cloner & Cherry Picker Video Protection**: Injected thumbnail extraction and full `DocumentAttributeVideo(duration, w=1280, h=720, supports_streaming=True)` into protected bypass routines in Cherry Picker and Topic Cloner.
+### 36. Extended Watermark, Bot Mentions & Emoji Stripping Rules
+* **Enhancement**:
+  - Added user-requested watermarks, bot channels, and emoji patterns to [strip_words.txt](file:///c:/TG_KindSync_Pro/strip_words.txt), [Friend_Edition/strip_words.txt](file:///c:/TG_KindSync_Pro/Friend_Edition/strip_words.txt), and `.env`:
+    - `Yw @gatekeeperbasbot`, `YW @gatekeeperbasbot`, `yw @gatekeeperbasbot`, `@gatekeeperbasbot`, `gatekeeperbasbot`
+    - `@Dams_new_robot.pdf`, `Dams_new_robot.pdf`, `@Dams_new_robot`, `Dams_new_robot`
+    - `The Pirate Bay 🏴☠️`, `The Pirate Bay 🏴‍☠️`, `The Pirate Bay 🏴`, `The Pirate Bay`
+    - `🏴☠️`, `🏴‍☠️`, `🏴`
+    - `yw`, `Yw`, `YW`
+    - Standalone `#` hashtag symbols
+  - Hardened `get_clean_rules()` parser in [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py) to differentiate comments from literal `#` strip patterns.
+  - Verified across 72 total active cleaning rules with 100% test pass rate.
+
 
 
 
