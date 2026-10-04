@@ -3972,7 +3972,9 @@ class TerminalPlatform:
                 "videos_sent": self.metrics.get("videos_sent", 0),
                 "docs_sent": self.metrics.get("docs_sent", 0),
                 "photos_sent": self.metrics.get("photos_sent", 0),
-                "text_sent": self.metrics.get("text_sent", 0)
+                "text_sent": self.metrics.get("text_sent", 0),
+                "src_info": getattr(self, "src_info", ""),
+                "tgt_info": getattr(self, "tgt_info", "")
             }
             with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f)
