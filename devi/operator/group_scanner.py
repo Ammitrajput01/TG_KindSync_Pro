@@ -12,8 +12,9 @@ import sys
 import asyncio
 import sqlite3
 import shutil
+import re
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from contextlib import suppress
 from dotenv import load_dotenv
 
@@ -149,7 +150,6 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
                     if topic_id and topic_id > 1:
                         iter_kwargs["reply_to"] = topic_id
                     async for msg in client.iter_messages(peer, **iter_kwargs):
-                        # Skip bot messages or status notifications
                         if getattr(msg.sender, 'bot', False) or getattr(msg, 'via_bot_id', None):
                             continue
 
@@ -186,7 +186,6 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
                             for ext in [".mp4", ".pdf", ".mkv", ".m4a", ".mp3", ".avi", ".epub"]:
                                 clean = clean.replace(ext, "").replace(ext.upper(), "")
                             clean = clean.strip()
-                            # Also skip if clean text matches bot notification pattern
                             if any(m in clean.lower() for m in BOT_IGNORE_MARKERS):
                                 continue
                             if clean:
@@ -214,26 +213,149 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
             return 0
     return 0
 
-import re
+async def harvest_all_messages(client, peer, target_chat_id: int) -> int:
+    """Universally harvests all topics and media messages in a single continuous stream."""
+    from telethon.tl.types import MessageActionTopicCreate, MessageActionTopicEdit
+    BOT_IGNORE_MARKERS = (
+        "auto-scan", "auto-pinned", "kind doctor", "topic study index", 
+        "topic index (part", "table of contents", "master topic directory", 
+        "index items add", "study index card", "auto-pin", "1-click auto-scan",
+        "topic #", "ke media files auto-scan"
+    )
+    harvested_count = 0
+    known_topics = {}
+    
+    # Load known topics from DB
+    try:
+        with get_db_conn() as conn:
+            init_tables(conn)
+            rows = conn.execute("SELECT topic_id, topic_title FROM telegram_group_topics WHERE chat_id = ?", (target_chat_id,)).fetchall()
+            for r in rows:
+                known_topics[r[0]] = r[1]
+    except Exception as e:
+        print(f"[!] Error loading topics: {e}")
+
+    batch_items = []
+    
+    try:
+        async for msg in client.iter_messages(peer, limit=None):
+            # 1. Discover Forum Topics from action messages
+            if getattr(msg, 'action', None):
+                if isinstance(msg.action, MessageActionTopicCreate):
+                    t_title = msg.action.title.strip()
+                    known_topics[msg.id] = t_title
+                    with get_db_conn() as conn:
+                        conn.execute("""
+                            INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title, topic_icon, updated_at)
+                            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        """, (target_chat_id, msg.id, t_title, get_topic_icon(t_title)))
+                        conn.commit()
+                elif isinstance(msg.action, MessageActionTopicEdit):
+                    if getattr(msg.action, 'title', None):
+                        t_title = msg.action.title.strip()
+                        known_topics[msg.id] = t_title
+                        with get_db_conn() as conn:
+                            conn.execute("""
+                                UPDATE telegram_group_topics SET topic_title = ?, topic_icon = ?, updated_at = CURRENT_TIMESTAMP
+                                WHERE chat_id = ? AND topic_id = ?
+                            """, (t_title, get_topic_icon(t_title), target_chat_id, msg.id))
+                            conn.commit()
+
+            # Skip bot messages or status notifications
+            if getattr(msg.sender, 'bot', False) or getattr(msg, 'via_bot_id', None):
+                continue
+
+            msg_text = (msg.message or "").strip()
+            if any(m in msg_text.lower() for m in BOT_IGNORE_MARKERS):
+                continue
+
+            title = None
+            icon = "🎬"
+            item_type = "video"
+
+            if msg.video:
+                title = msg.file.name if (msg.file and msg.file.name) else (msg_text.split("\n")[0] if msg_text else f"Lecture Video #{msg.id}")
+                icon = "🎬"
+                item_type = "video"
+            elif msg.document:
+                title = msg.file.name if (msg.file and msg.file.name) else (msg_text.split("\n")[0] if msg_text else f"Lecture Notes #{msg.id}")
+                icon = "📑"
+                item_type = "document"
+            elif msg.audio:
+                title = msg.file.name if (msg.file and msg.file.name) else (msg_text.split("\n")[0] if msg_text else f"Audio #{msg.id}")
+                icon = "🎧"
+                item_type = "audio"
+            elif msg_text and len(msg_text) > 3:
+                first_line = msg_text.split("\n")[0].strip()
+                if not first_line.startswith("/") and len(first_line) < 120:
+                    if not any(m in first_line.lower() for m in BOT_IGNORE_MARKERS):
+                        title = first_line
+                        icon = "📌"
+                        item_type = "note"
+
+            if title:
+                clean = title
+                for ext in [".mp4", ".pdf", ".mkv", ".m4a", ".mp3", ".avi", ".epub"]:
+                    clean = clean.replace(ext, "").replace(ext.upper(), "")
+                clean = clean.strip()
+                if any(m in clean.lower() for m in BOT_IGNORE_MARKERS):
+                    continue
+                if clean:
+                    # Resolve topic ID from reply header
+                    msg_topic_id = getattr(msg.reply_to, 'reply_to_top_id', None) or getattr(msg.reply_to, 'reply_to_msg_id', None) or 1
+                    
+                    # Ensure topic exists in DB
+                    if msg_topic_id not in known_topics:
+                        t_name = f"Topic #{msg_topic_id}" if msg_topic_id > 1 else "General Study Materials"
+                        known_topics[msg_topic_id] = t_name
+                        with get_db_conn() as conn:
+                            conn.execute("""
+                                INSERT OR IGNORE INTO telegram_group_topics (chat_id, topic_id, topic_title, topic_icon, updated_at)
+                                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                            """, (target_chat_id, msg_topic_id, t_name, get_topic_icon(t_name)))
+                            conn.commit()
+
+                    batch_items.append((target_chat_id, msg_topic_id, msg.id, clean[:100], icon, item_type))
+                    harvested_count += 1
+                    
+                    if len(batch_items) >= 50:
+                        with get_db_conn() as conn:
+                            conn.executemany("""
+                                INSERT OR REPLACE INTO telegram_topic_items 
+                                (chat_id, topic_id, msg_id, title, icon, item_type)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, batch_items)
+                            conn.commit()
+                        batch_items = []
+
+        if batch_items:
+            with get_db_conn() as conn:
+                conn.executemany("""
+                    INSERT OR REPLACE INTO telegram_topic_items 
+                    (chat_id, topic_id, msg_id, title, icon, item_type)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, batch_items)
+                conn.commit()
+    except Exception as ex:
+        print(f"[!] Warning during full harvest stream: {ex}")
+
+    print(f"[+] Total harvested {harvested_count} media items in group {target_chat_id}")
+    return harvested_count
 
 def extract_telegram_target(target_input: str):
     """Extracts invite hash, username, or numeric chat ID from input string."""
     raw = str(target_input).strip()
-    # Invite link (e.g. https://t.me/+hash or https://t.me/joinchat/hash)
     m_inv = re.search(r'(?:https?://)?(?:www\.)?(?:t\.me|telegram\.me)/(?:\+|joinchat/)([a-zA-Z0-9_-]+)', raw)
     if m_inv:
         return {"type": "invite_hash", "value": m_inv.group(1)}
     
-    # Public channel / group link (e.g. https://t.me/channel_name)
     m_url = re.search(r'(?:https?://)?(?:www\.)?(?:t\.me|telegram\.me)/([a-zA-Z0-9_]{4,})', raw)
     if m_url:
         return {"type": "username", "value": m_url.group(1)}
     
-    # Direct username (e.g. @channel_name)
     if raw.startswith("@"):
         return {"type": "username", "value": raw.lstrip("@")}
         
-    # Numeric ID
     try:
         val = int(raw)
         return {"type": "chat_id", "value": val}
@@ -258,14 +380,12 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
                 try:
                     updates = await client(ImportChatInviteRequest(h_val))
                     if hasattr(updates, 'chats') and updates.chats:
-                        ent = updates.chats[0]
-                        peer = ent
-                        target_chat_id = normalize_supergroup_chat_id(ent.id)
-                        print(f"[+] Successfully joined group via invite link: id={target_chat_id}")
+                        target_chat_id = normalize_supergroup_chat_id(updates.chats[0].id)
+                        peer = updates.chats[0]
                 except UserAlreadyParticipantError:
                     pass
                 except Exception as e:
-                    print(f"[!] Invite link join error: {e}")
+                    print(f"[!] ImportChatInviteRequest error: {e}")
 
             if not peer:
                 try:
@@ -290,7 +410,6 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
         # 3. Handle Numeric Chat IDs
         elif target_info["type"] == "chat_id":
             target_chat_id = normalize_supergroup_chat_id(target_info["value"])
-            # Ensure proper supergroup prefix if needed
             try:
                 peer = await client.get_input_entity(target_chat_id)
             except Exception:
@@ -349,7 +468,6 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
             print(f"[!] Fatal: Could not resolve peer for input '{target_input}'")
             return
 
-        # Ensure normalized negative ID for supergroups
         target_chat_id = normalize_supergroup_chat_id(target_chat_id)
 
         # Case 1: Targeted Single-Topic Scan (Lightning fast for /topicindex)
@@ -374,74 +492,9 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
             return
 
         # Case 2: Full Group Scan
-        topics_list = []
-        if client_type == "user":
-            try:
-                offset_topic = 0
-                while True:
-                    res = await client(GetForumTopicsRequest(
-                        peer=peer,
-                        offset_date=None,
-                        offset_id=0,
-                        offset_topic=offset_topic,
-                        limit=100
-                    ))
-                    batch = getattr(res, 'topics', []) or []
-                    if not batch:
-                        break
-                    topics_list.extend(batch)
-                    if len(batch) < 100:
-                        break
-                    offset_topic = batch[-1].id
-            except Exception as e:
-                print(f"[!] Warning: GetForumTopicsRequest failed ({e})")
-
-        with get_db_conn() as conn:
-            init_tables(conn)
-
-            # If topics_list was retrieved via MTProto user API
-            if topics_list:
-                for t in topics_list:
-                    topic_title = getattr(t, 'title', None) or f"Topic #{t.id}"
-                    topic_icon = get_topic_icon(topic_title)
-                    conn.execute("""
-                        INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title, topic_icon, updated_at)
-                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    """, (target_chat_id, t.id, topic_title, topic_icon))
-                conn.commit()
-                print(f"STAGE 1 COMPLETE: {len(topics_list)} topics registered to DB!")
-
-            # If topics_list is empty (e.g. running under bot token), read existing topics from DB
-            if not topics_list:
-                rows = conn.execute("SELECT topic_id, topic_title FROM telegram_group_topics WHERE chat_id = ?", (target_chat_id,)).fetchall()
-                topics_list = [{"id": r[0], "title": r[1]} for r in rows]
-
-        # STAGE 2: HARVEST MESSAGES (outside master connection to avoid long locks)
-        if scan_messages:
-            if not topics_list:
-                # Normal group (no forum topics) - Register root topic 0 and harvest all messages
-                default_title = "General Study Materials & Notes"
-                with get_db_conn() as conn:
-                    conn.execute("""
-                        INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title, topic_icon, updated_at)
-                        VALUES (?, 0, ?, '📚', CURRENT_TIMESTAMP)
-                    """, (target_chat_id, default_title))
-                    conn.commit()
-                cnt = await scan_single_topic(client, peer, target_chat_id, 0, default_title)
-                print(f"STAGE 2 COMPLETE: {cnt} items indexed in General Study Group!")
-            else:
-                total_harvested = 0
-                for t in topics_list:
-                    t_id = t.id if hasattr(t, 'id') else t["id"]
-                    t_title = getattr(t, 'title', None) or (t.get("title") if isinstance(t, dict) else f"Topic #{t_id}")
-                    if t_id == 1 and len(topics_list) > 1:
-                        continue  # Skip root general topic if specific topics exist
-                    cnt = await scan_single_topic(client, peer, target_chat_id, t_id, t_title)
-                    total_harvested += cnt
-
-                print(f"STAGE 2 COMPLETE: {total_harvested} total media items indexed across all topics!")
-
-        print(f"SUCCESS: Scanned group {target_chat_id}")
+        total_items = await harvest_all_messages(client, peer, target_chat_id)
+        print(f"SUCCESS: Scanned group {target_chat_id} ({total_items} items indexed)")
+        return
 
     finally:
         with suppress(Exception):
@@ -455,7 +508,6 @@ if __name__ == "__main__":
     target_topic = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else None
     preferred_user = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].isdigit() else None
     
-    # Determine if arg1 is numeric or string (url/username)
     try:
         target_chat = int(raw_arg1)
     except ValueError:
