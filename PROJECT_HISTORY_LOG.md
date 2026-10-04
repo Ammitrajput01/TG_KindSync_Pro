@@ -575,3 +575,5 @@ This log permanently documents root causes, architectural patterns, historical b
   - **Clean English Notice & Interactive DM Buttons**:
     - Updated `/scan` and `/mainindex` empty/restricted notice texts to clear, professional English detailing 4 easy ways to auto-index.
     - Added direct clickable links to Bot Private DM (`https://t.me/KindDoc_bot?start=linkaccount`) directly inside the text body and interactive inline buttons (`[ 🔗 Link Your Account ]`, `[ ⚡ 1-Click Auto-Scan ]`, `[ 🗑️ Delete Notice (Admin) ]`).
+  - **Supergroup ID Normalization Fix (`normalize_supergroup_chat_id`)**:
+    - Fixed mathematical multiplication bug `-100 * id` in [devi/operator/group_scanner.py](file:///c:/TG_KindSync_Pro/devi/operator/group_scanner.py) (which generated invalid `-350480711400` instead of `-1003504807114`), ensuring 100% matched database queries between bot and scanner engine.
