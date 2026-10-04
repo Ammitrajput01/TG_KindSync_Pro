@@ -3116,7 +3116,7 @@ def customize_caption(caption, for_media=False, batch_name=""):
         rest_lines = lines[1:]
 
         # Clean spaces before dots / extensions in first_line
-        first_line = re.sub(r"\s+(\.(?:[a-zA-Z0-9]{2,5}))\b", r"\1", first_line)
+        first_line = re.sub(r"\s+\.([a-zA-Z0-9]{2,6})\b", r".\1", first_line)
 
         # Detect Emoji based on filename / extension
         emoji = "📄"
@@ -3131,7 +3131,7 @@ def customize_caption(caption, for_media=False, batch_name=""):
             emoji = "🖼️"
 
         # Clean technical file extension from title line for clean display
-        first_line_clean = re.sub(r"(?i)\s*\.(?:mp4|mkv|avi|mov|webm|ts|m4v|pdf|docx?|pptx?|epub|zip|rar|mp3|m4a|wav)$", "", first_line).strip()
+        first_line_clean = re.sub(r"(?i)\s*\.(?:mp4|mkv|avi|mov|webm|ts|m4v|pdf|docx?|pptx?|epub|zip|rar|mp3|m4a|wav)(?=\s|$|\*|_|`)", "", first_line).strip()
         if first_line_clean:
             first_line = first_line_clean
 
@@ -3145,8 +3145,8 @@ def customize_caption(caption, for_media=False, batch_name=""):
                     filtered_rest.append(rl)
             clean = "\n".join([formatted_title] + filtered_rest).strip()
         elif first_line and re.search(r"(?i)\btitle\s*[:*]", first_line):
-            clean_first = re.sub(r"\s+(\.(?:[a-zA-Z0-9]{2,5}))\b", r"\1", first_line)
-            clean_first = re.sub(r"(?i)\s*\.(?:mp4|mkv|avi|mov|webm|ts|m4v|pdf|docx?|pptx?|epub|zip|rar|mp3|m4a|wav)$", "", clean_first).strip()
+            clean_first = re.sub(r"\s+\.([a-zA-Z0-9]{2,6})\b", r".\1", first_line)
+            clean_first = re.sub(r"(?i)\s*\.(?:mp4|mkv|avi|mov|webm|ts|m4v|pdf|docx?|pptx?|epub|zip|rar|mp3|m4a|wav)(?=\s|$|\*|_|`)", "", clean_first).strip()
             clean = "\n".join([clean_first] + rest_lines).strip()
 
     # Batch Tag Integration

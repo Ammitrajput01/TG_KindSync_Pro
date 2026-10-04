@@ -29,21 +29,6 @@ icacls "!KEY_PATH!" /inheritance:r >nul 2>nul
 icacls "!KEY_PATH!" /grant:r "%USERNAME%:R" >nul 2>nul
 
 echo [*] Connecting to your Oracle VPS (130.210.1.32)...
-echo [*] Freeing session locks on Oracle VPS...
-ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "!KEY_PATH!" ubuntu@130.210.1.32 "sudo systemctl stop tg-forwarder 2>/dev/null || true"
-
-if errorlevel 1 (
-    echo.
-    echo ⚠️ [NOTICE] VPS Direct SSH could not connect ^(Host connection closed / timeout^).
-    echo If your Oracle VPS is restarting or network changed, please check Oracle Cloud Console.
-    echo.
-    echo 💡 To run TG KindSync Pro LOCALLY on your PC right now:
-    echo    Bas '1_START_PRO.bat' me [1] dabayein ya 'python main.py' run karein!
-    echo.
-    pause
-    exit /b 1
-)
-
 echo [*] Launching 24/7 Persistent Terminal (tmux session)...
 echo [*] Note: You can safely close your laptop anytime - cloning will continue 24/7 in cloud!
 echo.
