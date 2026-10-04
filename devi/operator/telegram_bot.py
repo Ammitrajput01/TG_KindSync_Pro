@@ -100,6 +100,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/mainindex", "/topicindex", "/indexmaster", "/index",
     "/scan", "/autoindex", "/start", "/menu", "/fullhelp", "/manual",
     "/support", "/contact", "/id", "/myid", "/info",
+    "/linkaccount", "/connectaccount", "/myaccount", "/accountinfo", "/unlinkaccount", "/disconnect", "/logout",
     "/stats", "/leaderboard", "/topmembers", "/history", "/rules",
     "/userinfo", "/whois", "/botinfo", "/about",
     "/engine", "/status", "/backup", "/clean", "/cleanbot", "/sangmata",
@@ -133,6 +134,8 @@ class DeviTelegramBot:
         self.relay_map: Dict[tuple, Dict[str, Any]] = {}
         # Anti-Flood tracking: user_id -> list of timestamps
         self.flood_tracker: Dict[int, list] = {}
+        # Multi-Tenant User Session Linking State: user_id -> auth state dict
+        self.pending_auth: Dict[int, Dict[str, Any]] = {}
         
         self.memory = MemoryStore()
         self.evaluator = Evaluator(self.memory)
@@ -2167,6 +2170,224 @@ class DeviTelegramBot:
             except Exception as e:
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}"})
 
+    async def _handle_account_linking_step(self, session: aiohttp.ClientSession, chat_id: int, user_id: int, text: str, message: dict) -> bool:
+        """Processes interactive phone number -> OTP -> 2FA login steps for user session linking."""
+        auth_state = self.pending_auth.get(user_id)
+        if not auth_state:
+            return False
+
+        step = auth_state.get("step")
+        clean_txt = (text or "").strip()
+
+        # Cancellation
+        if clean_txt.lower() in ("/cancel", "cancel", "abort"):
+            client = auth_state.get("client")
+            if client:
+                with suppress(Exception):
+                    await client.disconnect()
+            self.pending_auth.pop(user_id, None)
+            await self._send_message(session, chat_id, "❌ **Account linking process cancelled.**")
+            return True
+
+        # STEP 1: Awaiting Phone Number
+        if step == "awaiting_phone":
+            phone = clean_txt
+            if "contact" in message:
+                phone = message["contact"].get("phone_number", "")
+            phone = re.sub(r'[^0-9+]', '', phone)
+            if not phone.startswith("+"):
+                phone = f"+{phone}"
+
+            if len(phone) < 8 or not phone[1:].isdigit():
+                await self._send_message(
+                    session, chat_id,
+                    "⚠️ **Invalid Phone Number format.**\n"
+                    "Kripya country code ke sath phone number bhejein (e.g. `+919876543210`) ya `/cancel` likhein."
+                )
+                return True
+
+            wait_msg = await self._send_message(session, chat_id, f"⏳ Connecting to Telegram for `{phone}`...")
+            try:
+                from telethon import TelegramClient
+                from telethon.sessions import StringSession
+                
+                client = TelegramClient(StringSession(), API_ID, API_HASH)
+                await client.connect()
+                send_code = await client.send_code_request(phone)
+                
+                auth_state["client"] = client
+                auth_state["phone"] = phone
+                auth_state["phone_code_hash"] = send_code.phone_code_hash
+                auth_state["step"] = "awaiting_otp"
+                auth_state["ts"] = asyncio.get_event_loop().time()
+
+                if wait_msg:
+                    await self._delete_message(session, chat_id, wait_msg)
+
+                otp_notice = (
+                    f"📩 <b>OTP Sent Successfully to {phone}!</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Aapke Telegram app par official <b>Telegram Service Notifications</b> se ek 5-digit login code aaya hoga.\n\n"
+                    f"👉 <b>Kripya wo code yahan bhejein:</b>\n"
+                    f"<i>(Tip: Aap <code>1 2 3 4 5</code> ya <code>12345</code> format me bhej sakte hain).</i>\n\n"
+                    f"❌ <i>(Cancel karne ke liye <code>/cancel</code> bhejein).</i>"
+                )
+                await self._send_message(session, chat_id, otp_notice)
+            except Exception as e:
+                if wait_msg:
+                    await self._delete_message(session, chat_id, wait_msg)
+                self.pending_auth.pop(user_id, None)
+                await self._send_message(session, chat_id, f"❌ **Login request failed:** {e}\n\nKripya `/linkaccount` dobara try karein.")
+            return True
+
+        # STEP 2: Awaiting OTP
+        elif step == "awaiting_otp":
+            raw_code = re.sub(r'[^0-9]', '', clean_txt)
+            if len(raw_code) < 4:
+                await self._send_message(
+                    session, chat_id,
+                    "⚠️ **Invalid OTP Code.** Kripya 5-digit code bhejein jo aapko Telegram Notifications me mila hai (ya `/cancel` likhein)."
+                )
+                return True
+
+            client = auth_state.get("client")
+            phone = auth_state.get("phone")
+            phone_code_hash = auth_state.get("phone_code_hash")
+
+            if not client:
+                self.pending_auth.pop(user_id, None)
+                await self._send_message(session, chat_id, "⚠️ Session timed out. Kripya `/linkaccount` dobara karein.")
+                return True
+
+            wait_msg = await self._send_message(session, chat_id, "⏳ Verifying login code...")
+            try:
+                from telethon.sessions import StringSession
+                from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError
+                try:
+                    await client.sign_in(phone, code=raw_code, phone_code_hash=phone_code_hash)
+                    # Success without 2FA
+                    me = await client.get_me()
+                    s_str = StringSession.save(client.session)
+                    await client.disconnect()
+
+                    from devi.operator.session_vault import save_linked_user_session
+                    full_name = f"{me.first_name or ''} {me.last_name or ''}".strip() or "Telegram User"
+                    save_linked_user_session(user_id, phone, s_str, name=full_name, username=me.username or "")
+                    self.pending_auth.pop(user_id, None)
+
+                    if wait_msg:
+                        await self._delete_message(session, chat_id, wait_msg)
+
+                    success_txt = (
+                        f"🎉 <b>Telegram Account Linked Successfully!</b> 🚀\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 <b>Account:</b> <b>{html.escape(full_name)}</b>\n"
+                        f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
+                        f"📱 <b>Phone:</b> <code>{phone}</code>\n\n"
+                        f"✨ <b>Ab kya hoga?</b>\n"
+                        f"• Aap jis bhi group me member/admin hain, wahan jab <code>/scan</code> chalega toh aapka account auto-index power provide karega!\n"
+                        f"• 100% Topics aur lakho lectures bina kisi restriction ke index honge.\n"
+                        f"• Aapka session isolated and secure SQLite vault me stored hai.\n\n"
+                        f"🗑️ <i>(Aap jab chahe <code>/unlinkaccount</code> bhej kar apna session delete kar sakte hain).</i>"
+                    )
+                    await self._send_message(session, chat_id, success_txt)
+                    return True
+
+                except SessionPasswordNeededError:
+                    auth_state["step"] = "awaiting_2fa"
+                    if wait_msg:
+                        await self._delete_message(session, chat_id, wait_msg)
+                    twofa_msg = (
+                        "🔒 <b>Two-Step Verification (2FA) Cloud Password Required</b>\n\n"
+                        "Aapke account par 2FA active hai. Kripya apna 2FA Password yahan bhejein:\n"
+                        "<i>(Password safely verify hoga aur kahin leak nahi hoga).</i>"
+                    )
+                    await self._send_message(session, chat_id, twofa_msg)
+                    return True
+
+                except PhoneCodeInvalidError:
+                    if wait_msg:
+                        await self._delete_message(session, chat_id, wait_msg)
+                    await self._send_message(session, chat_id, "❌ **Incorrect OTP Code.** Kripya check karke sahi code bhejein:")
+                    return True
+
+                except PhoneCodeExpiredError:
+                    if wait_msg:
+                        await self._delete_message(session, chat_id, wait_msg)
+                    with suppress(Exception):
+                        await client.disconnect()
+                    self.pending_auth.pop(user_id, None)
+                    await self._send_message(session, chat_id, "⚠️ **OTP code expired.** Kripya `/linkaccount` dobara karein.")
+                    return True
+
+            except Exception as e:
+                if wait_msg:
+                    await self._delete_message(session, chat_id, wait_msg)
+                with suppress(Exception):
+                    await client.disconnect()
+                self.pending_auth.pop(user_id, None)
+                await self._send_message(session, chat_id, f"❌ **Verification error:** {e}\n\nKripya `/linkaccount` dobara try karein.")
+                return True
+
+        # STEP 3: Awaiting 2FA Password
+        elif step == "awaiting_2fa":
+            password = clean_txt
+            client = auth_state.get("client")
+            phone = auth_state.get("phone")
+
+            if not client:
+                self.pending_auth.pop(user_id, None)
+                await self._send_message(session, chat_id, "⚠️ Session timed out. Kripya `/linkaccount` dobara karein.")
+                return True
+
+            wait_msg = await self._send_message(session, chat_id, "⏳ Verifying 2FA Password...")
+            try:
+                from telethon.sessions import StringSession
+                from telethon.errors import PasswordHashInvalidError
+                try:
+                    await client.sign_in(password=password)
+                    me = await client.get_me()
+                    s_str = StringSession.save(client.session)
+                    await client.disconnect()
+
+                    from devi.operator.session_vault import save_linked_user_session
+                    full_name = f"{me.first_name or ''} {me.last_name or ''}".strip() or "Telegram User"
+                    save_linked_user_session(user_id, phone, s_str, name=full_name, username=me.username or "")
+                    self.pending_auth.pop(user_id, None)
+
+                    if wait_msg:
+                        await self._delete_message(session, chat_id, wait_msg)
+
+                    success_txt = (
+                        f"🎉 <b>Telegram Account Linked Successfully! (2FA Verified)</b> 🚀\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 <b>Account:</b> <b>{html.escape(full_name)}</b>\n"
+                        f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
+                        f"📱 <b>Phone:</b> <code>{phone}</code>\n\n"
+                        f"✨ <b>Index Engine Active:</b>\n"
+                        f"Aapke kisi bhi group me <code>/scan</code> ab instant full-speed me kaam karega!\n\n"
+                        f"🗑️ <i>(Aap jab chahe <code>/unlinkaccount</code> bhej kar session remove kar sakte hain).</i>"
+                    )
+                    await self._send_message(session, chat_id, success_txt)
+                    return True
+
+                except PasswordHashInvalidError:
+                    if wait_msg:
+                        await self._delete_message(session, chat_id, wait_msg)
+                    await self._send_message(session, chat_id, "❌ **Incorrect 2FA Password.** Kripya apna sahi password dobara bhejein:")
+                    return True
+
+            except Exception as e:
+                if wait_msg:
+                    await self._delete_message(session, chat_id, wait_msg)
+                with suppress(Exception):
+                    await client.disconnect()
+                self.pending_auth.pop(user_id, None)
+                await self._send_message(session, chat_id, f"❌ **2FA Verification error:** {e}\n\nKripya `/linkaccount` dobara try karein.")
+                return True
+
+        return False
+
     async def _handle_incoming_message(self, session: aiohttp.ClientSession, message: dict):
         chat = message.get("chat", {})
         chat_type = chat.get("type", "private")
@@ -2182,6 +2403,12 @@ class DeviTelegramBot:
             return
 
         logger.info(f"📩 Telegram update from {sender_id} (@{sender.get('username')}) in {chat_id} [{chat_type}]: '{text}'")
+
+        # Multi-Tenant User Session Linking Flow in Private DM
+        if not is_group and sender_id in self.pending_auth:
+            handled = await self._handle_account_linking_step(session, chat_id, sender_id, text, message)
+            if handled:
+                return
 
         # ============================================================
         # 1. GROUP / SUPERGROUP SENTINEL SHIELD (SILENT GUARDIAN)
@@ -3128,17 +3355,118 @@ class DeviTelegramBot:
         # -------------------------------------------------------------
         # DUAL INDEX & AUTO-SCAN COMMANDS
         # -------------------------------------------------------------
+        elif cmd in ("/linkaccount", "/connectaccount", "/login"):
+            from devi.operator.session_vault import get_user_linked_session
+            existing = get_user_linked_session(admin_id)
+            if existing:
+                already_msg = (
+                    "✅ <b>Aapka Telegram Account pehle se linked hai!</b> 🩺\n\n"
+                    "• Details dekhne ke liye: <code>/myaccount</code>\n"
+                    "• Account disconnect karne ke liye: <code>/unlinkaccount</code>\n"
+                    "• Naya number link karne ke liye pehle <code>/unlinkaccount</code> karein."
+                )
+                await self._send_message(session, chat_id, already_msg, message_thread_id=thread_id)
+                return
+
+            if chat_id < 0:
+                guide_dm = (
+                    "🔒 <b>Security & Privacy Note:</b>\n\n"
+                    f"Phone number aur OTP enter karne ke liye kripya <b>Bot ke Private DM</b> me jayein:\n"
+                    f"👉 <a href=\"https://t.me/{self.bot_username}?start=linkaccount\"><b>Click here to Link Account securely in DM</b></a>"
+                )
+                await self._send_message(session, chat_id, guide_dm, message_thread_id=thread_id)
+                return
+
+            self.pending_auth[admin_id] = {
+                "step": "awaiting_phone",
+                "chat_id": chat_id,
+                "ts": asyncio.get_event_loop().time()
+            }
+            start_link_msg = (
+                "🔐 <b>Link Your Telegram Account (MTProto Fast-Indexer)</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Aap apna Telegram user account connect kar sakte hain taaki aapke groups ke <b>100% Forum Topics aur Millions of Lectures</b> 1-Click me auto-scan ho sakein.\n\n"
+                "📱 <b>Kripya apna Phone Number country code ke sath bhejein:</b>\n"
+                "<i>(Example: <code>+919876543210</code>)</i>\n\n"
+                "❌ <i>(Cancel karne ke liye <code>/cancel</code> likhein).</i>"
+            )
+            await self._send_message(session, chat_id, start_link_msg, message_thread_id=thread_id)
+
+        elif cmd in ("/myaccount", "/accountinfo"):
+            from devi.operator.session_vault import get_user_linked_session
+            s_str = get_user_linked_session(admin_id)
+            if not s_str:
+                not_linked = (
+                    "ℹ️ <b>Aapka koi Telegram Account linked nahi hai.</b>\n\n"
+                    "👉 Account link karne ke liye type karein: <code>/linkaccount</code>"
+                )
+                if chat_id < 0:
+                    markup = {
+                        "inline_keyboard": [
+                            [{"text": "🔗 Link Telegram Account in DM", "url": f"https://t.me/{self.bot_username}?start=linkaccount"}]
+                        ]
+                    }
+                else:
+                    markup = {
+                        "inline_keyboard": [
+                            [{"text": "🔗 Link Telegram Account", "callback_data": "act_link_account"}]
+                        ]
+                    }
+                await self._send_message(session, chat_id, not_linked, reply_markup=markup, message_thread_id=thread_id)
+                return
+
+            acc_info = (
+                f"👤 <b>Your Linked Telegram Account</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🆔 <b>User ID:</b> <code>{admin_id}</code>\n"
+                f"⚡ <b>Status:</b> <code>ACTIVE & READY</code> 🟢\n"
+                f"🚀 <b>Feature:</b> Fast Group & Topic Indexing Enabled\n\n"
+                f"👉 <i>Account disconnect karne ke liye: <code>/unlinkaccount</code></i>"
+            )
+            markup = {
+                "inline_keyboard": [
+                    [{"text": "🗑️ Unlink / Disconnect Account", "callback_data": "act_unlink_account"}]
+                ]
+            }
+            await self._send_message(session, chat_id, acc_info, reply_markup=markup, message_thread_id=thread_id)
+
+        elif cmd in ("/unlinkaccount", "/disconnect", "/logout"):
+            from devi.operator.session_vault import delete_linked_user_session
+            deleted = delete_linked_user_session(admin_id)
+            if deleted:
+                await self._send_message(
+                    session, chat_id,
+                    "✅ <b>Account Unlinked Successfully!</b>\n\n"
+                    "Aapka linked session token database se permanently delete kar diya gaya hai.",
+                    message_thread_id=thread_id
+                )
+            else:
+                await self._send_message(
+                    session, chat_id,
+                    "ℹ️ Aapka koi account linked nahi tha.",
+                    message_thread_id=thread_id
+                )
+
         elif cmd in ("/scan", "/autoindex"):
+            target_scan_input = None
+            for p in parts[1:]:
+                # If argument is a link (t.me/...), username (@...), or numeric id
+                if "t.me" in p or p.startswith("@") or (p.lstrip("-").isdigit() and len(p.lstrip("-")) >= 6):
+                    target_scan_input = p
+                    break
+            if not target_scan_input:
+                target_scan_input = str(self._resolve_study_group_id(chat_id))
+
             target_scan_chat = self._resolve_study_group_id(chat_id)
             status_msg_id = await self._send_message(
                 session, chat_id,
-                "⚡ **1-Click Auto-Scan Running...** 🔍\n"
+                "⚡ <b>1-Click Auto-Scan Running...</b> 🔍\n"
                 "Group ke sabhi forum topics aur unke andar ke videos/notes scan kiye ja rahe hain. Kripya 3-5 seconds wait karein...",
                 message_thread_id=thread_id
             )
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    sys.executable, "-m", "devi.operator.group_scanner", str(target_scan_chat),
+                    sys.executable, "-m", "devi.operator.group_scanner", str(target_scan_input), "0", str(admin_id),
                     cwd=str(BASE_PROJECT_DIR),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
@@ -3157,15 +3485,39 @@ class DeviTelegramBot:
                 pass
 
             if total_items == 0 and len(topics) <= 1:
+                bot_user = self.bot_username or "KindDoc_bot"
                 done_msg = (
-                    f"⚠️ <b>Auto-Scan Notice:</b>\n\n"
-                    f"• <b>Topics Found:</b> <code>{len(topics)}</code>\n"
-                    f"• <b>Lectures/Files:</b> <code>0</code>\n\n"
-                    f"💡 <b>Kripya Check Karein:</b>\n"
-                    f"1️⃣ Main user account (session) is group me member hona chahiye.\n"
-                    f"2️⃣ Bot ke paas group me <b>Admin Rights (Pin Messages & Read Messages)</b> active honi chahiye.\n"
-                    f"3️⃣ Ya fir topic ke andar <code>/settopic &lt;Title&gt;</code> aur files par reply karke <code>/additem</code> se manual add karein."
+                    "⚠️ <b>1-Click Archive &amp; Forum Indexer Notice</b> 📑\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "ℹ️ <b>Why did this happen?</b>\n"
+                    "Under official Telegram Server policies, <b>Bot Tokens</b> are restricted from bulk-scraping past message archives created before the bot was added.\n\n"
+                    "💡 <b>4 Easy Ways to Auto-Index 100% of Topics &amp; Lectures:</b>\n\n"
+                    "1️⃣ ⚡ <b>Link Your Account (Recommended — 100% Fast &amp; Private):</b>\n"
+                    "   • You can securely connect your own Telegram account to power high-speed indexing across all your groups.\n"
+                    f"   • <b>How to Link:</b> Open <a href=\"https://t.me/{bot_user}?start=linkaccount\"><b>Bot Private DM (@{bot_user})</b></a> and send <code>/linkaccount</code> (or tap the button below).\n"
+                    "   • <b>Benefits:</b> Scans 1,000+ forum topics and millions of lectures in seconds. You can disconnect anytime using <code>/unlinkaccount</code>.\n\n"
+                    "2️⃣ 👥 <b>Add Indexing Helper Member:</b>\n"
+                    "   • Simply invite our verified helper account (<b>@Kinddoctor4u</b>) as a member to this group, then run <code>/scan</code>.\n\n"
+                    "3️⃣ 🔗 <b>Scan via Group Invite Link:</b>\n"
+                    "   • Run scan with your invite link:\n"
+                    "     <code>/scan https://t.me/+YourInviteLink</code>\n\n"
+                    "4️⃣ ✍️ <b>Standalone Bot Mode (No Account Needed):</b>\n"
+                    "   • Inside any topic, type: <code>/settopic &lt;Subject Name&gt;</code>\n"
+                    "   • Reply to any video/PDF with: <code>/additem &lt;Lecture Title&gt;</code>\n"
+                    "   • Then type <code>/topicindex</code> or <code>/mainindex</code> to publish instant clickable navigation cards! 🎯"
                 )
+                notice_markup = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"},
+                            {"text": "🔗 Link Your Account", "url": f"https://t.me/{bot_user}?start=linkaccount"}
+                        ],
+                        [
+                            {"text": "🗑️ Delete Notice (Admin)", "callback_data": "purge_card"}
+                        ]
+                    ]
+                }
+                await self._send_message(session, chat_id, done_msg, reply_markup=notice_markup, message_thread_id=thread_id)
             else:
                 done_msg = (
                     f"✅ <b>Auto-Scan &amp; Indexing Successful!</b> 🎯\n\n"
@@ -3174,9 +3526,10 @@ class DeviTelegramBot:
                     f"• <b>Lectures/Files Indexed:</b> <code>{total_items}</code>\n\n"
                     f"👉 Ab aap <code>/mainindex</code> tap karein Master Hub dekhne ke liye, ya kisi topic me <code>/topicindex</code> bhejein!"
                 )
+                await self._send_message(session, chat_id, done_msg, message_thread_id=thread_id)
+
             if status_msg_id:
                 self.create_tracked_task(self._auto_delete_message(session, chat_id, status_msg_id, 2))
-            await self._send_message(session, chat_id, done_msg, message_thread_id=thread_id)
 
         elif cmd in ("/mainindex", "/main_index", "/indexmaster", "/alltopics"):
             target_index_chat = self._resolve_study_group_id(chat_id)
@@ -3209,14 +3562,36 @@ class DeviTelegramBot:
                     self.create_tracked_task(self._auto_delete_message(session, chat_id, scan_notify, 2))
 
             if not topics:
+                bot_user = self.bot_username or "KindDoc_bot"
                 help_msg = (
-                    f"⚠️ **Is Group me abhi koi Topics nahi mile.**\n\n"
-                    f"💡 **Topic Add karne ka aasaan tareeqa:**\n"
-                    f"1️⃣ Jis topic ko add karna hai, us topic ke andar type karein:\n"
-                    f"   `/settopic Cardiology`\n"
-                    f"2️⃣ Ya fir group me `/scan` chala kar auto-index karein! 🚀"
+                    "⚠️ <b>1-Click Archive &amp; Forum Indexer Notice</b> 📑\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "No topics or indexed lectures found for this group yet.\n"
+                    "Under official Telegram Server policies, <b>Bot Tokens</b> cannot bulk-read old message archives.\n\n"
+                    "💡 <b>4 Easy Ways to Auto-Index 100% of Topics &amp; Lectures:</b>\n\n"
+                    "1️⃣ ⚡ <b>Link Your Account (Recommended — 100% Fast &amp; Private):</b>\n"
+                    f"   • Open <a href=\"https://t.me/{bot_user}?start=linkaccount\"><b>Bot Private DM (@{bot_user})</b></a> and send <code>/linkaccount</code> to scan all forum topics instantly.\n\n"
+                    "2️⃣ 👥 <b>Add Indexing Helper Member:</b>\n"
+                    "   • Invite our verified helper account (<b>@Kinddoctor4u</b>) as a member to this group, then run <code>/scan</code>.\n\n"
+                    "3️⃣ 🔗 <b>Scan via Group Invite Link:</b>\n"
+                    "   • Run <code>/scan https://t.me/+YourInviteLink</code>.\n\n"
+                    "4️⃣ ✍️ <b>Standalone Bot Mode (No Account Needed):</b>\n"
+                    "   • Inside any topic, type: <code>/settopic &lt;Subject Name&gt;</code>\n"
+                    "   • Reply to any video/PDF with: <code>/additem &lt;Lecture Title&gt;</code>\n"
+                    "   • Then type <code>/topicindex</code> or <code>/mainindex</code> to publish instant clickable navigation cards! 🎯"
                 )
-                await self._send_message(session, chat_id, help_msg, message_thread_id=thread_id)
+                notice_markup = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"},
+                            {"text": "🔗 Link Your Account", "url": f"https://t.me/{bot_user}?start=linkaccount"}
+                        ],
+                        [
+                            {"text": "🗑️ Delete Notice (Admin)", "callback_data": "purge_card"}
+                        ]
+                    ]
+                }
+                await self._send_message(session, chat_id, help_msg, reply_markup=notice_markup, message_thread_id=thread_id)
                 return
 
             cards, reply_markup = self._build_main_index_cards(target_index_chat, sort_mode=sort_mode)

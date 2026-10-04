@@ -88,12 +88,109 @@ async def export_session_file_to_string(session_file_path: Path) -> Optional[str
                 (ROOT_DIR / f"{temp_stem}.session{ext}").unlink(missing_ok=True)
     return None
 
-async def get_vault_client(preferred_type: str = "user") -> Tuple[TelegramClient, str]:
+import sqlite3
+
+DB_PATH = ROOT_DIR / "history_core.sqlite"
+
+def init_linked_sessions_table():
+    try:
+        with sqlite3.connect(DB_PATH, timeout=30.0) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS telegram_linked_sessions (
+                    user_id INTEGER PRIMARY KEY,
+                    phone_number TEXT,
+                    account_name TEXT,
+                    username TEXT,
+                    session_string TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+    except Exception as e:
+        print(f"[!] Warning initializing telegram_linked_sessions: {e}")
+
+init_linked_sessions_table()
+
+def get_user_linked_session(user_id: int) -> Optional[str]:
+    """Retrieves active StringSession for a specific Telegram User ID."""
+    try:
+        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+            row = conn.execute(
+                "SELECT session_string FROM telegram_linked_sessions WHERE user_id = ? AND is_active = 1", 
+                (user_id,)
+            ).fetchone()
+            if row and row[0] and len(row[0]) > 50:
+                return row[0].strip()
+    except Exception:
+        pass
+    return None
+
+def save_linked_user_session(user_id: int, phone: str, session_str: str, name: str = "", username: str = "") -> bool:
+    """Saves or updates linked user session in SQLite database."""
+    if not session_str or len(session_str) < 50:
+        return False
+    try:
+        with sqlite3.connect(DB_PATH, timeout=30.0) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO telegram_linked_sessions 
+                (user_id, phone_number, account_name, username, session_string, is_active, updated_at)
+                VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+            """, (user_id, phone.strip(), name.strip(), username.strip(), session_str.strip()))
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"[!] Error saving linked session for {user_id}: {e}")
+        return False
+
+def delete_linked_user_session(user_id: int) -> bool:
+    """Deletes or unlinks user session from database."""
+    try:
+        with sqlite3.connect(DB_PATH, timeout=30.0) as conn:
+            conn.execute("DELETE FROM telegram_linked_sessions WHERE user_id = ?", (user_id,))
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"[!] Error unlinking session for {user_id}: {e}")
+        return False
+
+def get_all_active_linked_sessions() -> list:
+    """Returns all active linked user sessions."""
+    try:
+        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT user_id, phone_number, account_name, username, session_string FROM telegram_linked_sessions WHERE is_active = 1"
+            ).fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+async def get_vault_client_for_target(preferred_user_id: Optional[int] = None) -> Tuple[TelegramClient, str]:
     """
-    Returns a fully authorized TelegramClient.
-    Uses pure in-memory StringSession for zero file-lock collision across any number of processes.
+    Intelligently resolves the best available authorized MTProto Client.
+    Prioritizes:
+    1. Specifically requested user's linked session.
+    2. Any active linked user sessions from community admins.
+    3. Global Master StringSession.
+    4. Disk candidate sessions.
+    5. Bot token fallback.
     """
-    # 1. Try existing persisted StringSession
+    # 1. Check preferred user's linked session
+    if preferred_user_id:
+        s_user = get_user_linked_session(preferred_user_id)
+        if s_user:
+            try:
+                c = TelegramClient(StringSession(s_user), API_ID, API_HASH)
+                await c.connect()
+                if await c.is_user_authorized():
+                    return c, "user"
+                await c.disconnect()
+            except Exception as e:
+                print(f"[!] Preferred user session connect warning: {e}")
+
+    # 2. Check global Master StringSession
     s_str = get_persisted_session_string()
     if s_str:
         try:
@@ -105,7 +202,21 @@ async def get_vault_client(preferred_type: str = "user") -> Tuple[TelegramClient
         except Exception as e:
             print(f"[!] StringSession connect warning: {e}")
 
-    # 2. Extract from candidate session files on disk
+    # 3. Check any other active linked user sessions
+    all_linked = get_all_active_linked_sessions()
+    for item in all_linked:
+        ls_str = item.get("session_string")
+        if ls_str:
+            try:
+                c = TelegramClient(StringSession(ls_str), API_ID, API_HASH)
+                await c.connect()
+                if await c.is_user_authorized():
+                    return c, "user"
+                await c.disconnect()
+            except Exception:
+                pass
+
+    # 4. Extract from candidate session files on disk
     candidate_sessions = [
         "session_forwarder",
         "session_scanner",
@@ -126,8 +237,12 @@ async def get_vault_client(preferred_type: str = "user") -> Tuple[TelegramClient
                 except Exception:
                     pass
 
-    # 3. Fallback to Bot Token
+    # 5. Fallback to Bot Token
     print("[*] Initializing lock-free Bot Token Client...")
     bot_client = TelegramClient(StringSession(), API_ID, API_HASH)
     await bot_client.start(bot_token=BOT_TOKEN)
     return bot_client, "bot"
+
+async def get_vault_client(preferred_type: str = "user") -> Tuple[TelegramClient, str]:
+    """Default vault client resolver."""
+    return await get_vault_client_for_target()

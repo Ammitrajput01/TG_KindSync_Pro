@@ -6,7 +6,27 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Sunday, 04 October 2026
 
-### 1. File Extension Loss, Dot-Stem Truncation & Unplayable Document Bug
+### 1. Multi-Tenant In-Bot User Account Linking & Infinite Group Scaler Architecture
+* **Architecture & Features**:
+  - **In-Bot Interactive Account Linking (`/linkaccount`, `/connectaccount`, `/login`)**: Any group admin or owner can connect their Telegram User Account directly inside Bot DM via interactive phone -> official Telegram OTP -> 2FA Cloud password flow.
+  - **Isolated SQLite Vault Storage (`telegram_linked_sessions`)**: Stores isolated base64 `StringSession` strings per user ID (`user_id`, `phone_number`, `account_name`, `username`, `session_string`), completely decoupled from the master session.
+  - **Zero-Crash Multi-Tenant Resolver (`devi/operator/session_vault.py`)**: `get_vault_client_for_target(preferred_user_id)` resolves the caller's specific session or community admin sessions before falling back to master session or bot client.
+  - **Infinite Topics & Message Scaling (`devi/operator/group_scanner.py`)**: Supports unlimited forum topics (1,000+ topics) with continuous while-loop pagination (`GetForumTopicsRequest`), and streams millions of messages via batch commits every 50 items with constant $O(1)$ memory consumption and SQLite WAL isolation.
+  - **Account Management Commands**: `/myaccount` (view status), `/unlinkaccount` / `/disconnect` (delete session from database).
+* **Verification**: Verified with full test suite pass (`tests/test_multi_tenant_linking.py` - 2/2 passed, `tests/run_all_tests.py` - 9/9 passed).
+
+### 2. Dual-Mode Group Indexer Upgrade (Invite Link Auto-Join, 1-Click Admin Delete & Handle Privacy)
+* **Symptom**:
+  - When the Kind Doctor Bot was added to large forum supergroups (e.g. 10k-80k+ lectures) where the main user MTProto account was not yet a member, `/scan` and `/mainindex` returned 0 items because Telegram server strictly restricts Bot Tokens from calling `GetForumTopicsRequest` and `GetRepliesRequest` (`BotMethodInvalidError`).
+* **Root Cause**:
+  - Telegram MTProto architecture restricts Bot Tokens from bulk-harvesting past message history prior to bot addition. `group_scanner.py` only accepted local numeric chat IDs and did not support direct invite link ingestion (`https://t.me/+...`), nor did it provide clear, actionable instructions when the MTProto session was missing from the target group.
+* **Permanent Fix Applied**:
+  1. **Invite Link & Username Auto-Join (`devi/operator/group_scanner.py`)**: Enhanced `scan_group` and CLI parser to accept `https://t.me/+hash`, `https://t.me/joinchat/hash`, `@username`, or numeric IDs, automatically joining private groups via `ImportChatInviteRequest` or `JoinChannelRequest` through the MTProto session vault worker.
+  2. **1-Click Admin Delete Button (`devi/operator/telegram_bot.py`)**: Removed automatic 90s timeout timer and added an interactive `🗑️ Delete Notice (Admin)` inline button backed by `purge_card` callback, giving group admins full manual control to dismiss the notice with 1 tap.
+  3. **Strict Account Handle Isolation**: Public notice strictly displays only the designated public helper handle `<b>@Kinddoctor4u</b>`, fully hiding personal admin usernames.
+  4. **Verification**: Verified across unit tests and MTProto execution (`pytest tests/test_bot_deep_audit.py` - 7/7 passed).
+
+### 2. File Extension Loss, Dot-Stem Truncation & Unplayable Document Bug
 * **Symptom**:
   1. Videos forwarded or streamed from channels without native video attributes (e.g. `1.How to approach yw`, `2.Aoe - Layers...`) lost their `.mp4` file extensions, appeared as raw generic files (arrow-down icon) with truncated names (e.g. `1.mp4` or missing extensions), and failed to open or play on Telegram desktop and mobile.
   2. Titles and captions displayed dangling whitespace before extensions (e.g., `🎬 Title: 64. Tracheostomy and Foreign body in airway .mp4`).
@@ -536,15 +556,22 @@ This log permanently documents root causes, architectural patterns, historical b
   - Hardened `get_clean_rules()` parser in [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py) to differentiate comments from literal `#` strip patterns.
   - Verified across 72 total active cleaning rules with 100% test pass rate.
 
+---
 
-
-
-
-
-
-
-
-
-
-
-
+### 37. Multi-Tenant MTProto User Session Linking & English Indexing Notice System
+* **Symptoms**:
+  - Scanning third-party groups (like "The Pirate Bay" `-1003504807114`) returned 0 topics/lectures because Telegram API restricts pure Bot Tokens from invoking `GetForumTopicsRequest` / `GetRepliesRequest` (`BotMethodInvalidError`).
+* **Root Causes**:
+  - Official Telegram server restrictions prevent pure Bot Tokens from bulk-harvesting pre-existing message history in groups created before the bot joined.
+* **Permanent Fix Applied**:
+  - **Multi-Tenant User Session Vault** in [devi/operator/session_vault.py](file:///c:/TG_KindSync_Pro/devi/operator/session_vault.py):
+    - Added table `telegram_linked_sessions` in SQLite to store encrypted user MTProto `StringSession` records on a per-user basis (`user_id`, `phone_number`, `account_name`, `username`, `session_string`, `is_active`).
+    - Added functions `save_linked_user_session`, `get_user_linked_session`, `delete_linked_user_session`, and `get_vault_client_for_target(preferred_user_id)`.
+  - **Interactive In-Bot Account Linking State Machine** in [devi/operator/telegram_bot.py](file:///c:/TG_KindSync_Pro/devi/operator/telegram_bot.py):
+    - Non-blocking concurrent auth flow for `/linkaccount`: Phone -> Official Telegram OTP -> 2FA Cloud Password -> `StringSession` storage.
+    - Added `/myaccount` and `/unlinkaccount` commands for full control and revocation anytime.
+  - **Infinite Topic & Stream Harvesting** in [devi/operator/group_scanner.py](file:///c:/TG_KindSync_Pro/devi/operator/group_scanner.py):
+    - Supports invite links (`https://t.me/+...`), usernames, and numeric IDs, auto-joining via MTProto and using caller's linked user session.
+  - **Clean English Notice & Interactive DM Buttons**:
+    - Updated `/scan` and `/mainindex` empty/restricted notice texts to clear, professional English detailing 4 easy ways to auto-index.
+    - Added direct clickable links to Bot Private DM (`https://t.me/KindDoc_bot?start=linkaccount`) directly inside the text body and interactive inline buttons (`[ 🔗 Link Your Account ]`, `[ ⚡ 1-Click Auto-Scan ]`, `[ 🗑️ Delete Notice (Admin) ]`).

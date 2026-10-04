@@ -71,11 +71,11 @@ def init_tables(conn: sqlite3.Connection):
     """)
     conn.commit()
 
-async def get_authorized_client():
-    """Finds first available authorized user session via lock-free StringSession or fallback."""
+async def get_authorized_client(preferred_user_id: Optional[int] = None):
+    """Finds first available authorized user session via lock-free StringSession, linked sessions, or fallback."""
     try:
-        from devi.operator.session_vault import get_vault_client
-        client, client_type = await get_vault_client()
+        from devi.operator.session_vault import get_vault_client_for_target
+        client, client_type = await get_vault_client_for_target(preferred_user_id=preferred_user_id)
         return client, client_type, None
     except Exception as e:
         print(f"[!] Warning connecting to session vault: {e}. Fallback to bot token...")
@@ -202,64 +202,148 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
             return 0
     return 0
 
-async def scan_group(target_chat_id: int, target_topic_id: Optional[int] = None, scan_messages: bool = True):
-    from telethon.tl.functions.messages import GetForumTopicsRequest
+import re
 
-    client, client_type, temp_sess_file = await get_authorized_client()
+def extract_telegram_target(target_input: str):
+    """Extracts invite hash, username, or numeric chat ID from input string."""
+    raw = str(target_input).strip()
+    # Invite link (e.g. https://t.me/+hash or https://t.me/joinchat/hash)
+    m_inv = re.search(r'(?:https?://)?(?:www\.)?(?:t\.me|telegram\.me)/(?:\+|joinchat/)([a-zA-Z0-9_-]+)', raw)
+    if m_inv:
+        return {"type": "invite_hash", "value": m_inv.group(1)}
+    
+    # Public channel / group link (e.g. https://t.me/channel_name)
+    m_url = re.search(r'(?:https?://)?(?:www\.)?(?:t\.me|telegram\.me)/([a-zA-Z0-9_]{4,})', raw)
+    if m_url:
+        return {"type": "username", "value": m_url.group(1)}
+    
+    # Direct username (e.g. @channel_name)
+    if raw.startswith("@"):
+        return {"type": "username", "value": raw.lstrip("@")}
+        
+    # Numeric ID
     try:
+        val = int(raw)
+        return {"type": "chat_id", "value": val}
+    except ValueError:
+        return {"type": "raw", "value": raw}
+
+async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_messages: bool = True, preferred_user_id: Optional[int] = None):
+    from telethon.tl.functions.messages import GetForumTopicsRequest, ImportChatInviteRequest, CheckChatInviteRequest
+    from telethon.tl.functions.channels import JoinChannelRequest
+    from telethon.errors import UserAlreadyParticipantError, InviteHashExpiredError, InviteHashInvalidError
+
+    client, client_type, temp_sess_file = await get_authorized_client(preferred_user_id=preferred_user_id)
+    try:
+        target_info = extract_telegram_target(str(target_input))
         peer = None
-        # Try direct resolution
-        try:
-            peer = await client.get_input_entity(target_chat_id)
-        except Exception:
-            pass
+        target_chat_id = None
 
-        if not peer:
-            search_ids = [target_chat_id]
-            raw_id = abs(target_chat_id)
-            search_ids.extend([raw_id, -raw_id])
-            s_raw = str(raw_id)
-            if s_raw.startswith("100"):
-                with suppress(Exception):
-                    short_id = int(s_raw[3:])
-                    search_ids.extend([short_id, -short_id, int(f"-100{short_id}")])
-
-            for sid in search_ids:
+        # 1. Handle Invite Links via User Client
+        if target_info["type"] == "invite_hash":
+            h_val = target_info["value"]
+            if client_type == "user":
                 try:
-                    peer = await client.get_input_entity(sid)
-                    if peer: break
-                except Exception:
-                    pass
-                try:
-                    ent = await client.get_entity(sid)
-                    if ent:
+                    updates = await client(ImportChatInviteRequest(h_val))
+                    if hasattr(updates, 'chats') and updates.chats:
+                        ent = updates.chats[0]
                         peer = ent
-                        break
-                except Exception:
+                        target_chat_id = -100 * abs(ent.id) if not str(ent.id).startswith("-100") else ent.id
+                        print(f"[+] Successfully joined group via invite link: id={target_chat_id}")
+                except UserAlreadyParticipantError:
                     pass
+                except Exception as e:
+                    print(f"[!] Invite link join error: {e}")
 
-        if not peer:
+            if not peer:
+                try:
+                    check_res = await client(CheckChatInviteRequest(h_val))
+                    chat_obj = getattr(check_res, 'chat', None)
+                    if chat_obj:
+                        target_chat_id = -100 * abs(chat_obj.id) if not str(chat_obj.id).startswith("-100") else chat_obj.id
+                        peer = await client.get_input_entity(target_chat_id)
+                except Exception as ex:
+                    print(f"[!] CheckChatInviteRequest error: {ex}")
+
+        # 2. Handle Username / Public links
+        elif target_info["type"] == "username":
+            u_val = target_info["value"]
             try:
-                async for dialog in client.iter_dialogs(limit=None):
-                    d_id = abs(dialog.id)
-                    d_ent_id = abs(getattr(dialog.entity, 'id', 0))
-                    if d_id in search_ids or d_ent_id in search_ids:
-                        peer = dialog.input_entity
-                        break
+                ent = await client.get_entity(u_val)
+                peer = ent
+                target_chat_id = -100 * abs(ent.id) if not str(ent.id).startswith("-100") else ent.id
+            except Exception as e:
+                print(f"[!] Username entity resolution error: {e}")
+
+        # 3. Handle Numeric Chat IDs
+        elif target_info["type"] == "chat_id":
+            target_chat_id = target_info["value"]
+            # Ensure proper supergroup prefix if needed
+            try:
+                peer = await client.get_input_entity(target_chat_id)
             except Exception:
                 pass
 
-        if not peer:
+            if not peer:
+                search_ids = [target_chat_id]
+                raw_id = abs(target_chat_id)
+                search_ids.extend([raw_id, -raw_id])
+                s_raw = str(raw_id)
+                if s_raw.startswith("100"):
+                    with suppress(Exception):
+                        short_id = int(s_raw[3:])
+                        search_ids.extend([short_id, -short_id, int(f"-100{short_id}")])
+                elif not str(target_chat_id).startswith("-100"):
+                    with suppress(Exception):
+                        search_ids.append(int(f"-100{raw_id}"))
+
+                for sid in search_ids:
+                    try:
+                        peer = await client.get_input_entity(sid)
+                        if peer: 
+                            target_chat_id = sid
+                            break
+                    except Exception:
+                        pass
+                    try:
+                        ent = await client.get_entity(sid)
+                        if ent:
+                            peer = ent
+                            target_chat_id = sid
+                            break
+                    except Exception:
+                        pass
+
+            if not peer:
+                try:
+                    async for dialog in client.iter_dialogs(limit=None):
+                        d_id = abs(dialog.id)
+                        d_ent_id = abs(getattr(dialog.entity, 'id', 0))
+                        if d_id in search_ids or d_ent_id in search_ids:
+                            peer = dialog.input_entity
+                            target_chat_id = dialog.id
+                            break
+                except Exception:
+                    pass
+
+        if not peer and target_chat_id:
             try:
                 peer = await client.get_entity(target_chat_id)
             except Exception as e:
                 print(f"[!] Warning: Could not resolve peer for {target_chat_id}: {e}")
                 return
 
+        if not peer:
+            print(f"[!] Fatal: Could not resolve peer for input '{target_input}'")
+            return
+
+        # Ensure normalized negative ID for supergroups
+        if target_chat_id and target_chat_id > 0 and len(str(target_chat_id)) >= 9:
+            target_chat_id = -100 * target_chat_id
+
         # Case 1: Targeted Single-Topic Scan (Lightning fast for /topicindex)
         if target_topic_id:
             print(f"[*] Scanning specific topic #{target_topic_id} in chat {target_chat_id}...")
-            # Try to fetch topic title via GetForumTopicsRequest if user client
             topic_title = None
             if client_type == "user":
                 with suppress(Exception):
@@ -356,6 +440,14 @@ async def scan_group(target_chat_id: int, target_topic_id: Optional[int] = None,
                 Path(temp_sess_file).unlink(missing_ok=True)
 
 if __name__ == "__main__":
-    target_chat = int(sys.argv[1]) if len(sys.argv) > 1 else -1003912970546
+    raw_arg1 = sys.argv[1] if len(sys.argv) > 1 else "-1003912970546"
     target_topic = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else None
-    asyncio.run(scan_group(target_chat, target_topic))
+    preferred_user = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].isdigit() else None
+    
+    # Determine if arg1 is numeric or string (url/username)
+    try:
+        target_chat = int(raw_arg1)
+    except ValueError:
+        target_chat = raw_arg1
+
+    asyncio.run(scan_group(target_chat, target_topic_id=target_topic, preferred_user_id=preferred_user))
