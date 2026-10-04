@@ -2,14 +2,14 @@
 setlocal EnableDelayedExpansion
 chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
-title TG KINDSYNC PRO V14.5 -- MASTER CONTROL CENTER
+title TG KINDSYNC PRO V15.0.0 -- MASTER CONTROL CENTER
 color 0b
 cd /d "%~dp0"
 
 :MAIN_MENU
 cls
 echo ==============================================================================
-echo        TG KINDSYNC PRO V14.5 -- MASTER CONTROL CENTER (1-CLICK)
+echo        TG KINDSYNC PRO V15.0.0 -- MASTER CONTROL CENTER (1-CLICK)
 echo        Developer ^& Owner: Dr. Amit Singh (Kind Doctor)
 echo        Branding: Kind Doctor ^& Team -- Telegram: @Kinddoctor4u
 echo ==============================================================================

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-TG KindSync Pro 🩺 V14.5 – Main Entrypoint
+TG KindSync Pro 🩺 V15.0.0 – Main Entrypoint
 Pure Deterministic High-Speed Streaming Engine
 Created By: Dr. Amit Singh (Kind Doctor)
 """

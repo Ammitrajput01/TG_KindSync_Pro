@@ -4,7 +4,7 @@ import sqlite3
 
 """
 ================================================================================
-🌐 TG KINDSYNC PRO V14.5 — SENTINEL AI COMMAND CENTER & WEB DASHBOARD
+🌐 TG KINDSYNC PRO V15.0.0 — SENTINEL AI COMMAND CENTER & WEB DASHBOARD
 ================================================================================
 Ultra-responsive, luxury dark-mode web dashboard for real-time telemetry,
 interactive cloud backups, DLQ inspection, and remote controls over local Wi-Fi.
@@ -614,6 +614,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Telegram Mini App WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             /* Typography Families */
@@ -2628,7 +2630,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="auth-gate-header">
                 <div class="brand-logo" style="width: 52px; height: 52px; font-size: 22px; margin: 0 auto var(--space-3); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #6366F1 0%, #38BDF8 100%); color: #fff; font-weight: 800;">KS</div>
                 <div style="font-size: 20px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px;">KindSync Pro Enterprise</div>
-                <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 4px;">Sentinel AI Mission Control v14.5</div>
+                <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 4px;">Sentinel AI Mission Control v15.0.0</div>
                 <div class="pill pill-neutral" style="margin-top: 10px; font-size: 11px; display: inline-flex; border-color: rgba(99,102,241,0.3); color: #38BDF8;">🔒 End-to-End Encrypted Session</div>
             </div>
 
@@ -2662,7 +2664,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="brand-logo">KS</div>
                 <div class="brand-title">
                     <span>KindSync Pro</span>
-                    <span class="brand-subtitle">Enterprise Suite v14.5</span>
+                    <span class="brand-subtitle">Enterprise Suite v15.0.0</span>
                 </div>
             </div>
 
@@ -5174,7 +5176,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <span>Navigate <kbd class="hud-kbd">↑</kbd> <kbd class="hud-kbd">↓</kbd></span>
                     <span>Select <kbd class="hud-kbd">↵</kbd></span>
                 </div>
-                <div>KindSync Pro v14.5 Enterprise</div>
+                <div>KindSync Pro v15.0.0 Enterprise</div>
             </div>
         </div>
     </div>
@@ -5233,6 +5235,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
 
+    <script>
+        // Telegram Mini App Auto-Expand & Viewport Synchronization
+        if (window.Telegram && window.Telegram.WebApp) {
+            try {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+                if (window.Telegram.WebApp.setHeaderColor) {
+                    window.Telegram.WebApp.setHeaderColor('#05070B');
+                }
+                if (window.Telegram.WebApp.setBackgroundColor) {
+                    window.Telegram.WebApp.setBackgroundColor('#05070B');
+                }
+            } catch (e) {
+                console.debug("Telegram WebApp init:", e);
+            }
+        }
+    </script>
 </body>
 </html>
 """
@@ -6235,7 +6254,7 @@ class DashboardServer:
         lan_ip = get_local_lan_ip()
         print(r"""
  ╭──────────────────────────────────────────────────────────────────────────╮
- │  🌐 TG KINDSYNC PRO V14.5 — SENTINEL AI COMMAND CENTER                   │
+ │  🌐 TG KINDSYNC PRO V15.0.0 — SENTINEL AI COMMAND CENTER                 │
  │  Owner: Dr. Amit Singh (Kind Doctor) | Multi-User RBAC & Live Telemetry  │
  ╰──────────────────────────────────────────────────────────────────────────╯
 """)

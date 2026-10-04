@@ -12,6 +12,7 @@ import sys
 import os
 import asyncio
 import sqlite3
+import pytest
 from pathlib import Path
 
 # Add project root
@@ -46,6 +47,7 @@ def test_clean_rules_hashtags():
         assert res.strip() == expected.strip(), f"Mismatch: Got '{res}' but expected '{expected}'"
     print("  [+] Hashtags & Watermark cleaning: 100% PASS")
 
+@pytest.mark.asyncio
 async def test_topic_watermarks_persistence():
     print("[*] 2. Testing Topic Watermarks Persistence in StateManager...")
     state = StateManager()
@@ -75,6 +77,7 @@ async def test_topic_watermarks_persistence():
     await state2.close()
     print("  [+] Topic-wise Watermark Auto-Save & Resume Recovery: 100% PASS")
 
+@pytest.mark.asyncio
 async def test_pause_resume_event_architecture():
     print("[*] 3. Testing Pause / Resume Event Architecture...")
     cfg = AppConfig(api_id=12345, api_hash="abcdef", source_chat="-100111", target_chat="-100222")

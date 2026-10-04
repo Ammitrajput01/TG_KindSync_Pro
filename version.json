@@ -1,23 +1,21 @@
 {
   "app_name": "TG KindSync Pro",
-  "version": "14.5.0",
-  "release_tag": "v14.5",
-  "release_date": "2026-09-13",
+  "version": "15.0.0",
+  "release_tag": "v15.0.0",
+  "release_date": "2026-10-04",
   "developer": "Dr. Amit Singh (Kind Doctor)",
   "telegram_channels": ["@Kinddoctor4u", "@Ammitrajput1"],
   "changelog": [
-    "Official Rebranding to TG KindSync Pro v14.5 Enterprise Masterpiece",
-    "Real-time Cloud Forwarder with Zero Forward Tags (copyMessage API, No PC needed for other admins)",
-    "Topic-to-Topic forwarding routes (/settopicroute) & Media Filtering (/routefilter)",
-    "Deep SangMata & Rose style User Intelligence Inspector (/userinfo, /whois, /info)",
-    "UserInfoBot Forwarded Message Inspection & Telegram Data Center (DC) Detection",
-    "Cross-Group Member Scraper, CSV Backups & Safe-Adder with flood protection",
-    "On-Demand Welcome Card Purge (/cleanwelcome) & Ghost Cleaner (/cleandeleted)",
-    "Official 3-Part Command Manual (/manual & /fullhelp)",
-    "1-Click Auto-Updater & Multi-Friend Code Sync Engine",
-    "Executive Human Product Redesign for Admin Panel & Web Dashboard (Midnight Obsidian standards, anti-AI slop, zero card-salad)",
-    "Emil Kowalski physics-based micro-interactions and tactile feedback across all dashboard tabs",
-    "Autonomous Model Hub (Groq + Mistral Codestral + OpenRouter + Gemini) & Devi AI Copilot Studio integration",
-    "Standard Enterprise Timestamp Backup Engine with dual-track Friend vs Full Enterprise packaging"
+    "Official Release of TG KindSync Pro v15.0.0 Enterprise Turbo Masterpiece",
+    "KindDoctor Bot Dedicated Auto-Supervisor (@KindDoc_bot) with isolated background execution",
+    "Sangmata Multi-Bot Mesh & Multi-Session Failover pool for unblockable OSINT radar (/userinfo)",
+    "Obsidian Cyber-Glass Bento Dashboard with real-time dynamic speedometer dial & throttle slider",
+    "48-Parallel MTProto Chunk Streaming & Zero-Delay RAM Pipelining",
+    "Strict Sequential FIFO Queue Guard for 100% ordered curriculum delivery",
+    "16:9 Progressive Thumbnail In-Memory Buffer with zero disk thrashing",
+    "Extended Regex Caption Cleaner & Stripper for @Dams_new_robot, gatekeeperbasbot, and hashtags",
+    "Universal Lock-Free Session Vault with concurrent SQLite WAL access",
+    "Robust Filename Extension & Dot-Stem Preservation with smart MIME type video player attachment",
+    "Punctuation and trailing space cleanup before file extensions (.mp4, .pdf, .mkv)"
   ]
 }

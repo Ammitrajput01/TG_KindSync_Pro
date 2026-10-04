@@ -3,7 +3,7 @@
 
 """
 ================================================================================
-🚀 TELEGRAM KIND MODE 😉 V14.0 – FINAL ENTERPRISE MASTER EDITION
+🚀 TG KINDSYNC PRO 🩺 V15.0.0 – ENTERPRISE TURBO MASTERPIECE
 🛡️ PURE DETERMINISTIC HIGH-SPEED STREAMING ENGINE (ZERO AI OVERHEAD)
 👑 DESIGN ORGANIZATION CERTIFIED: PEAK UI/UX & ZERO-FRICTION WORKFLOWS
 ================================================================================
@@ -112,7 +112,7 @@ from telethon.tl.functions.channels import InviteToChannelRequest
 # ============================================================
 # 3. CONSTANTS & GLOBAL SETUP
 # ============================================================
-VERSION = "TG KindSync Pro 🩺 v14.5 Enterprise Masterpiece"
+VERSION = "TG KindSync Pro 🩺 v15.0.0 Enterprise Masterpiece"
 
 # --- STRICT BRANDING SPLIT ---
 TERMINAL_BRAND = "Dr. Amit Singh (Kind Doctor)"
@@ -240,6 +240,61 @@ class AdminTelemetry:
     def dispatch(client, title: str, details: dict):
         try:
             asyncio.create_task(AdminTelemetry.send_event(client, title, details))
+        except Exception:
+            pass
+
+    @staticmethod
+    async def send_cloud_backup(client):
+        """Creates an atomic SQLite WAL snapshot and exports it to admin channels with strict timestamp metadata."""
+        if not client: return
+        try:
+            now = datetime.now()
+            day_str = now.strftime("%A")
+            date_str = now.strftime("%d-%B-%Y")
+            time_str = now.strftime("%I-%M%p")
+            filename = f"history_core_backup_{day_str}_{date_str}_{time_str}.sqlite"
+            backup_dir = Path("db_backups")
+            backup_dir.mkdir(exist_ok=True)
+            out_path = backup_dir / filename
+
+            # Safe SQLite online backup
+            src = sqlite3.connect(DB_FILE, timeout=30.0)
+            dst = sqlite3.connect(str(out_path), timeout=30.0)
+            src.backup(dst)
+            dst.close()
+            src.close()
+
+            display_time = now.strftime("%A, %d %B %Y | %I:%M %p")
+            size_mb = os.path.getsize(out_path) / MB if os.path.exists(out_path) else 0.0
+
+            caption = (
+                f"💾 **TG KindSync Pro v15.0.0 — Automated Cloud Snapshot** 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📅 **Timestamp**: `{display_time}`\n"
+                f"📦 **Backup File**: `{filename}`\n"
+                f"📊 **Archive Size**: `{size_mb:.2f} MB`\n"
+                f"👑 **Owner**: Dr. Amit Singh (Kind Doctor)\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🔒 _100% Consistent SQLite WAL Online Snapshot_"
+            )
+
+            targets = ["me"] + ADMIN_HANDLES
+            for target in targets:
+                try:
+                    await asyncio.wait_for(
+                        client.send_file(target, str(out_path), caption=caption, parse_mode="md", silent=True),
+                        timeout=30.0
+                    )
+                    await asyncio.sleep(0.5)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"Automated cloud backup skipped: {e}")
+
+    @staticmethod
+    def dispatch_backup(client):
+        try:
+            asyncio.create_task(AdminTelemetry.send_cloud_backup(client))
         except Exception:
             pass
 
@@ -496,7 +551,11 @@ def apply_clean_rules(text: str) -> str:
         cleaned_lines.append(line)
     t = "\n".join(cleaned_lines)
     
-    # 6. Clean extra spaces
+    # 6. Clean dangling spaces before dots, extensions, or punctuation (e.g. 'airway .mp4' -> 'airway.mp4')
+    t = re.sub(r"[ \t]+(\.(?:[a-zA-Z0-9]{2,5}))\b", r"\1", t)
+    t = re.sub(r"[ \t]+([.,;:])(?:\s|$)", r"\1 ", t)
+    
+    # 7. Clean extra spaces & blank lines
     t = re.sub(r"[ \t]+", " ", t)
     t = re.sub(r"\n\s*\n\s*\n+", "\n\n", t).strip()
     return t
@@ -513,7 +572,7 @@ def _smart_replace_word(text: str, old_w: str, new_w: str) -> str:
     pattern = f"{prefix}{re.escape(old_w)}{suffix}"
     return re.sub(pattern, new_w, text, flags=re.IGNORECASE)
 
-def sanitize_filename(filename: str, fallback_ext: str = "") -> str:
+def sanitize_filename(filename: str, fallback_ext: str = "", mime_type: str = "") -> str:
     if not filename:
         ext = fallback_ext if fallback_ext.startswith(".") else (f".{fallback_ext}" if fallback_ext else ".bin")
         return f"media_{generate_random_long()}{ext}"
@@ -522,10 +581,35 @@ def sanitize_filename(filename: str, fallback_ext: str = "") -> str:
     name_str = os.path.basename(name_str.replace("\\", "/"))
     stem, ext = os.path.splitext(name_str)
     
+    # Validate if ext is actually a valid file extension (e.g. .mp4, .pdf, .mkv, .jpg, .zip, etc.)
+    valid_ext_pat = r"^\.(mp4|mkv|avi|mov|webm|ts|m4v|3gp|flv|wmv|pdf|docx?|pptx?|xlsx?|epub|zip|rar|7z|tar|gz|mp3|m4a|wav|aac|ogg|flac|opus|jpg|jpeg|png|webp|gif|svg|txt|json|apk|bin)$"
+    if not ext or not re.match(valid_ext_pat, ext, flags=re.IGNORECASE):
+        # The dot was not a file extension (e.g., '1.How to approach yw' where dot is after chapter number)
+        stem = name_str
+        ext = ""
+        if fallback_ext:
+            ext = fallback_ext if fallback_ext.startswith(".") else f".{fallback_ext}"
+        elif mime_type:
+            mime_lower = str(mime_type).lower().strip()
+            if "matroska" in mime_lower or "mkv" in mime_lower:
+                ext = ".mkv"
+            elif "webm" in mime_lower:
+                ext = ".webm"
+            elif "quicktime" in mime_lower or "mov" in mime_lower:
+                ext = ".mov"
+            elif mime_lower.startswith("video/"):
+                ext = ".mp4"
+            elif mime_lower.startswith("audio/"):
+                ext = ".mp3"
+            elif mime_lower in ("application/pdf", "text/pdf"):
+                ext = ".pdf"
+            elif mime_lower.startswith("image/"):
+                ext = ".jpg"
+
     # Clean illegal filesystem characters
     stem = re.sub(r'[\\/*?:"<>|\x00-\x1f]', '_', stem)
     ext = re.sub(r'[\\/*?:"<>|\x00-\x1f]', '', ext)
-    
+
     # 1. Apply Permanent Clean Rules (strip_words.txt + .env)
     stem = apply_clean_rules(stem)
 
@@ -576,8 +660,11 @@ def clean_index_title(raw_text: str, max_len: int = 55) -> str:
     # Strip Title: or Subject: or File: prefixes
     t = re.sub(r"(?i)^(?:title|batch|subject|file|video|lecture|notes?)\s*[:\-_]\s*", "", t)
     
+    # Clean spaces before dots / extensions first
+    t = re.sub(r"\s+(\.(?:[a-zA-Z0-9]{2,5}))\b", r"\1", t)
+
     # Strip file extensions
-    t = re.sub(r"(?i)\.(mp4|mkv|avi|mov|webm|ts|m4v|pdf|docx?|pptx?|epub|zip|rar)$", "", t)
+    t = re.sub(r"(?i)\s*\.(mp4|mkv|avi|mov|webm|ts|m4v|pdf|docx?|pptx?|epub|zip|rar)$", "", t)
     
     # Apply permanent clean rules (strip_words.txt + .env)
     t = apply_clean_rules(t)
@@ -918,7 +1005,7 @@ def get_persistent_header():
         top_grid.add_column(justify="left", ratio=2)
         top_grid.add_column(justify="right", ratio=1)
         top_grid.add_row(
-            "[bold cyan]🚀 TG KINDSYNC PRO V14.5[/]",
+            "[bold cyan]🚀 TG KINDSYNC PRO V15.0.0[/]",
             "[bold green]● ONLINE[/]"
         )
     else:
@@ -926,7 +1013,7 @@ def get_persistent_header():
         top_grid.add_column(justify="center")
         top_grid.add_column(justify="right")
         top_grid.add_row(
-            "[bold cyan]🚀  TG KINDSYNC PRO  V14.5[/]",
+            "[bold cyan]🚀  TG KINDSYNC PRO  V15.0.0[/]",
             "[bold yellow]🛡️  ENTERPRISE TELEGRAM CLOUD & STUDY SUITE[/]",
             "[bold green]● ENGINE ONLINE[/]"
         )
@@ -994,7 +1081,7 @@ def startup_animation():
     clear_screen()
     console.print(get_persistent_header())
     console.print(Panel(
-        Align.center(Text.from_markup("[bold cyan]🚀 INITIALIZING TG KINDSYNC PRO V14.5...[/]")),
+        Align.center(Text.from_markup("[bold cyan]🚀 INITIALIZING TG KINDSYNC PRO V15.0.0...[/]")),
         border_style="cyan", box=box.ROUNDED
     ))
     steps = [
@@ -1048,7 +1135,7 @@ class AppConfig:
 
     @classmethod
     def load(cls, media_filter="all", workers=1, parallelism=12, adaptive=False, routing_mode=1, run_dlq=False, live_mode=False, auto_shutdown=False, direct_forward: Optional[bool] = None):
-        load_dotenv(".env", override=True)
+        load_dotenv(".env", override=False)
         try:
             api_id = int(os.getenv("API_ID", 0) or 0)
         except ValueError:
@@ -2712,18 +2799,45 @@ class MemoryStreamer:
         if total_parts > 4000:
             raise RuntimeError("File size exceeds Telegram MTProto limits.")
         file_id = generate_random_long()
+
+        # Extract MIME type and document attributes
+        doc_obj = getattr(getattr(msg, "media", None), "document", None)
+        mime_t = ""
+        if doc_obj and hasattr(doc_obj, "mime_type") and doc_obj.mime_type:
+            mime_t = str(doc_obj.mime_type).lower().strip()
+        elif file_obj and hasattr(file_obj, "mime_type") and file_obj.mime_type:
+            mime_t = str(file_obj.mime_type).lower().strip()
+
+        has_vid_attr = False
+        has_aud_attr = False
+        if doc_obj and hasattr(doc_obj, "attributes"):
+            for a in doc_obj.attributes:
+                if isinstance(a, DocumentAttributeVideo):
+                    has_vid_attr = True
+                elif isinstance(a, DocumentAttributeAudio):
+                    has_aud_attr = True
+
         fallback_ext = ".bin"
-        if getattr(msg, "photo", None):
+        if getattr(msg, "photo", None) or mime_t.startswith("image/"):
             fallback_ext = ".jpg"
-        elif getattr(msg, "video", None):
-            fallback_ext = ".mp4"
-        elif getattr(msg, "audio", None) or getattr(msg, "voice", None):
+        elif getattr(msg, "video", None) or has_vid_attr or mime_t.startswith("video/"):
+            if "matroska" in mime_t or "mkv" in mime_t:
+                fallback_ext = ".mkv"
+            elif "webm" in mime_t:
+                fallback_ext = ".webm"
+            elif "quicktime" in mime_t or "mov" in mime_t:
+                fallback_ext = ".mov"
+            else:
+                fallback_ext = ".mp4"
+        elif getattr(msg, "audio", None) or getattr(msg, "voice", None) or has_aud_attr or mime_t.startswith("audio/"):
             fallback_ext = ".mp3"
+        elif mime_t in ("application/pdf", "text/pdf"):
+            fallback_ext = ".pdf"
         elif getattr(msg, "document", None):
             fallback_ext = ".pdf"
 
         raw_name = getattr(file_obj, "name", None) or f"media_{msg.id}{fallback_ext}"
-        name = sanitize_filename(raw_name, fallback_ext=fallback_ext)
+        name = sanitize_filename(raw_name, fallback_ext=fallback_ext, mime_type=mime_t)
         uploaded_bytes = 0
 
         async def drain_one(in_flight, task_sizes):
@@ -3001,6 +3115,9 @@ def customize_caption(caption, for_media=False, batch_name=""):
         first_line = lines[0].strip()
         rest_lines = lines[1:]
 
+        # Clean spaces before dots / extensions in first_line
+        first_line = re.sub(r"\s+(\.(?:[a-zA-Z0-9]{2,5}))\b", r"\1", first_line)
+
         # Detect Emoji based on filename / extension
         emoji = "📄"
         lower_txt = text.lower()
@@ -3013,6 +3130,11 @@ def customize_caption(caption, for_media=False, batch_name=""):
         elif any(ext in lower_txt for ext in (".jpg", ".jpeg", ".png", ".webp", "photo", "image")):
             emoji = "🖼️"
 
+        # Clean technical file extension from title line for clean display
+        first_line_clean = re.sub(r"(?i)\s*\.(?:mp4|mkv|avi|mov|webm|ts|m4v|pdf|docx?|pptx?|epub|zip|rar|mp3|m4a|wav)$", "", first_line).strip()
+        if first_line_clean:
+            first_line = first_line_clean
+
         if first_line and not re.search(r"(?i)\btitle\s*[:*]", first_line):
             formatted_title = f"{emoji} **Title**: {first_line}"
             # Check if rest_lines has redundant first_line duplicates and clean
@@ -3022,6 +3144,10 @@ def customize_caption(caption, for_media=False, batch_name=""):
                 if _canonical_line_key(rl) != f_canon:
                     filtered_rest.append(rl)
             clean = "\n".join([formatted_title] + filtered_rest).strip()
+        elif first_line and re.search(r"(?i)\btitle\s*[:*]", first_line):
+            clean_first = re.sub(r"\s+(\.(?:[a-zA-Z0-9]{2,5}))\b", r"\1", first_line)
+            clean_first = re.sub(r"(?i)\s*\.(?:mp4|mkv|avi|mov|webm|ts|m4v|pdf|docx?|pptx?|epub|zip|rar|mp3|m4a|wav)$", "", clean_first).strip()
+            clean = "\n".join([clean_first] + rest_lines).strip()
 
     # Batch Tag Integration
     if active_batch and show_batch and active_batch.lower() not in clean.lower():
@@ -3254,74 +3380,81 @@ class PipelineProcessor:
         batch_name = getattr(self.cfg, "batch_name", "")
         return customize_caption(text, for_media=for_media, batch_name=batch_name)
 
-    async def post_batch_index_card(self, target_chat, target_topic, client):
+    async def post_batch_index_card(self, default_target_chat, default_target_topic, client):
         if not self.batch_index_records:
             return
         silent_mode = os.getenv("SILENT_MODE", "false").strip().lower() in ("true", "1", "yes")
-        resolved_topic = await self.resolve_topic_id(target_chat, target_topic, client)
-        
-        raw_id = str(target_chat).replace("-100", "").replace("-", "").lstrip("@")
-        
-        cards = []
-        current_card_lines = [
-            "📑 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "📚 **BATCH INDEX & TABLE OF CONTENTS**",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        ]
-        
-        for idx, item in enumerate(self.batch_index_records, 1):
-            link = make_telegram_link(target_chat, item['msg_id'], topic_id=resolved_topic)
-            clean_t = clean_index_title(item['title'], max_len=45)
-            entry = f"{item['icon']} **#{idx:02d}** • [{clean_t}]({link})"
-            if sum(len(l) for l in current_card_lines) + len(entry) > 3400:
-                current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                cards.append("\n".join(current_card_lines))
-                current_card_lines = [f"📑 **BATCH INDEX (Part {len(cards)+1})**", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
-            current_card_lines.append(entry)
-            
-        total_count = len(self.batch_index_records)
-        current_card_lines.extend([
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"✨ **Total Delivered:** `{total_count}` Files & Lectures",
-            f"📚 {TELEGRAM_BRAND} | 💬 {GROUP_BRAND}"
-        ])
-        cards.append("\n".join(current_card_lines))
-        
-        sent_first_card = None
-        for idx, card in enumerate(cards):
-            try:
-                msg = await self.rpc.execute(
-                    lambda c, card_text=card: c.send_message(
-                        _parse_chat_id(target_chat),
-                        card_text,
-                        reply_to=resolved_topic,
-                        parse_mode="md",
-                        link_preview=False,
-                        silent=silent_mode
-                    ),
-                    client=client,
-                    timeout=45.0
-                )
-                if idx == 0 and msg:
-                    sent_first_card = msg
-                await asyncio.sleep(0.5)
-            except Exception as e:
-                logger.info(f"Batch Index send error: {e}")
-
-        # 📌 Auto-PIN Table of Contents at top of destination topic/channel
         auto_pin = os.getenv("AUTO_PIN_INDEX", "true").strip().lower() in ("true", "1", "yes")
-        if auto_pin and sent_first_card:
-            try:
-                await self.rpc.execute(
-                    lambda c: c.pin_message(_parse_chat_id(target_chat), sent_first_card.id, notify=False),
-                    client=client,
-                    timeout=30.0
-                )
-                self.log(f"[bold green]📌 Table of Contents pinned at top of topic successfully![/]")
-            except Exception as e:
-                logger.info(f"Auto-pin index note: {e}")
+        
+        # Group batch records strictly by (target_chat, target_topic)
+        grouped_records = {}
+        for item in self.batch_index_records:
+            t_chat = item.get("target_chat") or default_target_chat
+            t_top = item.get("target_topic", default_target_topic)
+            key = (str(t_chat), int(t_top or 0))
+            grouped_records.setdefault(key, []).append(item)
+            
+        for (tgt_chat, tgt_topic), records in grouped_records.items():
+            resolved_topic = await self.resolve_topic_id(tgt_chat, tgt_topic, client)
+            cards = []
+            current_card_lines = [
+                "📑 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                "📚 **BATCH INDEX & TABLE OF CONTENTS**",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            ]
+            
+            for idx, item in enumerate(records, 1):
+                link = make_telegram_link(tgt_chat, item['msg_id'], topic_id=resolved_topic)
+                clean_t = clean_index_title(item['title'], max_len=45)
+                entry = f"{item['icon']} **#{idx:02d}** • [{clean_t}]({link})"
+                if sum(len(l) for l in current_card_lines) + len(entry) > 3400:
+                    current_card_lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    cards.append("\n".join(current_card_lines))
+                    current_card_lines = [f"📑 **BATCH INDEX (Part {len(cards)+1})**", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+                current_card_lines.append(entry)
+                
+            total_count = len(records)
+            current_card_lines.extend([
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                f"✨ **Total Delivered:** `{total_count}` Files & Lectures",
+                f"📚 {TELEGRAM_BRAND} | 💬 {GROUP_BRAND}"
+            ])
+            cards.append("\n".join(current_card_lines))
+            
+            sent_first_card = None
+            for idx, card in enumerate(cards):
+                try:
+                    msg = await self.rpc.execute(
+                        lambda c, card_text=card, tc=tgt_chat, rt=resolved_topic: c.send_message(
+                            _parse_chat_id(tc),
+                            card_text,
+                            reply_to=rt,
+                            parse_mode="md",
+                            link_preview=False,
+                            silent=silent_mode
+                        ),
+                        client=client,
+                        timeout=45.0
+                    )
+                    if idx == 0 and msg:
+                        sent_first_card = msg
+                    await asyncio.sleep(0.5)
+                except Exception as e:
+                    logger.info(f"Batch Index send error for {tgt_chat}:{tgt_topic}: {e}")
 
-        self.log(f"[bold green]📑 Batch Index Card Posted ({total_count} items indexed)[/]")
+            # 📌 Auto-PIN Table of Contents at top of destination topic/channel
+            if auto_pin and sent_first_card:
+                try:
+                    await self.rpc.execute(
+                        lambda c, tc=tgt_chat, sc=sent_first_card: c.pin_message(_parse_chat_id(tc), sc.id, notify=False),
+                        client=client,
+                        timeout=30.0
+                    )
+                    self.log(f"[bold green]📌 Table of Contents pinned at top of topic {tgt_topic} successfully![/]")
+                except Exception as e:
+                    logger.info(f"Auto-pin index note: {e}")
+
+            self.log(f"[bold green]📑 Batch Index Card Posted to Topic {tgt_topic} ({total_count} items indexed)[/]")
 
     def reconstruct(self, msg):
         signature = f"\n\n📚 **{TELEGRAM_BRAND}**\n💬 {GROUP_BRAND}"
@@ -3552,11 +3685,12 @@ class PipelineProcessor:
                         cap_main, cap_overflow = self.format_text(m.text, for_media=True)
                         
                         orig_doc = getattr(getattr(m, "media", None), "document", None)
+                        file_sanitized_name = getattr(file, "name", "") or ""
                         attrs = []
                         if orig_doc and hasattr(orig_doc, "attributes"):
                             for a in orig_doc.attributes:
                                 if isinstance(a, DocumentAttributeFilename):
-                                    attrs.append(DocumentAttributeFilename(file_name=getattr(file, "name", a.file_name)))
+                                    attrs.append(DocumentAttributeFilename(file_name=file_sanitized_name or a.file_name))
                                 elif isinstance(a, DocumentAttributeVideo):
                                     vid_w = int(getattr(a, "w", 0) or 0)
                                     vid_h = int(getattr(a, "h", 0) or 0)
@@ -3572,8 +3706,16 @@ class PipelineProcessor:
                                 elif isinstance(a, DocumentAttributeAudio):
                                     attrs.append(a)
 
+                        if file_sanitized_name and not any(isinstance(x, DocumentAttributeFilename) for x in attrs):
+                            attrs.append(DocumentAttributeFilename(file_name=file_sanitized_name))
+
                         # If media is a video file but had no video attribute, inject 16:9 HD video attribute
-                        is_video_type = getattr(m, "video", None) or (getattr(file, "name", "").lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi")))
+                        mime_t = str(getattr(orig_doc, "mime_type", "") or "").lower()
+                        is_video_type = (
+                            getattr(m, "video", None) is not None
+                            or mime_t.startswith("video/")
+                            or file_sanitized_name.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))
+                        )
                         has_vid_attr = any(isinstance(x, DocumentAttributeVideo) for x in attrs)
                         if is_video_type and not has_vid_attr:
                             attrs.append(DocumentAttributeVideo(
@@ -3601,6 +3743,8 @@ class PipelineProcessor:
                                 title_clean = f_name or (m.text[:40] if m.text else f"Video #{m.id}")
                                 icon_m = "🎥" if getattr(m, "video", None) else ("📄" if getattr(m, "document", None) else ("🖼️" if getattr(m, "photo", None) else "📦"))
                                 self.batch_index_records.append({
+                                    "target_chat": target_chat,
+                                    "target_topic": target_topic,
                                     "msg_id": s_id,
                                     "title": clean_index_title(title_clean, max_len=60),
                                     "icon": icon_m
@@ -4859,6 +5003,8 @@ class TerminalPlatform:
                         "Total Duration": time_str,
                         "Errors / DLQ": f"{self.metrics.get('errors_count', 0)}"
                     })
+                    if is_done_with_items:
+                        AdminTelemetry.dispatch_backup(client)
                 except Exception as e:
                     logger.error(f"Saved messages completion alert error: {e}")
 
@@ -6859,8 +7005,10 @@ async def run_single_or_specific_messages_forwarder(session_mgr):
                             t_enforcer = ThumbEnforcer()
                             t_to_send = extracted_thumb if (extracted_thumb and os.path.exists(extracted_thumb)) else (await t_enforcer.get_input_file(client) if (THUMB_MODE == "custom") else None)
 
-                            # Preserve video attributes
-                            orig_attrs = getattr(getattr(m, 'media', None), 'document', None) and getattr(m.media.document, 'attributes', []) or []
+                            # Preserve video attributes and clean filename
+                            clean_fn = sanitize_filename(os.path.basename(downloaded_path))
+                            orig_doc = getattr(getattr(m, 'media', None), 'document', None)
+                            orig_attrs = getattr(orig_doc, 'attributes', []) if orig_doc else []
                             vid_attrs = []
                             for a in orig_attrs:
                                 if isinstance(a, DocumentAttributeVideo):
@@ -6871,8 +7019,16 @@ async def run_single_or_specific_messages_forwarder(session_mgr):
                                         supports_streaming=True
                                     ))
                                 elif isinstance(a, DocumentAttributeFilename):
+                                    vid_attrs.append(DocumentAttributeFilename(file_name=clean_fn or a.file_name))
+                                elif isinstance(a, DocumentAttributeAudio):
                                     vid_attrs.append(a)
-                            if not any(isinstance(x, DocumentAttributeVideo) for x in vid_attrs) and (getattr(m, 'video', None) or downloaded_path.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))):
+
+                            if clean_fn and not any(isinstance(x, DocumentAttributeFilename) for x in vid_attrs):
+                                vid_attrs.append(DocumentAttributeFilename(file_name=clean_fn))
+
+                            mime_t = str(getattr(orig_doc, 'mime_type', '') or '').lower()
+                            is_vid = getattr(m, 'video', None) or mime_t.startswith("video/") or downloaded_path.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))
+                            if not any(isinstance(x, DocumentAttributeVideo) for x in vid_attrs) and is_vid:
                                 vid_attrs.append(DocumentAttributeVideo(duration=0, w=1280, h=720, supports_streaming=True))
 
                             sent_msg = await client.send_file(
@@ -7241,8 +7397,10 @@ async def run_selective_content_picker(session_mgr):
                             t_enforcer = ThumbEnforcer()
                             t_to_send = extracted_thumb if (extracted_thumb and os.path.exists(extracted_thumb)) else (await t_enforcer.get_input_file(client) if (THUMB_MODE == "custom") else None)
 
-                            # Preserve video attributes
-                            orig_attrs = getattr(getattr(msg, 'media', None), 'document', None) and getattr(msg.media.document, 'attributes', []) or []
+                            # Preserve video attributes and clean filename
+                            clean_fn = sanitize_filename(os.path.basename(downloaded_path))
+                            orig_doc = getattr(getattr(msg, 'media', None), 'document', None)
+                            orig_attrs = getattr(orig_doc, 'attributes', []) if orig_doc else []
                             vid_attrs = []
                             for a in orig_attrs:
                                 if isinstance(a, DocumentAttributeVideo):
@@ -7253,8 +7411,16 @@ async def run_selective_content_picker(session_mgr):
                                         supports_streaming=True
                                     ))
                                 elif isinstance(a, DocumentAttributeFilename):
+                                    vid_attrs.append(DocumentAttributeFilename(file_name=clean_fn or a.file_name))
+                                elif isinstance(a, DocumentAttributeAudio):
                                     vid_attrs.append(a)
-                            if not any(isinstance(x, DocumentAttributeVideo) for x in vid_attrs) and (getattr(msg, 'video', None) or downloaded_path.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))):
+
+                            if clean_fn and not any(isinstance(x, DocumentAttributeFilename) for x in vid_attrs):
+                                vid_attrs.append(DocumentAttributeFilename(file_name=clean_fn))
+
+                            mime_t = str(getattr(orig_doc, 'mime_type', '') or '').lower()
+                            is_vid = getattr(msg, 'video', None) or mime_t.startswith("video/") or downloaded_path.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))
+                            if not any(isinstance(x, DocumentAttributeVideo) for x in vid_attrs) and is_vid:
                                 vid_attrs.append(DocumentAttributeVideo(duration=0, w=1280, h=720, supports_streaming=True))
 
                             sent_msg = await client.send_file(

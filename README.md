@@ -2,7 +2,7 @@
 
 ![TG KindSync Pro Header](docs/assets/header_banner.jpg)
 
-# 🩺 TG KINDSYNC PRO — V14.5 ENTERPRISE MASTERPIECE
+# 🩺 TG KINDSYNC PRO — V15.0.0 ENTERPRISE TURBO MASTERPIECE
 ### *High-Velocity Telegram In-Memory Streaming Suite • DEVI AI Sentinel • 24/7 Oracle Cloud Engine*
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
@@ -24,7 +24,7 @@
 
 ## 🌟 Executive Summary & System Overview
 
-**TG KindSync Pro V14.5** is a proprietary, enterprise-grade Telegram streaming, auto-synchronization, and content migration core. Built with custom high-speed MTProto in-memory pipelining, it is engineered to bypass forward and copy restrictions without saving files to disk, preserving topic hierarchies, injecting dynamic watermarking/captions, and running 24/7 non-stop across Windows, Linux, Android (Termux), and Oracle Cloud VPS.
+**TG KindSync Pro V15.0.0 Enterprise Turbo Masterpiece** is a proprietary, high-throughput Telegram streaming, auto-synchronization, and content migration core. Built with custom 48-parallel MTProto in-memory pipelining, it is engineered to bypass forward and copy restrictions without saving files to disk, preserving topic hierarchies, injecting dynamic watermarking/captions, providing strict sequential FIFO curriculum locks, in-app Telegram Mini App dashboard integration, automated 24h cloud backups, and running 24/7 non-stop across Windows, Linux, Android (Termux), and Oracle Cloud VPS.
 
 ---
 

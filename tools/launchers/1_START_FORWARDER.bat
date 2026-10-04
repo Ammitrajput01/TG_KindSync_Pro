@@ -2,11 +2,11 @@
 chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
 cd /d "%~dp0"
-title 🚀 TG KINDSYNC PRO V14.5 — TELEGRAM FORWARDER
+title 🚀 TG KINDSYNC PRO V15.0.0 — TELEGRAM FORWARDER
 cls
 
 echo ==============================================================================
-echo        🩺 TG KINDSYNC PRO V14.5 — TELEGRAM FORWARDER (1-CLICK RUN)
+echo        🩺 TG KINDSYNC PRO V15.0.0 — TELEGRAM FORWARDER (1-CLICK RUN)
 echo        Owner & Developer: Dr. Amit Singh (Kind Doctor)
 echo ==============================================================================
 echo.

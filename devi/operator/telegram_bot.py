@@ -2017,7 +2017,7 @@ class DeviTelegramBot:
                 await self._handle_admin_command(session, chat_id, admin_id, "/scan", message=msg_obj)
             elif action == "engine_refresh":
                 await self._handle_admin_command(session, chat_id, admin_id, "/engine", message=msg_obj)
-            elif action == "engine_backup":
+            elif action in ("engine_backup", "quick_backup"):
                 await self._handle_admin_command(session, chat_id, admin_id, "/backup", message=msg_obj)
             elif action == "engine_scan":
                 await self._handle_admin_command(session, chat_id, admin_id, "/scan", message=msg_obj)
@@ -3646,6 +3646,78 @@ class DeviTelegramBot:
                 return
 
             await self._export_members_csv_file(session, chat_id, target_chat_id, message_thread_id=thread_id)
+
+        elif cmd in ("/backup", "/dbbackup", "/snapshot"):
+            if admin_id not in self.master_admin_ids:
+                await self._send_message(session, chat_id, "⚠️ Database snapshot exports are restricted strictly to Bot Owners.", message_thread_id=thread_id)
+                return
+
+            await self._send_message(session, chat_id, "⏳ **Generating live encrypted SQLite snapshot backup...**", message_thread_id=thread_id)
+            try:
+                now = datetime.now()
+                day_str = now.strftime("%A")
+                date_str = now.strftime("%d-%B-%Y")
+                time_str = now.strftime("%I-%M%p")
+                fname = f"history_core_backup_{day_str}_{date_str}_{time_str}.sqlite"
+                backup_dir = BASE_PROJECT_DIR / "db_backups"
+                backup_dir.mkdir(exist_ok=True)
+                out_path = backup_dir / fname
+
+                # Online SQLite vacuum snapshot
+                src = sqlite3.connect(DB_PATH, timeout=30.0)
+                dst = sqlite3.connect(str(out_path), timeout=30.0)
+                src.backup(dst)
+                dst.close()
+                src.close()
+
+                with open(out_path, "rb") as bf:
+                    b_bytes = bf.read()
+
+                display_time = now.strftime("%A, %d %B %Y | %I:%M %p")
+                cap = (
+                    f"💾 **TG KindSync Pro v15.0.0 — Database Cloud Backup** 🩺\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📅 **Timestamp**: `{display_time}`\n"
+                    f"📦 **File**: `{fname}`\n"
+                    f"📊 **Size**: `{len(b_bytes) / (1024*1024):.2f} MB`\n"
+                    f"👑 **Owner**: Dr. Amit Singh (Kind Doctor)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🔒 _100% Consistent SQLite WAL Online Snapshot_"
+                )
+                success = await self._send_document(session, chat_id, b_bytes, fname, caption=cap, message_thread_id=thread_id)
+                if not success:
+                    await self._send_message(session, chat_id, f"✅ Backup created locally at `{out_path}`.", message_thread_id=thread_id)
+            except Exception as e:
+                logger.error(f"Snapshot backup failed: {e}")
+                await self._send_message(session, chat_id, f"❌ Backup failed: `{e}`", message_thread_id=thread_id)
+
+        elif cmd in ("/dashboard", "/missioncontrol", "/panel"):
+            if admin_id not in self.master_admin_ids:
+                await self._send_message(session, chat_id, "⚠️ Mission Control Dashboard is restricted strictly to Bot Owners.", message_thread_id=thread_id)
+                return
+
+            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+            dash_url = f"http://{lan_ip}:{dash_port}"
+
+            dash_card = (
+                f"🌐 **TG KINDSYNC PRO V15.0.0 — SENTINEL MISSION CONTROL** 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📊 **Live Telemetry & Web Dashboard**\n"
+                f"• ⚡ Speedometer Dial (48-Parallel MTProto Velocity)\n"
+                f"• 🎚️ Real-Time Stream Throttle Slider\n"
+                f"• 📈 RAM & Active Chunk Meters\n"
+                f"• 🔒 PBKDF2-HMAC-SHA256 Encrypted Session Gate\n\n"
+                f"🔗 **Access URL**: `{dash_url}`\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [{"text": "🌐 Open Mission Control Web App", "web_app": {"url": dash_url}}],
+                    [{"text": "💾 Instant SQLite Backup", "callback_data": "act_quick_backup"}]
+                ]
+            }
+            await self._send_message(session, chat_id, dash_card, reply_markup=kb, message_thread_id=thread_id)
 
         # -------------------------------------------------------------
         # 2B. GROUP CUSTOMIZATION & RULES MANAGEMENT (Admin Controls)

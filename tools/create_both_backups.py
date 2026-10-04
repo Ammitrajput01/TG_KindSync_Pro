@@ -9,26 +9,24 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Names of the two distinct backup packages
-FRIEND_ZIP_NAME = "TG_KindSync_Pro_v14.5_FOR_FRIEND.zip"
-OWNER_ZIP_NAME = "TG_KindSync_Pro_v14.5_OWNER_FULL_BACKUP.zip"
+FRIEND_ZIP_NAME = "TG_KindSync_Pro_v15.0.0_FOR_FRIEND.zip"
+OWNER_ZIP_NAME = "TG_KindSync_Pro_v15.0.0_OWNER_FULL_BACKUP.zip"
 
 FRIEND_ZIP_PATH = BASE_DIR / FRIEND_ZIP_NAME
 OWNER_ZIP_PATH = BASE_DIR / OWNER_ZIP_NAME
 
 # Files strictly required for friend (Standalone, Zero Clutter, Zero Private Leaks)
 FRIEND_FILES = [
-    "START_BOT.bat",
-    "EASY_SETUP.bat",
-    "tg_kind_mode_v14.py",
+    "Friend_Edition/tg_kindsync_pro.py",
+    "tg_kindsync_pro.py",
     "main.py",
-    "quick_setup.py",
     "requirements.txt",
     ".env.example",
     "kind_doctor_thumb.jpg",
-    "HOW_TO_RUN_FOR_FRIEND.txt",
+    "version.json",
     "README.md",
 ]
 

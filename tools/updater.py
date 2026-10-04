@@ -45,7 +45,7 @@ def load_version_info() -> dict:
                 return json.load(f)
         except Exception:
             pass
-    return {"app_name": "TG KindSync Pro", "version": "14.5.0", "release_tag": "v14.5"}
+    return {"app_name": "TG KindSync Pro", "version": "15.0.0", "release_tag": "v15.0.0"}
 
 def is_git_repository() -> bool:
     git_dir = BASE_DIR / ".git"
