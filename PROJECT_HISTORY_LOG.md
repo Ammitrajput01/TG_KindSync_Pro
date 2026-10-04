@@ -6,7 +6,18 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Sunday, 04 October 2026
 
-### 1. Multi-Tenant In-Bot User Account Linking & Infinite Group Scaler Architecture
+### 1. Universal Single-Pass Topic & Media Harvester (`harvest_all_messages`)
+* **Symptom**:
+  - Scanning third-party forum groups or admin supergroups via `/scan` resulted in `Topics Registered: 2` and `Lectures/Files Indexed: 0` or threw `Could not find a matching Constructor ID for the TLObject (ID d49f34c6)` on `GetForumTopicsRequest` / `GetRepliesRequest`.
+* **Root Cause**:
+  - Telegram layer 180+ server updates introduced TLObject constructor ID `0xd49f34c6` which caused raw `GetForumTopicsRequest` to raise deserialization errors in Telethon 1.44.0. Furthermore, Bot Tokens cannot call `GetRepliesRequest` directly.
+  - In `telegram_bot.py`, `if total_items == 0 and len(topics) <= 1:` failed to trigger the 4-method linking guide when placeholder topics existed in SQLite (`len(topics) == 2`).
+* **Permanent Fix Applied**:
+  1. **Universal Single-Pass Stream Harvester (`devi/operator/group_scanner.py`)**: Replaced fragmented `GetForumTopicsRequest` / `GetRepliesRequest` calls with `harvest_all_messages(client, peer, target_chat_id)`. It iterates messages in a continuous stream, dynamically auto-discovering topics via `MessageActionTopicCreate` & `MessageActionTopicEdit`, and mapping all media files directly to their respective `topic_id` in 50-item transactional batches.
+  2. **0-Item Scan Guard (`devi/operator/telegram_bot.py`)**: Updated notice condition to `if total_items == 0:` so that whenever 0 files are indexed, the user is immediately shown the clear 4-method guide with 1-click `/linkaccount` button.
+  3. **Verification**: Verified via `py_compile`, pytest suites, Git commit & push, and live Oracle Cloud VPS restart.
+
+### 2. Multi-Tenant In-Bot User Account Linking & Infinite Group Scaler Architecture
 * **Architecture & Features**:
   - **In-Bot Interactive Account Linking (`/linkaccount`, `/connectaccount`, `/login`)**: Any group admin or owner can connect their Telegram User Account directly inside Bot DM via interactive phone -> official Telegram OTP -> 2FA Cloud password flow.
   - **Isolated SQLite Vault Storage (`telegram_linked_sessions`)**: Stores isolated base64 `StringSession` strings per user ID (`user_id`, `phone_number`, `account_name`, `username`, `session_string`), completely decoupled from the master session.
