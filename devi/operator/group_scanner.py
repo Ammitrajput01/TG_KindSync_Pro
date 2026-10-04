@@ -39,6 +39,18 @@ def get_db_conn() -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL;")
     return conn
 
+def normalize_supergroup_chat_id(cid) -> int:
+    """Converts any chat/channel entity ID or numeric string to Bot API supergroup ID (-100 prefix)."""
+    try:
+        raw_val = int(str(cid).strip())
+    except (ValueError, TypeError):
+        return 0
+    s = str(abs(raw_val))
+    if s.startswith("100"):
+        return int(f"-{s}")
+    else:
+        return int(f"-100{s}")
+
 def init_tables(conn: sqlite3.Connection):
     conn.execute("""
         CREATE TABLE IF NOT EXISTS telegram_group_topics (
@@ -248,7 +260,7 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
                     if hasattr(updates, 'chats') and updates.chats:
                         ent = updates.chats[0]
                         peer = ent
-                        target_chat_id = -100 * abs(ent.id) if not str(ent.id).startswith("-100") else ent.id
+                        target_chat_id = normalize_supergroup_chat_id(ent.id)
                         print(f"[+] Successfully joined group via invite link: id={target_chat_id}")
                 except UserAlreadyParticipantError:
                     pass
@@ -260,7 +272,7 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
                     check_res = await client(CheckChatInviteRequest(h_val))
                     chat_obj = getattr(check_res, 'chat', None)
                     if chat_obj:
-                        target_chat_id = -100 * abs(chat_obj.id) if not str(chat_obj.id).startswith("-100") else chat_obj.id
+                        target_chat_id = normalize_supergroup_chat_id(chat_obj.id)
                         peer = await client.get_input_entity(target_chat_id)
                 except Exception as ex:
                     print(f"[!] CheckChatInviteRequest error: {ex}")
@@ -271,13 +283,13 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
             try:
                 ent = await client.get_entity(u_val)
                 peer = ent
-                target_chat_id = -100 * abs(ent.id) if not str(ent.id).startswith("-100") else ent.id
+                target_chat_id = normalize_supergroup_chat_id(ent.id)
             except Exception as e:
                 print(f"[!] Username entity resolution error: {e}")
 
         # 3. Handle Numeric Chat IDs
         elif target_info["type"] == "chat_id":
-            target_chat_id = target_info["value"]
+            target_chat_id = normalize_supergroup_chat_id(target_info["value"])
             # Ensure proper supergroup prefix if needed
             try:
                 peer = await client.get_input_entity(target_chat_id)
@@ -301,7 +313,7 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
                     try:
                         peer = await client.get_input_entity(sid)
                         if peer: 
-                            target_chat_id = sid
+                            target_chat_id = normalize_supergroup_chat_id(sid)
                             break
                     except Exception:
                         pass
@@ -309,7 +321,7 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
                         ent = await client.get_entity(sid)
                         if ent:
                             peer = ent
-                            target_chat_id = sid
+                            target_chat_id = normalize_supergroup_chat_id(sid)
                             break
                     except Exception:
                         pass
@@ -321,7 +333,7 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
                         d_ent_id = abs(getattr(dialog.entity, 'id', 0))
                         if d_id in search_ids or d_ent_id in search_ids:
                             peer = dialog.input_entity
-                            target_chat_id = dialog.id
+                            target_chat_id = normalize_supergroup_chat_id(dialog.id)
                             break
                 except Exception:
                     pass
@@ -338,8 +350,7 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
             return
 
         # Ensure normalized negative ID for supergroups
-        if target_chat_id and target_chat_id > 0 and len(str(target_chat_id)) >= 9:
-            target_chat_id = -100 * target_chat_id
+        target_chat_id = normalize_supergroup_chat_id(target_chat_id)
 
         # Case 1: Targeted Single-Topic Scan (Lightning fast for /topicindex)
         if target_topic_id:
