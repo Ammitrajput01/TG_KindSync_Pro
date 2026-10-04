@@ -3484,7 +3484,7 @@ class DeviTelegramBot:
             except Exception:
                 pass
 
-            if total_items == 0 and len(topics) <= 1:
+            if total_items == 0:
                 bot_user = self.bot_username or "KindDoc_bot"
                 done_msg = (
                     "⚠️ <b>1-CLICK ARCHIVE &amp; FORUM INDEXER</b> 📑\n"
