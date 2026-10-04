@@ -5527,45 +5527,81 @@ class DashboardServer:
         finish_dt = datetime.now() + timedelta(seconds=eta_seconds)
         est_finish_time = finish_dt.strftime("%I:%M %p, %d %b") if calc_speed > 0 else "--:--"
 
+        # Extract live telemetry route names if available
+        live_src_info = ""
+        live_tgt_info = ""
+        if ENGINE_TELEMETRY_FILE.exists():
+            with suppress(Exception):
+                with open(ENGINE_TELEMETRY_FILE, "r", encoding="utf-8") as f:
+                    t_data_raw = json.load(f)
+                    live_src_info = str(t_data_raw.get("src_info", "")).strip()
+                    live_tgt_info = str(t_data_raw.get("tgt_info", "")).strip()
+
         # Route Topology Mapping
         source_chat_id = os.getenv("SOURCE_CHAT", "").strip("'\"")
         source_topic_id = os.getenv("SOURCE_TOPIC", "").strip("'\"")
         target_chat_id = os.getenv("TARGET_CHAT", "").strip("'\"")
         target_topic_id = os.getenv("TARGET_TOPIC", "").strip("'\"")
 
-        src_top_name = topic_map.get(int(source_topic_id), f"Topic #{source_topic_id}") if source_topic_id.isdigit() else (source_topic_id or "Active Stream")
+        src_chat_name = "Source Channel Stream"
+        src_topic_name = "General / All Topics"
+        if live_src_info:
+            clean_s = re.sub(r"\[.*?\]", "", live_src_info).replace("Source:", "").replace("Src:", "").strip()
+            if "(" in clean_s and clean_s.endswith(")"):
+                p_src = clean_s.rsplit("(", 1)
+                src_chat_name = p_src[0].strip() or "Source Channel"
+                src_topic_name = p_src[1].rstrip(")").strip() or "All Topics"
+            else:
+                src_chat_name = clean_s
+        elif source_chat_id:
+            src_chat_name = f"Source {source_chat_id}"
+            src_topic_name = topic_map.get(int(source_topic_id), f"Topic #{source_topic_id}") if source_topic_id.isdigit() else (source_topic_id or "General")
+
         source_route = {
-            "chat_name": f"Source {source_chat_id}" if source_chat_id else "Telegram Channel Stream",
-            "topic_name": src_top_name if source_topic_id else "General / All Topics",
-            "chat_id": source_chat_id or "Not Configured"
+            "chat_name": src_chat_name,
+            "topic_name": src_topic_name,
+            "chat_id": source_chat_id or "Active Stream"
         }
+
+        tgt_chat_name = "Target Study Group"
+        tgt_topic_name = "General"
+        if live_tgt_info:
+            clean_t = re.sub(r"\[.*?\]", "", live_tgt_info).replace("Target:", "").replace("Tgt:", "").strip()
+            if "(" in clean_t and clean_t.endswith(")"):
+                p_tgt = clean_t.rsplit("(", 1)
+                tgt_chat_name = p_tgt[0].strip() or "Target Group"
+                tgt_topic_name = p_tgt[1].rstrip(")").strip() or "General"
+            else:
+                tgt_chat_name = clean_t
+        elif target_chat_id:
+            tgt_chat_name = f"Target Group {target_chat_id}"
+            tgt_topic_name = topic_map.get(int(target_topic_id), f"Topic #{target_topic_id}") if target_topic_id.isdigit() else (target_topic_id or "General")
 
         target_routes = []
         raw_rules = os.getenv("FORWARDING_RULES", "").strip()
         if raw_rules:
             rules_parts = [r.strip() for r in raw_rules.split(",") if r.strip()]
-            for rp in rules_parts:
+            for idx, rp in enumerate(rules_parts, 1):
                 p_items = rp.split(":")
                 if len(p_items) >= 4:
                     tgt_cid = p_items[2]
                     tgt_tid = p_items[3]
                     t_title = topic_map.get(int(tgt_tid), f"Topic #{tgt_tid}") if tgt_tid.isdigit() else f"Topic #{tgt_tid}"
                     target_routes.append({
-                        "chat_name": f"Target Group {tgt_cid}",
+                        "chat_name": f"{tgt_chat_name} (Rule {idx})",
                         "topic_name": t_title,
                         "target_chat_id": tgt_cid,
                         "target_topic_id": tgt_tid,
-                        "status": "Active Synced"
+                        "status": "Active Synced 🟢"
                     })
-        if not target_routes and target_chat_id:
-            tgt_top_name = topic_map.get(int(target_topic_id), f"Topic #{target_topic_id}") if target_topic_id.isdigit() else (target_topic_id or "General")
+        if not target_routes:
             target_routes = [
                 {
-                    "chat_name": f"Target Group {target_chat_id}",
-                    "topic_name": tgt_top_name,
-                    "target_chat_id": target_chat_id,
+                    "chat_name": tgt_chat_name,
+                    "topic_name": tgt_topic_name,
+                    "target_chat_id": target_chat_id or "Active",
                     "target_topic_id": target_topic_id or "0",
-                    "status": "Active Synced"
+                    "status": "Active Synced 🟢"
                 }
             ]
 
@@ -5586,8 +5622,8 @@ class DashboardServer:
 
         db_count = max(real_db_count, getattr(self.state, "db_forwarded_count", 0))
 
-        active_topic_title = topic_map.get(int(target_topic_id), f"Topic #{target_topic_id}") if (target_topic_id and target_topic_id.isdigit()) else (target_topic_id or "Standby")
-        active_group_title = f"Group {target_chat_id}" if target_chat_id else "Standby"
+        active_topic_title = tgt_topic_name
+        active_group_title = tgt_chat_name
 
         # Speed formatter for JSON API
         if cur_speed <= 0.0001:

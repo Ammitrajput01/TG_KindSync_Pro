@@ -577,3 +577,22 @@ This log permanently documents root causes, architectural patterns, historical b
     - Added direct clickable links to Bot Private DM (`https://t.me/KindDoc_bot?start=linkaccount`) directly inside the text body and interactive inline buttons (`[ 🔗 Link Your Account ]`, `[ ⚡ 1-Click Auto-Scan ]`, `[ 🗑️ Delete Notice (Admin) ]`).
   - **Supergroup ID Normalization Fix (`normalize_supergroup_chat_id`)**:
     - Fixed mathematical multiplication bug `-100 * id` in [devi/operator/group_scanner.py](file:///c:/TG_KindSync_Pro/devi/operator/group_scanner.py) (which generated invalid `-350480711400` instead of `-1003504807114`), ensuring 100% matched database queries between bot and scanner engine.
+
+---
+
+### 38. Dynamic Telemetry Route Topology Bridge & Title Caption Polish
+* **Symptoms**:
+  - Web Dashboard showed stale static channel names ("Study Help 2.0") instead of currently active source channel ("Marrow:Pirate Bay Premium") and target topic ("Marrow Edition 6 Videos").
+  - File captions rendered trailing file extensions with leading whitespace (e.g., `Title: 28. Vestibular Neuritis .mp4`).
+* **Root Causes**:
+  1. `web_dashboard.py` read fallback routes exclusively from static `.env` variables instead of the live engine telemetry payload (`logs/engine_telemetry.json`).
+  2. When keyword/watermark stripping removed strings preceding `.mp4`, it left a space before the file extension.
+* **Permanent Fix Applied**:
+  - In [tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/tg_kindsync_pro.py) and [Friend_Edition/tg_kindsync_pro.py](file:///c:/TG_KindSync_Pro/Friend_Edition/tg_kindsync_pro.py):
+    - Added `src_info` and `tgt_info` to `_write_engine_telemetry()` broadcast payload.
+    - Enhanced `customize_caption` with boundary-safe regex to strip technical extensions and collapse pre-dot whitespace (`\s+\.([a-zA-Z0-9]+)` ➔ `.\1`).
+  - In [web_dashboard.py](file:///c:/TG_KindSync_Pro/web_dashboard.py):
+    - Upgraded `_build_status_dict()` to dynamically parse live source and target group/topic names from engine telemetry, routing matrices, and multi-rules with 100% reactive state.
+  - In [1_START_MY_ORACLE_DIRECT.bat](file:///c:/TG_KindSync_Pro/1_START_MY_ORACLE_DIRECT.bat) & [UPDATE_ORACLE_BOT_ONE_CLICK.bat](file:///c:/TG_KindSync_Pro/UPDATE_ORACLE_BOT_ONE_CLICK.bat):
+    - Removed blocking service stop command, enabling 0.5s instant SSH reconnection and automated 1-click VPS bot updates.
+
