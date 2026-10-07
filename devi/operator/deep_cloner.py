@@ -276,6 +276,23 @@ async def get_or_create_target_topic(
     # Default to general chat topic 0/1 if forum creation unavailable
     return 1
 
+async def _safe_resolve_entity(client: TelegramClient, target):
+    """Safely resolves an input peer entity for an ID or username, with dialog cache population fallback."""
+    try:
+        return await client.get_input_entity(target)
+    except Exception:
+        pass
+    try:
+        return await client.get_entity(target)
+    except Exception:
+        pass
+    try:
+        await client.get_dialogs(limit=100)
+        return await client.get_input_entity(target)
+    except Exception:
+        pass
+    return await client.get_entity(target)
+
 # ---------------------------------------------------------------------------
 # Deep Cloner Core Engine (Async Stream Pipeline)
 # ---------------------------------------------------------------------------
@@ -307,11 +324,12 @@ class DeepClonerEngine:
         total_count = 0
 
         try:
-            src_peer = await user_client.get_input_entity(source_chat_id)
-            tgt_peer = await user_client.get_input_entity(target_chat_id)
+            src_peer = await _safe_resolve_entity(user_client, source_chat_id)
+            tgt_peer = await _safe_resolve_entity(user_client, target_chat_id)
         except Exception as e:
             logger.error(f"Failed resolving entities for {source_chat_id} -> {target_chat_id}: {e}")
             return 0, 0
+
 
         # Collect all message IDs for reverse chronological stream
         # source_topic_id == 0 means root/general chat or regular channel
@@ -415,8 +433,8 @@ class DeepClonerEngine:
             return
 
         try:
-            src_peer = await user_client.get_input_entity(source_chat_id)
-            tgt_peer = await user_client.get_input_entity(target_chat_id)
+            src_peer = await _safe_resolve_entity(user_client, source_chat_id)
+            tgt_peer = await _safe_resolve_entity(user_client, target_chat_id)
         except Exception as e:
             update_clone_job_progress(job_id, status="failed", error_msg=f"Access denied or invalid group: {e}")
             return
