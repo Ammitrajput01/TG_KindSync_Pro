@@ -98,6 +98,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/find", "/search", "/faq", "/faqs", 
     "/indexhelp", "/clonehelp", "/cloninghelp", "/clonerhelp", "/cloner", "/routehelp", "/forwardhelp", "/routinghelp",
     "/adminhelp", "/modhelp", "/securityhelp", "/calchelp", "/dosehelp", "/scorehelp",
+    "/stripwords", "/striplist",
     "/topics", "/help",
     "/mainindex", "/topicindex", "/indexmaster", "/index",
     "/scan", "/autoindex", "/start", "/menu", "/fullhelp", "/manual",
@@ -7274,6 +7275,87 @@ class DeviTelegramBot:
                         await self._send_message(session, chat_id, "No custom commands set yet. Create one with:\n`/setcmd /name Your text response`", message_thread_id=thread_id)
             except Exception as e:
                 await self._send_message(session, chat_id, f"Error: {e}", message_thread_id=thread_id)
+
+        elif cmd in ("/addstrip", "/stripadd"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+            if len(parts) < 2:
+                await self._send_message(
+                    session, chat_id,
+                    "Usage: `/addstrip <word/tag/channel to remove>`\n\n"
+                    "• **Direct Word Removal:** `/addstrip @MyOldChannel`\n"
+                    "• **Word Replacement:** `/addstrip OldBrand => NewBrand`",
+                    message_thread_id=thread_id
+                )
+                return
+            word_to_add = " ".join(parts[1:]).strip()
+            strip_file = BASE_PROJECT_DIR / "strip_words.txt"
+            try:
+                existing_lines = strip_file.read_text(encoding="utf-8").splitlines() if strip_file.exists() else []
+                if word_to_add in [l.strip() for l in existing_lines]:
+                    await self._send_message(session, chat_id, f"ℹ️ `{word_to_add}` already `strip_words.txt` me present hai.", message_thread_id=thread_id)
+                    return
+                with open(strip_file, "a", encoding="utf-8") as f:
+                    f.write(f"\n{word_to_add}")
+                await self._send_message(
+                    session, chat_id,
+                    f"✅ **Strip Word Added Successfully!** 🛡️\n\n"
+                    f"• **New Rule:** `{word_to_add}`\n"
+                    f"• **Saved To:** `strip_words.txt`\n"
+                    f"• **Effect:** Future cloned & forwarded captions/filenames se yeh word automatically remove ho jayega.",
+                    message_thread_id=thread_id
+                )
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Error adding strip word: {e}", message_thread_id=thread_id)
+
+        elif cmd in ("/delstrip", "/stripdel"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+            if len(parts) < 2:
+                await self._send_message(session, chat_id, "Usage: `/delstrip <word to remove from strip list>`", message_thread_id=thread_id)
+                return
+            target_word = " ".join(parts[1:]).strip()
+            strip_file = BASE_PROJECT_DIR / "strip_words.txt"
+            try:
+                if not strip_file.exists():
+                    await self._send_message(session, chat_id, "⚠️ `strip_words.txt` not found.", message_thread_id=thread_id)
+                    return
+                lines = strip_file.read_text(encoding="utf-8").splitlines()
+                new_lines = [l for l in lines if l.strip().lower() != target_word.lower()]
+                if len(new_lines) == len(lines):
+                    await self._send_message(session, chat_id, f"⚠️ Word `{target_word}` strip list me nahi mila.", message_thread_id=thread_id)
+                    return
+                strip_file.write_text("\n".join(new_lines), encoding="utf-8")
+                await self._send_message(session, chat_id, f"🗑️ Word `{target_word}` successfully removed from `strip_words.txt`.", message_thread_id=thread_id)
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Error deleting strip word: {e}", message_thread_id=thread_id)
+
+        elif cmd in ("/stripwords", "/striplist"):
+            strip_file = BASE_PROJECT_DIR / "strip_words.txt"
+            try:
+                if not strip_file.exists():
+                    await self._send_message(session, chat_id, "⚠️ `strip_words.txt` not found.", message_thread_id=thread_id)
+                    return
+                raw_lines = [l.strip() for l in strip_file.read_text(encoding="utf-8").splitlines() if l.strip() and not l.strip().startswith("#")]
+                total_cnt = len(raw_lines)
+                sample = raw_lines[-15:]
+                sample_list = "\n".join(f"• `{w}`" for w in sample)
+                msg = (
+                    f"🛡️ **Permanent Strip & Clean Words List**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📊 **Total Active Cleaning Rules:** `{total_cnt}`\n\n"
+                    f"**Recent Rules Preview (Last 15):**\n"
+                    f"{sample_list}\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"➕ Add Word: `/addstrip <word>`\n"
+                    f"❌ Delete Word: `/delstrip <word>`\n"
+                    f"📁 File Location: `strip_words.txt`"
+                )
+                await self._send_message(session, chat_id, msg, message_thread_id=thread_id)
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Error reading strip words: {e}", message_thread_id=thread_id)
 
         elif cmd in ("/engine", "/status"):
             if not self.is_admin(admin_id):
