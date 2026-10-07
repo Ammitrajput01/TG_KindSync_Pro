@@ -5319,24 +5319,29 @@ class DeviTelegramBot:
                                 if not u_cl:
                                     await self._send_message(session, chat_id, "❌ No connected user session. Use /connect first.", message_thread_id=thread_id)
                                     return
+                                from devi.operator.deep_cloner import resolve_source_topic_title, get_or_create_target_topic, update_clone_job_progress
+                                real_title = await resolve_source_topic_title(u_cl, src_chat_input, src_top)
+                                update_clone_job_progress(job_id, total_topics=1, current_topic_title=real_title, status="running")
+
                                 resolved_tgt_top = tgt_top
                                 if not resolved_tgt_top:
-                                    from devi.operator.deep_cloner import get_or_create_target_topic
                                     resolved_tgt_top = await get_or_create_target_topic(
-                                        self.token, u_cl, tgt_chat_input, f"Topic #{src_top}"
+                                        self.token, u_cl, tgt_chat_input, real_title
                                     )
                                 cloned, tot = await engine.clone_topic_stream(
                                     job_id, u_cl, src_chat_input, src_top, tgt_chat_input, resolved_tgt_top,
-                                    topic_title=f"Topic #{src_top}",
+                                    topic_title=real_title,
                                     progress_callback=lambda top, cur, tot, cl: _ui_progress(
                                         f"🚀 <b>Topic Clone in Progress (Job #{job_id})</b>\n"
                                         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                                        f"📂 <b>Topic ID:</b> <code>#{src_top}</code>\n"
-                                        f"📊 <b>Progress:</b> <code>{cur}</code> / <code>{tot}</code> ({round((cur/max(1,tot))*100,1)}%)\n"
-                                        f"⚡ <b>Cloned:</b> <code>{cl}</code> items"
+                                        f"📂 <b>Topic:</b> <b>{html.escape(real_title)}</b>\n"
+                                        f"📊 <b>Cloned:</b> <code>{cl}</code> items 🚀\n"
+                                        f"🛡️ <b>Clean Status:</b> ❌ Zero Tags | ✨ Stripped Watermarks\n\n"
+                                        f"<i>(Aap jab chahe <code>/stopclone {job_id}</code> bhej kar stop kar sakte hain).</i>"
                                     )
                                 )
-                                await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed (Job #{job_id})!</b> Cloned <code>{cloned}</code> / <code>{tot}</code> items.", message_thread_id=thread_id)
+                                update_clone_job_progress(job_id, status="completed", completed_topics=1)
+                                await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed (Job #{job_id})!</b>\n\nCloned <code>{cloned}</code> items into <b>{html.escape(real_title)}</b>.", message_thread_id=thread_id)
                             except Exception as ex_t:
                                 logger.error(f"Topic clone error: {ex_t}", exc_info=True)
                                 from devi.operator.deep_cloner import update_clone_job_progress

@@ -302,6 +302,26 @@ async def _safe_resolve_entity(client: TelegramClient, target):
         pass
     return await client.get_entity(target)
 
+async def resolve_source_topic_title(client: TelegramClient, source_chat, topic_id: int) -> str:
+    """Fetches real title of a forum topic from source group using MTProto."""
+    if not topic_id or topic_id <= 1:
+        return "General Discussion & Study Media"
+    try:
+        src_peer = await _safe_resolve_entity(client, source_chat)
+        res = await client(GetForumTopicsRequest(
+            peer=src_peer,
+            offset_date=None,
+            offset_id=0,
+            offset_topic=0,
+            limit=100
+        ))
+        for t in getattr(res, 'topics', []):
+            if getattr(t, 'id', None) == topic_id:
+                return getattr(t, 'title', None) or f"Topic #{topic_id}"
+    except Exception as e:
+        logger.warning(f"Could not resolve topic title for #{topic_id}: {e}")
+    return f"Topic #{topic_id}"
+
 # ---------------------------------------------------------------------------
 # Deep Cloner Core Engine (Async Stream Pipeline)
 # ---------------------------------------------------------------------------
@@ -414,13 +434,12 @@ class DeepClonerEngine:
                         await asyncio.sleep(0.5)
 
                 if success:
-                    # Update SQLite progress checkpoint every 10 items
-                    if cloned_count % 10 == 0:
-                        update_clone_job_progress(job_id, cloned_inc=10, last_msg_id=msg.id)
+                    # Update SQLite progress checkpoint on EVERY message
+                    update_clone_job_progress(job_id, cloned_inc=1, last_msg_id=msg.id, status="running")
 
                     # Send real-time telemetry callback
                     now_t = asyncio.get_event_loop().time()
-                    if progress_callback and (cloned_count % 5 == 0 or now_t - last_progress_time > 3.0):
+                    if progress_callback and (cloned_count % 2 == 0 or now_t - last_progress_time > 2.0):
                         with suppress(Exception):
                             await progress_callback(topic_title, cloned_count, total_count, cloned_count)
                         last_progress_time = now_t
