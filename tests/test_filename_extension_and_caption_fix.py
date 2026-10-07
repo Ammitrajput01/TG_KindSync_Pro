@@ -45,32 +45,39 @@ def test_apply_clean_rules():
 
 def test_sanitize_filename():
     print("[*] 2. Testing sanitize_filename for extension preservation & MIME inference...")
+    import os
+    old_pfx = os.environ.get("CUSTOM_FILE_PREFIX")
+    try:
+        os.environ.pop("CUSTOM_FILE_PREFIX", None)
 
-    # Case 1: Video with yw before extension
-    fn1 = sanitize_filename("64. Tracheostomy and Foreign body in airway yw.mp4")
-    assert fn1 == "64. Tracheostomy and Foreign body in airway.mp4", f"Got '{fn1}'"
+        # Case 1: Video with yw before extension
+        fn1 = sanitize_filename("64. Tracheostomy and Foreign body in airway yw.mp4")
+        assert fn1 == "64. Tracheostomy and Foreign body in airway.mp4", f"Got '{fn1}'"
 
-    # Case 2: Video without extension but fallback_ext='.mp4'
-    fn2 = sanitize_filename("1.How to approach yw", fallback_ext=".mp4")
-    assert fn2 == "1.How to approach.mp4", f"Got '{fn2}'"
+        # Case 2: Video without extension but fallback_ext='.mp4'
+        fn2 = sanitize_filename("1.How to approach yw", fallback_ext=".mp4")
+        assert fn2 == "1.How to approach.mp4", f"Got '{fn2}'"
 
-    # Case 3: Video without extension but mime_type='video/mp4'
-    fn3 = sanitize_filename("1.How to approach yw", mime_type="video/mp4")
-    assert fn3 == "1.How to approach.mp4", f"Got '{fn3}'"
+        # Case 3: Video without extension but mime_type='video/mp4'
+        fn3 = sanitize_filename("1.How to approach yw", mime_type="video/mp4")
+        assert fn3 == "1.How to approach.mp4", f"Got '{fn3}'"
 
-    # Case 4: Long anatomy lecture with mime_type='video/mp4'
-    fn4 = sanitize_filename("2.Aoe - Layers , structure of eyeball and anatomy of cornea yw", mime_type="video/mp4")
-    assert fn4 == "2.Aoe - Layers, structure of eyeball and anatomy of cornea.mp4", f"Got '{fn4}'"
+        # Case 4: Long anatomy lecture with mime_type='video/mp4'
+        fn4 = sanitize_filename("2.Aoe - Layers , structure of eyeball and anatomy of cornea yw", mime_type="video/mp4")
+        assert fn4 == "2.Aoe - Layers, structure of eyeball and anatomy of cornea.mp4", f"Got '{fn4}'"
 
-    # Case 5: MKV video
-    fn5 = sanitize_filename("Lecture 03 Biochem yw", mime_type="video/x-matroska")
-    assert fn5 == "Lecture 03 Biochem.mkv", f"Got '{fn5}'"
+        # Case 5: MKV video
+        fn5 = sanitize_filename("Lecture 03 Biochem yw", mime_type="video/x-matroska")
+        assert fn5 == "Lecture 03 Biochem.mkv", f"Got '{fn5}'"
 
-    # Case 6: PDF document
-    fn6 = sanitize_filename("Anatomy Notes Chapter 1 yw", mime_type="application/pdf")
-    assert fn6 == "Anatomy Notes Chapter 1.pdf", f"Got '{fn6}'"
+        # Case 6: PDF document
+        fn6 = sanitize_filename("Anatomy Notes Chapter 1 yw", mime_type="application/pdf")
+        assert fn6 == "Anatomy Notes Chapter 1.pdf", f"Got '{fn6}'"
 
-    print("  [+] sanitize_filename extension & MIME inference: 100% PASS")
+        print("  [+] sanitize_filename extension & MIME inference: 100% PASS")
+    finally:
+        if old_pfx is not None:
+            os.environ["CUSTOM_FILE_PREFIX"] = old_pfx
 
 def test_customize_caption():
     print("[*] 3. Testing customize_caption clean title formatting...")

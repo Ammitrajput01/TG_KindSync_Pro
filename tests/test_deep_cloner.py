@@ -81,3 +81,21 @@ def test_clone_job_sqlite_lifecycle():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("DELETE FROM telegram_clone_jobs WHERE id = ?", (job_id,))
         conn.commit()
+
+def test_clean_cloned_caption_rich_formatting():
+    """Verify Title formatting, filename fallback, and Kind Doctor signature."""
+    # Case 1: Raw video text
+    cap1 = clean_cloned_caption("61 Electron transport chain", is_media=True)
+    assert "Title: 61 Electron transport chain" in cap1
+    assert "📚 **Kind Doctor & Team**" in cap1
+    assert "Group Study Help 😉" in cap1
+
+    # Case 2: Empty text with filename
+    cap2 = clean_cloned_caption("", orig_filename="1._How_to_study_OBG_using_Marrow_Edition_6.mp4", is_media=True)
+    assert "Title: 1. How to study OBG using Marrow Edition 6" in cap2
+    assert "📚 **Kind Doctor & Team**" in cap2
+
+    # Case 3: Section banner preserved
+    cap3 = clean_cloned_caption("✨ 🩺 OBSTETRICS & GYNAECOLOGY ✨")
+    assert cap3 == "✨ 🩺 OBSTETRICS & GYNAECOLOGY ✨"
+

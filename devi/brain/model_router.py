@@ -31,6 +31,12 @@ PROVIDER_VITALITY: Dict[str, Dict[str, Any]] = {
     "openrouter": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
     "cerebras": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
     "sambanova": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
+    "siliconflow": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
+    "nvidia": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
+    "deepseek": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
+    "freellmapi": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
+    "huggingface": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
+    "cloudflare": {"status": "STANDBY", "latency_ms": 0, "last_used": 0, "error": None},
 }
 
 class ModelRouter:
@@ -50,14 +56,8 @@ class ModelRouter:
         if not FREE_AI_HUB_AVAILABLE or not self.config:
             return {}
         active = [p.name.lower() for p in self.config.get_active_providers()]
-        return {
-            "groq": "groq" in active,
-            "gemini": "gemini" in active,
-            "openrouter": "openrouter" in active,
-            "mistral": "mistral" in active,
-            "sambanova": "sambanova" in active,
-            "cerebras": "cerebras" in active,
-        }
+        all_provs = ["groq", "gemini", "openrouter", "mistral", "sambanova", "cerebras", "siliconflow", "nvidia", "deepseek", "freellmapi", "huggingface", "cloudflare"]
+        return {p: (p in active) for p in all_provs}
 
     async def generate_response(
         self,

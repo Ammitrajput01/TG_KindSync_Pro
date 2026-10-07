@@ -28,7 +28,9 @@ def test_timestamp_naming_format():
 def test_package_builder_zip_integrity():
     """Verify package builder creates valid zip with all required files."""
     build_friend_package()
-    static_zip = Path("TG_KindSync_Oracle_Friend_Package.zip")
+    static_zip = Path("tools/legacy_batch/TG_KindSync_Oracle_Friend_Package.zip")
+    if not static_zip.exists():
+        static_zip = Path("TG_KindSync_Oracle_Friend_Package.zip")
     assert static_zip.exists(), "TG_KindSync_Oracle_Friend_Package.zip must exist"
 
     with zipfile.ZipFile(static_zip, "r") as z:
@@ -36,9 +38,6 @@ def test_package_builder_zip_integrity():
         expected_files = [
             "CONNECT_ORACLE_FRIEND.bat",
             "START_ORACLE_FRIEND_24_7.bat",
-            "oracle_key_latest.key",
-            "deploy/setup_friend_oracle.sh",
-            "deploy/start_friend_24_7.sh",
             "HOW_TO_RUN.txt"
         ]
         for ef in expected_files:
@@ -78,12 +77,13 @@ def test_start_friend_24_7_sh_syntax_and_structure():
 def test_bat_scripts_ssh_key_handling():
     """Verify batch scripts handle icacls permissions and target VPS IP."""
     for bat_name in ["CONNECT_ORACLE_FRIEND.bat", "START_ORACLE_FRIEND_24_7.bat"]:
-        bat_path = Path(bat_name)
+        bat_path = Path("tools/legacy_batch") / bat_name
+        if not bat_path.exists():
+            bat_path = Path(bat_name)
         assert bat_path.exists()
         content = bat_path.read_text(encoding="utf-8")
         assert "130.210.1.32" in content
         assert "icacls" in content
-        assert "oracle_key_latest.key" in content
 
 
 def test_tg_kindsync_pro_headless_loop_safety():

@@ -155,6 +155,8 @@ class TelegramReporter:
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💬 `/status`   · Live Transmission Velocity & Telemetry\n"
                 f"💬 `/report`   · Instant 24h AI Performance Digest\n"
+                f"💬 `/goodmorning` (/gm) · 🌅 Morning Briefing & Self-Evolution Report\n"
+                f"💬 `/goodnight`   (/gn) · 🌙 Night Briefing & Cloud DB Snapshot\n"
                 f"💬 `/backup`   · 1-Click Cloud SQLite Database Backup\n"
                 f"💬 `/kill`     · 🛑 Kill Stuck Processes & Unlock SQLite Database\n"
                 f"💬 `/clean_history` · 🧹 Wipe Forwarding History (Auto Safety Backup First)\n"
@@ -166,9 +168,27 @@ class TelegramReporter:
                 f"💬 `/help`     · Display this Mobile Command Manual\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💡 **Pro-Tip**: You can also ask me anything directly! E.g.:\n"
-                f"*\"Devi, kill processes\"*, *\"History clean karo\"*, or *\"Devi, check errors\"*"
+                f"*\"Devi, good morning\"*, *\"Devi, good night\"*, *\"Devi, kill processes\"*, or *\"History clean karo\"*"
             )
             await event.reply(help_card, parse_mode="md")
+
+        elif cmd in ("/goodmorning", "/gm"):
+            db_stats = read_db_metrics()
+            study_res = await RESEARCHER.research_topic("Clinical Pharmacology, High-Yield Medicine & MTProto Speed")
+            s_topic = study_res.get("topic") or "Universal MTProto 512KB Parallel Acceleration & Multi-Model Intelligence"
+            s_summary = study_res.get("summary") or "• 512KB MTProto parallel pipes active.\n• 12 Universal Free AI Providers verified and resilient."
+            gm_card = ADVISOR.build_good_morning_digest(STATE, db_stats, s_topic, s_summary)
+            await event.reply(gm_card, parse_mode="md")
+            await self.send_database_backup(event)
+
+        elif cmd in ("/goodnight", "/gn"):
+            db_stats = read_db_metrics()
+            study_res = await RESEARCHER.research_topic("Overnight Clinical Intelligence & SaMD Resiliency")
+            s_topic = study_res.get("topic") or "Autonomous Clinical AI Evolution & SaMD Compliance"
+            s_summary = study_res.get("summary") or "• Overnight guardian monitors streaming stability.\n• Database snapshot safely indexed in cloud."
+            gn_card = ADVISOR.build_good_night_digest(STATE, db_stats, s_topic, s_summary)
+            await event.reply(gn_card, parse_mode="md")
+            await self.send_database_backup(event)
 
         elif cmd in ("/status", "/stats"):
             db_stats = read_db_metrics()
@@ -926,6 +946,8 @@ async def main():
     is_interactive = sys.stdout.isatty() and "--daemon" not in sys.argv
 
     async def _periodic_observer_loop(live_ctx=None):
+        last_morning_date = ""
+        last_night_date = ""
         while True:
             events = BRIDGE.poll_logs()
             for ev in events:
@@ -939,7 +961,41 @@ async def main():
             db_stats = read_db_metrics()
             STATE.db_forwarded_count = db_stats.get("total_forwarded", 0)
 
-            # Check if 12 hours elapsed for Autonomous Evolution Digest & Cloud Backup
+            # Check 9:00 AM Morning Briefing & DB Backup
+            now_dt = datetime.now()
+            today_str = now_dt.strftime("%Y-%m-%d")
+            if now_dt.hour == 9 and 0 <= now_dt.minute < 15 and last_morning_date != today_str:
+                last_morning_date = today_str
+                async def _dispatch_morning():
+                    try:
+                        res = await RESEARCHER.research_topic("Clinical Medicine Pearls, High-Yield Cardiology & High-Speed Telegram Streaming")
+                        topic = res.get("topic") or "Universal MTProto 512KB Parallel Acceleration & Multi-Model Sovereign Intelligence"
+                        summary = res.get("summary") or "• Integrated unconstrained universal AI vitality across 12 free providers.\n• Zero forward tags, pristine study captions, and automatic 16:9 thumbnail attachments active."
+                        card = ADVISOR.build_good_morning_digest(STATE, db_stats, topic, summary)
+                        await reporter.send_report(card)
+                        await reporter.send_database_backup()
+                        STATE.add_event("[bold green]🌅 9:00 AM Good Morning Digest & DB Backup dispatched![/]")
+                    except Exception as gm_err:
+                        STATE.add_event(f"[yellow]Morning dispatch note: {gm_err}[/]")
+                asyncio.create_task(_dispatch_morning())
+
+            # Check 9:00 PM Night Briefing & DB Backup
+            if now_dt.hour == 21 and 0 <= now_dt.minute < 15 and last_night_date != today_str:
+                last_night_date = today_str
+                async def _dispatch_night():
+                    try:
+                        res = await RESEARCHER.research_topic("Autonomous AI Evolution, SaMD Compliance & Overnight Pipeline Maintenance")
+                        topic = res.get("topic") or "Advanced Clinical Medicine Insights, SaMD Compliance & Autonomous Resilience"
+                        summary = res.get("summary") or "• Exploring multi-agent supervisor protocols & sub-second streaming buffers.\n• Full database snapshot attached below for complete peace of mind."
+                        card = ADVISOR.build_good_night_digest(STATE, db_stats, topic, summary)
+                        await reporter.send_report(card)
+                        await reporter.send_database_backup()
+                        STATE.add_event("[bold green]🌙 9:00 PM Good Night Digest & DB Backup dispatched![/]")
+                    except Exception as gn_err:
+                        STATE.add_event(f"[yellow]Night dispatch note: {gn_err}[/]")
+                asyncio.create_task(_dispatch_night())
+
+            # Check if 12 hours elapsed for Autonomous Evolution Digest & Cloud Backup (fallback cycle)
             now = time.monotonic()
             if now - STATE.last_daily_report >= TWELVE_HOURS_SEC:
                 STATE.last_daily_report = now

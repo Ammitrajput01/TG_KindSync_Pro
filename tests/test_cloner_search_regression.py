@@ -64,6 +64,9 @@ def test_env_in_memory_synchronization():
     assert cfg.forwarding_rules[1]["target_topic"] == 202, "Second rule target topic should be 202"
     print("    [+] Env, os.environ, and AppConfig.load() synchronized accurately!")
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_sqlite_clone_session_persistence():
     print("[*] 3. Testing SQLite Topic Mapping Persistence...")
     state_mgr = StateManager()

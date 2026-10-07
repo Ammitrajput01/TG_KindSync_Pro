@@ -59,30 +59,37 @@ class VitalityDaemon:
         target_keys = [
             "GROQ_API_KEY", "MISTRAL_API_KEY", "GEMINI_API_KEY",
             "OPENROUTER_API_KEY", "CEREBRAS_API_KEY", "SAMBANOVA_API_KEY",
-            "OPENAI_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY"
+            "SILICONFLOW_API_KEY", "DEEPSEEK_API_KEY", "NVIDIA_API_KEY",
+            "HUGGINGFACE_API_KEY", "CLOUDFLARE_API_KEY", "FREELLMAPI_API_KEY",
+            "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "COHERE_API_KEY"
         ]
 
         # 1. Environment
         for k in target_keys:
             val = os.getenv(k, "").strip()
-            if val and len(val) > 8:
+            if val and len(val) > 6:
                 keys_found[k] = val
 
-        # 2. Local .env
-        env_file = ROOT_DIR / ".env"
-        if env_file.exists():
-            try:
-                content = env_file.read_text(encoding="utf-8", errors="ignore")
-                for line in content.splitlines():
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        parts = line.split("=", 1)
-                        k = parts[0].strip()
-                        v = parts[1].strip().strip("'").strip('"')
-                        if k in target_keys and v and len(v) > 8 and k not in keys_found:
-                            keys_found[k] = v
-            except Exception as e:
-                logger.debug(f"Scan .env exception: {e}")
+        # 2. Local .env and free_ai_keys.env files
+        env_files = [
+            ROOT_DIR / ".env",
+            ROOT_DIR / ".agents" / "free_ai_keys.env",
+            ROOT_DIR / "free_ai_keys.env"
+        ]
+        for env_file in env_files:
+            if env_file.exists():
+                try:
+                    content = env_file.read_text(encoding="utf-8", errors="ignore")
+                    for line in content.splitlines():
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            parts = line.split("=", 1)
+                            k = parts[0].strip()
+                            v = parts[1].strip().strip("'").strip('"')
+                            if k in target_keys and v and len(v) > 6 and k not in keys_found:
+                                keys_found[k] = v
+                except Exception as e:
+                    logger.debug(f"Scan env exception on {env_file.name}: {e}")
 
         self.discovered_keys_count = len(keys_found)
         self.last_hunt_time = time.time()

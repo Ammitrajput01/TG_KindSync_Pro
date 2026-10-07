@@ -5865,6 +5865,12 @@ class DeviTelegramBot:
             await self._send_message(session, chat_id, "\n".join(lines), message_thread_id=thread_id)
 
         elif cmd in ("/stopclone", "/cancelclone", "/pauseclone"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
+                return
+
             if len(parts) < 2 or not parts[1].isdigit():
                 await self._send_message(
                     session, chat_id,
@@ -5877,15 +5883,31 @@ class DeviTelegramBot:
 
             target_job_id = int(parts[1])
             from devi.operator.deep_cloner import _job_cancel_flags, update_clone_job_progress
+            from devi.operator.session_vault import _running_user_jobs
             _job_cancel_flags[target_job_id] = True
+            for uid, tasks in list(_running_user_jobs.items()):
+                for t in tasks:
+                    if not t.done() and (str(target_job_id) in t.get_name()):
+                        t.cancel()
             update_clone_job_progress(target_job_id, status="stopped", error_msg="Stopped by admin command")
             await self._send_message(session, chat_id, f"🛑 <b>Clone Job #{target_job_id} has been signalled to STOP.</b>", message_thread_id=thread_id)
 
         elif cmd in ("/resetjobs", "/cleanjobs", "/clearjobs", "/resetcloner"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
             if not is_caller_admin:
                 await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
                 return
-            from devi.operator.session_vault import DB_PATH
+            from devi.operator.session_vault import DB_PATH, _running_user_jobs
+            from devi.operator.deep_cloner import _job_cancel_flags
+            _job_cancel_flags[-1] = True
+            for j_id in list(_job_cancel_flags.keys()):
+                _job_cancel_flags[j_id] = True
+            for uid, tasks in list(_running_user_jobs.items()):
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
+                _running_user_jobs[uid] = []
             import sqlite3
             try:
                 with sqlite3.connect(DB_PATH, timeout=20.0) as conn:

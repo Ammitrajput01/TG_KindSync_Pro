@@ -143,10 +143,16 @@ _job_cancel_flags: Dict[int, bool] = {}
 # Caption & Watermark Sanitizer
 # ---------------------------------------------------------------------------
 
-def clean_cloned_caption(raw_text: Optional[str]) -> str:
+def clean_cloned_caption(
+    raw_text: Optional[str],
+    orig_filename: Optional[str] = None,
+    topic_title: Optional[str] = None,
+    is_media: bool = False
+) -> str:
     """
     Cleans promotional watermarks, third-party handles, promo links,
-    strip_words.txt rules, and adds study signature while preserving educational content.
+    strip_words.txt rules, formats proper 'Title: ...' and adds the
+    Kind Doctor study signature.
     """
     if not raw_text:
         text = ""
@@ -188,14 +194,59 @@ def clean_cloned_caption(raw_text: Optional[str]) -> str:
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r'[ \t]{2,}', ' ', text).strip()
 
-    # 6. Append Kind Doctor Branding Signature if enabled
+    # Check if this is a Section Header Banner (e.g. ✨ 🩺 OBSTETRICS & GYNAECOLOGY ✨)
+    is_header_banner = bool(
+        text.startswith(("✨", "🩺", "📌", "━━", "══")) or 
+        (text.isupper() and len(text) < 60 and "\n" not in text)
+    )
+    if is_header_banner:
+        return text
+
+    # Extract or build Title
+    title_val = ""
+    body_extra = ""
+
+    if text:
+        m_title = re.match(r'(?i)^(?:🎬|📄|📁|🎥)?\s*Title\s*:\s*(.*)', text, flags=re.DOTALL)
+        if m_title:
+            title_val = m_title.group(1).strip()
+            if "\n" in title_val:
+                t_lines = title_val.split("\n", 1)
+                title_val = t_lines[0].strip()
+                body_extra = t_lines[1].strip()
+        else:
+            t_lines = text.split("\n", 1)
+            title_val = t_lines[0].strip()
+            if len(t_lines) > 1:
+                body_extra = t_lines[1].strip()
+
+    if not title_val and orig_filename:
+        clean_stem = Path(orig_filename).stem.replace("_", " ").replace("-", " ").strip()
+        title_val = clean_stem
+
+    if not title_val and topic_title:
+        title_val = topic_title.strip()
+
+    # Clean file extensions if present in title (e.g. .mp4, .pdf)
+    if title_val:
+        title_val = re.sub(r'(?i)\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk)$', '', title_val).strip()
+
+    formatted_parts = []
+    if title_val:
+        formatted_parts.append(f"Title: {title_val}")
+
+    if body_extra:
+        body_clean = re.sub(r'(?i)📚\s*\*{0,2}Kind Doctor & Team\*{0,2}', '', body_extra)
+        body_clean = re.sub(r'(?i)💬\s*Group Study Help.*', '', body_clean).strip()
+        if body_clean:
+            formatted_parts.append(body_clean)
+
+    # Append Kind Doctor Branding Signature if enabled
     enable_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
-    if enable_sig and text:
-        branding_sig = "\n\n📚 **Kind Doctor & Team**\n💬 Group Study Help 😉"
-        if "Kind Doctor & Team" not in text:
-            text = text + branding_sig
-    
-    return text.strip()
+    if enable_sig:
+        formatted_parts.append("📚 **Kind Doctor & Team**\n💬 Group Study Help 😉")
+
+    return "\n\n".join(p for p in formatted_parts if p).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +271,7 @@ async def get_or_create_target_topic(
     if clean_title.lower() in ("general", "general topic", "general discussion & study media") or clean_title == "1":
         return 1
 
-    # Check local SQLite cache first to avoid redundant creations
+    # 1. Check local SQLite cache first to avoid redundant creations
     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
         row = conn.execute(
             "SELECT topic_id FROM telegram_group_topics WHERE chat_id = ? AND LOWER(topic_title) = LOWER(?)",
@@ -229,7 +280,33 @@ async def get_or_create_target_topic(
         if row and row[0] > 0:
             return int(row[0])
 
-    # Method 1: Create via Telegram Bot API (Instant & Clean)
+    # 2. Check live forum topics in target group via user_client to reuse matching existing topics
+    if user_client:
+        try:
+            target_peer = await _safe_resolve_entity(user_client, target_chat_id)
+            res = await user_client(GetForumTopicsRequest(
+                peer=target_peer,
+                offset_date=None,
+                offset_id=0,
+                offset_topic=0,
+                limit=100
+            ))
+            for t in getattr(res, 'topics', []):
+                t_title = getattr(t, 'title', '')
+                t_id = getattr(t, 'id', 0)
+                if t_id and (clean_title.lower() in t_title.lower() or t_title.lower() in clean_title.lower()):
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
+                            (target_chat_id, t_id, t_title)
+                        )
+                        conn.commit()
+                    logger.info(f"✅ Reused existing target topic '{t_title}' (#{t_id})")
+                    return t_id
+        except Exception as ex_fetch_topics:
+            logger.debug(f"Target forum topic inspection skipped: {ex_fetch_topics}")
+
+    # 3. Method 1: Create via Telegram Bot API (Instant & Clean)
     if bot_token:
         try:
             url = f"https://api.telegram.org/bot{bot_token}/createForumTopic"
@@ -390,13 +467,12 @@ class DeepClonerEngine:
                                     break
 
                         raw_text = (msg.text or "").strip()
-                        if not raw_text and orig_filename:
-                            stem = Path(orig_filename).stem.replace("_", " ").replace("-", " ").strip()
-                            raw_text = f"📄 **{stem}**"
-                        elif not raw_text and msg.media:
-                            raw_text = f"📁 **{topic_title}**"
-
-                        cleaned_caption = clean_cloned_caption(raw_text)
+                        cleaned_caption = clean_cloned_caption(
+                            raw_text=raw_text,
+                            orig_filename=orig_filename,
+                            topic_title=topic_title,
+                            is_media=bool(msg.media)
+                        )
                         dest_thread = target_topic_id if target_topic_id > 1 else None
 
                         if msg.media:
@@ -428,13 +504,16 @@ class DeepClonerEngine:
                                     try:
                                         dl_res = await user_client.download_media(msg, file=str(tmp_path))
                                         if dl_res and Path(dl_res).exists():
+                                            if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
+                                                break
                                             await user_client.send_file(
                                                 tgt_peer,
                                                 file=str(dl_res),
                                                 caption=cleaned_caption,
                                                 thumb=thumb_to_attach,
                                                 attributes=doc_attrs,
-                                                reply_to=dest_thread
+                                                reply_to=dest_thread,
+                                                part_size_kb=512
                                             )
                                         else:
                                             raise ex_fwd
