@@ -3256,7 +3256,7 @@ def format_media_log_detail(m, prefix="✔ Sent") -> str:
 # ============================================================
 SUBJECT_DEFINITIONS = [
     # Foundation Pre- & Para-Clinical
-    ("ANATOMY", "🫀", r"(?i)\b(anat|anatomy|neuroanat|embryo|histology)\b", "#Anatomy"),
+    ("ANATOMY", "🦴", r"(?i)\b(anat|anatomy|neuroanat|embryo|histology)\b", "#Anatomy"),
     ("PHYSIOLOGY", "⚡", r"(?i)\b(physio|physiology|homeostasis)\b", "#Physiology"),
     ("BIOCHEMISTRY", "🧬", r"(?i)\b(biochem|biochemistry|metabolism|krebs|glycolysis)\b", "#Biochemistry"),
     ("PATHOLOGY", "🔬", r"(?i)\b(path|pathology|patho|histopath|neoplasia|biopsy)\b", "#Pathology"),
@@ -3358,7 +3358,7 @@ class PipelineProcessor:
         
         if last_subj != detected["name"]:
             self.last_subject_sent[route_key] = detected["name"]
-            auto_hashtags_enabled = os.getenv("AUTO_HASHTAGS", "true").strip().lower() in ("true", "1", "yes")
+            auto_hashtags_enabled = os.getenv("AUTO_HASHTAGS", "false").strip().lower() in ("true", "1", "yes")
             if auto_hashtags_enabled and detected.get("tag"):
                 header_text = f"✨ {detected['icon']} **{detected['name']}** ✨  {detected['tag']}"
             else:

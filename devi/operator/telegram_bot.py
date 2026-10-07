@@ -99,6 +99,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/indexhelp", "/clonehelp", "/cloninghelp", "/clonerhelp", "/cloner", "/routehelp", "/forwardhelp", "/routinghelp",
     "/adminhelp", "/modhelp", "/securityhelp", "/calchelp", "/dosehelp", "/scorehelp",
     "/stripwords", "/striplist",
+    "/setthumb", "/thumb", "/setcover", "/viewthumb", "/getthumb", "/showthumb", "/delthumb", "/resetthumb",
     "/topics", "/help",
     "/mainindex", "/topicindex", "/indexmaster", "/index",
     "/scan", "/autoindex", "/start", "/menu", "/fullhelp", "/manual",
@@ -140,6 +141,8 @@ class DeviTelegramBot:
         self.flood_tracker: Dict[int, list] = {}
         # Multi-Tenant User Session Linking State: user_id -> auth state dict
         self.pending_auth: Dict[int, Dict[str, Any]] = {}
+        # Thumbnail Upload State: user_id -> True
+        self.pending_thumb_upload: Dict[int, bool] = {}
         # Rate Limiting for /connect: user_id -> list of attempt timestamps within 1 hour
         self.connect_rate_limits: Dict[int, list] = {}
         
@@ -1781,6 +1784,32 @@ class DeviTelegramBot:
             logger.warning(f"Failed to send document {filename} to {chat_id}: {e}")
             return False
 
+    async def _send_photo(
+        self,
+        session: aiohttp.ClientSession,
+        chat_id: int,
+        photo_bytes: bytes,
+        filename: str = "thumb.jpg",
+        caption: str = "",
+        message_thread_id: Optional[int] = None
+    ) -> bool:
+        """Sends a photo file via Telegram Bot API."""
+        url = f"https://api.telegram.org/bot{self.token}/sendPhoto"
+        data = aiohttp.FormData()
+        data.add_field("chat_id", str(chat_id))
+        if message_thread_id:
+            data.add_field("message_thread_id", str(message_thread_id))
+        if caption:
+            data.add_field("caption", caption)
+            data.add_field("parse_mode", "HTML")
+        data.add_field("photo", photo_bytes, filename=filename, content_type="image/jpeg")
+        try:
+            async with session.post(url, data=data, timeout=60) as resp:
+                return resp.status == 200
+        except Exception as e:
+            logger.warning(f"Failed to send photo to {chat_id}: {e}")
+            return False
+
     async def _export_members_csv_file(self, session: aiohttp.ClientSession, send_to_chat: int, group_id: int, message_thread_id: Optional[int] = None):
         """Generates and sends an audit CSV with member details and join timestamps."""
         try:
@@ -2676,6 +2705,65 @@ class DeviTelegramBot:
             handled = await self._handle_account_linking_step(session, chat_id, sender_id, text, message)
             if handled:
                 return
+
+        # In-Bot 16:9 HD Cover Thumbnail Upload Handler (Private DM or Admin Group)
+        is_admin_user = (sender_id in self.master_admin_ids) or (sender_id in self.co_admins) or (await self.is_admin_for_chat(session, chat_id, sender_id, message=message))
+        caption_txt = message.get("caption", "").strip()
+        photo_list = message.get("photo", [])
+        doc_obj = message.get("document", {})
+        is_doc_img = doc_obj.get("mime_type", "").startswith("image/") if doc_obj else False
+        
+        should_set_thumb = False
+        if is_admin_user and (photo_list or is_doc_img):
+            if sender_id in self.pending_thumb_upload:
+                should_set_thumb = True
+            elif any(caption_txt.lower().startswith(c) for c in ("/setthumb", "/thumb", "/setcover", "/cover")):
+                should_set_thumb = True
+
+        if should_set_thumb:
+            file_id = photo_list[-1]["file_id"] if photo_list else doc_obj["file_id"]
+            async with session.get(f"https://api.telegram.org/bot{self.token}/getFile?file_id={file_id}") as g_resp:
+                if g_resp.status == 200:
+                    g_data = await g_resp.json()
+                    f_path = g_data.get("result", {}).get("file_path")
+                    if f_path:
+                        async with session.get(f"https://api.telegram.org/file/bot{self.token}/{f_path}") as dl_resp:
+                            if dl_resp.status == 200:
+                                img_bytes = await dl_resp.read()
+                                dest_raw = BASE_PROJECT_DIR / "kind_doctor_thumb.jpg"
+                                dest_raw.write_bytes(img_bytes)
+                                
+                                # Auto-crop / scale to 1280x720 16:9 HD via Pillow
+                                dest_cache = BASE_PROJECT_DIR / "tg_thumb_cached.jpg"
+                                try:
+                                    from PIL import Image, ImageOps
+                                    import io
+                                    img = Image.open(io.BytesIO(img_bytes))
+                                    if img.mode in ("RGBA", "P"):
+                                        img = img.convert("RGB")
+                                    fitted = ImageOps.fit(img, (1280, 720), Image.Resampling.LANCZOS)
+                                    fitted.save(str(dest_cache), "JPEG", quality=92, optimize=True)
+                                except Exception:
+                                    dest_cache.write_bytes(img_bytes)
+                                    
+                                set_key(str(ENV_PATH), "THUMB_MODE", "custom")
+                                set_key(str(ENV_PATH), "THUMB_FILE", "kind_doctor_thumb.jpg")
+                                os.environ["THUMB_MODE"] = "custom"
+                                os.environ["THUMB_FILE"] = "kind_doctor_thumb.jpg"
+                                self.pending_thumb_upload.pop(sender_id, None)
+                                
+                                success_card = (
+                                    "🎉 <b>New 16:9 HD Cover Thumbnail Updated Successfully!</b> 🖼️\n"
+                                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                    "📁 <b>Saved File:</b> <code>kind_doctor_thumb.jpg</code>\n"
+                                    "📐 <b>Rendered Cache:</b> <code>tg_thumb_cached.jpg</code> (1280x720 HD)\n"
+                                    "⚡ <b>Mode:</b> <code>CUSTOM 16:9 HD</code> (Active)\n\n"
+                                    "✨ <i>All new forward, clone, and batch jobs will now use this cover!</i>\n"
+                                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                    "💡 <i>Tip: Use /viewthumb to inspect or /delthumb to disable.</i>"
+                                )
+                                await self._send_message(session, chat_id, success_card, message_thread_id=message.get("message_thread_id"))
+                                return
 
         # ============================================================
         # 1. GROUP / SUPERGROUP SENTINEL SHIELD (SILENT GUARDIAN)
@@ -5060,6 +5148,111 @@ class DeviTelegramBot:
                 with get_db_conn() as conn:
                     conn.execute("UPDATE telegram_forward_routes SET media_filter = ? WHERE id = ?", (f_val, r_id))
                 await self._send_message(session, chat_id, f"🎯 Route #{r_id} filter updated to: `{f_val}`", message_thread_id=thread_id)
+
+        # ------------------------------------------------------------
+        # 16:9 HD COVER THUMBNAIL STUDIO COMMANDS (/setthumb, /viewthumb, /delthumb)
+        # ------------------------------------------------------------
+        elif cmd in ("/setthumb", "/thumb", "/setcover", "/cover"):
+            reply_msg = message.get("reply_to_message", {})
+            reply_photos = reply_msg.get("photo", [])
+            reply_doc = reply_msg.get("document", {})
+            is_reply_img = reply_doc.get("mime_type", "").startswith("image/") if reply_doc else False
+
+            if reply_photos or is_reply_img:
+                # User replied directly to an existing photo with /setthumb
+                file_id = reply_photos[-1]["file_id"] if reply_photos else reply_doc["file_id"]
+                async with session.get(f"https://api.telegram.org/bot{self.token}/getFile?file_id={file_id}") as g_resp:
+                    if g_resp.status == 200:
+                        g_data = await g_resp.json()
+                        f_path = g_data.get("result", {}).get("file_path")
+                        if f_path:
+                            async with session.get(f"https://api.telegram.org/file/bot{self.token}/{f_path}") as dl_resp:
+                                if dl_resp.status == 200:
+                                    img_bytes = await dl_resp.read()
+                                    dest_raw = BASE_PROJECT_DIR / "kind_doctor_thumb.jpg"
+                                    dest_raw.write_bytes(img_bytes)
+                                    dest_cache = BASE_PROJECT_DIR / "tg_thumb_cached.jpg"
+                                    try:
+                                        from PIL import Image, ImageOps
+                                        import io
+                                        img = Image.open(io.BytesIO(img_bytes))
+                                        if img.mode in ("RGBA", "P"):
+                                            img = img.convert("RGB")
+                                        fitted = ImageOps.fit(img, (1280, 720), Image.Resampling.LANCZOS)
+                                        fitted.save(str(dest_cache), "JPEG", quality=92, optimize=True)
+                                    except Exception:
+                                        dest_cache.write_bytes(img_bytes)
+
+                                    set_key(str(ENV_PATH), "THUMB_MODE", "custom")
+                                    set_key(str(ENV_PATH), "THUMB_FILE", "kind_doctor_thumb.jpg")
+                                    os.environ["THUMB_MODE"] = "custom"
+                                    os.environ["THUMB_FILE"] = "kind_doctor_thumb.jpg"
+
+                                    card = (
+                                        "🎉 <b>New 16:9 HD Cover Thumbnail Updated Successfully!</b> 🖼️\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        "📁 <b>Saved File:</b> <code>kind_doctor_thumb.jpg</code>\n"
+                                        "📐 <b>Rendered Cache:</b> <code>tg_thumb_cached.jpg</code> (1280x720 HD)\n"
+                                        "⚡ <b>Mode:</b> <code>CUSTOM 16:9 HD</code> (Active)\n\n"
+                                        "✨ <i>All new forward, clone, and batch jobs will now use this cover!</i>\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        "💡 <i>Tip: Use /viewthumb to inspect or /delthumb to disable.</i>"
+                                    )
+                                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                                    return
+
+            # Prompt admin to send the photo
+            self.pending_thumb_upload[admin_id] = True
+            prompt = (
+                "📸 <b>Upload New 16:9 HD Cover Thumbnail</b> 🖼️\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Please <b>send or upload any photo/image</b> now in this chat.\n\n"
+                "✨ <b>Features:</b>\n"
+                "• Automatically cropped & rendered in <b>1280x720 HD 16:9</b> widescreen format\n"
+                "• Saved directly to Oracle VPS & activated across all Forwarder & Cloner engines\n"
+                "• Bypasses blank/black video previews on mobile & PC\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Send the photo now, or type /cancel to abort.</i>"
+            )
+            await self._send_message(session, chat_id, prompt, message_thread_id=thread_id)
+            return
+
+        elif cmd in ("/viewthumb", "/getthumb", "/showthumb"):
+            cand = None
+            for c in [BASE_PROJECT_DIR / "tg_thumb_cached.jpg", BASE_PROJECT_DIR / "kind_doctor_thumb.jpg", BASE_PROJECT_DIR / "thumb.jpg"]:
+                if c.exists():
+                    cand = c
+                    break
+            cur_th = os.getenv("THUMB_MODE", "custom").strip().lower()
+            if cand and cand.exists():
+                photo_bytes = cand.read_bytes()
+                caption_card = (
+                    f"🖼️ <b>Current Active Cover Thumbnail</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📁 <b>File:</b> <code>{cand.name}</code> ({len(photo_bytes)/1024:.1f} KB)\n"
+                    f"⚙️ <b>Active Mode:</b> <code>{cur_th.upper()}</code>\n"
+                    f"📐 <b>Resolution:</b> 1280x720 (16:9 HD Widescreen)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💡 <i>Send /setthumb to change or /delthumb to disable.</i>"
+                )
+                await self._send_photo(session, chat_id, photo_bytes, filename=cand.name, caption=caption_card, message_thread_id=thread_id)
+            else:
+                await self._send_message(session, chat_id, "⚠️ <b>No custom thumbnail file found!</b> Send /setthumb to upload one.", message_thread_id=thread_id)
+            return
+
+        elif cmd in ("/delthumb", "/resetthumb"):
+            set_key(str(ENV_PATH), "THUMB_MODE", "original")
+            os.environ["THUMB_MODE"] = "original"
+            card = (
+                "🎞️ <b>Custom Thumbnail Disabled!</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Mode switched to <code>ORIGINAL</code>.\n"
+                "The engine will now retain the original source video/media thumbnails during forwarding & cloning.\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Type /setthumb anytime to reactivate custom 16:9 covers.</i>"
+            )
+            await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+            return
 
         elif cmd in ("/clone", "/clonegroup", "/clonetopic"):
             target_chat_id = self._resolve_study_group_id(chat_id)

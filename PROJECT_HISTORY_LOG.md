@@ -6,6 +6,16 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 6. In-Bot 16:9 HD Cover Thumbnail Studio & Clean Subject Header Dividers (`telegram_bot.py`, `tg_kindsync_pro.py`)
+* **Feature & User Request**:
+  1. Make subject divider headers clean without hashtags (`✨ 🦴 **ANATOMY** ✨`), with `AUTO_HASHTAGS=false` default.
+  2. Allow admins to upload and update new 16:9 HD cover thumbnails directly from Telegram Bot via `/setthumb`, direct photo upload, `/viewthumb`, and `/delthumb`.
+* **Architectural Guarantees & Implementation**:
+  1. **Clean Subject Dividers**: Modified `tg_kindsync_pro.py` `check_and_send_subject_header` and `SUBJECT_DEFINITIONS` to render `✨ 🦴 **ANATOMY** ✨` without hashtags.
+  2. **Direct In-Bot Photo Upload & 16:9 Auto-Cropping**: Admins can now simply send/upload any photo to the bot (or reply with `/setthumb` or send with `/setthumb` caption). The bot downloads it via Bot API `getFile`, saves to `kind_doctor_thumb.jpg`, and uses Pillow (`ImageOps.fit`) to render a pristine `1280x720 HD 16:9` cached thumbnail (`tg_thumb_cached.jpg`), automatically updating `.env`.
+  3. **Bot Commands**: Added `/setthumb`, `/thumb`, `/setcover`, `/viewthumb`, `/getthumb`, `/delthumb`, `/resetthumb` to `PUBLIC_ALLOWED_COMMANDS`.
+* **Verification**: Verified via test suite [tests/test_bot_thumbnail_studio.py](file:///c:/TG_KindSync_Pro/tests/test_bot_thumbnail_studio.py) (3/3 passed).
+
 ### 5. Universal Supersonic MTProto Server-Side Media Copy & Uncapped Velocity Architecture (`tg_kindsync_pro.py`, `PipelineProcessor`, `RateBudgeter`)
 * **Symptom**:
   - Main forwarder/sync engine running in background with user sessions was extremely slow (taking ~4 days for 700–800 messages).
