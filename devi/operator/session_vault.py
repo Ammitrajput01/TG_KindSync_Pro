@@ -20,7 +20,13 @@ from dotenv import load_dotenv, set_key
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from cryptography.fernet import Fernet
+
+try:
+    from cryptography.fernet import Fernet
+    _HAS_FERNET = True
+except ImportError:
+    Fernet = None
+    _HAS_FERNET = False
 
 logger = logging.getLogger("SessionVault")
 
@@ -42,8 +48,10 @@ _running_user_jobs: Dict[int, List[asyncio.Task]] = {}
 # Fernet Encryption & Key Management
 # ---------------------------------------------------------------------------
 
-def get_fernet_cipher() -> Fernet:
+def get_fernet_cipher():
     """Retrieves or auto-generates a persistent Fernet encryption key from .env."""
+    if not _HAS_FERNET:
+        return None
     key = os.getenv("FERNET_KEY") or os.getenv("ENCRYPTION_KEY")
     if not key or len(key.strip()) < 32:
         key = Fernet.generate_key().decode("utf-8")
@@ -60,21 +68,35 @@ def encrypt_session_string(raw_session: str) -> str:
     """Encrypts raw StringSession to Fernet ciphertext token."""
     if not raw_session:
         return ""
-    cipher = get_fernet_cipher()
-    return cipher.encrypt(raw_session.strip().encode("utf-8")).decode("utf-8")
+    if _HAS_FERNET:
+        cipher = get_fernet_cipher()
+        if cipher:
+            return cipher.encrypt(raw_session.strip().encode("utf-8")).decode("utf-8")
+    # Base64 fallback if cryptography is not installed
+    import base64
+    return "b64:" + base64.b64encode(raw_session.strip().encode("utf-8")).decode("utf-8")
 
 def decrypt_session_string(encrypted_token: str) -> Optional[str]:
     """Decrypts Fernet ciphertext token back to raw StringSession."""
     if not encrypted_token:
         return None
-    try:
-        cipher = get_fernet_cipher()
-        return cipher.decrypt(encrypted_token.strip().encode("utf-8")).decode("utf-8")
-    except Exception:
-        # Fallback for legacy unencrypted session strings if any exist
-        if len(encrypted_token) > 50 and not encrypted_token.startswith("gAAAAA"):
-            return encrypted_token.strip()
-        return None
+    if encrypted_token.startswith("b64:"):
+        import base64
+        try:
+            return base64.b64decode(encrypted_token[4:].encode("utf-8")).decode("utf-8")
+        except Exception:
+            return None
+    if _HAS_FERNET:
+        try:
+            cipher = get_fernet_cipher()
+            if cipher:
+                return cipher.decrypt(encrypted_token.strip().encode("utf-8")).decode("utf-8")
+        except Exception:
+            pass
+    # Fallback for legacy unencrypted session strings if any exist
+    if len(encrypted_token) > 50 and not encrypted_token.startswith("gAAAAA"):
+        return encrypted_token.strip()
+    return None
 
 def mask_phone_number(phone: str) -> str:
     """Masks phone number for safe logging (e.g. +91*****3210)."""

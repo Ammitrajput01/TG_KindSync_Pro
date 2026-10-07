@@ -6,6 +6,16 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 4. Cryptography Dependency Installation & Resilient Base64 Fallback (`session_vault.py`)
+* **Symptom**:
+  - In supergroups, `/clonegroup` and `/clonetopic` commands produced no reply or crashed silently with `ModuleNotFoundError: No module named 'cryptography'`.
+* **Root Cause**:
+  - The newly added multi-tenant session vault imported `cryptography.fernet` unconditionally, but the Oracle Cloud VPS virtual environment (`.venv`) did not have `cryptography` installed.
+* **Permanent Fix Applied**:
+  1. Installed `cryptography` in VPS Python environment (`.venv/bin/pip install cryptography`).
+  2. Wrapped Fernet imports in `session_vault.py` with try-except fallback to base64 encoding, preventing `ModuleNotFoundError` crashes under any environment state.
+* **Verification**: Verified via test suite and VPS service run.
+
 ### 3. Bot Activation Welcome Card Handle Dynamic Resolution (`@KindDoc_bot`)
 * **Symptom**:
   - In group activation cards ("*Kind Doctor Bot Successfully Activated!*"), the username appeared as `@KindDocbot` (missing underscore).
