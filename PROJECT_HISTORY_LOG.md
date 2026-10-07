@@ -4,6 +4,24 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ---
 
+## 📅 Log Entry: Wednesday, 07 October 2026
+
+### 1. Forum Topic Indexer Phantom Topic Elimination & Strict Topic Resolution
+* **Symptom**:
+  - In Master Topic Directory (`/mainindex`), SECTION #T became flooded with dozens of dummy entries like `[100] Topic #22885`, `[101] Topic #22915`, `[102] Topic #22945`, `[120] Topic #24036` to `[132] Topic #620`.
+* **Root Cause**:
+  - In `devi/operator/group_scanner.py` (`harvest_all_messages`), when messages in the general Chit Chat Chatter Box (Topic #1) had replies to previous user messages, `reply_to_top_id` was `None` while `reply_to_msg_id` contained the replied message ID.
+  - The fallback `or getattr(msg.reply_to, 'reply_to_msg_id', None)` erroneously treated random chat message IDs as new forum topics, created synthetic `f"Topic #{msg_topic_id}"` entries, and inserted them into `telegram_group_topics`.
+  - In alphabetical sorting, all `Topic #...` strings sorted under letter **#T**, polluting the master directory.
+* **Permanent Fix Applied**:
+  1. **Strict Forum Topic Header Validation (`devi/operator/group_scanner.py`)**: Only messages with `forum_topic=True`, explicit `reply_to_top_id`, or `reply_to_msg_id` matching verified `known_topics` are mapped to topics. Chit-chat message replies are strictly categorized under Topic #1 (General/Root) and never generate synthetic topic entries.
+  2. **Official MTProto Pre-Fetch (`GetForumTopicsRequest`)**: Pre-fetches all genuine forum topics with pagination directly from Telegram prior to the message harvesting pass.
+  3. **Auto-Cleanup & Self-Healing Migration (`devi/operator/group_scanner.py` & `devi/operator/telegram_bot.py`)**: Automatically purges phantom `Topic #%` rows (`DELETE FROM telegram_group_topics WHERE topic_title LIKE 'Topic #%' AND topic_id > 1`) and normalizes orphaned topic items.
+  4. **Directory Filtering Guard (`_get_topics` in `telegram_bot.py`)**: Strictly excludes any `Topic #%` dummy titles from `/mainindex` query (`AND topic_title NOT LIKE 'Topic #%'`).
+  5. **Verification**: Verified via dedicated unit test suite [tests/test_clean_topics_indexing.py](file:///c:/TG_KindSync_Pro/tests/test_clean_topics_indexing.py) (2/2 passed) and Codestral AI audit.
+
+---
+
 ## 📅 Log Entry: Sunday, 04 October 2026
 
 ### 1. Universal Single-Pass Topic & Media Harvester (`harvest_all_messages`)

@@ -2460,7 +2460,7 @@ async def get_account_channels_list(client):
     if not channels:
         with suppress(Exception):
             with get_db_conn() as conn:
-                rows = conn.execute("SELECT DISTINCT chat_id, topic_title FROM telegram_group_topics").fetchall()
+                rows = conn.execute("SELECT DISTINCT chat_id, topic_title FROM telegram_group_topics WHERE topic_title NOT LIKE 'Topic #%'").fetchall()
                 seen = set()
                 for r in rows:
                     cid = r[0]

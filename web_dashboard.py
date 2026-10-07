@@ -5359,7 +5359,7 @@ class DashboardServer:
                         total_db_items = int(row[0])
 
                     # 3. Topic Map for Human Names
-                    cur = conn.execute("SELECT topic_id, topic_title FROM telegram_group_topics")
+                    cur = conn.execute("SELECT topic_id, topic_title FROM telegram_group_topics WHERE topic_title NOT LIKE 'Topic #%'")
                     for tid, ttitle in cur.fetchall():
                         if ttitle:
                             clean_t = str(ttitle).strip()
