@@ -64,6 +64,8 @@ def init_clone_jobs_table():
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            # Cleanup stale jobs from prior process restarts
+            conn.execute("UPDATE telegram_clone_jobs SET status = 'interrupted' WHERE status = 'running'")
             conn.commit()
     except Exception as e:
         logger.error(f"[!] Error initializing clone jobs table: {e}")
@@ -212,6 +214,9 @@ async def get_or_create_target_topic(
     clean_title = (topic_name or "General Topic").strip()
     if len(clean_title) > 120:
         clean_title = clean_title[:117] + "..."
+
+    if clean_title.lower() in ("general", "general topic", "general discussion & study media") or clean_title == "1":
+        return 1
 
     # Check local SQLite cache first to avoid redundant creations
     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:

@@ -5304,33 +5304,45 @@ class DeviTelegramBot:
 
                     if job_type == "topic":
                         async def _run_topic():
-                            from devi.operator.session_vault import get_vault_client_for_target
-                            u_cl, _ = await get_vault_client_for_target(preferred_user_id=admin_id)
-                            if not u_cl:
-                                await self._send_message(session, chat_id, "❌ No connected user session. Use /connect first.", message_thread_id=thread_id)
-                                return
-                            cloned, tot = await engine.clone_topic_stream(
-                                job_id, u_cl, src_chat_input, src_top, tgt_chat_input, tgt_top,
-                                progress_callback=lambda top, cur, tot, cl: _ui_progress(
-                                    f"🚀 <b>Topic Clone in Progress (Job #{job_id})</b>\n"
-                                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                                    f"📊 <b>Progress:</b> <code>{cur}</code> / <code>{tot}</code> ({round((cur/max(1,tot))*100,1)}%)\n"
-                                    f"⚡ <b>Cloned:</b> <code>{cl}</code> items"
+                            try:
+                                from devi.operator.session_vault import get_vault_client_for_target
+                                u_cl, _ = await get_vault_client_for_target(preferred_user_id=admin_id)
+                                if not u_cl:
+                                    await self._send_message(session, chat_id, "❌ No connected user session. Use /connect first.", message_thread_id=thread_id)
+                                    return
+                                cloned, tot = await engine.clone_topic_stream(
+                                    job_id, u_cl, src_chat_input, src_top, tgt_chat_input, tgt_top,
+                                    progress_callback=lambda top, cur, tot, cl: _ui_progress(
+                                        f"🚀 <b>Topic Clone in Progress (Job #{job_id})</b>\n"
+                                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        f"📊 <b>Progress:</b> <code>{cur}</code> / <code>{tot}</code> ({round((cur/max(1,tot))*100,1)}%)\n"
+                                        f"⚡ <b>Cloned:</b> <code>{cl}</code> items"
+                                    )
                                 )
-                            )
-                            await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed!</b> Cloned <code>{cloned}</code> / <code>{tot}</code> items.", message_thread_id=thread_id)
+                                await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed!</b> Cloned <code>{cloned}</code> / <code>{tot}</code> items.", message_thread_id=thread_id)
+                            except Exception as ex_t:
+                                logger.error(f"Topic clone error: {ex_t}", exc_info=True)
+                                from devi.operator.deep_cloner import update_clone_job_progress
+                                update_clone_job_progress(job_id, status="failed", error_msg=str(ex_t))
+                                await self._send_message(session, chat_id, f"❌ <b>Topic Clone Error:</b> {html.escape(str(ex_t))}", message_thread_id=thread_id)
                         self.create_tracked_task(_run_topic(), name=f"clone_topic_{job_id}")
                     else:
                         async def _run_group():
-                            await engine.clone_entire_group(
-                                job_id, admin_id, src_chat_input, tgt_chat_input,
-                                progress_updater=_ui_progress
-                            )
-                            await self._send_message(
-                                session, chat_id,
-                                f"🎉 <b>Deep Forum Clone Completed (Job #{job_id})!</b> 🚀\n\nAll topics and lectures have been cloned with zero forward tags.",
-                                message_thread_id=thread_id
-                            )
+                            try:
+                                await engine.clone_entire_group(
+                                    job_id, admin_id, src_chat_input, tgt_chat_input,
+                                    progress_updater=_ui_progress
+                                )
+                                await self._send_message(
+                                    session, chat_id,
+                                    f"🎉 <b>Deep Forum Clone Completed (Job #{job_id})!</b> 🚀\n\nAll topics and lectures have been cloned with zero forward tags.",
+                                    message_thread_id=thread_id
+                                )
+                            except Exception as ex_g:
+                                logger.error(f"Group clone error: {ex_g}", exc_info=True)
+                                from devi.operator.deep_cloner import update_clone_job_progress
+                                update_clone_job_progress(job_id, status="failed", error_msg=str(ex_g))
+                                await self._send_message(session, chat_id, f"❌ <b>Group Clone Error:</b> {html.escape(str(ex_g))}", message_thread_id=thread_id)
                         self.create_tracked_task(_run_group(), name=f"clone_group_{job_id}")
 
                     return

@@ -6,6 +6,17 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 7. Stale Clone Job Recovery on Restart & Bot Task Exception Telemetry (`deep_cloner.py`, `telegram_bot.py`)
+* **Symptom**:
+  - `/clonestatus` displayed Job #4 as `RUNNING` with `0/0 topics` and `0 cloned` even though the background task had terminated during a bot service restart.
+* **Root Cause**:
+  - Background asyncio tasks (`_run_group` / `_run_topic`) running deep clone jobs did not persist process lifecycle interruption across `systemd` service restarts. Previous SQLite records remained stuck in `status='running'`.
+* **Permanent Fix Applied**:
+  1. **Stale Job Auto-Recovery**: `init_clone_jobs_table()` automatically updates any dangling `running` jobs to `interrupted` upon service boot.
+  2. **Exception Telemetry & Telegram Alerts**: Added robust `try...except` wrapper around `_run_group` and `_run_topic` tasks in `DeviTelegramBot`. Any unexpected runtime failure immediately marks the SQLite job as `failed` with the exact error message and notifies the user in chat.
+  3. **Verified MTProto Permissions**: Confirmed via direct test on Oracle VPS that user session has full access to resolve 12 topics in `-1003504807114` and post to target `-1004313086843`.
+* **Verification**: Verified via 18/18 pytest unit tests, live MTProto test on VPS, and syntax check.
+
 ### 6. In-Bot 16:9 HD Cover Thumbnail Studio & Clean Subject Header Dividers (`telegram_bot.py`, `tg_kindsync_pro.py`)
 * **Feature & User Request**:
   1. Make subject divider headers clean without hashtags (`✨ 🦴 **ANATOMY** ✨`), with `AUTO_HASHTAGS=false` default.
