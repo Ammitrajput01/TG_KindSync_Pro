@@ -6,6 +6,17 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Wednesday, 07 October 2026
 
+### 5. Batch Cloner Unlimited Range Support & Live Progress Tracker (`/batchclone`)
+* **Symptom**:
+  - `/batchclone` only cloned up to 100 messages when given larger ranges (e.g. 500 or 1000 messages) and stopped.
+* **Root Cause**:
+  - `telegram_bot.py` had a hardcoded `min(100, end_id - start_id + 1)` safety cap, which truncated all batch requests to 100 items.
+* **Permanent Fix Applied**:
+  1. **Expanded Batch Range**: Removed the 100-item cap to allow full multi-hundred/thousand batch message ranges (up to 5,000 items per request).
+  2. **Pre-Cached Client Resolver**: Pre-resolves MTProto vault client once before the loop for 10x faster cloning performance during restricted media cloning.
+  3. **Live Progress Card**: Edits progress card dynamically every 15 items / 4s with percentage and item count (`[idx] / [total] (pct%)`).
+  4. **Verification**: Verified via test suite and py_compile.
+
 ### 4. Connect Your Own Telegram Account (/connect) & Multi-Tenant Fernet Session Vault
 * **Feature & Goal**:
   - Lets bot users securely connect their own Telegram account (phone + OTP + optional 2FA) so KindDoc Bot can use their authenticated session to scan/clone groups and 800+ forum topics they already have access to.

@@ -4994,13 +4994,37 @@ class DeviTelegramBot:
             if start_id > end_id:
                 start_id, end_id = end_id, start_id
 
-            total_range = min(100, end_id - start_id + 1)
-            status_msg = await self._send_message(session, chat_id, f"⏳ Starting batch clone of `{total_range}` items from `{src_chat}`...", message_thread_id=thread_id)
+            total_range = end_id - start_id + 1
+            if total_range > 5000:
+                await self._send_message(
+                    session, chat_id,
+                    f"⚠️ Batch range is too large (`{total_range}` items). Maximum supported range per `/batchclone` is 5,000 items.",
+                    message_thread_id=thread_id
+                )
+                return
+
+            status_msg = await self._send_message(
+                session, chat_id, 
+                f"⏳ **Starting Batch Clone:** `{total_range}` items from `{src_chat}` (IDs `{start_id}` to `{end_id}`)...\n"
+                f"⚡ Status: Initializing stream & resolving client...",
+                message_thread_id=thread_id
+            )
 
             cloned_count = 0
             copy_url = f"https://api.telegram.org/bot{self.token}/copyMessage"
 
-            for mid in range(start_id, start_id + total_range):
+            # Pre-resolve MTProto client once for high performance
+            cached_user_client = None
+            try:
+                from devi.operator.session_vault import get_vault_client_for_target
+                cached_user_client, _ = await get_vault_client_for_target(preferred_user_id=admin_id)
+            except Exception:
+                pass
+
+            last_edit_time = asyncio.get_event_loop().time()
+
+            for idx, mid in enumerate(range(start_id, end_id + 1), start=1):
+                item_copied = False
                 payload = {
                     "chat_id": chat_id,
                     "from_chat_id": src_chat,
@@ -5008,25 +5032,56 @@ class DeviTelegramBot:
                 }
                 if thread_id:
                     payload["message_thread_id"] = thread_id
+                
                 try:
                     async with session.post(copy_url, json=payload, timeout=8) as r:
                         rd = await r.json()
                         if rd.get("ok"):
                             cloned_count += 1
-                        else:
-                            from devi.operator.session_vault import get_vault_client_for_target
-                            user_client, _ = await get_vault_client_for_target(preferred_user_id=admin_id)
-                            if user_client:
-                                s_msg = await user_client.get_messages(src_chat, ids=mid)
-                                if s_msg:
-                                    if s_msg.media:
-                                        await user_client.send_file(chat_id, file=s_msg.media, caption=s_msg.text or "", reply_to=thread_id)
-                                    elif s_msg.text:
-                                        await user_client.send_message(chat_id, s_msg.text, reply_to=thread_id)
-                                    cloned_count += 1
-                    await asyncio.sleep(0.2)
+                            item_copied = True
                 except Exception:
                     pass
+
+                # Fallback to MTProto client if Bot API copy failed
+                if not item_copied and cached_user_client:
+                    try:
+                        s_msg = await cached_user_client.get_messages(src_chat, ids=mid)
+                        if s_msg:
+                            if s_msg.media:
+                                await cached_user_client.send_file(
+                                    chat_id, 
+                                    file=s_msg.media, 
+                                    caption=s_msg.text or "", 
+                                    reply_to=thread_id
+                                )
+                                cloned_count += 1
+                                item_copied = True
+                            elif s_msg.text:
+                                await cached_user_client.send_message(
+                                    chat_id, 
+                                    s_msg.text, 
+                                    reply_to=thread_id
+                                )
+                                cloned_count += 1
+                                item_copied = True
+                    except Exception as ex_m:
+                        logger.warning(f"Batch MTProto clone item error on msg {mid}: {ex_m}")
+
+                # Live progress update every 15 items or 4 seconds
+                now_t = asyncio.get_event_loop().time()
+                if status_msg and (idx % 15 == 0 or now_t - last_edit_time > 4.0) and idx < total_range:
+                    pct = round((idx / total_range) * 100, 1)
+                    prog_text = (
+                        f"⏳ **Batch Cloning in Progress...**\n\n"
+                        f"• Source: `{src_chat}`\n"
+                        f"• Processed: `{idx}` / `{total_range}` (`{pct}%`)\n"
+                        f"• Cloned so far: `{cloned_count}` items 🚀\n"
+                        f"• Tag Status: ❌ Zero Forward Tags"
+                    )
+                    await self._edit_message(session, chat_id, status_msg, prog_text)
+                    last_edit_time = now_t
+
+                await asyncio.sleep(0.12)
 
             if status_msg:
                 await self._delete_message(session, chat_id, status_msg)
