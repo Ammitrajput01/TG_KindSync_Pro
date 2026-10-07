@@ -6,6 +6,18 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 9. Protected Chat In-Memory Fallback & Full Clone Job Reset Studio (`deep_cloner.py`, `telegram_bot.py`)
+* **Symptom**:
+  - Cloning from protected sources failed with `ChatForwardsRestrictedError: You can't forward messages from a protected chat` when using server-side pointer.
+  - Job counter kept incrementing (Job #7, Job #8...) with no clean command to reset historical jobs back to #1.
+* **Root Cause**:
+  1. Channels with `noforwards=True` reject server-side media pointer references (`send_file(tgt, file=msg.media)`).
+  2. No DB truncation command existed to reset `telegram_clone_jobs` table and SQLite autoincrement sequence.
+* **Permanent Fix Applied**:
+  1. **Tier 2 In-Memory Protected Streamer Fallback**: If `send_file` encounters a protected chat error, `clone_topic_stream` automatically streams media bytes directly into in-memory RAM via `download_media(file=bytes)` and uploads as a fresh standalone document, completely bypassing Telegram protection with zero disk usage.
+  2. **Job Reset Command (`/resetjobs` / `/cleanjobs`)**: Added admin command to clear `telegram_clone_jobs` and reset the SQLite autoincrement sequence so the next clone starts clean as **Job #1**.
+* **Verification**: Verified via 18/18 pytest unit tests, live protected message clone test to target channel, and syntax checks.
+
 ### 8. Single Topic Cloner 4-Part Argument Resolution & Background Task Spawner Fix (`telegram_bot.py`)
 * **Symptom**:
   - Sending `/clone -1003504807114 -1004313086843 81041` initiated a `Full Forum & All Topics` group job instead of a single topic job and stayed stuck at `0/0 topics`.

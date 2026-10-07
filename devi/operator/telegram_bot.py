@@ -5853,6 +5853,7 @@ class DeviTelegramBot:
                 "🎮 <b>Quick Actions:</b>\n"
                 "• /clonestatus — <i>Refresh active progress</i>\n"
                 "• /clonejobs — <i>List all active/queued jobs</i>\n"
+                "• /resetjobs — <i>Reset job history back to #1</i>\n"
                 "• /viewthumb — <i>Preview 16:9 cover thumbnail</i>\n"
                 "• /fullhelp — <i>Complete command guide</i>"
             )
@@ -5874,6 +5875,30 @@ class DeviTelegramBot:
             _job_cancel_flags[target_job_id] = True
             update_clone_job_progress(target_job_id, status="stopped", error_msg="Stopped by admin command")
             await self._send_message(session, chat_id, f"🛑 <b>Clone Job #{target_job_id} has been signalled to STOP.</b>", message_thread_id=thread_id)
+
+        elif cmd in ("/resetjobs", "/cleanjobs", "/clearjobs", "/resetcloner"):
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
+                return
+            from devi.operator.session_vault import DB_PATH
+            import sqlite3
+            try:
+                with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                    conn.execute("DELETE FROM telegram_clone_jobs")
+                    with suppress(Exception):
+                        conn.execute("DELETE FROM sqlite_sequence WHERE name='telegram_clone_jobs'")
+                    conn.commit()
+                await self._send_message(
+                    session, chat_id,
+                    "🧹 <b>Clone Job History Successfully Reset!</b> ✨\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "• All past & stuck jobs have been cleared from database.\n"
+                    "• Job counter has been reset to <b>#0</b>.\n"
+                    "• Next clone job will start fresh as <b>Job #1</b> 🚀\n\n"
+                    "👉 Start a new clone anytime with <code>/clone &lt;source&gt; &lt;target&gt;</code>!",
+                    message_thread_id=thread_id
+                )
+            except Exception as ex_rst:
+                await self._send_message(session, chat_id, f"❌ Failed resetting jobs: {ex_rst}", message_thread_id=thread_id)
 
         elif cmd in ("/send", "/pm", "/msg", "/sendlink", "/reply", "/say", "/dr"):
             # 1. Admin speaking through bot in Group or DM: /say <msg> or /dr <msg>

@@ -371,13 +371,31 @@ class DeepClonerEngine:
                                     if cand.exists():
                                         thumb_to_attach = str(cand)
                                         break
-                            await user_client.send_file(
-                                tgt_peer,
-                                file=msg.media,
-                                caption=cleaned_caption,
-                                thumb=thumb_to_attach,
-                                reply_to=dest_thread
-                            )
+                            try:
+                                # Tier 1: Instant Server-Side Cloud Pointer Copy (0.15s, 0 bytes bandwidth)
+                                await user_client.send_file(
+                                    tgt_peer,
+                                    file=msg.media,
+                                    caption=cleaned_caption,
+                                    thumb=thumb_to_attach,
+                                    reply_to=dest_thread
+                                )
+                            except Exception as ex_fwd:
+                                if "protected chat" in str(ex_fwd).lower() or "forward" in str(ex_fwd).lower() or "restricted" in str(ex_fwd).lower():
+                                    # Tier 2: Protected Content In-Memory RAM Streamer Fallback
+                                    dl_bytes = await user_client.download_media(msg, file=bytes)
+                                    if dl_bytes:
+                                        await user_client.send_file(
+                                            tgt_peer,
+                                            file=dl_bytes,
+                                            caption=cleaned_caption,
+                                            thumb=thumb_to_attach,
+                                            reply_to=dest_thread
+                                        )
+                                    else:
+                                        raise ex_fwd
+                                else:
+                                    raise ex_fwd
                         elif msg.text:
                             await user_client.send_message(
                                 tgt_peer,
