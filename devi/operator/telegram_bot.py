@@ -3479,25 +3479,31 @@ class DeviTelegramBot:
                 f"• `/scan` — 1-Click auto-scan group media and update topic directory"
             )
             part3 = (
-                f"👨‍⚕️ **Kind Doctor — Official Command Manual (Part 3/3)** 📖\n"
+                f"👨‍⚕️ <b>Kind Doctor — Official Command Manual (Part 3/3)</b> 📖\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🔄 **CLOUD FORWARDER & ZERO-TAG REMOVER (No PC Needed):**\n"
-                f"• `/setroute <source_chat_id> [topic_id]` — Auto-mirror posts with **zero forward tag**\n"
-                f"• `/settopicroute <src_chat> <src_topic> [tgt_topic]` — Topic-to-topic auto-mirroring\n"
-                f"• `/routes` — List and manage all active forward routes\n"
-                f"• `/pauseroute <id>` & `/resumeroute <id>` — Pause or resume forwarding\n"
-                f"• `/delroute <id>` — Delete an existing forward route\n"
-                f"• `/routefilter <id> <all|video|doc|photo>` — Set media type filter for route\n"
-                f"• `/clone <link | reply>` — Instantly copy 1 message with zero forward tag\n"
-                f"• `/batchclone <start_link> <end_link>` — Batch copy sequence of messages\n\n"
-                f"👑 **MASTER ADMIN PIPELINE & SYSTEM SPECS:**\n"
-                f"• `/botinfo` / `/about` — View Kind Doctor Bot architecture, version & admin specs\n"
-                f"• `/update` — 1-Click Code Sync & Auto-Updater (Master Admins)\n"
-                f"• `/allgroups` — Master network overview of all connected groups\n"
-                f"• `/health` — Real-time telemetry, memory & database integrity status\n"
-                f"• `/purge <count>` — Mass-delete recent messages in case of emergency\n"
+                f"🚀 <b>INFINITE DEEP CLONER SUITE (200k+ Msgs & 2k+ Topics):</b>\n"
+                f"• <code>/clonegroup [Source Group Link] [Target Group Link]</code> — Entire supergroup clone (auto-creates all 2,000+ forum topics)\n"
+                f"• <code>/clonetopic [Source Topic Link] [Target Topic Name]</code> — Full single topic clone (thousands of lectures & media)\n"
+                f"• <code>/batchclone [Start Msg Link] [End Msg Link]</code> — Sequence clone of specific message range\n"
+                f"• <code>/clone [Message Link | Reply]</code> — 1-Click single post clone\n"
+                f"• <code>/clonejobs</code> — Live dashboard of all active and running clone jobs\n"
+                f"• <code>/stopclone [Job ID]</code> — Abort or safely stop a running clone job\n\n"
+                f"🔄 <b>CLOUD FORWARDER & ROUTING (Auto-Sync Streams):</b>\n"
+                f"• <code>/setroute [Source Chat ID] [Target Topic ID]</code> — Auto-mirror live posts with zero forward tag\n"
+                f"• <code>/settopicroute [Src Chat] [Src Topic] [Tgt Topic]</code> — Topic-to-topic live stream forward\n"
+                f"• <code>/routes</code> — List and manage all active forward routes\n"
+                f"• <code>/pauseroute [Route ID]</code> & <code>/resumeroute [Route ID]</code> — Pause/resume live route\n"
+                f"• <code>/delroute [Route ID]</code> — Delete an existing forward route\n\n"
+                f"🔑 <b>ACCOUNT VAULT & MULTI-TENANT:</b>\n"
+                f"• <code>/connect</code> — Securely link your Telegram account (OTP) to clone restricted private groups\n"
+                f"• <code>/disconnect</code> — Revoke and wipe linked Telegram account session\n\n"
+                f"👑 <b>MASTER ADMIN CONTROLS:</b>\n"
+                f"• <code>/backup</code> — Zero-downtime full SQLite snapshot export\n"
+                f"• <code>/update</code> — 1-Click Code Sync & Auto-Updater\n"
+                f"• <code>/health</code> — Real-time telemetry, RAM & database status\n"
+                f"• <code>/purge [count]</code> — Mass-delete recent messages in case of emergency\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 *Tip: Tap /menu anytime for interactive 1-click button controls.*"
+                f"💡 <i>Tip: Tap /menu anytime for interactive 1-click button controls.</i>"
             )
             await self._send_message(session, chat_id, part1, message_thread_id=thread_id)
             await asyncio.sleep(0.3)
@@ -4886,13 +4892,21 @@ class DeviTelegramBot:
 
             if not from_chat or not from_msg:
                 guide = (
-                    "📥 **Instant 1-Click Message Cloner (Zero Forward Tag):**\n\n"
-                    "• **Method 1:** Reply to any message/video/PDF in group with `/clone`\n"
-                    "• **Method 2:** Type `/clone <telegram_post_link>`\n\n"
-                    "**Examples:**\n"
-                    "`/clone https://t.me/c/3912970546/22803/45`\n"
-                    "`/clone https://t.me/c/3912970546/45`\n"
-                    "`/clone https://t.me/medical_hub/10/45`"
+                    "📥 <b>Instant 1-Click Message Cloner (Zero Forward Tag):</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "<b>Use Case:</b> Kisi bhi single message, lecture video, PDF ya photo ko bina forward tag ke instant copy karne ke liye.\n\n"
+                    "<b>Syntax:</b>\n"
+                    "• <code>/clone [Message Link]</code> (Post link dekar clone karein)\n"
+                    "• Reply with <code>/clone</code> (Group me kisi message par reply karein)\n\n"
+                    "<b>Examples (Data & Link Format):</b>\n"
+                    "• <code>/clone https://t.me/c/3912970546/22803/45</code>\n"
+                    "  <i>[Private Topic Post Link: Chat + Topic + Msg ID]</i>\n\n"
+                    "• <code>/clone https://t.me/c/3912970546/45</code>\n"
+                    "  <i>[Private Channel Post Link: Chat + Msg ID]</i>\n\n"
+                    "• <code>/clone https://t.me/medical_hub/150/45</code>\n"
+                    "  <i>[Public Topic Post Link]</i>\n\n"
+                    "• <code>/clone https://t.me/medical_hub/45</code>\n"
+                    "  <i>[Public Channel Post Link]</i>"
                 )
                 await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
                 return
@@ -4913,7 +4927,7 @@ class DeviTelegramBot:
                     res_data = await r.json()
                     if res_data.get("ok"):
                         cloned = True
-                        await self._send_message(session, chat_id, "✔ **Cloned Successfully!** *(Forward tag removed)* 🩺", message_thread_id=thread_id)
+                        await self._send_message(session, chat_id, "✔ <b>Cloned Successfully!</b> <i>(Forward tag removed & media preserved)</i> 🩺", message_thread_id=thread_id)
             except Exception:
                 pass
 
@@ -4921,33 +4935,35 @@ class DeviTelegramBot:
             if not cloned:
                 try:
                     from devi.operator.session_vault import get_vault_client_for_target
+                    from devi.operator.deep_cloner import clean_cloned_caption
                     user_client, client_type = await get_vault_client_for_target(preferred_user_id=admin_id)
                     if user_client:
                         src_msg = await user_client.get_messages(from_chat, ids=from_msg)
                         if src_msg:
+                            clean_cap = clean_cloned_caption(src_msg.text or "")
                             if src_msg.media:
                                 await user_client.send_file(
                                     chat_id,
                                     file=src_msg.media,
-                                    caption=src_msg.text or "",
+                                    caption=clean_cap,
                                     reply_to=thread_id
                                 )
                             elif src_msg.text:
                                 await user_client.send_message(
                                     chat_id,
-                                    src_msg.text,
+                                    clean_cap,
                                     reply_to=thread_id
                                 )
                             cloned = True
-                            await self._send_message(session, chat_id, "✔ **Cloned Successfully via MTProto Vault!** *(Bypassed & Forward tag removed)* 🩺", message_thread_id=thread_id)
+                            await self._send_message(session, chat_id, "✔ <b>Cloned Successfully via MTProto Vault!</b> <i>(Content protection bypassed & tags stripped)</i> 🩺", message_thread_id=thread_id)
                 except Exception as ex_mt:
                     logger.warning(f"MTProto fallback clone failed: {ex_mt}")
 
             if not cloned:
                 await self._send_message(
                     session, chat_id, 
-                    "⚠️ **Clone Failed:** Message access restricted or post not found.\n"
-                    "💡 *Tip:* Make sure the bot or your linked Telegram account (`/linkaccount`) is a member of the source channel!",
+                    "⚠️ <b>Clone Failed:</b> Message access restricted or post not found.\n"
+                    "💡 <i>Tip:</i> Run <code>/connect</code> in bot DM to link your Telegram account so the bot can access restricted private groups!",
                     message_thread_id=thread_id
                 )
 
@@ -4960,11 +4976,19 @@ class DeviTelegramBot:
 
             if len(parts) < 3:
                 guide = (
-                    "📦 **Batch Message Cloner (Zero Forward Tag):**\n\n"
-                    "Usage: `/batchclone <start_msg_link> <end_msg_link>`\n\n"
-                    "**Examples:**\n"
-                    "`/batchclone https://t.me/c/3912970546/22803/10 https://t.me/c/3912970546/22803/25`\n"
-                    "`/batchclone https://t.me/c/3912970546/10 https://t.me/c/3912970546/25`"
+                    "📦 <b>Batch Continuous Message Cloner (Zero Forward Tag):</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "<b>Use Case:</b> Ek hi topic ya channel ke continuous messages ki series (e.g. 10 se 200 lectures) ko ek sath copy karne ke liye.\n\n"
+                    "<b>Syntax:</b>\n"
+                    "<code>/batchclone [Start Message Link] [End Message Link]</code>\n\n"
+                    "<b>Examples (Data & Link Format):</b>\n"
+                    "• <code>/batchclone https://t.me/c/3912970546/22803/10 https://t.me/c/3912970546/22803/85</code>\n"
+                    "  <i>[Private Topic Range: Message #10 se #85 tak clone karega]</i>\n\n"
+                    "• <code>/batchclone https://t.me/c/3912970546/100 https://t.me/c/3912970546/500</code>\n"
+                    "  <i>[Private Channel Range: Message #100 se #500 tak clone karega]</i>\n\n"
+                    "• <code>/batchclone https://t.me/medical_hub/1 https://t.me/medical_hub/50</code>\n"
+                    "  <i>[Public Group Range: Message #1 se #50 tak clone karega]</i>\n\n"
+                    "💡 <i>Tip: Agar poora topic ya poora group clone karna hai, toh <code>/clonetopic</code> ya <code>/clonegroup</code> use karein!</i>"
                 )
                 await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
                 return
@@ -4989,7 +5013,7 @@ class DeviTelegramBot:
                 end_id = int(m2_pub.group(2))
 
             if not src_chat or start_id is None or end_id is None:
-                await self._send_message(session, chat_id, "⚠️ Invalid link formats. Both must be Telegram message links from the same group/channel.", message_thread_id=thread_id)
+                await self._send_message(session, chat_id, "⚠️ Invalid link formats. Dono links valid Telegram message links hone chahiye.", message_thread_id=thread_id)
                 return
 
             if start_id > end_id:
@@ -4999,22 +5023,21 @@ class DeviTelegramBot:
             if total_range > 5000:
                 await self._send_message(
                     session, chat_id,
-                    f"⚠️ Batch range is too large (`{total_range}` items). Maximum supported range per `/batchclone` is 5,000 items.",
+                    f"⚠️ Batch range is too large (<code>{total_range}</code> items). Maximum supported range per <code>/batchclone</code> is 5,000 items. (Poore group ke liye <code>/clonegroup</code> use karein).",
                     message_thread_id=thread_id
                 )
                 return
 
             status_msg = await self._send_message(
                 session, chat_id, 
-                f"⏳ **Starting Batch Clone:** `{total_range}` items from `{src_chat}` (IDs `{start_id}` to `{end_id}`)...\n"
-                f"⚡ Status: Initializing stream & resolving client...",
+                f"⏳ <b>Starting Batch Clone:</b> <code>{total_range}</code> items from <code>{src_chat}</code> (IDs <code>{start_id}</code> to <code>{end_id}</code>)...\n"
+                f"⚡ <b>Status:</b> Initializing stream & resolving client...",
                 message_thread_id=thread_id
             )
 
             cloned_count = 0
             copy_url = f"https://api.telegram.org/bot{self.token}/copyMessage"
 
-            # Pre-resolve MTProto client once for high performance
             cached_user_client = None
             try:
                 from devi.operator.session_vault import get_vault_client_for_target
@@ -5023,6 +5046,7 @@ class DeviTelegramBot:
                 pass
 
             last_edit_time = asyncio.get_event_loop().time()
+            from devi.operator.deep_cloner import clean_cloned_caption
 
             for idx, mid in enumerate(range(start_id, end_id + 1), start=1):
                 item_copied = False
@@ -5048,11 +5072,12 @@ class DeviTelegramBot:
                     try:
                         s_msg = await cached_user_client.get_messages(src_chat, ids=mid)
                         if s_msg:
+                            clean_cap = clean_cloned_caption(s_msg.text or "")
                             if s_msg.media:
                                 await cached_user_client.send_file(
                                     chat_id, 
                                     file=s_msg.media, 
-                                    caption=s_msg.text or "", 
+                                    caption=clean_cap, 
                                     reply_to=thread_id
                                 )
                                 cloned_count += 1
@@ -5060,7 +5085,7 @@ class DeviTelegramBot:
                             elif s_msg.text:
                                 await cached_user_client.send_message(
                                     chat_id, 
-                                    s_msg.text, 
+                                    clean_cap, 
                                     reply_to=thread_id
                                 )
                                 cloned_count += 1
@@ -5073,11 +5098,11 @@ class DeviTelegramBot:
                 if status_msg and (idx % 15 == 0 or now_t - last_edit_time > 4.0) and idx < total_range:
                     pct = round((idx / total_range) * 100, 1)
                     prog_text = (
-                        f"⏳ **Batch Cloning in Progress...**\n\n"
-                        f"• Source: `{src_chat}`\n"
-                        f"• Processed: `{idx}` / `{total_range}` (`{pct}%`)\n"
-                        f"• Cloned so far: `{cloned_count}` items 🚀\n"
-                        f"• Tag Status: ❌ Zero Forward Tags"
+                        f"⏳ <b>Batch Cloning in Progress...</b>\n\n"
+                        f"• <b>Source:</b> <code>{src_chat}</code>\n"
+                        f"• <b>Progress:</b> <code>{idx}</code> / <code>{total_range}</code> (<code>{pct}%</code>)\n"
+                        f"• <b>Cloned:</b> <code>{cloned_count}</code> items 🚀\n"
+                        f"• <b>Tag Status:</b> ❌ Zero Forward Tags | ✨ Stripped"
                     )
                     await self._edit_message(session, chat_id, status_msg, prog_text)
                     last_edit_time = now_t
@@ -5090,7 +5115,7 @@ class DeviTelegramBot:
             await self._send_message(
                 session, 
                 chat_id, 
-                f"🎉 **Batch Clone Completed!**\n\n• Successfully Cloned: `{cloned_count}` / `{total_range}` items\n• Forward Tags: ❌ Removed (Clean Posts) ✨",
+                f"🎉 <b>Batch Clone Completed!</b>\n\n• Successfully Cloned: <code>{cloned_count}</code> / <code>{total_range}</code> items\n• Forward Tags: ❌ Removed (Clean Posts) ✨",
                 message_thread_id=thread_id
             )
 
@@ -5103,33 +5128,45 @@ class DeviTelegramBot:
 
             if len(parts) < 2:
                 guide = (
-                    "🚀 <b>Deep Group Cloner & Topic Mirror Suite (200k+ Msgs & 2k+ Topics):</b>\n\n"
-                    "Usage: <code>/clonegroup &lt;source_group_link_or_id&gt;</code>\n\n"
-                    "<b>Features:</b>\n"
-                    "• 📂 <b>Auto Topic Creation:</b> Target group me saare topics automatically create honge.\n"
-                    "• 🏷️ <b>Zero Forward Tags:</b> Clean original posts format me mirror hoga.\n"
-                    "• 🧼 <b>Watermark Sanitization:</b> Third-party bot handles & promo text automatically stripped.\n"
-                    "• ♾️ <b>Massive Scale:</b> 200,000+ messages aur 2,000+ topics bina crash ke stream honge.\n\n"
-                    "<b>Examples:</b>\n"
+                    "🚀 <b>Deep Group Cloner Suite (200,000+ Msgs & 2,000+ Topics):</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "<b>Use Case:</b> Poore ke poore supergroup / channel ko clone karna. Bot khud 2,000+ forum topics discover karega, destination group me auto-create karega aur saare 200,000+ messages transfer karega.\n\n"
+                    "<b>Syntax:</b>\n"
+                    "<code>/clonegroup [Source Group Link/ID] [Optional Target Group Link/ID]</code>\n\n"
+                    "<b>Examples (Data & Link Format):</b>\n"
                     "• <code>/clonegroup https://t.me/c/3912970546</code>\n"
-                    "• <code>/clonegroup @medical_study_hub</code>\n"
-                    "• <code>/clonegroup -1001234567890</code>"
+                    "  <i>[Private Supergroup: Is group ke saare 2000+ topics current group me auto-create karke clone karega]</i>\n\n"
+                    "• <code>/clonegroup https://t.me/c/3912970546 https://t.me/c/1234567890</code>\n"
+                    "  <i>[Source Private Group ➔ Target Private Group: Kisi doosre destination group me clone karega]</i>\n\n"
+                    "• <code>/clonegroup @source_study_hub @destination_study_hub</code>\n"
+                    "  <i>[Public Group Link / Username Format]</i>\n\n"
+                    "• <code>/clonegroup -1003912970546 -1001234567890</code>\n"
+                    "  <i>[Numeric Chat ID Format]</i>\n\n"
+                    "🛡️ <b>Features:</b>\n"
+                    "• 📁 <b>Auto-Create Topics:</b> Target group me matching topics khud create karega\n"
+                    "• 🏷️ <b>Zero Forward Tags:</b> 100% clean posts format me mirror hoga\n"
+                    "• ✨ <b>Watermark Sanitization:</b> Third-party promo text & bot handles stripped\n"
+                    "• 🔄 <b>Job Monitoring:</b> Live progress check karne ke liye <code>/clonejobs</code> likhein\n"
+                    "• 🛑 <b>Emergency Stop:</b> Rokne ke liye <code>/stopclone [Job ID]</code> likhein"
                 )
                 await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
                 return
 
-            src_arg = parts[1].strip()
-            src_chat = None
-            m_priv = re.search(r't\.me/c/(\d+)', src_arg)
-            m_pub = re.search(r't\.me/([a-zA-Z0-9_]+)', src_arg)
-            if m_priv:
-                src_chat = int(f"-100{m_priv.group(1)}")
-            elif m_pub:
-                src_chat = f"@{m_pub.group(1)}"
-            elif src_arg.lstrip("-").isdigit():
-                src_chat = int(src_arg)
-            else:
-                src_chat = f"@{src_arg.lstrip('@')}"
+            def _resolve_raw_chat(raw_arg: str):
+                raw = raw_arg.strip()
+                m_priv = re.search(r't\.me/c/(\d+)', raw)
+                m_pub = re.search(r't\.me/([a-zA-Z0-9_]+)', raw)
+                if m_priv:
+                    return int(f"-100{m_priv.group(1)}")
+                elif m_pub:
+                    return f"@{m_pub.group(1)}"
+                elif raw.lstrip("-").isdigit():
+                    return int(raw)
+                else:
+                    return f"@{raw.lstrip('@')}"
+
+            src_chat = _resolve_raw_chat(parts[1])
+            dest_chat = _resolve_raw_chat(parts[2]) if len(parts) > 2 else target_chat_id
 
             from devi.operator.deep_cloner import DeepClonerEngine, create_clone_job, _job_cancel_flags
             cloner = DeepClonerEngine(bot_token=self.token)
@@ -5138,7 +5175,7 @@ class DeviTelegramBot:
                 session, chat_id,
                 f"⏳ <b>Initializing Deep Group Clone...</b>\n\n"
                 f"• <b>Source:</b> <code>{src_chat}</code>\n"
-                f"• <b>Target:</b> <code>{target_chat_id}</code>\n"
+                f"• <b>Target:</b> <code>{dest_chat}</code>\n"
                 f"• <b>Status:</b> Discovering topics & authenticating MTProto vault...",
                 message_thread_id=thread_id
             )
@@ -5146,7 +5183,7 @@ class DeviTelegramBot:
             job_id = create_clone_job(
                 user_id=admin_id,
                 source_chat=str(src_chat),
-                target_chat=str(target_chat_id),
+                target_chat=str(dest_chat),
                 job_type="group",
                 progress_msg_id=init_msg or 0,
                 progress_chat_id=chat_id
@@ -5165,7 +5202,7 @@ class DeviTelegramBot:
                     job_id=job_id,
                     user_id=admin_id,
                     source_chat_id=src_chat,
-                    target_chat_id=target_chat_id,
+                    target_chat_id=dest_chat,
                     progress_updater=_live_progress_updater
                 ),
                 name=f"deep_clone_group_{job_id}"
@@ -5180,11 +5217,24 @@ class DeviTelegramBot:
 
             if len(parts) < 2:
                 guide = (
-                    "📂 <b>Clone Single Full Topic (Massive Lectures & Media):</b>\n\n"
-                    "Usage: <code>/clonetopic &lt;source_topic_link&gt; [target_topic_name]</code>\n\n"
-                    "<b>Examples:</b>\n"
+                    "📂 <b>Deep Topic Cloner (Thousands of Lectures & Media):</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "<b>Use Case:</b> Kisi bhi ek specific Forum Topic ke saare messages, lecture videos aur PDFs ko ek hi click me clone karna.\n\n"
+                    "<b>Syntax:</b>\n"
+                    "<code>/clonetopic [Source Topic Link] [Optional Target Topic Name]</code>\n\n"
+                    "<b>Examples (Data & Link Format):</b>\n"
                     "• <code>/clonetopic https://t.me/c/3912970546/22803</code>\n"
-                    "• <code>/clonetopic https://t.me/c/3912970546/22803 Pathology 2.0</code>"
+                    "  <i>[Private Topic Link: Topic #22803 ke saare lectures current topic me mirror karega]</i>\n\n"
+                    "• <code>/clonetopic https://t.me/c/3912970546/22803 Pathology 2.0 Full</code>\n"
+                    "  <i>[Private Topic + Custom Name: Target group me 'Pathology 2.0 Full' topic khud banakar clone karega]</i>\n\n"
+                    "• <code>/clonetopic https://t.me/medical_hub/150 Microbiology LRR</code>\n"
+                    "  <i>[Public Topic Link + Custom Name]</i>\n\n"
+                    "• <code>/clonetopic https://t.me/c/3912970546/22803/45</code>\n"
+                    "  <i>[Post Link Inside Topic: Topic ID auto-detect karke poora topic clone karega]</i>\n\n"
+                    "🛡️ <b>Features:</b>\n"
+                    "• ❌ Zero Forward Tags | ✨ Stripped Watermarks & Ads\n"
+                    "• 📊 Live Real-time Percentage & Counter Tracker\n"
+                    "• 🛑 <code>/stopclone [Job ID]</code> bhej kar anytime cancel karein"
                 )
                 await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
                 return
@@ -5206,7 +5256,7 @@ class DeviTelegramBot:
                 src_topic = int(m_pub.group(2)) if m_pub.group(2) else 1
 
             if not src_chat:
-                await self._send_message(session, chat_id, "⚠️ Invalid topic link format.", message_thread_id=thread_id)
+                await self._send_message(session, chat_id, "⚠️ Invalid topic link format. Kripya valid Telegram forum topic link enter karein.", message_thread_id=thread_id)
                 return
 
             from devi.operator.session_vault import get_vault_client_for_target
@@ -5285,7 +5335,12 @@ class DeviTelegramBot:
             from devi.operator.deep_cloner import get_active_clone_jobs
             jobs = get_active_clone_jobs(user_id=admin_id if not self.is_admin(admin_id) else None)
             if not jobs:
-                await self._send_message(session, chat_id, "ℹ️ No active clone jobs running currently.\n\nUse <code>/clonegroup</code> or <code>/clonetopic</code> to start a job!", message_thread_id=thread_id)
+                await self._send_message(
+                    session, chat_id,
+                    "ℹ️ <b>No active clone jobs running currently.</b>\n\n"
+                    "Use <code>/clonegroup</code> or <code>/clonetopic</code> to start a new deep cloning job!",
+                    message_thread_id=thread_id
+                )
                 return
 
             lines = ["📋 <b>Active Deep Clone Jobs:</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
@@ -5303,7 +5358,13 @@ class DeviTelegramBot:
 
         elif cmd in ("/stopclone", "/cancelclone", "/pauseclone"):
             if len(parts) < 2 or not parts[1].isdigit():
-                await self._send_message(session, chat_id, "Usage: <code>/stopclone &lt;job_id&gt;</code>\n\nCheck active IDs with <code>/clonejobs</code>", message_thread_id=thread_id)
+                await self._send_message(
+                    session, chat_id,
+                    "Usage: <code>/stopclone [Job ID]</code>\n\n"
+                    "<b>Example:</b> <code>/stopclone 1</code>\n\n"
+                    "<i>(Active Job IDs check karne ke liye <code>/clonejobs</code> likhein).</i>",
+                    message_thread_id=thread_id
+                )
                 return
 
             target_job_id = int(parts[1])

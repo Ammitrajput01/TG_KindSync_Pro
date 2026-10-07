@@ -6,6 +6,12 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 2. Cloner Suite Rich Examples & Bracketed Link Guidance Card Upgrade (`/clonegroup`, `/clonetopic`, `/batchclone`, `/clone`)
+* **Feature & Goal**:
+  - Enhanced all cloner command guidance cards (`/clone`, `/batchclone`, `/clonegroup`, `/clonetopic`, `/fullhelp`) with crystal-clear bracketed parameter explanations (`[Source Group Link]`, `[Target Group Link]`, `[Source Topic Link]`, `[Target Topic Name]`, `[Start Msg Link]`, `[End Msg Link]`), distinct use-cases, and multi-format examples for private supergroups, public channels, forum topics, and numeric IDs.
+  - Upgraded `/clonegroup` and `/clonetopic` argument parsers to seamlessly accept raw links, `@usernames`, or numeric IDs for both source and destination chats.
+* **Verification**: Verified via test suite and `py_compile`.
+
 ### 1. Infinite Deep Group & Forum Topic Cloner Suite (`/clonegroup`, `/clonetopic`, `/clonejobs`, `/stopclone`)
 * **Feature & Goal**:
   - High-throughput asynchronous cloner capable of cloning entire supergroups and forum groups with **200,000+ messages** and **2,000+ topics** without memory leaks, forward tags, or data truncation.
