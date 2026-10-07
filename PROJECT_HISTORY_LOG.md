@@ -713,3 +713,27 @@ This log permanently documents root causes, architectural patterns, historical b
   - In [1_START_MY_ORACLE_DIRECT.bat](file:///c:/TG_KindSync_Pro/1_START_MY_ORACLE_DIRECT.bat) & [UPDATE_ORACLE_BOT_ONE_CLICK.bat](file:///c:/TG_KindSync_Pro/UPDATE_ORACLE_BOT_ONE_CLICK.bat):
     - Removed blocking service stop command, enabling 0.5s instant SSH reconnection and automated 1-click VPS bot updates.
 
+---
+
+### 39. Modular Feature-Specific Help Guides, Cloner Manual & Interactive Navigation System
+* **User Request / Requirement**:
+  - Break down the monolithic `/help` command into dedicated, modular help guides for each separate feature of the Kind Doctor system (`/clonehelp`, `/routehelp`, `/adminhelp`, `/calchelp`, `/indexhelp`, `/connect_help`).
+  - Add explicit syntax examples with bracketed placeholders (`(e.g., https://t.me/c/... or -100...)`) for cloning, routing, moderation, and medical tools.
+  - Explain deep forum topic cloning (2000+ topics, unlimited messages), forward header stripping, job monitoring (`/clonestatus`, `/clonejobs`, `/clonepause`, `/cloneresume`, `/clonestop`), and history maintenance (`/clean_history`).
+  - Fix bot username reference to `@KindDoc_bot`.
+* **Permanent Implementation**:
+  - In [devi/operator/telegram_bot.py](file:///c:/TG_KindSync_Pro/devi/operator/telegram_bot.py):
+    1. **Public Commands Whitelist**: Added `/clonehelp`, `/cloninghelp`, `/clonerhelp`, `/cloner`, `/routehelp`, `/forwardhelp`, `/routinghelp`, `/adminhelp`, `/modhelp`, `/securityhelp`, `/calchelp`, `/dosehelp`, `/scorehelp` into `PUBLIC_ALLOWED_COMMANDS` so all group members and admins can access guides without permissions blocks.
+    2. **Dedicated Command Handlers**:
+       - `/clonehelp` (`/cloner`): Complete guide for Deep Forum & Topic Cloner, Batch Cloner, forward header stripping, speed, rate-limits, and job controls (`/clonestatus`, `/clonejobs`, `/clonepause`, `/cloneresume`, `/clonestop`).
+       - `/routehelp` (`/forwardhelp`): 24/7 Cloud Background Forwarding guide (`/addroute`, `/routes`, `/delroute`, `/clean_history`).
+       - `/adminhelp` (`/securityhelp`): Moderation, anti-spam, ghost account purge (`/cleandeleted`), welcome cleaners (`/cleanwelcome`), and SangMata forensics (`/whois`, `/userinfo`).
+       - `/calchelp` (`/scorehelp`): Clinical calculations guide (`/bmi`, `/bsa`, `/dose`, `/maintenance`, `/gfr`, `/gcs`, `/curb65`, `/map`, `/parkland`).
+    3. **Master `/help` & `/menu` Interactive Inline Buttons**:
+       - Added 1-click inline button grids directly inside `/help` and `/menu` to navigate across all specialized guides (`[ 📦 Deep Cloner Help ]`, `[ 🔄 Cloud Routing Help ]`, `[ 📑 Topic Index Help ]`, `[ 🛡️ Security & Mod Help ]`, `[ 🧮 Medical Calc Help ]`, `[ 🔗 Account Connect Help ]`).
+    4. **Callback Query Dispatcher**:
+       - Linked `act_clonehelp`, `act_indexhelp`, `act_routehelp`, `act_adminhelp`, `act_calchelp`, `act_cleandeleted`, `act_cleanwelcome`, `act_bmi_guide`, `act_gfr_guide`, `act_clonejobs`, `act_routes` to in-memory command runners for instant UI transitions.
+    5. **Bot Username Fix**:
+       - Standardized dynamic `@KindDoc_bot` reference across all group welcome cards and help texts.
+
+

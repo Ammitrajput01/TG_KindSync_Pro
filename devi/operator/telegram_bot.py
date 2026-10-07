@@ -96,7 +96,9 @@ DANGEROUS_EXT_REGEX = re.compile(r'(?i)\.(apk|exe|bat|cmd|vbs|scr|msi)$')
 # Commands accessible to all group members without requiring admin privilege
 PUBLIC_ALLOWED_COMMANDS = (
     "/find", "/search", "/faq", "/faqs", 
-    "/indexhelp", "/topics", "/help",
+    "/indexhelp", "/clonehelp", "/cloninghelp", "/clonerhelp", "/cloner", "/routehelp", "/forwardhelp", "/routinghelp",
+    "/adminhelp", "/modhelp", "/securityhelp", "/calchelp", "/dosehelp", "/scorehelp",
+    "/topics", "/help",
     "/mainindex", "/topicindex", "/indexmaster", "/index",
     "/scan", "/autoindex", "/start", "/menu", "/fullhelp", "/manual",
     "/support", "/contact", "/id", "/myid", "/info",
@@ -2131,6 +2133,28 @@ class DeviTelegramBot:
             elif action in ("unlink_account", "disconnect", "logout"):
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Disconnecting Account..."})
                 await self._handle_admin_command(session, chat_id, admin_id, "/disconnect", message=msg_obj)
+            elif action in ("clonehelp", "cloninghelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/clonehelp", message=msg_obj)
+            elif action in ("indexhelp", "topicshelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/indexhelp", message=msg_obj)
+            elif action in ("routehelp", "forwardhelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/routehelp", message=msg_obj)
+            elif action in ("adminhelp", "securityhelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/adminhelp", message=msg_obj)
+            elif action in ("calchelp", "scorehelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/calchelp", message=msg_obj)
+            elif action == "cleandeleted":
+                await self._handle_admin_command(session, chat_id, admin_id, "/cleandeleted", message=msg_obj)
+            elif action == "cleanwelcome":
+                await self._handle_admin_command(session, chat_id, admin_id, "/cleanwelcome", message=msg_obj)
+            elif action == "bmi_guide":
+                await self._handle_admin_command(session, chat_id, admin_id, "/score bmi", message=msg_obj)
+            elif action == "gfr_guide":
+                await self._handle_admin_command(session, chat_id, admin_id, "/gfr", message=msg_obj)
+            elif action == "clonejobs":
+                await self._handle_admin_command(session, chat_id, admin_id, "/clonejobs", message=msg_obj)
+            elif action == "routes":
+                await self._handle_admin_command(session, chat_id, admin_id, "/routes", message=msg_obj)
             elif action == "menu":
                 await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
             elif action == "support":
@@ -3370,26 +3394,28 @@ class DeviTelegramBot:
             if self.is_admin(admin_id):
                 admin_panel_text = (
                     f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"⚙️ **Admin Pipeline Controls:**\n"
-                    f"• Forwarding: `{'⚡ Fast Direct (0.2s Instant)' if cur_direct else '🔄 Stream Mode (Safe, Fresh Hashes)'}`\n"
-                    f"• Branding & Media: `{'👑 ON (Kind Doctor Sig + 16:9 HD Cover)' if cur_sig else '🏷️ OFF (Clean Mode: No Sig & Original Media)'}`\n"
-                    f"• Video Cover Override: `{'🖼️ 16:9 HD Custom Cover' if cur_thumb == 'custom' else '🎞️ Original Media'}`\n"
-                    f"_(Neeche diye 1-click buttons se instant switch karein)_"
+                    f"⚙️ <b>Admin Pipeline Controls:</b>\n"
+                    f"• Forwarding: <code>{'⚡ Fast Direct (0.2s Instant)' if cur_direct else '🔄 Stream Mode (Safe, Fresh Hashes)'}</code>\n"
+                    f"• Branding & Media: <code>{'👑 ON (Kind Doctor Sig + 16:9 HD Cover)' if cur_sig else '🏷️ OFF (Clean Mode: No Sig & Original Media)'}</code>\n"
+                    f"• Video Cover Override: <code>{'🖼️ 16:9 HD Custom Cover' if cur_thumb == 'custom' else '🎞️ Original Media'}</code>\n"
+                    f"<i>(Neeche diye 1-click buttons se instant switch karein)</i>"
                 )
 
             reply = (
-                f"👨‍⚕️ **Kind Doctor** 🤍 🩺\n"
+                f"👨‍⚕️ <b>Kind Doctor</b> 🤍 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Welcome! Aapka study & group assistant **100% Active** hai.\n"
-                f"Neeche diye **1-Click Buttons** se direct features use karein:\n\n"
-                f"⚡ **Core Tools:**\n"
-                f"• 📑 **Master Topic Directory**: Saare subjects ka Alphabetical (A-Z) hub\n"
-                f"• ⚡ **1-Click Auto-Scan**: Poora group scan karke directory auto-fill\n"
-                f"• 💬 **Message Kind Doctor**: Direct personal live support\n"
-                f"• 🔍 **Search Engine**: `/find <topic/lecture>` instantly dhoondein\n"
+                f"Welcome! Aapka study & group assistant <b>100% Active</b> hai.\n"
+                f"Neeche diye <b>1-Click Buttons</b> se direct features aur dedicated guides open karein:\n\n"
+                f"⚡ <b>Core Tools:</b>\n"
+                f"• 📑 <b>Master Topic Directory</b>: Saare subjects ka Alphabetical (A-Z) hub\n"
+                f"• ⚡ <b>1-Click Auto-Scan</b>: Poora group scan karke directory auto-fill\n"
+                f"• 🚀 <b>Deep Cloner Suite</b>: 200k+ messages & 2k+ topics clone engine\n"
+                f"• 🔄 <b>Cloud Forwarder</b>: Real-time 0-tag live mirroring streams\n"
+                f"• 💬 <b>Message Kind Doctor</b>: Direct personal live support desk\n"
+                f"• 🔍 <b>Search Engine</b>: <code>/find &lt;topic/lecture&gt;</code> instantly dhoondein\n"
                 f"{admin_panel_text}\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 *Tip: Poori guide dekhne ke liye `/fullhelp` likhein ya neeche [📖 Full Manual] tap karein.*"
+                f"💡 <i>Tip: Har feature ki alag help file dekhne ke liye neeche buttons tap karein!</i>"
             )
             keyboard = {
                 "inline_keyboard": [
@@ -3398,8 +3424,20 @@ class DeviTelegramBot:
                         {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"}
                     ],
                     [
+                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_clonehelp"},
+                        {"text": "📑 Topic Index Guide", "callback_data": "act_indexhelp"}
+                    ],
+                    [
+                        {"text": "🔄 Cloud Routing Guide", "callback_data": "act_routehelp"},
+                        {"text": "🔑 Connect Account", "callback_data": "act_connect"}
+                    ],
+                    [
+                        {"text": "🛡️ Admin & Security Guide", "callback_data": "act_adminhelp"},
+                        {"text": "🩺 Clinical Calculators", "callback_data": "act_calchelp"}
+                    ],
+                    [
                         {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"},
-                        {"text": "📖 Full Manual", "callback_data": "act_manual"}
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
                     ]
                 ]
             }
@@ -3582,7 +3620,141 @@ class DeviTelegramBot:
                 f"• `/deltopic <topic_id>` - Topic remove karein\n"
                 f"• `/clearindex` - Topic index fresh start karein"
             )
-            await self._send_message(session, chat_id, help_text, message_thread_id=thread_id)
+            markup = {
+                "inline_keyboard": [
+                    [{"text": "⚡ Auto-Scan Topics (/scan)", "callback_data": "act_scan"}],
+                    [{"text": "📖 All Topics (/topics)", "callback_data": "act_topics"}, {"text": "📑 Master Index (/mainindex)", "callback_data": "act_mainindex"}],
+                    [{"text": "🔙 Main Help Menu", "callback_data": "act_menu"}]
+                ]
+            }
+            await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
+
+        elif cmd in ("/clonehelp", "/cloninghelp", "/clonerhelp", "/cloner"):
+            help_text = (
+                "📦 <b>Kind Doctor Deep Cloner & Forum Topic Mirroring Guide</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Kind Doctor Bot me 2 powerful clone modes hain: <b>1-Click Direct Copy</b> aur <b>Deep Forum/Topic Auto-Clone Engine</b>.\n\n"
+                "🚀 <b>FEATURE 1: Deep Forum & Topic Cloner (Unlimited Msgs & Topics)</b>\n"
+                "Yeh engine pure group ke saare topics (1 to 2000+) automatically target group me create karta hai aur har topic ka data forward tags strip karke clone karta hai:\n"
+                "• <b>Full Clone Syntax:</b>\n"
+                "  <code>/clone &lt;source_chat_id/link&gt; &lt;target_chat_id/link&gt;</code>\n"
+                "  <i>Example:</i> <code>/clone -1001234567890 -1009876543210</code>\n"
+                "  <i>Link Example:</i> <code>/clone https://t.me/c/1234567890 https://t.me/c/9876543210</code>\n\n"
+                "• <b>Topic-to-Topic Clone Syntax:</b>\n"
+                "  <code>/clone &lt;source_chat&gt; &lt;target_chat&gt; &lt;source_topic_id&gt; &lt;target_topic_id&gt;</code>\n"
+                "  <i>Example:</i> <code>/clone -1001234567890 -1009876543210 45 102</code>\n\n"
+                "• <b>Batch Range Clone (Single Chat/Topic):</b>\n"
+                "  <code>/batchclone &lt;from_msg_id&gt; &lt;to_msg_id&gt;</code>\n"
+                "  <i>Example:</i> <code>/batchclone 100 2500</code>\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🎮 <b>JOB CONTROL & MONITORING:</b>\n"
+                "• 📊 <code>/clonestatus [job_id]</code> — Live progress bar, speed (msgs/sec), remaining time\n"
+                "• 📋 <code>/clonejobs</code> — Active, paused aur completed clone jobs ki list\n"
+                "• ⏸️ <code>/clonepause &lt;job_id&gt;</code> — Running clone task ko instantly pause karein\n"
+                "• ▶️ <code>/cloneresume &lt;job_id&gt;</code> — Paused clone task ko wahi se resume karein\n"
+                "• ⏹️ <code>/clonestop &lt;job_id&gt;</code> — Clone task ko permanently terminate karein\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🛡️ <b>ANTI-RESTRICTION & SPEED SPECS:</b>\n"
+                "• <b>Clean Forward Header Stripping:</b> Original channel name/tags remove ho jate hain.\n"
+                "• <b>FloodWait Auto-Backoff:</b> Telegram rate-limits handle karta hai bina crash huye.\n"
+                "• <b>Private Group Access:</b> Apne account ko <code>/connect</code> karein taaki private groups/topics ka data bina bot admin requirement ke clone ho sake."
+            )
+            markup = {
+                "inline_keyboard": [
+                    [{"text": "📋 Active Clone Jobs (/clonejobs)", "callback_data": "act_clonejobs"}],
+                    [{"text": "🔗 Connect Account (/connect)", "callback_data": "act_connect"}, {"text": "🔄 Route Help (/routehelp)", "callback_data": "act_routehelp"}],
+                    [{"text": "🔙 Main Help Menu", "callback_data": "act_menu"}]
+                ]
+            }
+            await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
+
+        elif cmd in ("/routehelp", "/forwardhelp", "/routinghelp"):
+            help_text = (
+                "🔄 <b>Kind Doctor Cloud Real-Time Auto-Forwarder & Router Guide</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "24/7 Cloud Background Forwarding Engine bina kisi PC ke continuous real-time copy karta hai:\n\n"
+                "⚡ <b>CORE ROUTING COMMANDS:</b>\n"
+                "• ➕ <b>Add Auto-Forward Route:</b>\n"
+                "  <code>/addroute &lt;source_chat_id&gt; &lt;target_chat_id&gt; [clean/forward]</code>\n"
+                "  <i>Example:</i> <code>/addroute -1001234567890 -1009876543210 clean</code>\n"
+                "  <i>Note:</i> <code>clean</code> mode removes forwarded headers completely.\n\n"
+                "• 📋 <b>List Active Routes:</b>\n"
+                "  <code>/routes</code> — Saari active auto-mirror routing streams dekhein\n\n"
+                "• ❌ <b>Delete Route:</b>\n"
+                "  <code>/delroute &lt;route_id&gt;</code> — Auto-mirroring stream deactivate karein\n\n"
+                "• 🧹 <b>Clean Routing History:</b>\n"
+                "  <code>/clean_history</code> — Forwarded ID cache aur duplicate tracker reset karein\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <b>TIPS:</b>\n"
+                "• Dono Source aur Target me Bot ko Admin hona zaroori hai (Post Messages permission ke sath).\n"
+                "• Agar source private channel hai jisme bot add nahi ho sakta, toh <code>/connect</code> se apna user account link karein."
+            )
+            markup = {
+                "inline_keyboard": [
+                    [{"text": "📋 View Active Routes (/routes)", "callback_data": "act_routes"}],
+                    [{"text": "📦 Clone Help (/clonehelp)", "callback_data": "act_clonehelp"}, {"text": "📑 Index Help (/indexhelp)", "callback_data": "act_indexhelp"}],
+                    [{"text": "🔙 Main Help Menu", "callback_data": "act_menu"}]
+                ]
+            }
+            await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
+
+        elif cmd in ("/adminhelp", "/modhelp", "/securityhelp"):
+            help_text = (
+                "🛡️ <b>Kind Doctor Moderation, Security & Sanitation Guide</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Group ko spam, raids aur ghost accounts se 100% safe rakhne ke liye built-in command suite:\n\n"
+                "👮 <b>MODERATION & RESTRICTION:</b>\n"
+                "• 🔇 <code>/mute &lt;reply/user_id&gt; [minutes]</code> — Member ko temporary mute karein\n"
+                "• 🔊 <code>/unmute &lt;reply/user_id&gt;</code> — Member ki restriction remove karein\n"
+                "• 👢 <code>/kick &lt;reply/user_id&gt;</code> — Member ko group se bahar nikalein\n"
+                "• 🚫 <code>/ban &lt;reply/user_id&gt;</code> — Member ko permanently ban karein\n"
+                "• 🔓 <code>/unban &lt;reply/user_id&gt;</code> — Ban list se remove karein\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🧹 <b>GROUP SANITATION CLEANERS:</b>\n"
+                "• 🗑️ <code>/cleanwelcome</code> — Saare purane welcome cards auto-delete karein\n"
+                "• 👻 <code>/cleandeleted</code> — Group se Deleted Accounts (Ghost IDs) scan karke purge karein\n"
+                "• 🧹 <code>/clean_history</code> — Bot routing logs aur temp message maps clear karein\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🕵️ <b>USER INTELLIGENCE & FORENSICS:</b>\n"
+                "• 🔍 <code>/whois [reply/user_id]</code> — SangMata-style name history & username audit\n"
+                "• 📊 <code>/userinfo [reply/user_id]</code> — Account creation age, safety score & permissions\n"
+                "• 🔗 <code>/invitelink</code> — Single-use disposable 1-click invite link generate karein"
+            )
+            markup = {
+                "inline_keyboard": [
+                    [{"text": "👻 Purge Ghost Accounts (/cleandeleted)", "callback_data": "act_cleandeleted"}],
+                    [{"text": "🧹 Clean Welcomes (/cleanwelcome)", "callback_data": "act_cleanwelcome"}],
+                    [{"text": "🔙 Main Help Menu", "callback_data": "act_menu"}]
+                ]
+            }
+            await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
+
+        elif cmd in ("/calchelp", "/dosehelp", "/scorehelp"):
+            help_text = (
+                "🧮 <b>Kind Doctor Medical Calculator & Clinical Scores Guide</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Instant clinical calculation tools bedside practice aur medical exams ke liye:\n\n"
+                "⚖️ <b>ANTHROPOMETRY & DOSING:</b>\n"
+                "• <code>/bmi &lt;weight_kg&gt; &lt;height_cm&gt;</code> — BMI & Category\n"
+                "• <code>/bsa &lt;weight_kg&gt; &lt;height_cm&gt;</code> — Body Surface Area (Mosteller)\n"
+                "• <code>/dose &lt;wt_kg&gt; &lt;mg_per_kg&gt; [freq]</code> — Pediatric & weight-based dosing\n"
+                "• <code>/maintenance &lt;weight_kg&gt;</code> — Holiday-Segar 4-2-1 Pediatric fluids\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🏥 <b>ICU, EMERGENCY & RENAL SCORES:</b>\n"
+                "• <code>/gfr &lt;cr_mg_dl&gt; &lt;age&gt; &lt;sex m/f&gt; [wt_kg]</code> — CKD-EPI & Cockcroft-Gault\n"
+                "• <code>/gcs &lt;E 1-4&gt; &lt;V 1-5&gt; &lt;M 1-6&gt;</code> — Glasgow Coma Scale\n"
+                "• <code>/curb65 &lt;confusion&gt; &lt;bun&gt; &lt;rr&gt; &lt;bp&gt; &lt;age&gt;</code> — Pneumonia severity\n"
+                "• <code>/map &lt;sbp&gt; &lt;dbp&gt;</code> — Mean Arterial Pressure\n"
+                "• <code>/parkland &lt;wt_kg&gt; &lt;tbsa_percent&gt;</code> — Burn resuscitation fluids"
+            )
+            markup = {
+                "inline_keyboard": [
+                    [{"text": "⚖️ Quick BMI (/bmi)", "callback_data": "act_bmi_guide"}, {"text": "🫁 GFR Calculator", "callback_data": "act_gfr_guide"}],
+                    [{"text": "🔙 Main Help Menu", "callback_data": "act_menu"}]
+                ]
+            }
+            await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
+
 
         # -------------------------------------------------------------
         # USER ACCOUNT LINKING & MTPROTO CONNECT FLOW (/connect)
