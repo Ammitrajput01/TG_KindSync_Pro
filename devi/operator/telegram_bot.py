@@ -5268,7 +5268,7 @@ class DeviTelegramBot:
 
                 if src_chat_input and tgt_chat_input:
                     from devi.operator.deep_cloner import DeepClonerEngine, create_clone_job
-                    src_top = int(parts[3]) if len(parts) >= 5 and parts[3].isdigit() else 0
+                    src_top = int(parts[3]) if len(parts) >= 4 and parts[3].isdigit() else 0
                     tgt_top = int(parts[4]) if len(parts) >= 5 and parts[4].isdigit() else 0
 
                     job_type = "topic" if src_top > 0 else "group"
@@ -5319,22 +5319,32 @@ class DeviTelegramBot:
                                 if not u_cl:
                                     await self._send_message(session, chat_id, "❌ No connected user session. Use /connect first.", message_thread_id=thread_id)
                                     return
+                                resolved_tgt_top = tgt_top
+                                if not resolved_tgt_top:
+                                    from devi.operator.deep_cloner import get_or_create_target_topic
+                                    resolved_tgt_top = await get_or_create_target_topic(
+                                        self.token, u_cl, tgt_chat_input, f"Topic #{src_top}"
+                                    )
                                 cloned, tot = await engine.clone_topic_stream(
-                                    job_id, u_cl, src_chat_input, src_top, tgt_chat_input, tgt_top,
+                                    job_id, u_cl, src_chat_input, src_top, tgt_chat_input, resolved_tgt_top,
+                                    topic_title=f"Topic #{src_top}",
                                     progress_callback=lambda top, cur, tot, cl: _ui_progress(
                                         f"🚀 <b>Topic Clone in Progress (Job #{job_id})</b>\n"
                                         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        f"📂 <b>Topic ID:</b> <code>#{src_top}</code>\n"
                                         f"📊 <b>Progress:</b> <code>{cur}</code> / <code>{tot}</code> ({round((cur/max(1,tot))*100,1)}%)\n"
                                         f"⚡ <b>Cloned:</b> <code>{cl}</code> items"
                                     )
                                 )
-                                await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed!</b> Cloned <code>{cloned}</code> / <code>{tot}</code> items.", message_thread_id=thread_id)
+                                await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed (Job #{job_id})!</b> Cloned <code>{cloned}</code> / <code>{tot}</code> items.", message_thread_id=thread_id)
                             except Exception as ex_t:
                                 logger.error(f"Topic clone error: {ex_t}", exc_info=True)
                                 from devi.operator.deep_cloner import update_clone_job_progress
                                 update_clone_job_progress(job_id, status="failed", error_msg=str(ex_t))
                                 await self._send_message(session, chat_id, f"❌ <b>Topic Clone Error:</b> {html.escape(str(ex_t))}", message_thread_id=thread_id)
-                        self.create_tracked_task(_run_topic(), name=f"clone_topic_{job_id}")
+                        t = asyncio.create_task(_run_topic())
+                        from devi.operator.session_vault import register_user_job_task
+                        register_user_job_task(admin_id, t)
                     else:
                         async def _run_group():
                             try:
@@ -5352,7 +5362,9 @@ class DeviTelegramBot:
                                 from devi.operator.deep_cloner import update_clone_job_progress
                                 update_clone_job_progress(job_id, status="failed", error_msg=str(ex_g))
                                 await self._send_message(session, chat_id, f"❌ <b>Group Clone Error:</b> {html.escape(str(ex_g))}", message_thread_id=thread_id)
-                        self.create_tracked_task(_run_group(), name=f"clone_group_{job_id}")
+                        t = asyncio.create_task(_run_group())
+                        from devi.operator.session_vault import register_user_job_task
+                        register_user_job_task(admin_id, t)
 
                     return
 

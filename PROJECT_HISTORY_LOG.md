@@ -6,6 +6,18 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 8. Single Topic Cloner 4-Part Argument Resolution & Background Task Spawner Fix (`telegram_bot.py`)
+* **Symptom**:
+  - Sending `/clone -1003504807114 -1004313086843 81041` initiated a `Full Forum & All Topics` group job instead of a single topic job and stayed stuck at `0/0 topics`.
+* **Root Cause**:
+  1. `src_top` condition was checking `len(parts) >= 5` instead of `len(parts) >= 4` when only source topic ID was supplied.
+  2. `self.create_tracked_task()` was referenced on `DeviTelegramBot` instead of standard `asyncio.create_task()` and `register_user_job_task()`, which threw an unhandled `AttributeError` after posting the card.
+* **Permanent Fix Applied**:
+  1. Fixed argument parsing boundary: `src_top = int(parts[3]) if len(parts) >= 4 and parts[3].isdigit() else 0`.
+  2. Integrated `asyncio.create_task()` with automatic `register_user_job_task(admin_id, t)` for guaranteed non-blocking execution and graceful lifecycle tracking.
+  3. Added auto-creation of destination topic in `_run_topic` when `target_topic_id` is omitted.
+* **Verification**: Verified via 18/18 pytest unit tests, live entity resolution on VPS, and syntax checks.
+
 ### 7. Stale Clone Job Recovery on Restart & Bot Task Exception Telemetry (`deep_cloner.py`, `telegram_bot.py`)
 * **Symptom**:
   - `/clonestatus` displayed Job #4 as `RUNNING` with `0/0 topics` and `0 cloned` even though the background task had terminated during a bot service restart.
