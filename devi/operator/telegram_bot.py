@@ -4608,8 +4608,8 @@ class DeviTelegramBot:
                 from_msg = reply_to["message_id"]
             elif len(parts) > 1:
                 link = parts[1].strip()
-                m_priv = re.search(r't\.me/c/(\d+)/(\d+)', link)
-                m_pub = re.search(r't\.me/([a-zA-Z0-9_]+)/(\d+)', link)
+                m_priv = re.search(r't\.me/c/(\d+)(?:/\d+)?/(\d+)', link)
+                m_pub = re.search(r't\.me/([a-zA-Z0-9_]+)(?:/\d+)?/(\d+)', link)
                 if m_priv:
                     from_chat = int(f"-100{m_priv.group(1)}")
                     from_msg = int(m_priv.group(2))
@@ -4620,14 +4620,18 @@ class DeviTelegramBot:
             if not from_chat or not from_msg:
                 guide = (
                     "📥 **Instant 1-Click Message Cloner (Zero Forward Tag):**\n\n"
-                    "• **Method 1:** Reply to any message in group with `/clone`\n"
+                    "• **Method 1:** Reply to any message/video/PDF in group with `/clone`\n"
                     "• **Method 2:** Type `/clone <telegram_post_link>`\n\n"
-                    "**Example:**\n"
-                    "`/clone https://t.me/c/1234567890/45`"
+                    "**Examples:**\n"
+                    "`/clone https://t.me/c/3912970546/22803/45`\n"
+                    "`/clone https://t.me/c/3912970546/45`\n"
+                    "`/clone https://t.me/medical_hub/10/45`"
                 )
                 await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
                 return
 
+            # Step 1: Try instant copyMessage via Telegram Bot API
+            cloned = False
             copy_url = f"https://api.telegram.org/bot{self.token}/copyMessage"
             payload = {
                 "chat_id": chat_id,
@@ -4641,12 +4645,44 @@ class DeviTelegramBot:
                 async with session.post(copy_url, json=payload, timeout=12) as r:
                     res_data = await r.json()
                     if res_data.get("ok"):
+                        cloned = True
                         await self._send_message(session, chat_id, "✔ **Cloned Successfully!** *(Forward tag removed)* 🩺", message_thread_id=thread_id)
-                    else:
-                        err_desc = res_data.get("description", "Unknown error")
-                        await self._send_message(session, chat_id, f"⚠️ Clone failed: {err_desc}", message_thread_id=thread_id)
-            except Exception as e:
-                await self._send_message(session, chat_id, f"❌ Error cloning message: {e}", message_thread_id=thread_id)
+            except Exception:
+                pass
+
+            # Step 2: If bot copyMessage failed (e.g. protected content or private source), fallback to MTProto Vault
+            if not cloned:
+                try:
+                    from devi.operator.session_vault import get_vault_client_for_target
+                    user_client, client_type = await get_vault_client_for_target(preferred_user_id=admin_id)
+                    if user_client:
+                        src_msg = await user_client.get_messages(from_chat, ids=from_msg)
+                        if src_msg:
+                            if src_msg.media:
+                                await user_client.send_file(
+                                    chat_id,
+                                    file=src_msg.media,
+                                    caption=src_msg.text or "",
+                                    reply_to=thread_id
+                                )
+                            elif src_msg.text:
+                                await user_client.send_message(
+                                    chat_id,
+                                    src_msg.text,
+                                    reply_to=thread_id
+                                )
+                            cloned = True
+                            await self._send_message(session, chat_id, "✔ **Cloned Successfully via MTProto Vault!** *(Bypassed & Forward tag removed)* 🩺", message_thread_id=thread_id)
+                except Exception as ex_mt:
+                    logger.warning(f"MTProto fallback clone failed: {ex_mt}")
+
+            if not cloned:
+                await self._send_message(
+                    session, chat_id, 
+                    "⚠️ **Clone Failed:** Message access restricted or post not found.\n"
+                    "💡 *Tip:* Make sure the bot or your linked Telegram account (`/linkaccount`) is a member of the source channel!",
+                    message_thread_id=thread_id
+                )
 
         elif cmd == "/batchclone":
             target_chat_id = self._resolve_study_group_id(chat_id)
@@ -4659,23 +4695,35 @@ class DeviTelegramBot:
                 guide = (
                     "📦 **Batch Message Cloner (Zero Forward Tag):**\n\n"
                     "Usage: `/batchclone <start_msg_link> <end_msg_link>`\n\n"
-                    "**Example:**\n"
-                    "`/batchclone https://t.me/c/1234567890/10 https://t.me/c/1234567890/25`"
+                    "**Examples:**\n"
+                    "`/batchclone https://t.me/c/3912970546/22803/10 https://t.me/c/3912970546/22803/25`\n"
+                    "`/batchclone https://t.me/c/3912970546/10 https://t.me/c/3912970546/25`"
                 )
                 await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
                 return
 
             link1, link2 = parts[1].strip(), parts[2].strip()
-            m1 = re.search(r't\.me/(?:c/(\d+)|([a-zA-Z0-9_]+))/(\d+)', link1)
-            m2 = re.search(r't\.me/(?:c/(\d+)|([a-zA-Z0-9_]+))/(\d+)', link2)
+            m1_priv = re.search(r't\.me/c/(\d+)(?:/\d+)?/(\d+)', link1)
+            m1_pub = re.search(r't\.me/([a-zA-Z0-9_]+)(?:/\d+)?/(\d+)', link1)
+            m2_priv = re.search(r't\.me/c/(\d+)(?:/\d+)?/(\d+)', link2)
+            m2_pub = re.search(r't\.me/([a-zA-Z0-9_]+)(?:/\d+)?/(\d+)', link2)
 
-            if not m1 or not m2:
-                await self._send_message(session, chat_id, "⚠️ Invalid link formats. Both must be Telegram message links.", message_thread_id=thread_id)
+            src_chat = None
+            start_id = None
+            end_id = None
+
+            if m1_priv and m2_priv:
+                src_chat = int(f"-100{m1_priv.group(1)}")
+                start_id = int(m1_priv.group(2))
+                end_id = int(m2_priv.group(2))
+            elif m1_pub and m2_pub:
+                src_chat = f"@{m1_pub.group(1)}"
+                start_id = int(m1_pub.group(2))
+                end_id = int(m2_pub.group(2))
+
+            if not src_chat or start_id is None or end_id is None:
+                await self._send_message(session, chat_id, "⚠️ Invalid link formats. Both must be Telegram message links from the same group/channel.", message_thread_id=thread_id)
                 return
-
-            src_chat = int(f"-100{m1.group(1)}") if m1.group(1) else f"@{m1.group(2)}"
-            start_id = int(m1.group(3))
-            end_id = int(m2.group(3))
 
             if start_id > end_id:
                 start_id, end_id = end_id, start_id
@@ -4699,7 +4747,18 @@ class DeviTelegramBot:
                         rd = await r.json()
                         if rd.get("ok"):
                             cloned_count += 1
-                    await asyncio.sleep(0.15)
+                        else:
+                            from devi.operator.session_vault import get_vault_client_for_target
+                            user_client, _ = await get_vault_client_for_target(preferred_user_id=admin_id)
+                            if user_client:
+                                s_msg = await user_client.get_messages(src_chat, ids=mid)
+                                if s_msg:
+                                    if s_msg.media:
+                                        await user_client.send_file(chat_id, file=s_msg.media, caption=s_msg.text or "", reply_to=thread_id)
+                                    elif s_msg.text:
+                                        await user_client.send_message(chat_id, s_msg.text, reply_to=thread_id)
+                                    cloned_count += 1
+                    await asyncio.sleep(0.2)
                 except Exception:
                     pass
 

@@ -6,6 +6,17 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Wednesday, 07 October 2026
 
+### 3. Cloner & Batch Cloner Forum 3-Part URL & MTProto Restricted Channel Fallback (`/clone`, `/batchclone`)
+* **Symptom**:
+  - `/clone` and `/batchclone` failed when given 3-part forum topic URLs (e.g. `https://t.me/c/3912970546/22803/50` or `https://t.me/groupname/100/200`) or reported errors copying from private/restricted channels.
+* **Root Cause**:
+  - Regular expressions for message link parsing (`t.me/c/(\d+)/(\d+)` and `t.me/([a-zA-Z0-9_]+)/(\d+)`) only accepted 2 segments, extracting the topic ID as the message ID and dropping the true message ID when copying from forum topics.
+  - Pure bot tokens cannot use `copyMessage` / `forwardMessages` on channels where content saving is restricted (`CHAT_FORWARDS_RESTRICTED`) or where the bot token is not a member/admin.
+* **Permanent Fix Applied**:
+  1. **Universal 3-Part Forum Link Parser (`telegram_bot.py`)**: Updated regexes in both `/clone` and `/batchclone` to `r't\.me/c/(\d+)(?:/\d+)?/(\d+)'` and `r't\.me/([a-zA-Z0-9_]+)(?:/\d+)?/(\d+)'` to reliably capture source chat ID and target message ID whether in forum topics or regular channels.
+  2. **Automatic MTProto Vault Fallback (`session_vault.py`)**: When bot token copy fails (`CHAT_FORWARDS_RESTRICTED` or `CHAT_ADMIN_REQUIRED`), automatically acquires an MTProto client from the session vault (`get_vault_client_for_target`), downloads/streams media, and sends as a clean message to the destination thread without forward tags.
+  3. **Verification**: Verified regex resolution and tests in [tests/test_clean_topics_indexing.py](file:///c:/TG_KindSync_Pro/tests/test_clean_topics_indexing.py).
+
 ### 2. Topic Indexer Multi-Scan Deduplication & Watermark/Handle Sanitization (`/topicindex`)
 * **Symptom**:
   - In `/topicindex` cards (e.g. *Shure Shot SS 6.0*), each lecture appeared duplicated 3 times (e.g. `[01]`, `[02]`, `[03]` pointing to the exact same lecture).

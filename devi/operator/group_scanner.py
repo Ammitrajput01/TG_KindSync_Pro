@@ -275,13 +275,13 @@ async def harvest_all_messages(client, peer, target_chat_id: int) -> int:
 
     # Pre-fetch all official forum topics via MTProto GetForumTopicsRequest if supported
     try:
-        from telethon.tl.functions.channels import GetForumTopicsRequest
+        from telethon.tl.functions.messages import GetForumTopicsRequest
         offset_date = None
         offset_id = 0
         offset_topic = 0
         while True:
             res = await client(GetForumTopicsRequest(
-                channel=peer,
+                peer=peer,
                 offset_date=offset_date,
                 offset_id=offset_id,
                 offset_topic=offset_topic,
