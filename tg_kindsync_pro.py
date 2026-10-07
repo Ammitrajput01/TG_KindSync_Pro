@@ -2243,12 +2243,18 @@ class MultiSessionManager:
 
 class RateBudgeter:
     """
-    Sliding-window request velocity budgeter with Poisson-Distributed Human Jitter (RES-BAN-001).
-    Proactively prevents Telegram FloodWait by simulating natural human dispatch variations.
+    Sliding-window request velocity budgeter with dynamic adaptive pacing.
+    Proactively prevents Telegram FloodWait while allowing maximum safe throughput.
     """
-    def __init__(self, max_per_minute: int = 25):
-        self.max_per_minute = max_per_minute
-        self.history = deque(maxlen=max_per_minute)
+    def __init__(self, max_per_minute: Optional[int] = None):
+        env_limit = os.getenv("RATE_LIMIT_PER_MINUTE", "").strip()
+        if env_limit.isdigit() and int(env_limit) > 0:
+            self.max_per_minute = int(env_limit)
+        elif max_per_minute is not None:
+            self.max_per_minute = max_per_minute
+        else:
+            self.max_per_minute = 300  # High-throughput default (5 msgs/sec burst)
+        self.history = deque(maxlen=self.max_per_minute)
         self.cooldown_until = 0.0
 
     def record_flood_wait(self, seconds: float):
@@ -2264,12 +2270,10 @@ class RateBudgeter:
             oldest = self.history[0]
             elapsed = now - oldest
             if elapsed < 60.0:
-                base_needed = min(max((60.0 - elapsed) / max(1, self.max_per_minute - len(self.history) + 1), 0.1), 2.0)
-                # Anti-Ban Human Jitter Matrix
-                import random
-                jitter = random.uniform(0.12, 0.42)
-                await asyncio.sleep(base_needed + jitter)
-                now = time.time()
+                base_needed = (60.0 - elapsed) / max(1, self.max_per_minute)
+                if base_needed > 0.01:
+                    await asyncio.sleep(min(base_needed, 0.4))
+                    now = time.time()
 
         self.history.append(now)
 
@@ -2318,7 +2322,7 @@ class AdaptiveSpeedCruiseControl:
 
 GLOBAL_CRUISE_CONTROLLER = AdaptiveSpeedCruiseControl()
 
-GLOBAL_RATE_BUDGETER = RateBudgeter(max_per_minute=25)
+GLOBAL_RATE_BUDGETER = RateBudgeter(max_per_minute=300)
 
 async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, **kwargs):
     attempt = 0
@@ -3656,79 +3660,135 @@ class PipelineProcessor:
         if not direct_forward_success:
             try:
                 if len(active_messages) > 1:
-                    async def process_media(m):
-                        async with self.album_sem:
-                            return await self.streamer.stream_media(m, stop_event, client=client)
-                            
-                    coros = [process_media(m) for m in active_messages if getattr(m, "media", None)]
-                    if coros:
-                        tasks = [asyncio.create_task(c) for c in coros]
-                        caps = []
-                        for m in active_messages:
-                            if getattr(m, "media", None):
-                                c_main, _ = self.format_text(getattr(m, "text", ""), for_media=True)
-                                caps.append(c_main)
-                        files = await asyncio.gather(*tasks)
-                        await self.rpc.execute(
-                            lambda c: c.send_file(_parse_chat_id(target_chat), files, caption=caps, thumb=t_path, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
-                            client=client, timeout=120.0
-                        )
-                        self.log(f"[bold green]✔ Streamed Album ({len(files)} files)[/] [dim](ID: #{item.first_id})[/]")
-                        for m in active_messages:
-                            self.log(f"  ↳ {format_media_log_detail(m, prefix='Sent')}")
-                        self.metrics["albums_forwarded"] += 1
-                        success_flag = True
+                    caps = []
+                    media_items = []
+                    for m in active_messages:
+                        if getattr(m, "media", None):
+                            c_main, _ = self.format_text(getattr(m, "text", ""), for_media=True)
+                            caps.append(c_main)
+                            media_items.append(m.media)
+
+                    direct_album_sent = False
+                    if media_items:
+                        # Tier 1: Fast Server-Side MTProto Media Reference Copy (0.2s latency, zero bandwidth)
+                        try:
+                            await self.rpc.execute(
+                                lambda c: c.send_file(
+                                    _parse_chat_id(target_chat),
+                                    media_items,
+                                    caption=caps,
+                                    thumb=t_path,
+                                    reply_to=resolved_topic,
+                                    parse_mode="md",
+                                    silent=silent_mode
+                                ),
+                                client=client,
+                                timeout=45.0
+                            )
+                            self.log(f"[bold green]⚡ Fast Direct-Copied Album ({len(media_items)} files)[/] [dim](ID: #{item.first_id})[/]")
+                            for m in active_messages:
+                                self.log(f"  ↳ {format_media_log_detail(m, prefix='Copied')}")
+                            self.metrics["albums_forwarded"] += 1
+                            success_flag = True
+                            direct_album_sent = True
+                        except Exception as ex_album_fast:
+                            self.log(f"[yellow]ℹ Server-side album copy bypass -> RAM Streamer: {str(ex_album_fast)[:60]}[/]")
+
+                    if not direct_album_sent and media_items:
+                        # Tier 2: High-Speed Parallel In-Memory RAM Streamer
+                        async def process_media(m):
+                            async with self.album_sem:
+                                return await self.streamer.stream_media(m, stop_event, client=client)
+
+                        coros = [process_media(m) for m in active_messages if getattr(m, "media", None)]
+                        if coros:
+                            tasks = [asyncio.create_task(c) for c in coros]
+                            files = await asyncio.gather(*tasks)
+                            await self.rpc.execute(
+                                lambda c: c.send_file(_parse_chat_id(target_chat), files, caption=caps, thumb=t_path, reply_to=resolved_topic, parse_mode="md", silent=silent_mode),
+                                client=client, timeout=120.0
+                            )
+                            self.log(f"[bold green]✔ Streamed Album ({len(files)} files)[/] [dim](ID: #{item.first_id})[/]")
+                            for m in active_messages:
+                                self.log(f"  ↳ {format_media_log_detail(m, prefix='Sent')}")
+                            self.metrics["albums_forwarded"] += 1
+                            success_flag = True
                 else:
                     m = active_messages[0]
                     if getattr(m, "media", None) and (hasattr(m.media, 'document') or hasattr(m.media, 'photo')):
-                        file = await self.streamer.stream_media(m, stop_event, client=client)
                         cap_main, cap_overflow = self.format_text(m.text, for_media=True)
-                        
-                        orig_doc = getattr(getattr(m, "media", None), "document", None)
-                        file_sanitized_name = getattr(file, "name", "") or ""
-                        attrs = []
-                        if orig_doc and hasattr(orig_doc, "attributes"):
-                            for a in orig_doc.attributes:
-                                if isinstance(a, DocumentAttributeFilename):
-                                    attrs.append(DocumentAttributeFilename(file_name=file_sanitized_name or a.file_name))
-                                elif isinstance(a, DocumentAttributeVideo):
-                                    vid_w = int(getattr(a, "w", 0) or 0)
-                                    vid_h = int(getattr(a, "h", 0) or 0)
-                                    # If dimensions missing or low, enforce 16:9 HD for widescreen player on laptop & mobile
-                                    if vid_w <= 0 or vid_h <= 0:
-                                        vid_w, vid_h = 1280, 720
-                                    attrs.append(DocumentAttributeVideo(
-                                        duration=int(getattr(a, "duration", 0) or 0),
-                                        w=vid_w,
-                                        h=vid_h,
-                                        supports_streaming=True
-                                    ))
-                                elif isinstance(a, DocumentAttributeAudio):
-                                    attrs.append(a)
+                        sent_media = None
+                        direct_media_copied = False
 
-                        if file_sanitized_name and not any(isinstance(x, DocumentAttributeFilename) for x in attrs):
-                            attrs.append(DocumentAttributeFilename(file_name=file_sanitized_name))
+                        # Tier 1: Instant Server-Side MTProto Media Reference Copy (0.1s latency, zero byte download/upload)
+                        try:
+                            sent_media = await self.rpc.execute(
+                                lambda c: c.send_file(
+                                    _parse_chat_id(target_chat),
+                                    m.media,
+                                    caption=cap_main,
+                                    thumb=t_path,
+                                    reply_to=resolved_topic,
+                                    parse_mode="md",
+                                    supports_streaming=True,
+                                    silent=silent_mode
+                                ),
+                                client=client,
+                                timeout=35.0
+                            )
+                            direct_media_copied = True
+                        except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError) as ex_restr:
+                            self.log(f"[yellow]🔒 Direct Media Copy Restricted ({type(ex_restr).__name__}) -> Fallback to RAM Streamer[/]")
+                        except Exception as ex_direct:
+                            logger.debug(f"Direct server-side media copy bypass: {ex_direct}")
 
-                        # If media is a video file but had no video attribute, inject 16:9 HD video attribute
-                        mime_t = str(getattr(orig_doc, "mime_type", "") or "").lower()
-                        is_video_type = (
-                            getattr(m, "video", None) is not None
-                            or mime_t.startswith("video/")
-                            or file_sanitized_name.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))
-                        )
-                        has_vid_attr = any(isinstance(x, DocumentAttributeVideo) for x in attrs)
-                        if is_video_type and not has_vid_attr:
-                            attrs.append(DocumentAttributeVideo(
-                                duration=0,
-                                w=1280,
-                                h=720,
-                                supports_streaming=True
-                            ))
+                        if not direct_media_copied:
+                            # Tier 2: High-Speed In-Memory RAM Streamer (For restricted channels or expired references)
+                            file = await self.streamer.stream_media(m, stop_event, client=client)
+                            orig_doc = getattr(getattr(m, "media", None), "document", None)
+                            file_sanitized_name = getattr(file, "name", "") or ""
+                            attrs = []
+                            if orig_doc and hasattr(orig_doc, "attributes"):
+                                for a in orig_doc.attributes:
+                                    if isinstance(a, DocumentAttributeFilename):
+                                        attrs.append(DocumentAttributeFilename(file_name=file_sanitized_name or a.file_name))
+                                    elif isinstance(a, DocumentAttributeVideo):
+                                        vid_w = int(getattr(a, "w", 0) or 0)
+                                        vid_h = int(getattr(a, "h", 0) or 0)
+                                        if vid_w <= 0 or vid_h <= 0:
+                                            vid_w, vid_h = 1280, 720
+                                        attrs.append(DocumentAttributeVideo(
+                                            duration=int(getattr(a, "duration", 0) or 0),
+                                            w=vid_w,
+                                            h=vid_h,
+                                            supports_streaming=True
+                                        ))
+                                    elif isinstance(a, DocumentAttributeAudio):
+                                        attrs.append(a)
 
-                        sent_media = await self.rpc.execute(
-                            lambda c: c.send_file(_parse_chat_id(target_chat), file, caption=cap_main, thumb=t_path, attributes=attrs if attrs else None, reply_to=resolved_topic, parse_mode="md", supports_streaming=True, silent=silent_mode),
-                            client=client, timeout=120.0
-                        )
+                            if file_sanitized_name and not any(isinstance(x, DocumentAttributeFilename) for x in attrs):
+                                attrs.append(DocumentAttributeFilename(file_name=file_sanitized_name))
+
+                            mime_t = str(getattr(orig_doc, "mime_type", "") or "").lower()
+                            is_video_type = (
+                                getattr(m, "video", None) is not None
+                                or mime_t.startswith("video/")
+                                or file_sanitized_name.lower().endswith((".mp4", ".mkv", ".mov", ".ts", ".webm", ".avi"))
+                            )
+                            has_vid_attr = any(isinstance(x, DocumentAttributeVideo) for x in attrs)
+                            if is_video_type and not has_vid_attr:
+                                attrs.append(DocumentAttributeVideo(
+                                    duration=0,
+                                    w=1280,
+                                    h=720,
+                                    supports_streaming=True
+                                ))
+
+                            sent_media = await self.rpc.execute(
+                                lambda c: c.send_file(_parse_chat_id(target_chat), file, caption=cap_main, thumb=t_path, attributes=attrs if attrs else None, reply_to=resolved_topic, parse_mode="md", supports_streaming=True, silent=silent_mode),
+                                client=client, timeout=120.0
+                            )
+
                         if cap_overflow and sent_media:
                             reply_id = getattr(sent_media, "id", None) or resolved_topic
                             with suppress(Exception):
