@@ -142,30 +142,57 @@ _job_cancel_flags: Dict[int, bool] = {}
 def clean_cloned_caption(raw_text: Optional[str]) -> str:
     """
     Cleans promotional watermarks, third-party handles, promo links,
-    and trailing garbage while preserving educational, clinical, and lecture content.
+    strip_words.txt rules, and adds study signature while preserving educational content.
     """
     if not raw_text:
-        return ""
+        text = ""
+    else:
+        text = raw_text.strip()
     
-    text = raw_text.strip()
-    
-    # 1. Remove third-party @bot and @channel handles (except bot's own brand)
+    # 1. Load dynamic strip_words.txt rules
+    strip_file = ROOT_DIR / "strip_words.txt"
+    if strip_file.exists():
+        try:
+            for line in strip_file.read_text(encoding="utf-8").splitlines():
+                rule = line.strip()
+                if not rule or (rule.startswith("#") and len(rule) > 1 and not rule.startswith("#The")):
+                    continue
+                if "=>" in rule:
+                    old_w, new_w = rule.split("=>", 1)
+                    text = re.sub(re.escape(old_w.strip()), new_w.strip(), text, flags=re.IGNORECASE)
+                elif ":" in rule and not rule.startswith("http"):
+                    old_w, new_w = rule.split(":", 1)
+                    text = re.sub(re.escape(old_w.strip()), new_w.strip(), text, flags=re.IGNORECASE)
+                else:
+                    text = re.sub(re.escape(rule), "", text, flags=re.IGNORECASE)
+        except Exception as ex_strip:
+            logger.debug(f"Strip words load skipped: {ex_strip}")
+
+    # 2. Remove third-party @bot and @channel handles (except bot's own brand)
     text = re.sub(r'(?i)@(?!Kinddoctor4u|KindDoc_bot|Ammitrajput1)[a-zA-Z0-9_]{4,32}\b', '', text)
     
-    # 2. Remove third-party invite/telegram links
+    # 3. Remove third-party invite/telegram links
     text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?:joinchat/|\+)[a-zA-Z0-9_-]+', '', text)
     text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?!c/|KindDoc)[a-zA-Z0-9_]{4,32}(?:/\d+)?', '', text)
     
-    # 3. Remove common watermark brackets & stamps: (SS 6 @AnandxBotss), (_wm), [By @xyz]
+    # 4. Remove common watermark brackets & stamps: (SS 6 @AnandxBotss), (_wm), [By @xyz]
     text = re.sub(r'(?i)\([^\)]*(?:@|bot|share|join|_wm|watermark)[^\)]*\)', '', text)
     text = re.sub(r'(?i)\[[^\]]*(?:@|bot|share|join|_wm|watermark)[^\]]*\]', '', text)
     text = re.sub(r'(?i)\b(?:Uploaded by|Shared by|Join channel|For more lectures|Official channel|Join now)[:\s]+[^\n]*', '', text)
     
-    # 4. Clean up multiple empty lines & whitespace
+    # 5. Clean up multiple empty lines & whitespace
     text = re.sub(r'\n{3,}', '\n\n', text)
-    text = re.sub(r'[ \t]{2,}', ' ', text)
+    text = re.sub(r'[ \t]{2,}', ' ', text).strip()
+
+    # 6. Append Kind Doctor Branding Signature if enabled
+    enable_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
+    if enable_sig and text:
+        branding_sig = "\n\n📚 **Kind Doctor & Team**\n💬 Group Study Help 😉"
+        if "Kind Doctor & Team" not in text:
+            text = text + branding_sig
     
     return text.strip()
+
 
 # ---------------------------------------------------------------------------
 # Target Topic Auto-Creator (Dual MTProto & Bot API)
@@ -319,10 +346,18 @@ class DeepClonerEngine:
                     dest_thread = target_topic_id if target_topic_id > 1 else None
 
                     if msg.media:
+                        thumb_to_attach = None
+                        thumb_mode = os.getenv("THUMB_MODE", "custom").strip().lower()
+                        if thumb_mode == "custom":
+                            for cand in [ROOT_DIR / "tg_thumb_cached.jpg", ROOT_DIR / "assets" / "thumb.jpg", ROOT_DIR / "thumb.jpg"]:
+                                if cand.exists():
+                                    thumb_to_attach = str(cand)
+                                    break
                         await user_client.send_file(
                             tgt_peer,
                             file=msg.media,
                             caption=cleaned_caption,
+                            thumb=thumb_to_attach,
                             reply_to=dest_thread
                         )
                     elif msg.text:
