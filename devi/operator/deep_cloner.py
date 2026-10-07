@@ -18,7 +18,9 @@ from typing import Optional, Dict, List, Tuple
 from contextlib import suppress
 from pathlib import Path
 
+import random
 from telethon import TelegramClient
+from telethon.helpers import generate_random_long
 from telethon.tl.types import InputPeerChannel, MessageActionTopicCreate, MessageActionTopicEdit
 from telethon.tl.functions.messages import GetForumTopicsRequest, CreateForumTopicRequest
 from telethon.errors import FloodWaitError, ChannelPrivateError, ChatAdminRequiredError

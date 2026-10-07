@@ -5272,17 +5272,6 @@ class DeviTelegramBot:
                     tgt_top = int(parts[4]) if len(parts) >= 5 and parts[4].isdigit() else 0
 
                     job_type = "topic" if src_top > 0 else "group"
-                    progress_card = (
-                        f"🚀 <b>Deep Cloner Engine Initiated!</b> 🩺\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"📤 <b>Source Chat:</b> <code>{src_chat_input}</code>\n"
-                        f"📥 <b>Target Chat:</b> <code>{tgt_chat_input}</code>\n"
-                        f"⚙️ <b>Job Mode:</b> <code>{'Specific Topic #' + str(src_top) if job_type == 'topic' else 'Full Forum & All Topics'}</code>\n"
-                        f"🔒 <b>Security:</b> <code>Zero Forward Tags & Strip Words Active</code>\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"⏳ <i>Connecting to MTProto session & discovering topics...</i>"
-                    )
-                    prog_msg_id = await self._send_message(session, chat_id, progress_card, message_thread_id=thread_id)
 
                     job_id = create_clone_job(
                         user_id=admin_id,
@@ -5291,9 +5280,29 @@ class DeviTelegramBot:
                         job_type=job_type,
                         source_topic_id=src_top,
                         target_topic_id=tgt_top,
-                        progress_msg_id=prog_msg_id or 0,
+                        progress_msg_id=0,
                         progress_chat_id=chat_id
                     )
+
+                    progress_card = (
+                        f"🚀 <b>Deep Cloner Engine Initiated (Job #{job_id})!</b> 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"📤 <b>Source Chat:</b> <code>{src_chat_input}</code>\n"
+                        f"📥 <b>Target Chat:</b> <code>{tgt_chat_input}</code>\n"
+                        f"⚙️ <b>Job Mode:</b> <code>{'Specific Topic #' + str(src_top) if job_type == 'topic' else 'Full Forum & All Topics'}</code>\n"
+                        f"🔒 <b>Security:</b> <code>Zero Forward Tags & Strip Words Active</code>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"⏳ <i>Connecting to MTProto session & discovering topics...</i>\n\n"
+                        f"🎮 <b>Helpful Commands (Click to use):</b>\n"
+                        f"• /clonestatus — <i>Check real-time progress</i>\n"
+                        f"• /stopclone {job_id} — <i>Cancel this clone job</i>\n"
+                        f"• /pauseclone {job_id} — <i>Pause cloning</i>\n"
+                        f"• /clonejobs — <i>List all active & historical jobs</i>\n"
+                        f"• /viewthumb — <i>Preview 16:9 cover thumbnail</i>\n"
+                        f"• /setthumb — <i>Upload custom cover thumbnail</i>\n"
+                        f"• /fullhelp — <i>Complete command manual</i>"
+                    )
+                    prog_msg_id = await self._send_message(session, chat_id, progress_card, message_thread_id=thread_id)
 
                     engine = DeepClonerEngine(self.token)
 
@@ -5827,6 +5836,14 @@ class DeviTelegramBot:
                     f"  Current: <i>{html.escape(j['current_topic_title'] or 'Processing...')}</i>\n"
                     f"  Stop: <code>/stopclone {j['id']}</code>\n"
                 )
+            lines.append(
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🎮 <b>Quick Actions:</b>\n"
+                "• /clonestatus — <i>Refresh active progress</i>\n"
+                "• /clonejobs — <i>List all active/queued jobs</i>\n"
+                "• /viewthumb — <i>Preview 16:9 cover thumbnail</i>\n"
+                "• /fullhelp — <i>Complete command guide</i>"
+            )
             await self._send_message(session, chat_id, "\n".join(lines), message_thread_id=thread_id)
 
         elif cmd in ("/stopclone", "/cancelclone", "/pauseclone"):
