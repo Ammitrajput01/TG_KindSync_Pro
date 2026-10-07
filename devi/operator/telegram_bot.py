@@ -238,6 +238,17 @@ class DeviTelegramBot:
                         SELECT topic_id FROM telegram_group_topics WHERE chat_id = telegram_topic_items.chat_id
                     )
                 """)
+                # Deduplicate topic items by (chat_id, topic_id, msg_id/custom_link/title)
+                conn.execute("""
+                    DELETE FROM telegram_topic_items 
+                    WHERE id NOT IN (
+                        SELECT MIN(id) FROM telegram_topic_items 
+                        GROUP BY chat_id, topic_id, COALESCE(msg_id, custom_link, title)
+                    )
+                """)
+                conn.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_items_chat_topic_msg ON telegram_topic_items(chat_id, topic_id, msg_id) WHERE msg_id IS NOT NULL
+                """)
                 # Rose Style Group Notes Table
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS telegram_group_notes (
@@ -1146,8 +1157,23 @@ class DeviTelegramBot:
             logger.warning(f"Error saving topic item: {e}")
             return 0
 
+    def _clean_topic_item_title(self, raw_title: str) -> str:
+        """Strips third-party bot handles (@AnandxBotss), promo watermarks, file extensions, and unclosed brackets."""
+        if not raw_title:
+            return "Lecture Material"
+        t = str(raw_title).strip()
+        for ext in [".mp4", ".pdf", ".mkv", ".m4a", ".mp3", ".avi", ".epub", ".docx", ".zip", ".rar"]:
+            t = t.replace(ext, "").replace(ext.upper(), "")
+        t = re.sub(r'(?i)@\w+', '', t)
+        t = re.sub(r'(?i)[\(\[\{][^\)\]\}]*(?:ss\s*\d+|_?wm|@\w+|anand|bot|doc|prep|marrow|dams|medlive)[^\)\]\}]*[\)\]\}]?', '', t)
+        t = re.sub(r'(?i)\b(?:_wm|wm|ss\s*\d+(?:\.\d+)?)\b', '', t)
+        t = re.sub(r'[\(\[\{]\s*[\)\]\}]', '', t)
+        t = re.sub(r'[\(\[\{]\s*$', '', t)
+        t = re.sub(r'\s+', ' ', t).strip(' .-_()[]')
+        return t or "Lecture Material"
+
     def _get_topic_items(self, chat_id: int, topic_id: int, sort_mode: str = "seq") -> list:
-        """Retrieves all items under a specific topic. sort_mode: 'seq' (natural numeric) or 'az' (alphabetical)."""
+        """Retrieves all deduplicated and cleaned items under a specific topic."""
         try:
             with get_db_conn() as conn:
                 conn.row_factory = sqlite3.Row
@@ -1155,7 +1181,23 @@ class DeviTelegramBot:
                     "SELECT id, title, msg_id, custom_link, icon FROM telegram_topic_items WHERE chat_id = ? AND topic_id = ? ORDER BY id ASC",
                     (chat_id, topic_id)
                 ).fetchall()
-                items = [dict(r) for r in rows]
+                raw_items = [dict(r) for r in rows]
+                
+                # Strict in-memory deduplication by (msg_id or custom_link or clean_title)
+                seen = set()
+                items = []
+                for itm in raw_items:
+                    m_id = itm.get("msg_id")
+                    c_link = itm.get("custom_link")
+                    title_raw = str(itm.get("title") or "").strip()
+                    clean_t = self._clean_topic_item_title(title_raw)
+                    itm["title"] = clean_t
+                    
+                    dedup_key = f"m:{m_id}" if m_id else (f"l:{c_link}" if c_link else f"t:{clean_t.lower()}")
+                    if dedup_key not in seen:
+                        seen.add(dedup_key)
+                        items.append(itm)
+
                 if sort_mode == "az" and items:
                     items.sort(key=lambda x: self._clean_sort_key(x.get("title", "")))
                 elif sort_mode == "seq" and items:

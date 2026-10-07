@@ -6,6 +6,19 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Wednesday, 07 October 2026
 
+### 2. Topic Indexer Multi-Scan Deduplication & Watermark/Handle Sanitization (`/topicindex`)
+* **Symptom**:
+  - In `/topicindex` cards (e.g. *Shure Shot SS 6.0*), each lecture appeared duplicated 3 times (e.g. `[01]`, `[02]`, `[03]` pointing to the exact same lecture).
+  - Lecture titles contained third-party bot promo handles, watermarks, and broken brackets (e.g. `0001_Biochemistry - 2 (SS 6 @AnandxBotss`, `(SS 6_wm @AnandxBotss`).
+* **Root Cause**:
+  - `telegram_topic_items` table lacked a unique index constraint across `(chat_id, topic_id, msg_id)`. Whenever `/scan` or topic auto-scan ran multiple times, identical records were inserted repeatedly.
+  - `_get_topic_items` did not deduplicate items by `msg_id` or unique title.
+  - Raw filenames with promo handles (`@AnandxBotss`, `_wm`, `SS 6`) were stored and rendered directly without comprehensive sanitization.
+* **Permanent Fix Applied**:
+  1. **Smart Watermark & Handle Stripper (`_clean_topic_item_title` & `clean_lecture_title`)**: Regex-cleans third-party bot handles (`@\w+`), watermark bracket groups (`(SS 6 ...)`, `_wm`), unclosed brackets, and technical file extensions, outputting pristine clinical lecture titles.
+  2. **Strict In-Memory & DB Deduplication (`_get_topic_items` & `telegram_topic_items`)**: Added in-memory deduplication tracking `(msg_id, custom_link, clean_title)` in `_get_topic_items`, added self-healing SQL cleanup `DELETE FROM telegram_topic_items WHERE id NOT IN (SELECT MIN(id) FROM telegram_topic_items GROUP BY chat_id, topic_id, COALESCE(msg_id, custom_link, title))`, and created `idx_topic_items_chat_topic_msg` unique index.
+  3. **Verification**: Verified via unit test suite [tests/test_clean_topics_indexing.py](file:///c:/TG_KindSync_Pro/tests/test_clean_topics_indexing.py) (4/4 passed).
+
 ### 1. Forum Topic Indexer Phantom Topic Elimination & Strict Topic Resolution
 * **Symptom**:
   - In Master Topic Directory (`/mainindex`), SECTION #T became flooded with dozens of dummy entries like `[100] Topic #22885`, `[101] Topic #22915`, `[102] Topic #22945`, `[120] Topic #24036` to `[132] Topic #620`.

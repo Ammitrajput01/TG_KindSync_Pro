@@ -75,8 +75,7 @@ def init_tables(conn: sqlite3.Connection):
             title TEXT,
             item_type TEXT DEFAULT 'video',
             icon TEXT DEFAULT '🎬',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(chat_id, topic_id, msg_id)
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.execute("""
@@ -91,7 +90,40 @@ def init_tables(conn: sqlite3.Connection):
             SELECT topic_id FROM telegram_group_topics WHERE chat_id = telegram_topic_items.chat_id
         )
     """)
+    # Deduplicate topic items by (chat_id, topic_id, msg_id/custom_link/title)
+    conn.execute("""
+        DELETE FROM telegram_topic_items 
+        WHERE id NOT IN (
+            SELECT MIN(id) FROM telegram_topic_items 
+            GROUP BY chat_id, topic_id, COALESCE(msg_id, custom_link, title)
+        )
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_items_chat_topic_msg ON telegram_topic_items(chat_id, topic_id, msg_id) WHERE msg_id IS NOT NULL
+    """)
     conn.commit()
+
+def clean_lecture_title(raw_title: str) -> str:
+    """Strips third-party bot handles (@AnandxBotss), promo watermarks, file extensions, and unclosed brackets."""
+    if not raw_title:
+        return "Lecture Material"
+    t = str(raw_title).strip()
+    # Strip file extensions
+    for ext in [".mp4", ".pdf", ".mkv", ".m4a", ".mp3", ".avi", ".epub", ".docx", ".zip", ".rar"]:
+        t = t.replace(ext, "").replace(ext.upper(), "")
+    # Strip @usernames / bot handles
+    t = re.sub(r'(?i)@\w+', '', t)
+    # Strip watermark bracket blocks like (SS 6_wm ...), [SS 6 ...], (wm @...), etc.
+    t = re.sub(r'(?i)[\(\[\{][^\)\]\}]*(?:ss\s*\d+|_?wm|@\w+|anand|bot|doc|prep|marrow|dams|medlive)[^\)\]\}]*[\)\]\}]?', '', t)
+    # Strip isolated watermark tokens
+    t = re.sub(r'(?i)\b(?:_wm|wm|ss\s*\d+(?:\.\d+)?)\b', '', t)
+    # Strip empty brackets
+    t = re.sub(r'[\(\[\{]\s*[\)\]\}]', '', t)
+    # Strip trailing unclosed opening brackets
+    t = re.sub(r'[\(\[\{]\s*$', '', t)
+    # Normalize whitespace and strip edge symbols
+    t = re.sub(r'\s+', ' ', t).strip(' .-_()[]')
+    return t or "Lecture Material"
 
 async def get_authorized_client(preferred_user_id: Optional[int] = None):
     """Finds first available authorized user session via lock-free StringSession, linked sessions, or fallback."""
@@ -191,10 +223,7 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
                                     item_type = "note"
 
                         if title:
-                            clean = title
-                            for ext in [".mp4", ".pdf", ".mkv", ".m4a", ".mp3", ".avi", ".epub"]:
-                                clean = clean.replace(ext, "").replace(ext.upper(), "")
-                            clean = clean.strip()
+                            clean = clean_lecture_title(title)
                             if any(m in clean.lower() for m in BOT_IGNORE_MARKERS):
                                 continue
                             if clean:
@@ -202,7 +231,7 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
                                     INSERT OR REPLACE INTO telegram_topic_items 
                                     (chat_id, topic_id, msg_id, title, icon, item_type)
                                     VALUES (?, ?, ?, ?, ?, ?)
-                                """, (target_chat_id, topic_id, msg.id, clean[:100], icon, item_type))
+                                """, (target_chat_id, topic_id, msg.id, clean[:120], icon, item_type))
                                 topic_items_count += 1
                                 if topic_items_count % 50 == 0:
                                     conn.commit()
@@ -341,10 +370,7 @@ async def harvest_all_messages(client, peer, target_chat_id: int) -> int:
                         item_type = "note"
 
             if title:
-                clean = title
-                for ext in [".mp4", ".pdf", ".mkv", ".m4a", ".mp3", ".avi", ".epub"]:
-                    clean = clean.replace(ext, "").replace(ext.upper(), "")
-                clean = clean.strip()
+                clean = clean_lecture_title(title)
                 if any(m in clean.lower() for m in BOT_IGNORE_MARKERS):
                     continue
                 if clean:
@@ -362,7 +388,7 @@ async def harvest_all_messages(client, peer, target_chat_id: int) -> int:
                     if not msg_topic_id or msg_topic_id not in known_topics:
                         msg_topic_id = 1
 
-                    batch_items.append((target_chat_id, msg_topic_id, msg.id, clean[:100], icon, item_type))
+                    batch_items.append((target_chat_id, msg_topic_id, msg.id, clean[:120], icon, item_type))
                     harvested_count += 1
                     
                     if len(batch_items) >= 50:

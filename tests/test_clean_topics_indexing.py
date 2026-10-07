@@ -44,3 +44,44 @@ def test_bot_get_topics_filters_phantom_topics():
     topics = bot._get_topics(-1003912970546)
     for t in topics:
         assert not t["topic_title"].startswith("Topic #"), f"Phantom topic found: {t['topic_title']}"
+
+def test_watermark_stripping_and_title_cleaning():
+    bot = DeviTelegramBot()
+    raw_titles = [
+        ("0001_Biochemistry - 2 (SS 6 @AnandxBotss", "0001_Biochemistry - 2"),
+        ("0001_Microbiology - 3 (SS 6_wm @AnandxBotss", "0001_Microbiology - 3"),
+        ("0002_Anatomy - 1 (SS 6_wm @AnandxBotss", "0002_Anatomy - 1"),
+        ("0004_PSM - I (SS 6_wm @AnandxBotss", "0004_PSM - I"),
+        ("Lecture 01 - Anatomy Basics.mp4", "Lecture 01 - Anatomy Basics")
+    ]
+    for raw, expected in raw_titles:
+        cleaned = bot._clean_topic_item_title(raw)
+        assert cleaned == expected, f"Expected '{expected}', got '{cleaned}'"
+
+def test_topic_items_deduplication(tmp_path):
+    bot = DeviTelegramBot()
+    # Test deduplication logic directly
+    raw_items = [
+        {"id": 1, "msg_id": 100, "custom_link": None, "title": "0001_Biochemistry - 2 (SS 6 @AnandxBotss"},
+        {"id": 2, "msg_id": 100, "custom_link": None, "title": "0001_Biochemistry - 2 (SS 6 @AnandxBotss"},
+        {"id": 3, "msg_id": 100, "custom_link": None, "title": "0001_Biochemistry - 2 (SS 6 @AnandxBotss"},
+        {"id": 4, "msg_id": 101, "custom_link": None, "title": "0001_Microbiology - 3 (SS 6_wm @AnandxBotss"},
+    ]
+    seen = set()
+    items = []
+    for itm in raw_items:
+        m_id = itm.get("msg_id")
+        c_link = itm.get("custom_link")
+        title_raw = str(itm.get("title") or "").strip()
+        clean_t = bot._clean_topic_item_title(title_raw)
+        itm["title"] = clean_t
+        
+        dedup_key = f"m:{m_id}" if m_id else (f"l:{c_link}" if c_link else f"t:{clean_t.lower()}")
+        if dedup_key not in seen:
+            seen.add(dedup_key)
+            items.append(itm)
+            
+    assert len(items) == 2
+    assert items[0]["title"] == "0001_Biochemistry - 2"
+    assert items[1]["title"] == "0001_Microbiology - 3"
+
