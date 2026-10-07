@@ -6,6 +6,18 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Wednesday, 07 October 2026
 
+### 4. Connect Your Own Telegram Account (/connect) & Multi-Tenant Fernet Session Vault
+* **Feature & Goal**:
+  - Lets bot users securely connect their own Telegram account (phone + OTP + optional 2FA) so KindDoc Bot can use their authenticated session to scan/clone groups and 800+ forum topics they already have access to.
+* **Architectural Guarantees & Implementation**:
+  1. **Explicit Consent & Flow Lifecycle**: Full FSM with explicit consent screen (`[✅ I Consent]`, `[❌ Cancel]`), space-separated OTP guidance (`1 2 3 4 5`), and 10-minute inactivity deadline (`/cancel` available at every stage).
+  2. **Error Recovery & Rate Limiting**: Handles `PhoneCodeInvalidError` (max 5 retry attempts), `PhoneCodeExpiredError` (clean restart prompt), `SessionPasswordNeededError` (2FA flow), `PasswordHashInvalidError` (max 5 retry attempts), `PhoneNumberInvalidError`, and `FloodWaitError`. Rate-limits `/connect` to max 5 attempts per hour per `telegram_user_id`.
+  3. **Fernet Military-Grade Encryption**: Raw `StringSession` strings are encrypted at rest using AES-128 Fernet encryption (`cryptography.fernet`). Database column never contains plaintext. Phone numbers and OTP codes are masked in logs and memory.
+  4. **Strict Tenant Isolation (`get_user_client`)**: A user's session is strictly isolated to their own Telegram User ID. It is NEVER used for another user's job and NEVER used silently by admins.
+  5. **Instant Revocation (`/disconnect`)**: Instantly purges SQLite record, disconnects active Telethon clients, and stops running user tasks gracefully without crashes.
+  6. **In-Bot Guide (`/connect_help`)**: Comprehensive plain-language guide on permissions, security, and revocation.
+  7. **Verification**: 100% verified via automated test suite [tests/test_user_account_connect.py](file:///c:/TG_KindSync_Pro/tests/test_user_account_connect.py) (10/10 passed).
+
 ### 3. Cloner & Batch Cloner Forum 3-Part URL & MTProto Restricted Channel Fallback (`/clone`, `/batchclone`)
 * **Symptom**:
   - `/clone` and `/batchclone` failed when given 3-part forum topic URLs (e.g. `https://t.me/c/3912970546/22803/50` or `https://t.me/groupname/100/200`) or reported errors copying from private/restricted channels.

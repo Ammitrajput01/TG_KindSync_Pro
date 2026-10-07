@@ -4,20 +4,25 @@
 """
 Kind Doctor Universal Telethon Session Vault
 Provides lock-free, concurrent MTProto access across multiple background daemons
-using in-memory StringSession architecture to completely prevent SQLite database locks.
+using in-memory StringSession architecture and Fernet-encrypted multi-tenant storage.
 """
 
 import os
 import sys
 import asyncio
 import shutil
+import sqlite3
+import logging
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, List
 from contextlib import suppress
 from dotenv import load_dotenv, set_key
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+from cryptography.fernet import Fernet
+
+logger = logging.getLogger("SessionVault")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(ROOT_DIR / ".env")
@@ -27,6 +32,62 @@ API_HASH = os.getenv("API_HASH", "fef19b9b1434a3e66b009fd31053200b").strip()
 BOT_TOKEN = os.getenv("DEVI_TELEGRAM_BOT_TOKEN", "").strip().strip("'").strip('"')
 
 SESSION_STRING_FILE = ROOT_DIR / "data" / "session_string.txt"
+DB_PATH = ROOT_DIR / "history_core.sqlite"
+
+# In-memory registry of active user clients and running jobs for graceful cancellation upon disconnect
+_active_user_clients: Dict[int, List[TelegramClient]] = {}
+_running_user_jobs: Dict[int, List[asyncio.Task]] = {}
+
+# ---------------------------------------------------------------------------
+# Fernet Encryption & Key Management
+# ---------------------------------------------------------------------------
+
+def get_fernet_cipher() -> Fernet:
+    """Retrieves or auto-generates a persistent Fernet encryption key from .env."""
+    key = os.getenv("FERNET_KEY") or os.getenv("ENCRYPTION_KEY")
+    if not key or len(key.strip()) < 32:
+        key = Fernet.generate_key().decode("utf-8")
+        env_path = ROOT_DIR / ".env"
+        if env_path.exists():
+            with suppress(Exception):
+                set_key(str(env_path), "FERNET_KEY", key)
+        os.environ["FERNET_KEY"] = key
+    else:
+        key = key.strip()
+    return Fernet(key.encode("utf-8") if isinstance(key, str) else key)
+
+def encrypt_session_string(raw_session: str) -> str:
+    """Encrypts raw StringSession to Fernet ciphertext token."""
+    if not raw_session:
+        return ""
+    cipher = get_fernet_cipher()
+    return cipher.encrypt(raw_session.strip().encode("utf-8")).decode("utf-8")
+
+def decrypt_session_string(encrypted_token: str) -> Optional[str]:
+    """Decrypts Fernet ciphertext token back to raw StringSession."""
+    if not encrypted_token:
+        return None
+    try:
+        cipher = get_fernet_cipher()
+        return cipher.decrypt(encrypted_token.strip().encode("utf-8")).decode("utf-8")
+    except Exception:
+        # Fallback for legacy unencrypted session strings if any exist
+        if len(encrypted_token) > 50 and not encrypted_token.startswith("gAAAAA"):
+            return encrypted_token.strip()
+        return None
+
+def mask_phone_number(phone: str) -> str:
+    """Masks phone number for safe logging (e.g. +91*****3210)."""
+    if not phone:
+        return "***"
+    phone_clean = phone.strip()
+    if len(phone_clean) >= 8:
+        return f"{phone_clean[:3]}*****{phone_clean[-4:]}"
+    return "***"
+
+# ---------------------------------------------------------------------------
+# Global Master Session Management
+# ---------------------------------------------------------------------------
 
 def get_persisted_session_string() -> Optional[str]:
     """Retrieves cached StringSession from environment or data directory."""
@@ -80,7 +141,7 @@ async def export_session_file_to_string(session_file_path: Path) -> Optional[str
             return s_str
         await client.disconnect()
     except Exception as e:
-        print(f"[!] Session Vault export error: {e}")
+        logger.warning(f"[!] Session Vault export error: {e}")
     finally:
         with suppress(Exception):
             temp_sess.unlink(missing_ok=True)
@@ -88,11 +149,12 @@ async def export_session_file_to_string(session_file_path: Path) -> Optional[str
                 (ROOT_DIR / f"{temp_stem}.session{ext}").unlink(missing_ok=True)
     return None
 
-import sqlite3
-
-DB_PATH = ROOT_DIR / "history_core.sqlite"
+# ---------------------------------------------------------------------------
+# Multi-Tenant SQLite Database Storage (Encrypted at Rest)
+# ---------------------------------------------------------------------------
 
 def init_linked_sessions_table():
+    """Initializes the multi-tenant encrypted session table with full schema migrations."""
     try:
         with sqlite3.connect(DB_PATH, timeout=30.0) as conn:
             conn.execute("""
@@ -103,94 +165,151 @@ def init_linked_sessions_table():
                     username TEXT,
                     session_string TEXT,
                     is_active INTEGER DEFAULT 1,
+                    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            # Schema self-healing for legacy tables missing connected_at
+            try:
+                conn.execute("ALTER TABLE telegram_linked_sessions ADD COLUMN connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            except Exception:
+                pass
             conn.commit()
     except Exception as e:
-        print(f"[!] Warning initializing telegram_linked_sessions: {e}")
+        logger.warning(f"[!] Warning initializing telegram_linked_sessions: {e}")
 
 init_linked_sessions_table()
 
 def get_user_linked_session(user_id: int) -> Optional[str]:
-    """Retrieves active StringSession for a specific Telegram User ID."""
+    """Retrieves and decrypts active StringSession strictly for a specific Telegram User ID."""
     try:
         with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
             row = conn.execute(
                 "SELECT session_string FROM telegram_linked_sessions WHERE user_id = ? AND is_active = 1", 
                 (user_id,)
             ).fetchone()
-            if row and row[0] and len(row[0]) > 50:
-                return row[0].strip()
-    except Exception:
-        pass
+            if row and row[0]:
+                return decrypt_session_string(row[0])
+    except Exception as e:
+        logger.error(f"[!] Error retrieving linked session for user {user_id}: {e}")
     return None
 
 def save_linked_user_session(user_id: int, phone: str, session_str: str, name: str = "", username: str = "") -> bool:
-    """Saves or updates linked user session in SQLite database."""
+    """Encrypts with Fernet and saves linked user session in SQLite database."""
     if not session_str or len(session_str) < 50:
         return False
     try:
+        encrypted_token = encrypt_session_string(session_str)
         with sqlite3.connect(DB_PATH, timeout=30.0) as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO telegram_linked_sessions 
-                (user_id, phone_number, account_name, username, session_string, is_active, updated_at)
-                VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-            """, (user_id, phone.strip(), name.strip(), username.strip(), session_str.strip()))
+                (user_id, phone_number, account_name, username, session_string, is_active, connected_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (user_id, phone.strip(), name.strip(), username.strip(), encrypted_token))
             conn.commit()
+            logger.info(f"✅ Securely saved encrypted session for user {user_id} ({mask_phone_number(phone)})")
             return True
     except Exception as e:
-        print(f"[!] Error saving linked session for {user_id}: {e}")
+        logger.error(f"[!] Error saving encrypted session for {user_id}: {e}")
         return False
 
 def delete_linked_user_session(user_id: int) -> bool:
-    """Deletes or unlinks user session from database."""
+    """
+    Deletes user session from database, disconnects any active clients,
+    and cancels running jobs gracefully.
+    """
+    # 1. Disconnect active Telethon client instances for this user
+    active_clients = _active_user_clients.pop(user_id, [])
+    for c in active_clients:
+        if c.is_connected():
+            with suppress(Exception):
+                asyncio.create_task(c.disconnect())
+
+    # 2. Stop running jobs for this user gracefully
+    running_tasks = _running_user_jobs.pop(user_id, [])
+    for task in running_tasks:
+        if not task.done():
+            task.cancel()
+
+    # 3. Remove row from database
     try:
         with sqlite3.connect(DB_PATH, timeout=30.0) as conn:
             conn.execute("DELETE FROM telegram_linked_sessions WHERE user_id = ?", (user_id,))
             conn.commit()
+            logger.info(f"🗑️ Successfully deleted session and disconnected client for user {user_id}")
             return True
     except Exception as e:
-        print(f"[!] Error unlinking session for {user_id}: {e}")
+        logger.error(f"[!] Error unlinking session for {user_id}: {e}")
         return False
 
+def register_user_job_task(user_id: int, task: asyncio.Task):
+    """Registers a background scan/clone task for graceful lifecycle management."""
+    if user_id not in _running_user_jobs:
+        _running_user_jobs[user_id] = []
+    _running_user_jobs[user_id].append(task)
+
 def get_all_active_linked_sessions() -> list:
-    """Returns all active linked user sessions."""
+    """Returns all active linked user sessions (metadata only, session decrypted on demand)."""
     try:
         with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
-                "SELECT user_id, phone_number, account_name, username, session_string FROM telegram_linked_sessions WHERE is_active = 1"
+                "SELECT user_id, phone_number, account_name, username, connected_at FROM telegram_linked_sessions WHERE is_active = 1"
             ).fetchall()
             return [dict(r) for r in rows]
     except Exception:
         return []
 
+# ---------------------------------------------------------------------------
+# Strict Isolation Telethon Client Builder
+# ---------------------------------------------------------------------------
+
+async def get_user_client(telegram_user_id: int) -> Optional[TelegramClient]:
+    """
+    Builds and returns an authorized Telethon client STRICTLY AND ONLY for the specified telegram_user_id.
+    
+    ISOLATION GUARANTEE:
+    - Never falls back to another user's session.
+    - Never allows another user or admin to borrow this session.
+    - If unauthorized or expired, marks is_active = 0.
+    """
+    s_user = get_user_linked_session(telegram_user_id)
+    if not s_user:
+        return None
+
+    try:
+        c = TelegramClient(StringSession(s_user), API_ID, API_HASH)
+        await c.connect()
+        if await c.is_user_authorized():
+            # Track active client for lifecycle management
+            if telegram_user_id not in _active_user_clients:
+                _active_user_clients[telegram_user_id] = []
+            _active_user_clients[telegram_user_id].append(c)
+            return c
+        await c.disconnect()
+        # Mark inactive if revoked in Telegram app
+        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+            conn.execute("UPDATE telegram_linked_sessions SET is_active = 0 WHERE user_id = ?", (telegram_user_id,))
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"Error connecting isolated user client for {telegram_user_id}: {e}")
+    return None
+
 async def get_vault_client_for_target(preferred_user_id: Optional[int] = None) -> Tuple[TelegramClient, str]:
     """
-    Intelligently resolves the best available authorized MTProto Client.
-    Prioritizes:
-    1. Specifically requested user's linked session.
-    2. Any active linked user sessions from community admins.
-    3. Global Master StringSession.
-    4. Disk candidate sessions.
-    5. Bot token fallback.
+    Resolves an authorized MTProto Client.
+    - If preferred_user_id is provided, strictly checks that user's linked account.
+    - If preferred_user_id is None or failed, falls back ONLY to global system Master Session or Bot Token.
+    - NEVER cross-shares arbitrary third-party user sessions.
     """
-    # 1. Check preferred user's linked session
+    # 1. Check preferred user's isolated session
     if preferred_user_id:
-        s_user = get_user_linked_session(preferred_user_id)
-        if s_user:
-            try:
-                c = TelegramClient(StringSession(s_user), API_ID, API_HASH)
-                await c.connect()
-                if await c.is_user_authorized():
-                    return c, "user"
-                await c.disconnect()
-            except Exception as e:
-                print(f"[!] Preferred user session connect warning: {e}")
+        user_c = await get_user_client(preferred_user_id)
+        if user_c:
+            return user_c, "user"
 
-    # 2. Check global Master StringSession
+    # 2. Check global System Master StringSession
     s_str = get_persisted_session_string()
     if s_str:
         try:
@@ -200,23 +319,9 @@ async def get_vault_client_for_target(preferred_user_id: Optional[int] = None) -
                 return client, "user"
             await client.disconnect()
         except Exception as e:
-            print(f"[!] StringSession connect warning: {e}")
+            logger.warning(f"[!] Master StringSession connect warning: {e}")
 
-    # 3. Check any other active linked user sessions
-    all_linked = get_all_active_linked_sessions()
-    for item in all_linked:
-        ls_str = item.get("session_string")
-        if ls_str:
-            try:
-                c = TelegramClient(StringSession(ls_str), API_ID, API_HASH)
-                await c.connect()
-                if await c.is_user_authorized():
-                    return c, "user"
-                await c.disconnect()
-            except Exception:
-                pass
-
-    # 4. Extract from candidate session files on disk
+    # 3. Extract from candidate system session files on disk
     candidate_sessions = [
         "session_forwarder",
         "session_scanner",
@@ -237,8 +342,7 @@ async def get_vault_client_for_target(preferred_user_id: Optional[int] = None) -
                 except Exception:
                     pass
 
-    # 5. Fallback to Bot Token
-    print("[*] Initializing lock-free Bot Token Client...")
+    # 4. Fallback to Bot Token Client
     bot_client = TelegramClient(StringSession(), API_ID, API_HASH)
     await bot_client.start(bot_token=BOT_TOKEN)
     return bot_client, "bot"
