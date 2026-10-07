@@ -1832,8 +1832,9 @@ class DeviTelegramBot:
                     await self._send_message(session, m_id, admin_alert)
 
                 # Send Automatic Welcome & Setup Guide directly into the new group
+                cur_uname = self.bot_username or "KindDoc_bot"
                 welcome_group_card = (
-                    f"🎉 **Kind Doctor Bot (@KindDoc_bot) Successfully Activated!** 🩺\n"
+                    f"🎉 **Kind Doctor Bot (@{cur_uname}) Successfully Activated!** 🩺\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"Namaste! **{title}** me study tools aur smart bot features activate ho chuke hain:\n\n"
                     f"📑 **`/mainindex`** — Master Topic Directory (#A to #Z)\n"

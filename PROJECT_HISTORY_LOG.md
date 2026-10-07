@@ -6,6 +6,15 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 3. Bot Activation Welcome Card Handle Dynamic Resolution (`@KindDoc_bot`)
+* **Symptom**:
+  - In group activation cards ("*Kind Doctor Bot Successfully Activated!*"), the username appeared as `@KindDocbot` (missing underscore).
+* **Root Cause**:
+  - A static typo string existed in `_handle_my_chat_member` before dynamic username resolution.
+* **Permanent Fix Applied**:
+  - Dynamically bound `self.bot_username or 'KindDoc_bot'` in `welcome_group_card` to ensure 100% precision with the official `@KindDoc_bot` Telegram handle.
+* **Verification**: Verified via test suite and `py_compile`.
+
 ### 2. Cloner Suite Rich Examples & Bracketed Link Guidance Card Upgrade (`/clonegroup`, `/clonetopic`, `/batchclone`, `/clone`)
 * **Feature & Goal**:
   - Enhanced all cloner command guidance cards (`/clone`, `/batchclone`, `/clonegroup`, `/clonetopic`, `/fullhelp`) with crystal-clear bracketed parameter explanations (`[Source Group Link]`, `[Target Group Link]`, `[Source Topic Link]`, `[Target Topic Name]`, `[Start Msg Link]`, `[End Msg Link]`), distinct use-cases, and multi-format examples for private supergroups, public channels, forum topics, and numeric IDs.
