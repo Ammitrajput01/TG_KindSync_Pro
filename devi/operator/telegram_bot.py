@@ -101,6 +101,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/scan", "/autoindex", "/start", "/menu", "/fullhelp", "/manual",
     "/support", "/contact", "/id", "/myid", "/info",
     "/connect", "/linkaccount", "/connectaccount", "/login", "/connect_help", "/linkhelp", "/myaccount", "/accountinfo", "/unlinkaccount", "/disconnect", "/logout",
+    "/clone", "/batchclone", "/clonegroup", "/cloneall", "/deepclone", "/clonetopic", "/clonejobs", "/clonestatus", "/stopclone", "/pauseclone",
     "/stats", "/leaderboard", "/topmembers", "/history", "/rules",
     "/userinfo", "/whois", "/botinfo", "/about",
     "/engine", "/status", "/backup", "/clean", "/cleanbot", "/sangmata",
@@ -5092,6 +5093,224 @@ class DeviTelegramBot:
                 f"🎉 **Batch Clone Completed!**\n\n• Successfully Cloned: `{cloned_count}` / `{total_range}` items\n• Forward Tags: ❌ Removed (Clean Posts) ✨",
                 message_thread_id=thread_id
             )
+
+        elif cmd in ("/clonegroup", "/cloneall", "/deepclone", "/mirror"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Group Admin rights required.", message_thread_id=thread_id)
+                return
+
+            if len(parts) < 2:
+                guide = (
+                    "🚀 <b>Deep Group Cloner & Topic Mirror Suite (200k+ Msgs & 2k+ Topics):</b>\n\n"
+                    "Usage: <code>/clonegroup &lt;source_group_link_or_id&gt;</code>\n\n"
+                    "<b>Features:</b>\n"
+                    "• 📂 <b>Auto Topic Creation:</b> Target group me saare topics automatically create honge.\n"
+                    "• 🏷️ <b>Zero Forward Tags:</b> Clean original posts format me mirror hoga.\n"
+                    "• 🧼 <b>Watermark Sanitization:</b> Third-party bot handles & promo text automatically stripped.\n"
+                    "• ♾️ <b>Massive Scale:</b> 200,000+ messages aur 2,000+ topics bina crash ke stream honge.\n\n"
+                    "<b>Examples:</b>\n"
+                    "• <code>/clonegroup https://t.me/c/3912970546</code>\n"
+                    "• <code>/clonegroup @medical_study_hub</code>\n"
+                    "• <code>/clonegroup -1001234567890</code>"
+                )
+                await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
+                return
+
+            src_arg = parts[1].strip()
+            src_chat = None
+            m_priv = re.search(r't\.me/c/(\d+)', src_arg)
+            m_pub = re.search(r't\.me/([a-zA-Z0-9_]+)', src_arg)
+            if m_priv:
+                src_chat = int(f"-100{m_priv.group(1)}")
+            elif m_pub:
+                src_chat = f"@{m_pub.group(1)}"
+            elif src_arg.lstrip("-").isdigit():
+                src_chat = int(src_arg)
+            else:
+                src_chat = f"@{src_arg.lstrip('@')}"
+
+            from devi.operator.deep_cloner import DeepClonerEngine, create_clone_job, _job_cancel_flags
+            cloner = DeepClonerEngine(bot_token=self.token)
+
+            init_msg = await self._send_message(
+                session, chat_id,
+                f"⏳ <b>Initializing Deep Group Clone...</b>\n\n"
+                f"• <b>Source:</b> <code>{src_chat}</code>\n"
+                f"• <b>Target:</b> <code>{target_chat_id}</code>\n"
+                f"• <b>Status:</b> Discovering topics & authenticating MTProto vault...",
+                message_thread_id=thread_id
+            )
+
+            job_id = create_clone_job(
+                user_id=admin_id,
+                source_chat=str(src_chat),
+                target_chat=str(target_chat_id),
+                job_type="group",
+                progress_msg_id=init_msg or 0,
+                progress_chat_id=chat_id
+            )
+            _job_cancel_flags[job_id] = False
+
+            async def _live_progress_updater(text_card: str):
+                if init_msg:
+                    await self._edit_message(session, chat_id, init_msg, text_card)
+                else:
+                    await self._send_message(session, chat_id, text_card, message_thread_id=thread_id)
+
+            # Spawn as tracked async background task
+            self.create_tracked_task(
+                cloner.clone_entire_group(
+                    job_id=job_id,
+                    user_id=admin_id,
+                    source_chat_id=src_chat,
+                    target_chat_id=target_chat_id,
+                    progress_updater=_live_progress_updater
+                ),
+                name=f"deep_clone_group_{job_id}"
+            )
+
+        elif cmd == "/clonetopic":
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Group Admin rights required.", message_thread_id=thread_id)
+                return
+
+            if len(parts) < 2:
+                guide = (
+                    "📂 <b>Clone Single Full Topic (Massive Lectures & Media):</b>\n\n"
+                    "Usage: <code>/clonetopic &lt;source_topic_link&gt; [target_topic_name]</code>\n\n"
+                    "<b>Examples:</b>\n"
+                    "• <code>/clonetopic https://t.me/c/3912970546/22803</code>\n"
+                    "• <code>/clonetopic https://t.me/c/3912970546/22803 Pathology 2.0</code>"
+                )
+                await self._send_message(session, chat_id, guide, message_thread_id=thread_id)
+                return
+
+            src_link = parts[1].strip()
+            custom_title = " ".join(parts[2:]).strip() if len(parts) > 2 else ""
+
+            m_priv = re.search(r't\.me/c/(\d+)(?:/(\d+))?', src_link)
+            m_pub = re.search(r't\.me/([a-zA-Z0-9_]+)(?:/(\d+))?', src_link)
+
+            src_chat = None
+            src_topic = 1
+
+            if m_priv:
+                src_chat = int(f"-100{m_priv.group(1)}")
+                src_topic = int(m_priv.group(2)) if m_priv.group(2) else 1
+            elif m_pub:
+                src_chat = f"@{m_pub.group(1)}"
+                src_topic = int(m_pub.group(2)) if m_pub.group(2) else 1
+
+            if not src_chat:
+                await self._send_message(session, chat_id, "⚠️ Invalid topic link format.", message_thread_id=thread_id)
+                return
+
+            from devi.operator.session_vault import get_vault_client_for_target
+            from devi.operator.deep_cloner import DeepClonerEngine, get_or_create_target_topic, create_clone_job, _job_cancel_flags
+
+            cloner = DeepClonerEngine(bot_token=self.token)
+            user_client, _ = await get_vault_client_for_target(preferred_user_id=admin_id)
+
+            if not user_client:
+                await self._send_message(session, chat_id, "⚠️ No MTProto session found. Please run <code>/connect</code> in bot DM first!", message_thread_id=thread_id)
+                return
+
+            tgt_topic_id = thread_id or 0
+            topic_name = custom_title or f"Cloned Topic #{src_topic}"
+
+            if not tgt_topic_id or custom_title:
+                tgt_topic_id = await get_or_create_target_topic(self.token, user_client, target_chat_id, topic_name)
+
+            init_msg = await self._send_message(
+                session, chat_id,
+                f"⏳ <b>Starting Deep Topic Clone...</b>\n\n"
+                f"• <b>Source Topic:</b> <code>{src_chat}</code> (Topic #{src_topic})\n"
+                f"• <b>Target Topic:</b> <code>{target_chat_id}</code> (Topic #{tgt_topic_id})\n"
+                f"• <b>Status:</b> Streaming all messages chronologically with zero forward tags...",
+                message_thread_id=thread_id
+            )
+
+            job_id = create_clone_job(
+                user_id=admin_id,
+                source_chat=str(src_chat),
+                target_chat=str(target_chat_id),
+                job_type="topic",
+                source_topic_id=src_topic,
+                target_topic_id=tgt_topic_id,
+                progress_msg_id=init_msg or 0,
+                progress_chat_id=chat_id
+            )
+            _job_cancel_flags[job_id] = False
+
+            async def _single_topic_prog_cb(top_name, cur_m, tot_m, cloned_m):
+                if init_msg:
+                    pct = round((cur_m / max(1, tot_m)) * 100, 1)
+                    await self._edit_message(
+                        session, chat_id, init_msg,
+                        f"⏳ <b>Topic Clone in Progress (Job #{job_id})</b>\n\n"
+                        f"• <b>Topic:</b> <b>{html.escape(topic_name)}</b>\n"
+                        f"• <b>Processed:</b> <code>{cur_m}</code> / <code>{tot_m}</code> ({pct}%)\n"
+                        f"• <b>Cloned:</b> <code>{cloned_m}</code> items 🚀\n"
+                        f"• <b>Tags:</b> ❌ Removed | ✨ Clean Media"
+                    )
+
+            async def _run_topic_job():
+                c_count, t_count = await cloner.clone_topic_stream(
+                    job_id=job_id,
+                    user_client=user_client,
+                    source_chat_id=src_chat,
+                    source_topic_id=src_topic,
+                    target_chat_id=target_chat_id,
+                    target_topic_id=tgt_topic_id,
+                    topic_title=topic_name,
+                    progress_callback=_single_topic_prog_cb
+                )
+                if init_msg:
+                    await self._edit_message(
+                        session, chat_id, init_msg,
+                        f"🎉 <b>Topic Clone Completed! (Job #{job_id})</b> 🚀\n\n"
+                        f"• <b>Topic:</b> <b>{html.escape(topic_name)}</b>\n"
+                        f"• <b>Cloned:</b> <code>{c_count}</code> / <code>{t_count}</code> messages\n"
+                        f"• <b>Forward Tags:</b> ❌ Completely Removed\n"
+                        f"• <b>Status:</b> 🟢 Ready in Destination Topic!"
+                    )
+
+            self.create_tracked_task(_run_topic_job(), name=f"clone_topic_{job_id}")
+
+        elif cmd in ("/clonejobs", "/clonestatus"):
+            from devi.operator.deep_cloner import get_active_clone_jobs
+            jobs = get_active_clone_jobs(user_id=admin_id if not self.is_admin(admin_id) else None)
+            if not jobs:
+                await self._send_message(session, chat_id, "ℹ️ No active clone jobs running currently.\n\nUse <code>/clonegroup</code> or <code>/clonetopic</code> to start a job!", message_thread_id=thread_id)
+                return
+
+            lines = ["📋 <b>Active Deep Clone Jobs:</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+            for j in jobs[:8]:
+                lines.append(
+                    f"• <b>Job #{j['id']}</b> ({j['job_type'].upper()}): "
+                    f"<code>{j['status'].upper()}</code>\n"
+                    f"  Source: <code>{j['source_chat']}</code> ➔ Target: <code>{j['target_chat']}</code>\n"
+                    f"  Topics: <code>{j['completed_topics']}/{j['total_topics']}</code> | "
+                    f"Msgs: <code>{j['cloned_messages']}</code> cloned\n"
+                    f"  Current: <i>{html.escape(j['current_topic_title'] or 'Processing...')}</i>\n"
+                    f"  Stop: <code>/stopclone {j['id']}</code>\n"
+                )
+            await self._send_message(session, chat_id, "\n".join(lines), message_thread_id=thread_id)
+
+        elif cmd in ("/stopclone", "/cancelclone", "/pauseclone"):
+            if len(parts) < 2 or not parts[1].isdigit():
+                await self._send_message(session, chat_id, "Usage: <code>/stopclone &lt;job_id&gt;</code>\n\nCheck active IDs with <code>/clonejobs</code>", message_thread_id=thread_id)
+                return
+
+            target_job_id = int(parts[1])
+            from devi.operator.deep_cloner import _job_cancel_flags, update_clone_job_progress
+            _job_cancel_flags[target_job_id] = True
+            update_clone_job_progress(target_job_id, status="stopped", error_msg="Stopped by admin command")
+            await self._send_message(session, chat_id, f"🛑 <b>Clone Job #{target_job_id} has been signalled to STOP.</b>", message_thread_id=thread_id)
 
         elif cmd in ("/send", "/pm", "/msg", "/sendlink", "/reply", "/say", "/dr"):
             # 1. Admin speaking through bot in Group or DM: /say <msg> or /dr <msg>
