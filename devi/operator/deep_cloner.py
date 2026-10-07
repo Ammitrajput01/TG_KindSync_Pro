@@ -250,11 +250,13 @@ async def get_or_create_target_topic(
     # Method 2: Create via User MTProto Client fallback
     if user_client:
         try:
-            target_peer = await user_client.get_input_entity(target_chat_id)
+            from telethon.helpers import generate_random_long
+            target_peer = await _safe_resolve_entity(user_client, target_chat_id)
             res = await user_client(CreateForumTopicRequest(
-                channel=target_peer,
+                peer=target_peer,
                 title=clean_title,
-                icon_color=icon_color
+                icon_color=icon_color,
+                random_id=generate_random_long()
             ))
             # Extract topic_id from created action message
             created_msg_id = getattr(res, 'id', None) or getattr(res, 'pts', None) or 1
@@ -331,85 +333,80 @@ class DeepClonerEngine:
             return 0, 0
 
 
-        # Collect all message IDs for reverse chronological stream
-        # source_topic_id == 0 means root/general chat or regular channel
+        total_count = 0
+        cloned_count = 0
+        last_progress_time = asyncio.get_event_loop().time()
         reply_to_filter = source_topic_id if source_topic_id > 1 else None
 
-        messages_to_clone = []
         try:
             async for msg in user_client.iter_messages(src_peer, reply_to=reply_to_filter, reverse=True):
                 if _job_cancel_flags.get(job_id):
+                    logger.info(f"🛑 Job #{job_id} cancelled by user.")
                     break
                 if getattr(msg, 'action', None):
                     # Skip service messages (topic creation, pinned notifications)
                     continue
                 if not (msg.text or msg.media):
                     continue
-                messages_to_clone.append(msg)
+
+                total_count += 1
+                success = False
+                for retry in range(3):
+                    try:
+                        cleaned_caption = clean_cloned_caption(msg.text or "")
+                        dest_thread = target_topic_id if target_topic_id > 1 else None
+
+                        if msg.media:
+                            thumb_to_attach = None
+                            thumb_mode = os.getenv("THUMB_MODE", "custom").strip().lower()
+                            if thumb_mode == "custom":
+                                for cand in [ROOT_DIR / "tg_thumb_cached.jpg", ROOT_DIR / "assets" / "thumb.jpg", ROOT_DIR / "thumb.jpg"]:
+                                    if cand.exists():
+                                        thumb_to_attach = str(cand)
+                                        break
+                            await user_client.send_file(
+                                tgt_peer,
+                                file=msg.media,
+                                caption=cleaned_caption,
+                                thumb=thumb_to_attach,
+                                reply_to=dest_thread
+                            )
+                        elif msg.text:
+                            await user_client.send_message(
+                                tgt_peer,
+                                cleaned_caption,
+                                reply_to=dest_thread
+                            )
+                        
+                        cloned_count += 1
+                        success = True
+                        break
+                    except FloodWaitError as fe:
+                        logger.warning(f"⏳ FloodWait encountered: Sleeping {fe.seconds + 2}s")
+                        await asyncio.sleep(fe.seconds + 2)
+                    except Exception as ex_send:
+                        logger.warning(f"Error copying message #{msg.id} (attempt {retry+1}): {ex_send}")
+                        await asyncio.sleep(0.5)
+
+                if success:
+                    # Update SQLite progress checkpoint every 10 items
+                    if cloned_count % 10 == 0:
+                        update_clone_job_progress(job_id, cloned_inc=10, last_msg_id=msg.id)
+
+                    # Send real-time telemetry callback
+                    now_t = asyncio.get_event_loop().time()
+                    if progress_callback and (cloned_count % 5 == 0 or now_t - last_progress_time > 3.0):
+                        with suppress(Exception):
+                            await progress_callback(topic_title, cloned_count, total_count, cloned_count)
+                        last_progress_time = now_t
+
+                await asyncio.sleep(0.12)
+
         except Exception as ex_fetch:
             logger.error(f"Error iterating messages for topic {source_topic_id}: {ex_fetch}")
 
-        total_count = len(messages_to_clone)
-        last_progress_time = asyncio.get_event_loop().time()
-
-        for idx, msg in enumerate(messages_to_clone, start=1):
-            if _job_cancel_flags.get(job_id):
-                logger.info(f"🛑 Job #{job_id} cancelled by user.")
-                break
-
-            success = False
-            for retry in range(3):
-                try:
-                    cleaned_caption = clean_cloned_caption(msg.text or "")
-                    dest_thread = target_topic_id if target_topic_id > 1 else None
-
-                    if msg.media:
-                        thumb_to_attach = None
-                        thumb_mode = os.getenv("THUMB_MODE", "custom").strip().lower()
-                        if thumb_mode == "custom":
-                            for cand in [ROOT_DIR / "tg_thumb_cached.jpg", ROOT_DIR / "assets" / "thumb.jpg", ROOT_DIR / "thumb.jpg"]:
-                                if cand.exists():
-                                    thumb_to_attach = str(cand)
-                                    break
-                        await user_client.send_file(
-                            tgt_peer,
-                            file=msg.media,
-                            caption=cleaned_caption,
-                            thumb=thumb_to_attach,
-                            reply_to=dest_thread
-                        )
-                    elif msg.text:
-                        await user_client.send_message(
-                            tgt_peer,
-                            cleaned_caption,
-                            reply_to=dest_thread
-                        )
-                    
-                    cloned_count += 1
-                    success = True
-                    break
-                except FloodWaitError as fe:
-                    logger.warning(f"⏳ FloodWait encountered: Sleeping {fe.seconds + 2}s")
-                    await asyncio.sleep(fe.seconds + 2)
-                except Exception as ex_send:
-                    logger.warning(f"Error copying message #{msg.id} (attempt {retry+1}): {ex_send}")
-                    await asyncio.sleep(0.5)
-
-            if success:
-                # Update SQLite progress checkpoint every 10 items
-                if idx % 10 == 0:
-                    update_clone_job_progress(job_id, cloned_inc=10, last_msg_id=msg.id)
-
-                # Send real-time telemetry callback
-                now_t = asyncio.get_event_loop().time()
-                if progress_callback and (idx % 15 == 0 or now_t - last_progress_time > 4.0 or idx == total_count):
-                    with suppress(Exception):
-                        await progress_callback(topic_title, idx, total_count, cloned_count)
-                    last_progress_time = now_t
-
-            await asyncio.sleep(0.12)
-
         return cloned_count, total_count
+
 
     async def clone_entire_group(
         self,
@@ -450,8 +447,8 @@ class DeepClonerEngine:
                 break
             try:
                 res = await user_client(GetForumTopicsRequest(
-                    channel=src_peer,
-                    offset_date=offset_date,
+                    peer=src_peer,
+                    offset_date=None,
                     offset_id=offset_id,
                     offset_topic=offset_topic,
                     limit=100
