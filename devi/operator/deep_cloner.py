@@ -380,7 +380,23 @@ class DeepClonerEngine:
                 success = False
                 for retry in range(3):
                     try:
-                        cleaned_caption = clean_cloned_caption(msg.text or "")
+                        orig_filename = getattr(msg.file, 'name', None)
+                        doc_obj = getattr(getattr(msg, 'media', None), 'document', None)
+                        doc_attrs = getattr(doc_obj, 'attributes', None) if doc_obj else None
+                        if not orig_filename and doc_attrs:
+                            for a in doc_attrs:
+                                if hasattr(a, 'file_name') and a.file_name:
+                                    orig_filename = a.file_name
+                                    break
+
+                        raw_text = (msg.text or "").strip()
+                        if not raw_text and orig_filename:
+                            stem = Path(orig_filename).stem.replace("_", " ").replace("-", " ").strip()
+                            raw_text = f"📄 **{stem}**"
+                        elif not raw_text and msg.media:
+                            raw_text = f"📁 **{topic_title}**"
+
+                        cleaned_caption = clean_cloned_caption(raw_text)
                         dest_thread = target_topic_id if target_topic_id > 1 else None
 
                         if msg.media:
@@ -402,18 +418,30 @@ class DeepClonerEngine:
                                 )
                             except Exception as ex_fwd:
                                 if "protected chat" in str(ex_fwd).lower() or "forward" in str(ex_fwd).lower() or "restricted" in str(ex_fwd).lower():
-                                    # Tier 2: Protected Content In-Memory RAM Streamer Fallback
-                                    dl_bytes = await user_client.download_media(msg, file=bytes)
-                                    if dl_bytes:
-                                        await user_client.send_file(
-                                            tgt_peer,
-                                            file=dl_bytes,
-                                            caption=cleaned_caption,
-                                            thumb=thumb_to_attach,
-                                            reply_to=dest_thread
-                                        )
-                                    else:
-                                        raise ex_fwd
+                                    # Tier 2: Protected Content High-Speed Streaming Fallback with Original Filename & Attributes
+                                    import tempfile
+                                    safe_name = orig_filename or f"study_material_{msg.id}.pdf"
+                                    temp_dir = Path(tempfile.gettempdir()) / "kindsync_clone_cache"
+                                    temp_dir.mkdir(parents=True, exist_ok=True)
+                                    tmp_path = temp_dir / safe_name
+
+                                    try:
+                                        dl_res = await user_client.download_media(msg, file=str(tmp_path))
+                                        if dl_res and Path(dl_res).exists():
+                                            await user_client.send_file(
+                                                tgt_peer,
+                                                file=str(dl_res),
+                                                caption=cleaned_caption,
+                                                thumb=thumb_to_attach,
+                                                attributes=doc_attrs,
+                                                reply_to=dest_thread
+                                            )
+                                        else:
+                                            raise ex_fwd
+                                    finally:
+                                        with suppress(Exception):
+                                            if tmp_path.exists():
+                                                tmp_path.unlink()
                                 else:
                                     raise ex_fwd
                         elif msg.text:
