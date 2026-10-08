@@ -4,6 +4,24 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 13. In-Bot Auto-Forward Control Hub, Native 1-Click Button UI & Login Panel API Resolution (`devi/operator/telegram_bot.py`)
+* **Symptom & User Feedback**:
+  - User requested native Telegram In-Bot Button Menu & Login Panel (matching `@AUTO_FORWARD_S_bot` luxury UI) to link accounts, manage sources/targets, and toggle sync directly from Telegram chat.
+  - User reported previous account login attempts failed with an API error during code request.
+* **Root Cause**:
+  1. `API_ID` and `API_HASH` were referenced in `telegram_bot.py` during `_handle_account_linking_step` without module-level definition/fallback, throwing a runtime `NameError`.
+  2. No dedicated `/autoforward` / `/forward` / `/fwd` control hub or interactive state machine existed for 1-click Source & Target channel setup inside Telegram chat.
+* **Permanent Fix Applied**:
+  1. **API Credentials Resolution**: Defined robust `API_ID` and `API_HASH` fallbacks at module scope in `telegram_bot.py`.
+  2. **Auto-Forward In-Bot Hub (`/autoforward`, `/forward`, `/fwd`, `/hub`)**: Implemented `_build_autoforward_panel_data` generating dynamic inline keyboards:
+     - `[ 👑 CLAIM VIP / PRO STATUS ]`
+     - `[ 🔑 LOGIN ACCOUNT ]` / `[ 🔄 SWITCH / RE-LOGIN ACCOUNT ]`
+     - `[ 🔗 ADD SOURCE ]` | `[ 📌 ADD TARGET ]`
+     - `[ ❌ UNLINK SOURCE ]` | `[ ❌ UNLINK TARGET ]`
+     - `[ ⚙️ FORWARD SETTINGS ]` | `[ 🚀 START AUTO-SYNC ]`
+  3. **Interactive Channel Setup State Machine**: Added `_handle_fwd_setup_step` with support for forwarded posts, invite links (`t.me/...`), usernames (`@...`), and numerical chat IDs with instant `.env` synchronization.
+* **Verification**: Verified via `py_compile` and full pytest regression suite.
+
 ### 12. Scheduled Morning (9:00 AM) & Night (9:00 PM) Greetings with Autonomous Cloud DB Backups & Mobile Slash Commands (`sentinel_observer.py`, `ai_advisor.py`)
 * **Symptom & User Feedback**:
   - User requested that Devi Ji automatically send a warm **Good Morning briefing at 9:00 AM** and a **Good Night briefing at 9:00 PM** to Saved Messages (`1553619403`), along with daily self-evolution reports and fresh Cloud SQLite database backups.

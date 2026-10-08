@@ -70,6 +70,9 @@ DB_PATH = BASE_PROJECT_DIR / "history_core.sqlite"
 ENV_PATH = BASE_PROJECT_DIR / ".env"
 load_dotenv(ENV_PATH)
 
+API_ID = int(os.getenv("API_ID", "36193727") or 36193727)
+API_HASH = os.getenv("API_HASH", "fef19b9b1434a3e66b009fd31053200b").strip()
+
 def get_db_conn() -> sqlite3.Connection:
     """Thread-safe, locked-resistant SQLite connection with 60s timeout and WAL pragma."""
     conn = sqlite3.connect(DB_PATH, timeout=60.0)
@@ -105,6 +108,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/scan", "/autoindex", "/start", "/menu", "/fullhelp", "/manual",
     "/support", "/contact", "/id", "/myid", "/info",
     "/connect", "/linkaccount", "/connectaccount", "/login", "/connect_help", "/linkhelp", "/myaccount", "/accountinfo", "/unlinkaccount", "/disconnect", "/logout",
+    "/autoforward", "/forward", "/fwd", "/autoforward_hub", "/forwarder", "/hub",
     "/clone", "/batchclone", "/clonegroup", "/cloneall", "/deepclone", "/clonetopic", "/clonejobs", "/clonestatus", "/stopclone", "/pauseclone",
     "/stats", "/leaderboard", "/topmembers", "/history", "/rules",
     "/userinfo", "/whois", "/botinfo", "/about",
@@ -141,6 +145,8 @@ class DeviTelegramBot:
         self.flood_tracker: Dict[int, list] = {}
         # Multi-Tenant User Session Linking State: user_id -> auth state dict
         self.pending_auth: Dict[int, Dict[str, Any]] = {}
+        # Auto-Forward Channel Config State: user_id -> dict(step, chat_id)
+        self.pending_fwd_setup: Dict[int, Dict[str, Any]] = {}
         # Thumbnail Upload State: user_id -> True
         self.pending_thumb_upload: Dict[int, bool] = {}
         # Rate Limiting for /connect: user_id -> list of attempt timestamps within 1 hour
@@ -2086,6 +2092,89 @@ class DeviTelegramBot:
             logger.warning(f"Failed to copy message to {to_chat_id}: {e}")
         return None
 
+    def _build_autoforward_panel_data(self, user_id: int):
+        """Constructs the exact interactive Auto-Forward Hub matching user specifications."""
+        from devi.operator.session_vault import get_user_linked_session, mask_phone_number
+        s_str = get_user_linked_session(user_id)
+        
+        load_dotenv(ENV_PATH, override=True)
+        src_chat = os.getenv("SOURCE_CHAT", "").strip() or "Not Set (None)"
+        tgt_chat = os.getenv("TARGET_CHAT", "").strip() or "Not Set (None)"
+        cur_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
+        cur_direct = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
+        cur_thumb = os.getenv("THUMB_MODE", "custom").strip().lower()
+
+        phone_info = "Connected"
+        account_name = "Telegram User"
+        if s_str:
+            try:
+                with sqlite3.connect(DB_PATH, timeout=10.0) as conn:
+                    conn.row_factory = sqlite3.Row
+                    r = conn.execute("SELECT phone_number, account_name, username FROM telegram_linked_sessions WHERE user_id = ? AND is_active = 1", (user_id,)).fetchone()
+                    if r:
+                        phone_info = mask_phone_number(r["phone_number"] or "")
+                        account_name = r["account_name"] or account_name
+            except Exception:
+                pass
+
+        if not s_str:
+            card_text = (
+                "📌 <b>HOW TO SETUP &amp; USE THIS BOT :-</b> https://t.me/KindDoctor4u\n"
+                "✅ <b>ISKO DEKH LO ISME PURA SETUP BATAYA HAI</b>\n"
+                "🗣️ <b>LOGIN KAISE KARNA HAI WO BATAYA GAYA HAI</b>\n\n"
+                "⚠️ <b>ACCOUNT NOT LOGGED IN</b>\n"
+                "✅ <b>CLICK 🔑 LOGIN ACCOUNT TO LOGIN</b>"
+            )
+            keyboard = {
+                "inline_keyboard": [
+                    [{"text": "👑 CLAIM VIP / PRO STATUS", "callback_data": "act_fwd_vip"}],
+                    [{"text": "🔑 LOGIN ACCOUNT", "callback_data": "act_fwd_login"}],
+                    [
+                        {"text": "🔗 ADD SOURCE", "callback_data": "act_fwd_add_src"},
+                        {"text": "📌 ADD TARGET", "callback_data": "act_fwd_add_tgt"}
+                    ],
+                    [
+                        {"text": "❌ UNLINK SOURCE", "callback_data": "act_fwd_del_src"},
+                        {"text": "❌ UNLINK TARGET", "callback_data": "act_fwd_del_tgt"}
+                    ],
+                    [
+                        {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
+                        {"text": "🚀 START AUTO-SYNC", "callback_data": "act_fwd_start"}
+                    ]
+                ]
+            }
+        else:
+            card_text = (
+                "🩺 <b>KIND DOCTOR AUTO FORWARD HUB PRO</b> 🚀\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✅ <b>ACCOUNT STATUS:</b> <code>LOGGED IN &amp; ACTIVE 🟢</code>\n"
+                f"👤 <b>Account:</b> <b>{html.escape(account_name)}</b> (<code>{phone_info}</code>)\n"
+                f"📤 <b>Active Source:</b> <code>{src_chat}</code>\n"
+                f"📥 <b>Active Target:</b> <code>{tgt_chat}</code>\n"
+                f"⚡ <b>Pipeline:</b> <code>{'⚡ Fast Direct' if cur_direct else '🔄 Stream Engine'}</code> | <b>Branding:</b> <code>{'👑 ON' if cur_sig else '🏷️ OFF'}</code>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🛡️ <i>Ready for Private, VIP, &amp; Protected Channel Sync!</i>"
+            )
+            keyboard = {
+                "inline_keyboard": [
+                    [{"text": "👑 VIP PRO STATUS: ACTIVE 🟢", "callback_data": "act_fwd_vip"}],
+                    [{"text": "🔄 SWITCH / RE-LOGIN ACCOUNT", "callback_data": "act_fwd_login"}],
+                    [
+                        {"text": f"🔗 {'CHANGE' if src_chat != 'Not Set (None)' else 'ADD'} SOURCE", "callback_data": "act_fwd_add_src"},
+                        {"text": f"📌 {'CHANGE' if tgt_chat != 'Not Set (None)' else 'ADD'} TARGET", "callback_data": "act_fwd_add_tgt"}
+                    ],
+                    [
+                        {"text": "❌ UNLINK SOURCE", "callback_data": "act_fwd_del_src"},
+                        {"text": "❌ UNLINK TARGET", "callback_data": "act_fwd_del_tgt"}
+                    ],
+                    [
+                        {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
+                        {"text": "🚀 START AUTO-SYNC", "callback_data": "act_fwd_start"}
+                    ]
+                ]
+            }
+        return card_text, keyboard
+
     async def _handle_callback_query(self, session: aiohttp.ClientSession, cb: dict):
         """Handle inline button clicks from Admins."""
         cb_id = cb.get("id")
@@ -2112,6 +2201,86 @@ class DeviTelegramBot:
             msg_obj = cb.get("message", {})
             thread_id = msg_obj.get("message_thread_id")
             
+            # --- AUTO FORWARD HUB BUTTON ACTIONS ---
+            if action in ("fwd_hub", "fwd_panel"):
+                card_text, kb = self._build_autoforward_panel_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Auto Forward Hub Refreshed ✨"})
+                return
+            elif action == "fwd_vip":
+                vip_info = (
+                    "👑 <b>KIND DOCTOR VIP PRO LIFETIME ACTIVE</b> 🩺\n\n"
+                    "• 🚀 <b>Supersonic MTProto Velocity</b> (Uncapped wire speed)\n"
+                    "• 🔒 <b>Restricted / Protected Content Bypass</b> enabled\n"
+                    "• 📁 <b>Up to 4 GB File Size Support</b> (No 50MB Bot limit)\n"
+                    "• 🏷️ <b>Zero Forward Tag & Custom Signature</b>\n"
+                    "• ♾️ <b>Unlimited Channels & Topics</b>"
+                )
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "👑 VIP PRO STATUS: 100% UNLOCKED & ACTIVE!", "show_alert": True})
+                return
+            elif action == "fwd_login":
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Starting Login Wizard..."})
+                await self._handle_admin_command(session, chat_id, admin_id, "/connect", message=msg_obj)
+                return
+            elif action == "fwd_add_src":
+                self.pending_fwd_setup[admin_id] = {"step": "awaiting_src_input", "chat_id": chat_id}
+                src_prompt = (
+                    "🔗 <b>ADD / SET SOURCE CHANNEL OR GROUP</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Aap niche diye kisi bhi 1 tareeqe se Source Channel specify kar sakte hain:\n\n"
+                    "1️⃣ <b>Forward Post:</b> Source channel ka koi bhi message is chat me <b>Forward</b> kar dein.\n"
+                    "2️⃣ <b>Link Send Karein:</b> Channel ka invite link ya public link send karein (e.g. <code>https://t.me/c/1234567890</code> ya <code>@MySourceChannel</code>).\n"
+                    "3️⃣ <b>Chat ID:</b> Numerical Chat ID send karein (e.g. <code>-1001234567890</code>).\n\n"
+                    "👉 <i>Abhi apna Source input send karein (ya <code>/cancel</code> likhein abort karne ke liye):</i>"
+                )
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Awaiting Source Channel..."})
+                await self._send_message(session, chat_id, src_prompt, message_thread_id=thread_id)
+                return
+            elif action == "fwd_add_tgt":
+                self.pending_fwd_setup[admin_id] = {"step": "awaiting_tgt_input", "chat_id": chat_id}
+                tgt_prompt = (
+                    "📌 <b>ADD / SET TARGET DESTINATION CHANNEL OR GROUP</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Target Channel specify karne ke tareeqe:\n\n"
+                    "1️⃣ <b>Forward Post:</b> Target channel ka koi bhi message yahan <b>Forward</b> kar dein.\n"
+                    "2️⃣ <b>Link Send Karein:</b> <code>https://t.me/c/...</code> ya <code>@MyTargetChannel</code> send karein.\n"
+                    "3️⃣ <b>Chat ID:</b> Numerical Chat ID send karein (e.g. <code>-1001234567890</code>).\n\n"
+                    "👉 <i>Abhi apna Target input send karein (ya <code>/cancel</code> likhein abort karne ke liye):</i>"
+                )
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Awaiting Target Channel..."})
+                await self._send_message(session, chat_id, tgt_prompt, message_thread_id=thread_id)
+                return
+            elif action == "fwd_del_src":
+                set_key(str(ENV_PATH), "SOURCE_CHAT", "")
+                os.environ["SOURCE_CHAT"] = ""
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "❌ Source Channel Unlinked!", "show_alert": False})
+                card_text, kb = self._build_autoforward_panel_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                return
+            elif action == "fwd_del_tgt":
+                set_key(str(ENV_PATH), "TARGET_CHAT", "")
+                os.environ["TARGET_CHAT"] = ""
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "❌ Target Channel Unlinked!", "show_alert": False})
+                card_text, kb = self._build_autoforward_panel_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                return
+            elif action == "fwd_settings":
+                await self._handle_admin_command(session, chat_id, admin_id, "/settings", message=msg_obj)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Opening Forward Settings..."})
+                return
+            elif action == "fwd_start":
+                await self._handle_admin_command(session, chat_id, admin_id, "/resume_engine", message=msg_obj)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "🚀 Forward Engine Active!"})
+                return
+
             if action == "mainindex":
                 target_index_chat = self._resolve_study_group_id(chat_id)
                 cards, reply_markup = self._build_main_index_cards(target_index_chat, sort_mode="az")
@@ -2684,6 +2853,67 @@ class DeviTelegramBot:
 
         return False
 
+    async def _handle_fwd_setup_step(self, session: aiohttp.ClientSession, chat_id: int, user_id: int, text: str, message: dict) -> bool:
+        """Processes interactive Source / Target channel setup via message forwarding or link input."""
+        setup_state = self.pending_fwd_setup.get(user_id)
+        if not setup_state:
+            return False
+
+        clean_txt = (text or "").strip()
+        if clean_txt.lower() in ("/cancel", "cancel", "abort"):
+            self.pending_fwd_setup.pop(user_id, None)
+            await self._send_message(session, chat_id, "❌ **Channel setup cancelled.**")
+            card_text, kb = self._build_autoforward_panel_data(user_id)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+            return True
+
+        step = setup_state.get("step")
+        
+        # Resolve chat ID / username from forwarded post or text
+        resolved_chat = None
+        fwd_chat = message.get("forward_from_chat", {})
+        if fwd_chat and fwd_chat.get("id"):
+            resolved_chat = str(fwd_chat.get("id"))
+        elif message.get("forward_origin", {}).get("chat", {}).get("id"):
+            resolved_chat = str(message["forward_origin"]["chat"]["id"])
+        elif clean_txt:
+            parsed = self._parse_chat_param(clean_txt)
+            resolved_chat = str(parsed) if parsed else clean_txt
+
+        if not resolved_chat:
+            await self._send_message(
+                session, chat_id,
+                "⚠️ **Invalid Channel Input.**\n"
+                "Kripya valid channel link (`https://t.me/...`), username (`@channel`), numerical ID (`-100...`), ya channel ka message forward karein (ya `/cancel` likhein):"
+            )
+            return True
+
+        if step == "awaiting_src_input":
+            set_key(str(ENV_PATH), "SOURCE_CHAT", resolved_chat)
+            os.environ["SOURCE_CHAT"] = resolved_chat
+            self.pending_fwd_setup.pop(user_id, None)
+            await self._send_message(
+                session, chat_id,
+                f"✅ **Source Channel Successfully Set!** 📤\n\n• **Active Source:** <code>{resolved_chat}</code>\n• **Saved to:** <code>.env</code>"
+            )
+            card_text, kb = self._build_autoforward_panel_data(user_id)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+            return True
+
+        elif step == "awaiting_tgt_input":
+            set_key(str(ENV_PATH), "TARGET_CHAT", resolved_chat)
+            os.environ["TARGET_CHAT"] = resolved_chat
+            self.pending_fwd_setup.pop(user_id, None)
+            await self._send_message(
+                session, chat_id,
+                f"✅ **Target Destination Successfully Set!** 📥\n\n• **Active Target:** <code>{resolved_chat}</code>\n• **Saved to:** <code>.env</code>"
+            )
+            card_text, kb = self._build_autoforward_panel_data(user_id)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+            return True
+
+        return False
+
     async def _handle_incoming_message(self, session: aiohttp.ClientSession, message: dict):
         chat = message.get("chat", {})
         chat_type = chat.get("type", "private")
@@ -2703,6 +2933,12 @@ class DeviTelegramBot:
         # Multi-Tenant User Session Linking Flow in Private DM
         if not is_group and sender_id in self.pending_auth:
             handled = await self._handle_account_linking_step(session, chat_id, sender_id, text, message)
+            if handled:
+                return
+
+        # Auto-Forward Channel Config Interceptor in Private DM
+        if not is_group and sender_id in self.pending_fwd_setup:
+            handled = await self._handle_fwd_setup_step(session, chat_id, sender_id, text, message)
             if handled:
                 return
 
@@ -3534,19 +3770,22 @@ class DeviTelegramBot:
                         {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"}
                     ],
                     [
+                        {"text": "🚀 Auto Forward Hub", "callback_data": "act_fwd_hub"},
+                        {"text": "🔑 Connect Account", "callback_data": "act_connect"}
+                    ],
+                    [
                         {"text": "🚀 Deep Cloner Guide", "callback_data": "act_clonehelp"},
                         {"text": "📑 Topic Index Guide", "callback_data": "act_indexhelp"}
                     ],
                     [
                         {"text": "🔄 Cloud Routing Guide", "callback_data": "act_routehelp"},
-                        {"text": "🔑 Connect Account", "callback_data": "act_connect"}
+                        {"text": "🛡️ Admin & Security Guide", "callback_data": "act_adminhelp"}
                     ],
                     [
-                        {"text": "🛡️ Admin & Security Guide", "callback_data": "act_adminhelp"},
-                        {"text": "🩺 Clinical Calculators", "callback_data": "act_calchelp"}
+                        {"text": "🩺 Clinical Calculators", "callback_data": "act_calchelp"},
+                        {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
                     ],
                     [
-                        {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"},
                         {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
                     ]
                 ]
@@ -3865,6 +4104,12 @@ class DeviTelegramBot:
             }
             await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
 
+        # -------------------------------------------------------------
+        # NATIVE AUTO-FORWARD HUB & LOGIN PANEL (Screenshot Mode)
+        # -------------------------------------------------------------
+        elif cmd in ("/autoforward", "/forward", "/fwd", "/autoforward_hub", "/forwarder", "/hub"):
+            card_text, kb = self._build_autoforward_panel_data(admin_id)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id, disable_web_page_preview=True)
 
         # -------------------------------------------------------------
         # USER ACCOUNT LINKING & MTPROTO CONNECT FLOW (/connect)
