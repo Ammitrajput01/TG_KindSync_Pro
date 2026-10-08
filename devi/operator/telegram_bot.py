@@ -5598,20 +5598,30 @@ class DeviTelegramBot:
                     else:
                         async def _run_group():
                             try:
-                                await engine.clone_entire_group(
+                                total_cloned, total_top = await engine.clone_entire_group(
                                     job_id, admin_id, src_chat_input, tgt_chat_input,
                                     progress_updater=_ui_progress
                                 )
-                                await self._send_message(
-                                    session, chat_id,
-                                    f"🎉 <b>Deep Forum Clone Completed (Job #{job_id})!</b> 🚀\n\nAll topics and lectures have been cloned with zero forward tags.",
-                                    message_thread_id=thread_id
-                                )
+                                if total_cloned > 0 or total_top > 0:
+                                    await self._send_message(
+                                        session, chat_id,
+                                        f"🎉 <b>Deep Forum Clone Completed (Job #{job_id})!</b> 🚀\n\n"
+                                        f"• <b>Total Topics:</b> <code>{total_top}</code>\n"
+                                        f"• <b>Total Messages:</b> <code>{total_cloned}</code>\n"
+                                        f"• <b>Status:</b> All lectures cloned with zero forward tags.",
+                                        message_thread_id=thread_id
+                                    )
+                                else:
+                                    await self._send_message(
+                                        session, chat_id,
+                                        f"⚠️ <b>Clone Job #{job_id} Finished:</b> No new messages or topics were cloned from source.",
+                                        message_thread_id=thread_id
+                                    )
                             except Exception as ex_g:
                                 logger.error(f"Group clone error: {ex_g}", exc_info=True)
                                 from devi.operator.deep_cloner import update_clone_job_progress
                                 update_clone_job_progress(job_id, status="failed", error_msg=str(ex_g))
-                                await self._send_message(session, chat_id, f"❌ <b>Group Clone Error:</b> {html.escape(str(ex_g))}", message_thread_id=thread_id)
+                                await self._send_message(session, chat_id, f"❌ <b>Group Clone Error (Job #{job_id}):</b>\n<code>{html.escape(str(ex_g))}</code>", message_thread_id=thread_id)
                         t = asyncio.create_task(_run_group())
                         from devi.operator.session_vault import register_user_job_task
                         register_user_job_task(admin_id, t)

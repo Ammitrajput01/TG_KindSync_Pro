@@ -4,6 +4,18 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Thursday, 08 October 2026
 
+### 14. Restricted Content Deep Clone Premature Completion & MTProto Entity Resolution Fix (`devi/operator/deep_cloner.py`, `devi/operator/telegram_bot.py`)
+* **Symptom & User Feedback**:
+  - Running `/clone -1003504807114 -1004313086843` reported "Completed" immediately in 1 second without actually cloning any messages from the restricted content channel (`The Pirate Bay`, `noforwards=True`).
+* **Root Cause**:
+  1. **Premature Completion Notification**: When `_safe_resolve_entity` failed in `clone_entire_group`, it caught the error, set status to `failed` in DB, and silently returned `None`. In `telegram_bot.py`, `_run_group` blindly sent "Deep Forum Clone Completed!" without checking if any messages or topics were actually transferred.
+  2. **Entity Resolution Cache Cold**: MTProto user client could not resolve input entity for `-1003504807114` because `_safe_resolve_entity` only fetched 100 dialogs via `get_dialogs(limit=100)`. If the channel was beyond 100 dialogs, `get_input_entity` threw `Could not find the input entity for PeerChannel(channel_id=3504807114)`.
+  3. **Restricted Content Copy Fallback**: Forwarding restricted media (`noforwards=True`) directly via `send_file(msg.media)` raised Telegram forwarding restrictions. The Tier 2 streaming fallback now catches all direct forwarding errors and seamlessly downloads media to temp cache and re-uploads as fresh native files.
+* **Permanent Fix Applied**:
+  1. **Full Dialog Scanning & Peer ID Normalization**: Upgraded `_safe_resolve_entity` to scan up to 300+ dialogs via `iter_dialogs()`, matching raw and sanitized channel IDs (`-100...` and short IDs) to reliably warm Telethon's access hash cache.
+  2. **Tier 2 High-Speed Protected Streaming**: Ensured any forward restrictions or errors during direct server-side pointer copy automatically escalate to Tier 2 download-and-reupload pipeline with original filenames and document attributes preserved.
+  3. **Accurate Clone Return Status & Reporting**: `clone_entire_group` now returns `(grand_total_cloned, total_topics)` and raises explicit errors upon missing client/entities. `_run_group` reports exact message counts or warning details to the admin.
+
 ### 13. In-Bot Auto-Forward Control Hub, Native 1-Click Button UI & Login Panel API Resolution (`devi/operator/telegram_bot.py`)
 * **Symptom & User Feedback**:
   - User requested native Telegram In-Bot Button Menu & Login Panel (matching `@AUTO_FORWARD_S_bot` luxury UI) to link accounts, manage sources/targets, and toggle sync directly from Telegram chat.

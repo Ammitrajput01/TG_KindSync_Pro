@@ -363,7 +363,8 @@ async def get_or_create_target_topic(
     return 1
 
 async def _safe_resolve_entity(client: TelegramClient, target):
-    """Safely resolves an input peer entity for an ID or username, with dialog cache population fallback."""
+    """Safely resolves an input peer entity for an ID or username, with full dialog scanning fallback."""
+    # 1. Try direct resolution
     try:
         return await client.get_input_entity(target)
     except Exception:
@@ -372,11 +373,31 @@ async def _safe_resolve_entity(client: TelegramClient, target):
         return await client.get_entity(target)
     except Exception:
         pass
+
+    # Normalize target for dialog search
+    clean_target = None
     try:
-        await client.get_dialogs(limit=100)
-        return await client.get_input_entity(target)
+        if isinstance(target, int):
+            clean_target = target
+        elif isinstance(target, str) and target.lstrip('-').isdigit():
+            clean_target = int(target)
     except Exception:
         pass
+
+    # 2. Search dialogs to populate Telethon session cache
+    try:
+        async for dialog in client.iter_dialogs(limit=300):
+            d_id = dialog.id
+            if d_id == clean_target or d_id == target:
+                return dialog.input_entity
+            if clean_target and abs(clean_target) > 1000000000000:
+                short_id = int(str(abs(clean_target)).replace("100", "", 1))
+                if abs(d_id) == short_id:
+                    return dialog.input_entity
+    except Exception as ex_dlg:
+        logger.warning(f"Dialog search encountered error: {ex_dlg}")
+
+    # 3. Final fallback attempt
     return await client.get_entity(target)
 
 async def resolve_source_topic_title(client: TelegramClient, source_chat, topic_id: int) -> str:
@@ -483,6 +504,7 @@ class DeepClonerEngine:
                                     if cand.exists():
                                         thumb_to_attach = str(cand)
                                         break
+                            tier1_success = False
                             try:
                                 # Tier 1: Instant Server-Side Cloud Pointer Copy (0.15s, 0 bytes bandwidth)
                                 await user_client.send_file(
@@ -492,37 +514,41 @@ class DeepClonerEngine:
                                     thumb=thumb_to_attach,
                                     reply_to=dest_thread
                                 )
+                                tier1_success = True
                             except Exception as ex_fwd:
-                                if "protected chat" in str(ex_fwd).lower() or "forward" in str(ex_fwd).lower() or "restricted" in str(ex_fwd).lower():
-                                    # Tier 2: Protected Content High-Speed Streaming Fallback with Original Filename & Attributes
-                                    import tempfile
-                                    safe_name = orig_filename or f"study_material_{msg.id}.pdf"
-                                    temp_dir = Path(tempfile.gettempdir()) / "kindsync_clone_cache"
-                                    temp_dir.mkdir(parents=True, exist_ok=True)
-                                    tmp_path = temp_dir / safe_name
+                                logger.info(f"Tier 1 copy failed for msg #{msg.id} ({ex_fwd}). Falling back to Tier 2 Protected Content Streamer...")
 
-                                    try:
-                                        dl_res = await user_client.download_media(msg, file=str(tmp_path))
-                                        if dl_res and Path(dl_res).exists():
-                                            if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
-                                                break
-                                            await user_client.send_file(
-                                                tgt_peer,
-                                                file=str(dl_res),
-                                                caption=cleaned_caption,
-                                                thumb=thumb_to_attach,
-                                                attributes=doc_attrs,
-                                                reply_to=dest_thread,
-                                                part_size_kb=512
-                                            )
-                                        else:
-                                            raise ex_fwd
-                                    finally:
-                                        with suppress(Exception):
-                                            if tmp_path.exists():
-                                                tmp_path.unlink()
-                                else:
-                                    raise ex_fwd
+                            if not tier1_success:
+                                # Tier 2: Protected Content High-Speed Streaming Fallback with Original Filename & Attributes
+                                import tempfile
+                                ext = ""
+                                if orig_filename and "." in orig_filename:
+                                    ext = "." + orig_filename.rsplit(".", 1)[-1]
+                                safe_name = orig_filename or f"study_material_{msg.id}{ext or '.bin'}"
+                                temp_dir = Path(tempfile.gettempdir()) / "kindsync_clone_cache"
+                                temp_dir.mkdir(parents=True, exist_ok=True)
+                                tmp_path = temp_dir / safe_name
+
+                                try:
+                                    dl_res = await user_client.download_media(msg, file=str(tmp_path))
+                                    if dl_res and Path(dl_res).exists():
+                                        if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
+                                            break
+                                        await user_client.send_file(
+                                            tgt_peer,
+                                            file=str(dl_res),
+                                            caption=cleaned_caption,
+                                            thumb=thumb_to_attach,
+                                            attributes=doc_attrs,
+                                            reply_to=dest_thread,
+                                            part_size_kb=512
+                                        )
+                                    else:
+                                        raise RuntimeError(f"Download returned empty for msg #{msg.id}")
+                                finally:
+                                    with suppress(Exception):
+                                        if tmp_path.exists():
+                                            tmp_path.unlink()
                         elif msg.text:
                             await user_client.send_message(
                                 tgt_peer,
@@ -577,15 +603,17 @@ class DeepClonerEngine:
         
         user_client, _ = await get_vault_client_for_target(preferred_user_id=user_id)
         if not user_client:
-            update_clone_job_progress(job_id, status="failed", error_msg="No authorized MTProto client available. Use /connect first.")
-            return
+            err = "No authorized MTProto client available. Use /connect first."
+            update_clone_job_progress(job_id, status="failed", error_msg=err)
+            raise RuntimeError(err)
 
         try:
             src_peer = await _safe_resolve_entity(user_client, source_chat_id)
             tgt_peer = await _safe_resolve_entity(user_client, target_chat_id)
         except Exception as e:
-            update_clone_job_progress(job_id, status="failed", error_msg=f"Access denied or invalid group: {e}")
-            return
+            err = f"Access denied or invalid group ({e})"
+            update_clone_job_progress(job_id, status="failed", error_msg=err)
+            raise RuntimeError(err)
 
         # Step 1: Discover All Topics from Source Group
         discovered_topics: List[Tuple[int, str]] = []
@@ -689,3 +717,5 @@ class DeepClonerEngine:
                     f"✨ <b>Promo & Watermarks:</b> 🧼 Pristine Clinical Sanitization\n"
                     f"⚡ <b>Ready:</b> All lectures & media organized in destination group!"
                 )
+
+        return grand_total_cloned, total_topics
