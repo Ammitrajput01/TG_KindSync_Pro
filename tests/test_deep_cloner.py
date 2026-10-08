@@ -99,3 +99,29 @@ def test_clean_cloned_caption_rich_formatting():
     cap3 = clean_cloned_caption("✨ 🩺 OBSTETRICS & GYNAECOLOGY ✨")
     assert cap3 == "✨ 🩺 OBSTETRICS & GYNAECOLOGY ✨"
 
+def test_clone_status_card_and_reset_flow():
+    """Verify _build_clone_status_card_data renders interactive inline keyboards for both empty and active states."""
+    from devi.operator.telegram_bot import DeviTelegramBot
+    bot = DeviTelegramBot()
+
+    # 1. Status with no jobs
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM telegram_clone_jobs WHERE user_id = 999888")
+        conn.commit()
+
+    text_empty, kb_empty = bot._build_clone_status_card_data(admin_id=999888)
+    assert "No active clone jobs running currently" in text_empty
+    assert any("act_cloner_reset" in btn["callback_data"] for row in kb_empty["inline_keyboard"] for btn in row)
+
+    # 2. Status with active jobs
+    job_id = create_clone_job(user_id=999888, source_chat="-1001", target_chat="-1002", job_type="group")
+    text_active, kb_active = bot._build_clone_status_card_data(admin_id=999888)
+    assert f"Job #{job_id}" in text_active
+    assert any("act_cloner_stop_all" in btn["callback_data"] for row in kb_active["inline_keyboard"] for btn in row)
+
+    # Clean up
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM telegram_clone_jobs WHERE user_id = 999888")
+        conn.commit()
+
+

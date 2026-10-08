@@ -29,7 +29,7 @@ import struct
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Set, Dict, Any, Optional
+from typing import Set, Dict, Any, Optional, Tuple, List
 from contextlib import suppress
 
 from dotenv import load_dotenv, set_key
@@ -2175,6 +2175,64 @@ class DeviTelegramBot:
             }
         return card_text, keyboard
 
+    def _build_clone_status_card_data(self, admin_id: int) -> Tuple[str, dict]:
+        """Constructs real-time cloner status card with 1-click Reset, Refresh, and Stop buttons."""
+        from devi.operator.deep_cloner import get_active_clone_jobs
+        jobs = get_active_clone_jobs(user_id=admin_id if not self.is_admin(admin_id) else None)
+        
+        if not jobs:
+            text = (
+                "📋 <b>Kind Doctor Deep Cloner Status:</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "ℹ️ <b>No active clone jobs running currently.</b>\n\n"
+                "🚀 <b>Ready for Deep Forum & Topic Cloning:</b>\n"
+                "• <code>/clone &lt;source_chat&gt; &lt;target_chat&gt;</code>\n"
+                "• <code>/clonegroup &lt;source&gt; &lt;target&gt;</code>\n"
+                "• <code>/clonetopic &lt;source_topic_link&gt;</code>\n\n"
+                "🔒 <i>Restricted / Protected Channels & 4GB files supported with Zero Forward tags.</i>"
+            )
+            keyboard = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🔄 Refresh Status", "callback_data": "act_cloner_refresh"},
+                        {"text": "🧹 Reset Job History (#0)", "callback_data": "act_cloner_reset"}
+                    ],
+                    [
+                        {"text": "🚀 Start New Clone Guide", "callback_data": "act_cloner_help"},
+                        {"text": "🖼️ Cover Thumbnail", "callback_data": "act_cloner_thumb"}
+                    ]
+                ]
+            }
+            return text, keyboard
+
+        lines = ["📋 <b>Active Deep Clone Jobs:</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+        for j in jobs[:8]:
+            lines.append(
+                f"• <b>Job #{j['id']}</b> ({j['job_type'].upper()}): "
+                f"<code>{j['status'].upper()}</code>\n"
+                f"  Source: <code>{j['source_chat']}</code> ➔ Target: <code>{j['target_chat']}</code>\n"
+                f"  Topics: <code>{j['completed_topics']}/{j['total_topics']}</code> | "
+                f"Msgs: <code>{j['cloned_messages']}</code> cloned\n"
+                f"  Current: <i>{html.escape(j['current_topic_title'] or 'Processing...')}</i>\n"
+                f"  Stop: <code>/stopclone {j['id']}</code>\n"
+            )
+        lines.append(
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🎮 <b>1-Click Control Actions:</b>"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "🔄 Refresh Progress", "callback_data": "act_cloner_refresh"},
+                    {"text": "🛑 Stop All Jobs", "callback_data": "act_cloner_stop_all"}
+                ],
+                [
+                    {"text": "🧹 Reset & Clear History", "callback_data": "act_cloner_reset"}
+                ]
+            ]
+        }
+        return "\n".join(lines), keyboard
+
     async def _handle_callback_query(self, session: aiohttp.ClientSession, cb: dict):
         """Handle inline button clicks from Admins."""
         cb_id = cb.get("id")
@@ -2279,6 +2337,107 @@ class DeviTelegramBot:
             elif action == "fwd_start":
                 await self._handle_admin_command(session, chat_id, admin_id, "/resume_engine", message=msg_obj)
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "🚀 Forward Engine Active!"})
+                return
+
+            # --- DEEP CLONER HUB & RESET ACTIONS ---
+            if action == "cloner_refresh":
+                card_text, kb = self._build_clone_status_card_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Cloner Status Refreshed 🔄"})
+                return
+            elif action == "cloner_reset":
+                target_chat_id = self._resolve_study_group_id(chat_id)
+                is_adm = (admin_id in self.master_admin_ids) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message=msg_obj))
+                if not is_adm:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⚠️ Admin Rights Required to Reset Jobs!", "show_alert": True})
+                    return
+                from devi.operator.session_vault import DB_PATH, _running_user_jobs
+                from devi.operator.deep_cloner import _job_cancel_flags
+                _job_cancel_flags[-1] = True
+                for j_id in list(_job_cancel_flags.keys()):
+                    _job_cancel_flags[j_id] = True
+                for uid, tasks in list(_running_user_jobs.items()):
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
+                    _running_user_jobs[uid] = []
+                try:
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                        conn.execute("DELETE FROM telegram_clone_jobs")
+                        with suppress(Exception):
+                            conn.execute("DELETE FROM sqlite_sequence WHERE name='telegram_clone_jobs'")
+                        conn.commit()
+                except Exception as ex_db:
+                    logger.error(f"Reset cloner DB error: {ex_db}")
+
+                reset_msg = (
+                    "🧹 <b>Clone Job History Successfully Reset!</b> ✨\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "• All past, active & stuck clone jobs cleared from database.\n"
+                    "• Job counter has been reset to <b>#0</b>.\n"
+                    "• Next clone job will start fresh as <b>Job #1</b> 🚀\n\n"
+                    "👉 Start a new clone anytime with <code>/clone &lt;source&gt; &lt;target&gt;</code>!"
+                )
+                kb_reset = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "🔄 Refresh Status", "callback_data": "act_cloner_refresh"},
+                            {"text": "🚀 Start New Clone", "callback_data": "act_cloner_help"}
+                        ]
+                    ]
+                }
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, reset_msg, reply_markup=kb_reset, disable_web_page_preview=True)
+                else:
+                    await self._send_message(session, chat_id, reset_msg, reply_markup=kb_reset, disable_web_page_preview=True)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Job history wiped and reset back to #1! 🧹", "show_alert": False})
+                return
+            elif action == "cloner_stop_all":
+                target_chat_id = self._resolve_study_group_id(chat_id)
+                is_adm = (admin_id in self.master_admin_ids) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message=msg_obj))
+                if not is_adm:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⚠️ Admin Rights Required!", "show_alert": True})
+                    return
+                from devi.operator.session_vault import _running_user_jobs
+                from devi.operator.deep_cloner import _job_cancel_flags
+                _job_cancel_flags[-1] = True
+                for uid, tasks in list(_running_user_jobs.items()):
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
+                    _running_user_jobs[uid] = []
+                with suppress(Exception):
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                        conn.execute("UPDATE telegram_clone_jobs SET status = 'stopped', error_msg = 'Stopped by admin' WHERE status IN ('running', 'queued')")
+                        conn.commit()
+                card_text, kb = self._build_clone_status_card_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "🛑 All active clone jobs stopped!"})
+                return
+            elif action == "cloner_help":
+                help_text = (
+                    "🚀 <b>Deep Cloner Command Manual:</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "1️⃣ <b>Full Forum / Group Clone:</b>\n"
+                    "<code>/clone &lt;source_chat&gt; &lt;target_chat&gt;</code>\n"
+                    "<i>Example:</i> <code>/clone -1003504807114 -1004313086843</code>\n\n"
+                    "2️⃣ <b>Specific Topic Clone:</b>\n"
+                    "<code>/clone &lt;source&gt; &lt;target&gt; &lt;src_topic_id&gt; &lt;tgt_topic_id&gt;</code>\n\n"
+                    "3️⃣ <b>Reset & History Controls:</b>\n"
+                    "• <code>/resetjobs</code> — Reset counter back to #1\n"
+                    "• <code>/stopclone &lt;id&gt;</code> — Stop specific job"
+                )
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Showing Clone Manual..."})
+                await self._send_message(session, chat_id, help_text, message_thread_id=thread_id)
+                return
+            elif action == "cloner_thumb":
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Loading thumbnail preview..."})
+                await self._handle_admin_command(session, chat_id, admin_id, "/viewthumb", message=msg_obj)
                 return
 
             if action == "mainindex":
@@ -6085,39 +6244,9 @@ class DeviTelegramBot:
 
             self.create_tracked_task(_run_topic_job(), name=f"clone_topic_{job_id}")
 
-        elif cmd in ("/clonejobs", "/clonestatus"):
-            from devi.operator.deep_cloner import get_active_clone_jobs
-            jobs = get_active_clone_jobs(user_id=admin_id if not self.is_admin(admin_id) else None)
-            if not jobs:
-                await self._send_message(
-                    session, chat_id,
-                    "ℹ️ <b>No active clone jobs running currently.</b>\n\n"
-                    "Use <code>/clonegroup</code> or <code>/clonetopic</code> to start a new deep cloning job!",
-                    message_thread_id=thread_id
-                )
-                return
-
-            lines = ["📋 <b>Active Deep Clone Jobs:</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
-            for j in jobs[:8]:
-                lines.append(
-                    f"• <b>Job #{j['id']}</b> ({j['job_type'].upper()}): "
-                    f"<code>{j['status'].upper()}</code>\n"
-                    f"  Source: <code>{j['source_chat']}</code> ➔ Target: <code>{j['target_chat']}</code>\n"
-                    f"  Topics: <code>{j['completed_topics']}/{j['total_topics']}</code> | "
-                    f"Msgs: <code>{j['cloned_messages']}</code> cloned\n"
-                    f"  Current: <i>{html.escape(j['current_topic_title'] or 'Processing...')}</i>\n"
-                    f"  Stop: <code>/stopclone {j['id']}</code>\n"
-                )
-            lines.append(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                "🎮 <b>Quick Actions:</b>\n"
-                "• /clonestatus — <i>Refresh active progress</i>\n"
-                "• /clonejobs — <i>List all active/queued jobs</i>\n"
-                "• /resetjobs — <i>Reset job history back to #1</i>\n"
-                "• /viewthumb — <i>Preview 16:9 cover thumbnail</i>\n"
-                "• /fullhelp — <i>Complete command guide</i>"
-            )
-            await self._send_message(session, chat_id, "\n".join(lines), message_thread_id=thread_id)
+        elif cmd in ("/clonejobs", "/clonestatus", "/clonereport", "/cloner"):
+            card_text, kb = self._build_clone_status_card_data(admin_id)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True, message_thread_id=thread_id)
 
         elif cmd in ("/stopclone", "/cancelclone", "/pauseclone"):
             target_chat_id = self._resolve_study_group_id(chat_id)
@@ -6147,7 +6276,7 @@ class DeviTelegramBot:
             update_clone_job_progress(target_job_id, status="stopped", error_msg="Stopped by admin command")
             await self._send_message(session, chat_id, f"🛑 <b>Clone Job #{target_job_id} has been signalled to STOP.</b>", message_thread_id=thread_id)
 
-        elif cmd in ("/resetjobs", "/cleanjobs", "/clearjobs", "/resetcloner"):
+        elif cmd in ("/resetjobs", "/cleanjobs", "/clearjobs", "/resetcloner", "/clearhistory", "/resethistory", "/cleanalljobs"):
             target_chat_id = self._resolve_study_group_id(chat_id)
             is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
             if not is_caller_admin:
@@ -6170,15 +6299,24 @@ class DeviTelegramBot:
                     with suppress(Exception):
                         conn.execute("DELETE FROM sqlite_sequence WHERE name='telegram_clone_jobs'")
                     conn.commit()
-                await self._send_message(
-                    session, chat_id,
-                    "🧹 <b>Clone Job History Successfully Reset!</b> ✨\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                
+                reset_msg = (
+                    "🧹 <b>Clone Job History Successfully Reset!</b> ✨\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     "• All past & stuck jobs have been cleared from database.\n"
                     "• Job counter has been reset to <b>#0</b>.\n"
                     "• Next clone job will start fresh as <b>Job #1</b> 🚀\n\n"
-                    "👉 Start a new clone anytime with <code>/clone &lt;source&gt; &lt;target&gt;</code>!",
-                    message_thread_id=thread_id
+                    "👉 Start a new clone anytime with <code>/clone &lt;source&gt; &lt;target&gt;</code>!"
                 )
+                kb_reset = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "🔄 Refresh Status", "callback_data": "act_cloner_refresh"},
+                            {"text": "🚀 Start New Clone", "callback_data": "act_cloner_help"}
+                        ]
+                    ]
+                }
+                await self._send_message(session, chat_id, reset_msg, reply_markup=kb_reset, message_thread_id=thread_id)
             except Exception as ex_rst:
                 await self._send_message(session, chat_id, f"❌ Failed resetting jobs: {ex_rst}", message_thread_id=thread_id)
 

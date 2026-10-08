@@ -2,7 +2,22 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
-## 📅 Log Entry: Thursday, 08 October 2026
+## 📅 Log Entry: Friday, 09 October 2026
+
+### 15. Deep Cloner 1-Click Interactive Status Hub & Job History Reset (`devi/operator/telegram_bot.py`, `devi/operator/deep_cloner.py`)
+* **Symptom & User Feedback**:
+  - User requested interactive reset/clear history options in Telegram bot cloner UI so stuck or old jobs can be cleared easily.
+* **Root Cause**:
+  - `/clonestatus` and `/clonejobs` sent plain static text cards without clickable inline buttons. Users had to manually type text commands like `/resetjobs` or `/stopclone <id>`.
+* **Permanent Fix Applied**:
+  1. **Dynamic Interactive Status UI (`_build_clone_status_card_data`)**: Implemented dynamic inline keyboards for `/clonestatus`, `/clonejobs`, and `/cloner`:
+     - `[ 🔄 Refresh Status / Progress ]`
+     - `[ 🛑 Stop All Active Jobs ]`
+     - `[ 🧹 Reset & Clear History (Back to #1) ]`
+     - `[ 🚀 Start New Clone Guide ]`
+  2. **1-Click History Reset Callback (`act_cloner_reset`)**: Cancels all running asyncio cloner tasks, wipes `telegram_clone_jobs` table, resets SQLite autoincrement sequence back to `#0`, and edits card in-place with instant toast notification.
+  3. **Expanded Command Aliases**: Added `/clearhistory`, `/resethistory`, `/cleanalljobs`, `/resetjobs`, `/clearjobs`, `/cleanjobs`, `/resetcloner`.
+  4. **Pagination Loop Guard in Topic Discovery**: Added advance guard in `GetForumTopicsRequest` pagination to guarantee zero stalling during forum scans.
 
 ### 14. Restricted Content Deep Clone Premature Completion & MTProto Entity Resolution Fix (`devi/operator/deep_cloner.py`, `devi/operator/telegram_bot.py`)
 * **Symptom & User Feedback**:

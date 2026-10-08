@@ -632,7 +632,7 @@ class DeepClonerEngine:
                     offset_topic=offset_topic,
                     limit=100
                 ))
-                if not getattr(res, 'topics', None):
+                if not getattr(res, 'topics', None) or len(res.topics) == 0:
                     break
                 for t in res.topics:
                     t_id = getattr(t, 'id', None)
@@ -642,9 +642,10 @@ class DeepClonerEngine:
                 if len(res.topics) < 100:
                     break
                 last_t = res.topics[-1]
+                if offset_topic == last_t.id:
+                    break
                 offset_topic = last_t.id
                 offset_id = getattr(last_t, 'top_message', 0)
-                offset_date = 0
             except Exception as ex_t:
                 logger.warning(f"GetForumTopicsRequest completed or not supported: {ex_t}")
                 break
