@@ -461,7 +461,7 @@ class DeepClonerEngine:
         total_count = 0
         cloned_count = 0
         last_progress_time = asyncio.get_event_loop().time()
-        reply_to_filter = source_topic_id if source_topic_id > 1 else None
+        reply_to_filter = source_topic_id if source_topic_id > 0 else None
 
         try:
             async for msg in user_client.iter_messages(src_peer, reply_to=reply_to_filter, reverse=True):
@@ -529,11 +529,41 @@ class DeepClonerEngine:
                                 temp_dir.mkdir(parents=True, exist_ok=True)
                                 tmp_path = temp_dir / safe_name
 
+                                dl_start_t = asyncio.get_event_loop().time()
+                                last_cb_t = [0.0]
+
+                                def _make_stream_cb(phase_name: str):
+                                    def _inner_cb(cur_b, tot_b):
+                                        n_t = asyncio.get_event_loop().time()
+                                        if n_t - last_cb_t[0] < 2.5 and cur_b < tot_b:
+                                            return
+                                        last_cb_t[0] = n_t
+                                        if progress_callback:
+                                            with suppress(Exception):
+                                                asyncio.create_task(progress_callback(
+                                                    top_name=topic_title,
+                                                    cur_m=cloned_count + 1,
+                                                    tot_m=total_count,
+                                                    top_cloned=cloned_count,
+                                                    file_name=safe_name,
+                                                    cur_bytes=cur_b,
+                                                    tot_bytes=tot_b,
+                                                    phase=phase_name,
+                                                    start_t=dl_start_t
+                                                ))
+                                    return _inner_cb
+
                                 try:
-                                    dl_res = await user_client.download_media(msg, file=str(tmp_path))
+                                    dl_res = await user_client.download_media(
+                                        msg,
+                                        file=str(tmp_path),
+                                        progress_callback=_make_stream_cb("⬇️ Downloading")
+                                    )
                                     if dl_res and Path(dl_res).exists():
                                         if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                                             break
+                                        dl_start_t = asyncio.get_event_loop().time()
+                                        last_cb_t[0] = 0.0
                                         await user_client.send_file(
                                             tgt_peer,
                                             file=str(dl_res),
@@ -541,7 +571,8 @@ class DeepClonerEngine:
                                             thumb=thumb_to_attach,
                                             attributes=doc_attrs,
                                             reply_to=dest_thread,
-                                            part_size_kb=512
+                                            part_size_kb=512,
+                                            progress_callback=_make_stream_cb("⬆️ Uploading")
                                         )
                                     else:
                                         raise RuntimeError(f"Download returned empty for msg #{msg.id}")
@@ -574,7 +605,14 @@ class DeepClonerEngine:
                     now_t = asyncio.get_event_loop().time()
                     if progress_callback and (cloned_count % 2 == 0 or now_t - last_progress_time > 2.0):
                         with suppress(Exception):
-                            await progress_callback(topic_title, cloned_count, total_count, cloned_count)
+                            await progress_callback(
+                                top_name=topic_title,
+                                cur_m=cloned_count,
+                                tot_m=total_count,
+                                top_cloned=cloned_count,
+                                file_name=orig_filename or "Study Message",
+                                phase="✅ Mirrored"
+                            )
                         last_progress_time = now_t
 
                 await asyncio.sleep(0.12)
@@ -676,15 +714,33 @@ class DeepClonerEngine:
             )
 
             # Define topic-level live progress callback
-            async def _topic_prog_cb(top_name, cur_m, tot_m, top_cloned):
+            async def _topic_prog_cb(top_name, cur_m, tot_m, top_cloned, file_name=None, cur_bytes=0, tot_bytes=0, phase="⚡ Processing", start_t=None):
                 if progress_updater:
                     pct = round((cur_m / max(1, tot_m)) * 100, 1)
+                    file_extra = ""
+                    if cur_bytes and tot_bytes and tot_bytes > 0:
+                        file_pct = min(100.0, round((cur_bytes / max(1, tot_bytes)) * 100, 1))
+                        cur_mb = round(cur_bytes / (1024 * 1024), 1)
+                        tot_mb = round(tot_bytes / (1024 * 1024), 1)
+                        elapsed = max(0.1, asyncio.get_event_loop().time() - (start_t or asyncio.get_event_loop().time()))
+                        speed_mb = (cur_bytes / (1024 * 1024)) / elapsed
+                        filled = int(file_pct / 100.0 * 10)
+                        bar = "█" * filled + "░" * (10 - filled)
+                        rem_b = max(0, tot_bytes - cur_bytes)
+                        eta_s = int(rem_b / max(1, (speed_mb * 1024 * 1024))) if speed_mb > 0.05 else 0
+                        eta_txt = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
+                        file_extra = (
+                            f"🎬 <b>File:</b> <code>{html.escape(file_name or 'Lecture Media')}</code>\n"
+                            f"⚡ <b>Activity:</b> <code>{phase} [{bar}] {file_pct}%</code>\n"
+                            f"🚀 <b>Speed:</b> <code>{speed_mb:.1f} MB/s</code> | <b>Size:</b> <code>{cur_mb}/{tot_mb} MB</code> | <b>ETA:</b> <code>{eta_txt}</code>\n"
+                        )
                     await progress_updater(
-                        f"🚀 <b>Deep Group Clone in Progress (Job #{job_id})</b>\n"
+                        f"🚀 <b>Deep Cloner in Progress (Job #{job_id})</b> 🩺\n"
                         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                         f"📂 <b>Topic ({topic_idx}/{total_topics}):</b> <b>{html.escape(src_top_title)}</b>\n"
+                        f"{file_extra}"
                         f"📊 <b>Topic Messages:</b> <code>{cur_m}</code> / <code>{tot_m}</code> ({pct}%)\n"
-                        f"💎 <b>Total Cloned So Far:</b> <code>{grand_total_cloned + top_cloned}</code> items 🚀\n"
+                        f"💎 <b>Total Cloned:</b> <code>{grand_total_cloned + top_cloned}</code> items 🚀\n"
                         f"🛡️ <b>Clean Status:</b> ❌ Zero Tags | ✨ Stripped Watermarks\n\n"
                         f"<i>(Aap jab chahe <code>/stopclone {job_id}</code> bhej kar pause/stop kar sakte hain).</i>"
                     )

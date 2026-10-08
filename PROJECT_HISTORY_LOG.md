@@ -4,6 +4,20 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Friday, 09 October 2026
 
+### 16. Forum Topic Isolation & Live File Transfer Speed / Progress Telemetry (`devi/operator/deep_cloner.py`)
+* **Symptom & User Feedback**:
+  - User reported: (1) Cloner stayed in General and did not proceed to create other forum topics; (2) Telegram UI did not show live transfer progress, download/upload speed (MB/s), or current file status while transferring massive video lectures.
+* **Root Cause**:
+  1. **Topic 1 Filter Collision**: In `clone_topic_stream`, `reply_to_filter = source_topic_id if source_topic_id > 1 else None` caused Topic 1 (`General`) to use `reply_to_filter = None`. In forum supergroups, `reply_to=None` fetches all 100k+ messages across all topics in the entire group, causing cloner to dump everything into General and never complete Topic 1 to move to Topic 2!
+  2. **Silent Background Media Transfers**: 450 MB video downloads and uploads had no sub-message chunk progress callbacks, leaving the Telegram progress card static for 7-8 minutes during file transfer.
+* **Permanent Fix Applied**:
+  1. **Strict Forum Topic Isolation**: Updated `reply_to_filter = source_topic_id if source_topic_id > 0 else None`. For Topic 1 (`General`), `reply_to=1` isolates only General topic messages, completes quickly, and cleanly proceeds to auto-create and clone Topic 2 (`Chat`), Topic 3 (`All Notes`), Topic 4 (`Core BTR`), etc.
+  2. **Live Chunk Telemetry & Progress Bars**: Integrated real-time chunk callbacks in `download_media` and `send_file`, dynamically updating the Telegram card every 2.5s with:
+     - 🎬 **Current File Name & Size** (e.g. `Biochemistry_01.mp4 (454.4 MB)`)
+     - ⚡ **Activity & Progress Bar** (`⬇️ Downloading [██████░░░░] 60%`)
+     - 🚀 **Speed & ETA** (`8.2 MB/s | ETA: 22s`)
+     - 💎 **Total Cloned Counter**
+
 ### 15. Deep Cloner 1-Click Interactive Status Hub & Job History Reset (`devi/operator/telegram_bot.py`, `devi/operator/deep_cloner.py`)
 * **Symptom & User Feedback**:
   - User requested interactive reset/clear history options in Telegram bot cloner UI so stuck or old jobs can be cleared easily.
