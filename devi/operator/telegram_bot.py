@@ -109,7 +109,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/support", "/contact", "/id", "/myid", "/info",
     "/connect", "/linkaccount", "/connectaccount", "/login", "/connect_help", "/linkhelp", "/myaccount", "/accountinfo", "/unlinkaccount", "/disconnect", "/logout",
     "/autoforward", "/forward", "/fwd", "/autoforward_hub", "/forwarder", "/hub",
-    "/clone", "/batchclone", "/clonegroup", "/cloneall", "/deepclone", "/clonetopic", "/clonejobs", "/clonestatus", "/stopclone", "/pauseclone",
+    "/clone", "/batchclone", "/clonegroup", "/cloneall", "/deepclone", "/clonetopic", "/clonejobs", "/clonestatus", "/stopclone", "/pauseclone", "/resumeclone", "/pause", "/resume",
     "/stats", "/leaderboard", "/topmembers", "/history", "/rules",
     "/userinfo", "/whois", "/botinfo", "/about",
     "/engine", "/status", "/backup", "/clean", "/cleanbot", "/sangmata",
@@ -1476,16 +1476,21 @@ class DeviTelegramBot:
             # 1. Official Command Autocomplete List
             commands = [
                 {"command": "menu", "description": "Interactive 1-Click Control Panel"},
+                {"command": "forward", "description": "Forward & Route messages to Topics"},
+                {"command": "pause", "description": "Pause auto-forwarding & live sync"},
+                {"command": "resume", "description": "Resume auto-forwarding & live sync"},
+                {"command": "clonestatus", "description": "Live cloning progress, speed & controls"},
+                {"command": "clone", "description": "1-Click Instant Message Cloner"},
+                {"command": "batchclone", "description": "Batch Clone continuous message ranges"},
+                {"command": "pauseclone", "description": "Pause active deep clone jobs"},
+                {"command": "resumeclone", "description": "Resume paused deep clone jobs"},
+                {"command": "stopclone", "description": "Cancel a running clone job"},
                 {"command": "index", "description": "Topic Table of Contents & Lecture Index"},
                 {"command": "mainindex", "description": "Master Topic Directory (#A to #Z)"},
                 {"command": "find", "description": "Search lectures, notes & topics"},
-                {"command": "clone", "description": "1-Click Instant Message Cloner"},
-                {"command": "batchclone", "description": "Batch Clone continuous message ranges"},
-                {"command": "forward", "description": "Forward & Route messages to Topics"},
                 {"command": "userinfo", "description": "SangMata & Rose style user dossier"},
                 {"command": "cleanwelcome", "description": "Auto-purge welcome & service alerts"},
                 {"command": "cleandeleted", "description": "Purge deleted ghost accounts from group"},
-                {"command": "broadcast", "description": "Broadcast announcement to study groups"},
                 {"command": "status", "description": "Live transmission speed & health telemetry"},
                 {"command": "backup", "description": "Instant SQLite database backup snapshot"},
                 {"command": "manual", "description": "Official 3-Part Command Manual"},
@@ -2144,10 +2149,20 @@ class DeviTelegramBot:
                 ]
             }
         else:
+            ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
+            is_fwd_paused = False
+            if ctrl_p.exists():
+                with suppress(Exception):
+                    with open(ctrl_p, "r", encoding="utf-8") as cf:
+                        is_fwd_paused = json.load(cf).get("paused", False)
+
+            sync_status_badge = "PAUSED ⏸️" if is_fwd_paused else "ACTIVE & SYNCING 🟢"
+            fwd_pause_btn = {"text": "▶️ RESUME AUTO-SYNC", "callback_data": "act_fwd_resume"} if is_fwd_paused else {"text": "⏸️ PAUSE AUTO-SYNC", "callback_data": "act_fwd_pause"}
+
             card_text = (
                 "🩺 <b>KIND DOCTOR AUTO FORWARD HUB PRO</b> 🚀\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"✅ <b>ACCOUNT STATUS:</b> <code>LOGGED IN &amp; ACTIVE 🟢</code>\n"
+                f"✅ <b>ACCOUNT STATUS:</b> <code>LOGGED IN 🟢</code> | <b>SYNC:</b> <code>{sync_status_badge}</code>\n"
                 f"👤 <b>Account:</b> <b>{html.escape(account_name)}</b> (<code>{phone_info}</code>)\n"
                 f"📤 <b>Active Source:</b> <code>{src_chat}</code>\n"
                 f"📥 <b>Active Target:</b> <code>{tgt_chat}</code>\n"
@@ -2169,14 +2184,14 @@ class DeviTelegramBot:
                     ],
                     [
                         {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
-                        {"text": "🚀 START AUTO-SYNC", "callback_data": "act_fwd_start"}
+                        fwd_pause_btn
                     ]
                 ]
             }
         return card_text, keyboard
 
     def _build_clone_status_card_data(self, admin_id: int) -> Tuple[str, dict]:
-        """Constructs real-time cloner status card with 1-click Reset, Refresh, and Stop buttons."""
+        """Constructs real-time cloner status card with 1-click Reset, Refresh, Pause, Resume, and Stop buttons."""
         from devi.operator.deep_cloner import get_active_clone_jobs
         jobs = get_active_clone_jobs(user_id=admin_id if not self.is_admin(admin_id) else None)
         
@@ -2206,10 +2221,12 @@ class DeviTelegramBot:
             return text, keyboard
 
         lines = ["📋 <b>Active Deep Clone Jobs:</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+        any_paused = any(j.get('status') == 'paused' for j in jobs)
         for j in jobs[:8]:
+            status_icon = "⏸️ PAUSED" if j['status'] == 'paused' else f"🟢 {j['status'].upper()}"
             lines.append(
                 f"• <b>Job #{j['id']}</b> ({j['job_type'].upper()}): "
-                f"<code>{j['status'].upper()}</code>\n"
+                f"<code>{status_icon}</code>\n"
                 f"  Source: <code>{j['source_chat']}</code> ➔ Target: <code>{j['target_chat']}</code>\n"
                 f"  Topics: <code>{j['completed_topics']}/{j['total_topics']}</code> | "
                 f"Msgs: <code>{j['cloned_messages']}</code> cloned\n"
@@ -2220,13 +2237,15 @@ class DeviTelegramBot:
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "🎮 <b>1-Click Control Actions:</b>"
         )
+        cloner_pause_btn = {"text": "▶️ Resume All Jobs", "callback_data": "act_cloner_resume_all"} if any_paused else {"text": "⏸️ Pause All Jobs", "callback_data": "act_cloner_pause_all"}
         keyboard = {
             "inline_keyboard": [
                 [
                     {"text": "🔄 Refresh Progress", "callback_data": "act_cloner_refresh"},
-                    {"text": "🛑 Stop All Jobs", "callback_data": "act_cloner_stop_all"}
+                    cloner_pause_btn
                 ],
                 [
+                    {"text": "🛑 Stop All Jobs", "callback_data": "act_cloner_stop_all"},
                     {"text": "🧹 Reset & Clear History", "callback_data": "act_cloner_reset"}
                 ]
             ]
@@ -2334,12 +2353,60 @@ class DeviTelegramBot:
                 await self._handle_admin_command(session, chat_id, admin_id, "/settings", message=msg_obj)
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Opening Forward Settings..."})
                 return
-            elif action == "fwd_start":
-                await self._handle_admin_command(session, chat_id, admin_id, "/resume_engine", message=msg_obj)
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "🚀 Forward Engine Active!"})
+            elif action in ("fwd_start", "fwd_resume"):
+                ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
+                with suppress(Exception):
+                    with open(ctrl_p, "w", encoding="utf-8") as cf:
+                        json.dump({"paused": False, "ts": asyncio.get_event_loop().time(), "by": admin_id}, cf)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "▶️ Auto-Forward Resumed & Active 🟢!"})
+                card_text, kb = self._build_autoforward_panel_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                return
+            elif action == "fwd_pause":
+                ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
+                with suppress(Exception):
+                    with open(ctrl_p, "w", encoding="utf-8") as cf:
+                        json.dump({"paused": True, "ts": asyncio.get_event_loop().time(), "by": admin_id}, cf)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⏸️ Auto-Forward Paused!"})
+                card_text, kb = self._build_autoforward_panel_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
                 return
 
             # --- DEEP CLONER HUB & RESET ACTIONS ---
+            if action == "cloner_pause_all":
+                from devi.operator.deep_cloner import _job_pause_flags
+                _job_pause_flags[-1] = True
+                for j_id in list(_job_pause_flags.keys()):
+                    _job_pause_flags[j_id] = True
+                with suppress(Exception):
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                        conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE status = 'running'")
+                        conn.commit()
+                card_text, kb = self._build_clone_status_card_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⏸️ All clone jobs paused!"})
+                return
+            elif action == "cloner_resume_all":
+                from devi.operator.deep_cloner import _job_pause_flags
+                _job_pause_flags[-1] = False
+                for j_id in list(_job_pause_flags.keys()):
+                    _job_pause_flags[j_id] = False
+                with suppress(Exception):
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                        conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE status = 'paused'")
+                        conn.commit()
+                card_text, kb = self._build_clone_status_card_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "▶️ All clone jobs resumed! 🚀"})
+                return
             if action == "cloner_refresh":
                 card_text, kb = self._build_clone_status_card_data(admin_id)
                 msg_id = msg_obj.get("message_id")
@@ -3891,6 +3958,16 @@ class DeviTelegramBot:
             cur_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
             cur_thumb = os.getenv("THUMB_MODE", "custom").strip().lower()
 
+            ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
+            is_fwd_paused = False
+            if ctrl_p.exists():
+                with suppress(Exception):
+                    with open(ctrl_p, "r", encoding="utf-8") as cf:
+                        is_fwd_paused = json.load(cf).get("paused", False)
+
+            fwd_pause_btn_txt = "▶️ Resume Auto-Forward" if is_fwd_paused else "⏸️ Pause Auto-Forward"
+            fwd_pause_cb = "act_fwd_resume" if is_fwd_paused else "act_fwd_pause"
+
             direct_btn_txt = "⚡ Fast Direct: ON" if cur_direct else "🔄 Stream: Default"
             sig_btn_txt = "👑 Branding: ✅ ON" if cur_sig else "🏷️ Clean Mode: ❌ OFF"
             thumb_btn_txt = "🖼️ Cover: 16:9 HD" if cur_thumb == "custom" else "🎞️ Cover: Original"
@@ -3900,7 +3977,8 @@ class DeviTelegramBot:
                 admin_panel_text = (
                     f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"⚙️ <b>Admin Pipeline Controls:</b>\n"
-                    f"• Forwarding: <code>{'⚡ Fast Direct (0.2s Instant)' if cur_direct else '🔄 Stream Mode (Safe, Fresh Hashes)'}</code>\n"
+                    f"• Auto-Forward Sync: <code>{'PAUSED ⏸️' if is_fwd_paused else 'ACTIVE 🟢'}</code>\n"
+                    f"• Forwarding Mode: <code>{'⚡ Fast Direct (0.2s Instant)' if cur_direct else '🔄 Stream Mode (Safe, Fresh Hashes)'}</code>\n"
                     f"• Branding & Media: <code>{'👑 ON (Kind Doctor Sig + 16:9 HD Cover)' if cur_sig else '🏷️ OFF (Clean Mode: No Sig & Original Media)'}</code>\n"
                     f"• Video Cover Override: <code>{'🖼️ 16:9 HD Custom Cover' if cur_thumb == 'custom' else '🎞️ Original Media'}</code>\n"
                     f"<i>(Neeche diye 1-click buttons se instant switch karein)</i>"
@@ -3950,6 +4028,10 @@ class DeviTelegramBot:
                 ]
             }
             if self.is_admin(admin_id):
+                keyboard["inline_keyboard"].append([
+                    {"text": fwd_pause_btn_txt, "callback_data": fwd_pause_cb},
+                    {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}
+                ])
                 keyboard["inline_keyboard"].append([
                     {"text": direct_btn_txt, "callback_data": "act_toggle_direct"},
                     {"text": sig_btn_txt, "callback_data": "act_toggle_sig"}
@@ -6248,7 +6330,49 @@ class DeviTelegramBot:
             card_text, kb = self._build_clone_status_card_data(admin_id)
             await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True, message_thread_id=thread_id)
 
-        elif cmd in ("/stopclone", "/cancelclone", "/pauseclone"):
+        elif cmd in ("/pauseclone", "/pausejob"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
+                return
+            from devi.operator.deep_cloner import _job_pause_flags
+            target_job_id = int(parts[1]) if len(parts) >= 2 and parts[1].isdigit() else -1
+            _job_pause_flags[target_job_id] = True
+            with suppress(Exception):
+                with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                    if target_job_id == -1:
+                        conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE status = 'running'")
+                    else:
+                        conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE id = ?", (target_job_id,))
+                    conn.commit()
+            if target_job_id == -1:
+                await self._send_message(session, chat_id, "⏸️ <b>All active clone jobs PAUSED!</b>\n\n• Type <code>/resumeclone</code> anytime to continue.", message_thread_id=thread_id)
+            else:
+                await self._send_message(session, chat_id, f"⏸️ <b>Clone Job #{target_job_id} PAUSED!</b>\n\n• Type <code>/resumeclone {target_job_id}</code> to continue.", message_thread_id=thread_id)
+
+        elif cmd in ("/resumeclone", "/resumejob"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
+                return
+            from devi.operator.deep_cloner import _job_pause_flags
+            target_job_id = int(parts[1]) if len(parts) >= 2 and parts[1].isdigit() else -1
+            _job_pause_flags[target_job_id] = False
+            with suppress(Exception):
+                with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                    if target_job_id == -1:
+                        conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE status = 'paused'")
+                    else:
+                        conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE id = ?", (target_job_id,))
+                    conn.commit()
+            if target_job_id == -1:
+                await self._send_message(session, chat_id, "▶️ <b>All clone jobs RESUMED!</b> 🚀", message_thread_id=thread_id)
+            else:
+                await self._send_message(session, chat_id, f"▶️ <b>Clone Job #{target_job_id} RESUMED!</b> 🚀", message_thread_id=thread_id)
+
+        elif cmd in ("/stopclone", "/cancelclone"):
             target_chat_id = self._resolve_study_group_id(chat_id)
             is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
             if not is_caller_admin:

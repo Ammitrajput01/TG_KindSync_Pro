@@ -4,6 +4,24 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Friday, 09 October 2026
 
+### 17. 1-Click Dynamic Pause & Resume Controls Hub & Command Engine (`devi/operator/telegram_bot.py`, `devi/operator/deep_cloner.py`)
+* **Symptom & User Feedback**:
+  - User requested: (1) Add Pause and Resume options directly into the Telegram bot interactive menu and command suggestions; (2) Enable 1-click toggling so if forwarding or cloning is paused, a resume button appears automatically to restart sync without typing manual commands.
+* **Root Cause**:
+  1. Auto-Forward Hub and `/menu` only had start or static buttons; when paused, there was no intuitive 1-click resume toggle button on the interactive Telegram cards.
+  2. In Telegram Bot command suggestions (`setMyCommands`), `/pause`, `/resume`, `/pauseclone`, and `/resumeclone` were not registered in the autocomplete pop-up menu.
+  3. Deep cloner lacked dedicated `/pauseclone [id]` and `/resumeclone [id]` command handlers with database status synchronization.
+* **Permanent Fix Applied**:
+  1. **Dynamic 1-Click Button Toggles**:
+     - **Auto-Forward Hub & /menu**: Added dynamic toggle buttons: `[ ⏸️ PAUSE AUTO-SYNC ]` (when active) and `[ ▶️ RESUME AUTO-SYNC ]` (when paused). Clicking updates `engine_control.json` and refreshes the card UI in-place with instant toast feedback.
+     - **Deep Cloner Hub (`/clonestatus`)**: Added dynamic `[ ⏸️ Pause All Jobs ]` / `[ ▶️ Resume All Jobs ]` buttons that toggle active/paused clone workers and update SQLite job records (`telegram_clone_jobs`).
+  2. **Dedicated Command Handlers**:
+     - Added `/pauseclone [Job ID]` & `/resumeclone [Job ID]` with SQLite state updates and active thread suspension.
+     - Added `/pause` & `/resume` (aliases for `/pause_engine` and `/resume_engine`).
+  3. **Official Telegram Commands Registration (`_sync_bot_commands_and_profile`)**:
+     - Registered `/pause`, `/resume`, `/pauseclone`, `/resumeclone`, and `/clonestatus` in the official Telegram command menu for all chat scopes.
+  4. **Verification**: 100% verified with all 93/93 unit tests passing.
+
 ### 16. Forum Topic Isolation & Live File Transfer Speed / Progress Telemetry (`devi/operator/deep_cloner.py`)
 * **Symptom & User Feedback**:
   - User reported: (1) Cloner stayed in General and did not proceed to create other forum topics; (2) Telegram UI did not show live transfer progress, download/upload speed (MB/s), or current file status while transferring massive video lectures.

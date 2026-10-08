@@ -136,8 +136,9 @@ def get_active_clone_jobs(user_id: Optional[int] = None) -> List[dict]:
             rows = conn.execute("SELECT * FROM telegram_clone_jobs WHERE status IN ('running', 'paused') ORDER BY id DESC").fetchall()
         return [dict(r) for r in rows]
 
-# In-memory registry of active clone cancellation signals
+# In-memory registry of active clone cancellation & pause signals
 _job_cancel_flags: Dict[int, bool] = {}
+_job_pause_flags: Dict[int, bool] = {}
 
 # ---------------------------------------------------------------------------
 # Caption & Watermark Sanitizer
@@ -465,7 +466,11 @@ class DeepClonerEngine:
 
         try:
             async for msg in user_client.iter_messages(src_peer, reply_to=reply_to_filter, reverse=True):
-                if _job_cancel_flags.get(job_id):
+                while _job_pause_flags.get(job_id) or _job_pause_flags.get(-1):
+                    if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
+                        break
+                    await asyncio.sleep(1.0)
+                if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                     logger.info(f"🛑 Job #{job_id} cancelled by user.")
                     break
                 if getattr(msg, 'action', None):
@@ -698,7 +703,11 @@ class DeepClonerEngine:
 
         grand_total_cloned = 0
         for topic_idx, (src_top_id, src_top_title) in enumerate(discovered_topics, start=1):
-            if _job_cancel_flags.get(job_id):
+            while _job_pause_flags.get(job_id) or _job_pause_flags.get(-1):
+                if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
+                    break
+                await asyncio.sleep(1.0)
+            if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                 update_clone_job_progress(job_id, status="stopped", error_msg="User stopped the job.")
                 logger.info(f"🛑 Deep clone job #{job_id} stopped.")
                 return
