@@ -1147,14 +1147,7 @@ class DeviTelegramBot:
         ])
         cards.append("\n".join(current_card_lines))
 
-        reply_markup = {
-            "inline_keyboard": [
-                [
-                    {"text": "🔄 Refresh Index", "callback_data": "act_mainindex"},
-                    {"text": "🩺 Clinical Tools", "callback_data": "act_menu"}
-                ]
-            ]
-        }
+        reply_markup = None
         return cards, reply_markup
 
     def _delete_topic(self, chat_id: int, topic_id: int) -> bool:
@@ -2193,7 +2186,9 @@ class DeviTelegramBot:
     def _build_clone_status_card_data(self, admin_id: int) -> Tuple[str, dict]:
         """Constructs real-time cloner status card with 1-click Reset, Refresh, Pause, Resume, and Stop buttons."""
         from devi.operator.deep_cloner import get_active_clone_jobs
-        jobs = get_active_clone_jobs(user_id=admin_id if not self.is_admin(admin_id) else None)
+        # Strict User Isolation: Non-master admins only see their own jobs
+        user_filter = None if admin_id in self.master_admin_ids else admin_id
+        jobs = get_active_clone_jobs(user_id=user_filter)
         
         if not jobs:
             text = (
@@ -2379,12 +2374,16 @@ class DeviTelegramBot:
             # --- DEEP CLONER HUB & RESET ACTIONS ---
             if action == "cloner_pause_all":
                 from devi.operator.deep_cloner import _job_pause_flags
+                is_master = admin_id in self.master_admin_ids
                 _job_pause_flags[-1] = True
                 for j_id in list(_job_pause_flags.keys()):
                     _job_pause_flags[j_id] = True
                 with suppress(Exception):
                     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                        conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE status = 'running'")
+                        if is_master:
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE status = 'running'")
+                        else:
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE user_id = ? AND status = 'running'", (admin_id,))
                         conn.commit()
                 card_text, kb = self._build_clone_status_card_data(admin_id)
                 msg_id = msg_obj.get("message_id")
@@ -2394,12 +2393,16 @@ class DeviTelegramBot:
                 return
             elif action == "cloner_resume_all":
                 from devi.operator.deep_cloner import _job_pause_flags
+                is_master = admin_id in self.master_admin_ids
                 _job_pause_flags[-1] = False
                 for j_id in list(_job_pause_flags.keys()):
                     _job_pause_flags[j_id] = False
                 with suppress(Exception):
                     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                        conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE status = 'paused'")
+                        if is_master:
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE status = 'paused'")
+                        else:
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE user_id = ? AND status = 'paused'", (admin_id,))
                         conn.commit()
                 card_text, kb = self._build_clone_status_card_data(admin_id)
                 msg_id = msg_obj.get("message_id")
@@ -2416,25 +2419,36 @@ class DeviTelegramBot:
                 return
             elif action == "cloner_reset":
                 target_chat_id = self._resolve_study_group_id(chat_id)
-                is_adm = (admin_id in self.master_admin_ids) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message=msg_obj))
+                is_master = admin_id in self.master_admin_ids
+                is_adm = is_master or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message=msg_obj))
                 if not is_adm:
                     await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⚠️ Admin Rights Required to Reset Jobs!", "show_alert": True})
                     return
                 from devi.operator.session_vault import DB_PATH, _running_user_jobs
                 from devi.operator.deep_cloner import _job_cancel_flags
-                _job_cancel_flags[-1] = True
-                for j_id in list(_job_cancel_flags.keys()):
-                    _job_cancel_flags[j_id] = True
-                for uid, tasks in list(_running_user_jobs.items()):
-                    for t in tasks:
+                if is_master:
+                    _job_cancel_flags[-1] = True
+                    for j_id in list(_job_cancel_flags.keys()):
+                        _job_cancel_flags[j_id] = True
+                    for uid, tasks in list(_running_user_jobs.items()):
+                        for t in tasks:
+                            if not t.done():
+                                t.cancel()
+                        _running_user_jobs[uid] = []
+                else:
+                    for t in _running_user_jobs.get(admin_id, []):
                         if not t.done():
                             t.cancel()
-                    _running_user_jobs[uid] = []
+                    _running_user_jobs[admin_id] = []
+
                 try:
                     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                        conn.execute("DELETE FROM telegram_clone_jobs")
-                        with suppress(Exception):
-                            conn.execute("DELETE FROM sqlite_sequence WHERE name='telegram_clone_jobs'")
+                        if is_master:
+                            conn.execute("DELETE FROM telegram_clone_jobs")
+                            with suppress(Exception):
+                                conn.execute("DELETE FROM sqlite_sequence WHERE name='telegram_clone_jobs'")
+                        else:
+                            conn.execute("DELETE FROM telegram_clone_jobs WHERE user_id = ?", (admin_id,))
                         conn.commit()
                 except Exception as ex_db:
                     logger.error(f"Reset cloner DB error: {ex_db}")
@@ -2464,22 +2478,33 @@ class DeviTelegramBot:
                 return
             elif action == "cloner_stop_all":
                 target_chat_id = self._resolve_study_group_id(chat_id)
-                is_adm = (admin_id in self.master_admin_ids) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message=msg_obj))
+                is_master = admin_id in self.master_admin_ids
+                is_adm = is_master or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message=msg_obj))
                 if not is_adm:
                     await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⚠️ Admin Rights Required!", "show_alert": True})
                     return
                 from devi.operator.session_vault import _running_user_jobs
                 from devi.operator.deep_cloner import _job_cancel_flags
-                _job_cancel_flags[-1] = True
-                for uid, tasks in list(_running_user_jobs.items()):
-                    for t in tasks:
+                if is_master:
+                    _job_cancel_flags[-1] = True
+                    for uid, tasks in list(_running_user_jobs.items()):
+                        for t in tasks:
+                            if not t.done():
+                                t.cancel()
+                        _running_user_jobs[uid] = []
+                    with suppress(Exception):
+                        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'stopped', error_msg = 'Stopped by admin' WHERE status IN ('running', 'queued')")
+                            conn.commit()
+                else:
+                    for t in _running_user_jobs.get(admin_id, []):
                         if not t.done():
                             t.cancel()
-                    _running_user_jobs[uid] = []
-                with suppress(Exception):
-                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                        conn.execute("UPDATE telegram_clone_jobs SET status = 'stopped', error_msg = 'Stopped by admin' WHERE status IN ('running', 'queued')")
-                        conn.commit()
+                    _running_user_jobs[admin_id] = []
+                    with suppress(Exception):
+                        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'stopped', error_msg = 'Stopped by user' WHERE user_id = ? AND status IN ('running', 'queued')", (admin_id,))
+                            conn.commit()
                 card_text, kb = self._build_clone_status_card_data(admin_id)
                 msg_id = msg_obj.get("message_id")
                 if msg_id:
@@ -4036,10 +4061,9 @@ class DeviTelegramBot:
                     {"text": direct_btn_txt, "callback_data": "act_toggle_direct"},
                     {"text": sig_btn_txt, "callback_data": "act_toggle_sig"}
                 ])
-                keyboard["inline_keyboard"].append([
-                    {"text": thumb_btn_txt, "callback_data": "act_toggle_thumb"}
-                ])
-            await self._send_message(session, chat_id, reply, reply_markup=keyboard, message_thread_id=thread_id)
+            sent_m = await self._send_message(session, chat_id, reply, reply_markup=keyboard, message_thread_id=thread_id)
+            if sent_m and chat_id < 0:
+                self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_m, 120))
 
         elif cmd in ("/support", "/contact"):
             support_card = (
@@ -4337,13 +4361,9 @@ class DeviTelegramBot:
                 "• <code>/map &lt;sbp&gt; &lt;dbp&gt;</code> — Mean Arterial Pressure\n"
                 "• <code>/parkland &lt;wt_kg&gt; &lt;tbsa_percent&gt;</code> — Burn resuscitation fluids"
             )
-            markup = {
-                "inline_keyboard": [
-                    [{"text": "⚖️ Quick BMI (/bmi)", "callback_data": "act_bmi_guide"}, {"text": "🫁 GFR Calculator", "callback_data": "act_gfr_guide"}],
-                    [{"text": "🔙 Main Help Menu", "callback_data": "act_menu"}]
-                ]
-            }
-            await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
+            sent_m = await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
+            if sent_m and chat_id < 0:
+                self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_m, 120))
 
         # -------------------------------------------------------------
         # NATIVE AUTO-FORWARD HUB & LOGIN PANEL (Screenshot Mode)
@@ -8522,6 +8542,61 @@ class DeviTelegramBot:
             except Exception as e:
                 logger.error(f"Clean history failed: {e}")
                 await self._send_message(session, chat_id, f"❌ **Clean history failed:** {e}", message_thread_id=thread_id)
+
+        elif cmd in ("/purge", "/delhistory", "/clearchat", "/cleanmessages", "/delmsg") or (cmd == "/clean" and (reply_to or (len(parts) > 1 and parts[1].isdigit()))):
+            is_adm = (admin_id in self.master_admin_ids) or (await self.is_admin_for_chat(session, chat_id, admin_id, message=message))
+            if not is_adm:
+                await self._send_message(session, chat_id, "⛔ Restricted to Group Admins.", message_thread_id=thread_id)
+                return
+
+            msg_id = message.get("message_id") if message else 0
+            to_delete = []
+
+            if reply_to and reply_to.get("message_id"):
+                start_id = reply_to["message_id"]
+                end_id = msg_id or start_id
+                if end_id >= start_id:
+                    to_delete = list(range(start_id, min(end_id + 1, start_id + 1000)))
+            elif len(parts) > 1 and parts[1].isdigit():
+                count = min(int(parts[1]), 500)
+                if msg_id:
+                    to_delete = list(range(max(1, msg_id - count), msg_id + 1))
+            else:
+                if msg_id:
+                    to_delete = list(range(max(1, msg_id - 10), msg_id + 1))
+
+            deleted_count = 0
+            if to_delete:
+                for i in range(0, len(to_delete), 100):
+                    batch = to_delete[i:i+100]
+                    try:
+                        res = await session.post(
+                            f"https://api.telegram.org/bot{self.token}/deleteMessages",
+                            json={"chat_id": chat_id, "message_ids": batch},
+                            timeout=8
+                        )
+                        r_data = await res.json()
+                        if r_data.get("ok"):
+                            deleted_count += len(batch)
+                        else:
+                            for mid in batch:
+                                with suppress(Exception):
+                                    await self._delete_message(session, chat_id, mid)
+                                    deleted_count += 1
+                    except Exception:
+                        for mid in batch:
+                            with suppress(Exception):
+                                await self._delete_message(session, chat_id, mid)
+                                deleted_count += 1
+
+            notify = await self._send_message(
+                session, chat_id,
+                f"🧹 <b>Purged {deleted_count} messages from topic/chat!</b> ⏱️ <i>(Cleaning notice in 5s)</i>",
+                message_thread_id=thread_id
+            )
+            if notify:
+                self.create_tracked_task(self._auto_delete_message(session, chat_id, notify, 5))
+            return
 
         elif cmd == "/clean":
             if not self.is_admin(admin_id):

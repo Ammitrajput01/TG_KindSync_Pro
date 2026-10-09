@@ -208,18 +208,12 @@ def clean_cloned_caption(
     body_extra = ""
 
     if text:
-        m_title = re.match(r'(?i)^(?:🎬|📄|📁|🎥)?\s*Title\s*:\s*(.*)', text, flags=re.DOTALL)
-        if m_title:
-            title_val = m_title.group(1).strip()
-            if "\n" in title_val:
-                t_lines = title_val.split("\n", 1)
-                title_val = t_lines[0].strip()
-                body_extra = t_lines[1].strip()
-        else:
-            t_lines = text.split("\n", 1)
-            title_val = t_lines[0].strip()
-            if len(t_lines) > 1:
-                body_extra = t_lines[1].strip()
+        # Strip all leading emoji icons and Title: prefixes (even if repeated multiple times)
+        cleaned_text = re.sub(r'(?i)^[🎬📄📁🎥\s]*(?:title\s*[:\-\s]*)+', '', text).strip()
+        t_lines = cleaned_text.split("\n", 1)
+        title_val = t_lines[0].strip()
+        if len(t_lines) > 1:
+            body_extra = t_lines[1].strip()
 
     if not title_val and orig_filename:
         clean_stem = Path(orig_filename).stem.replace("_", " ").replace("-", " ").strip()
@@ -228,8 +222,9 @@ def clean_cloned_caption(
     if not title_val and topic_title:
         title_val = topic_title.strip()
 
-    # Clean file extensions if present in title (e.g. .mp4, .pdf)
+    # Clean file extensions if present in title (e.g. .mp4, .pdf) and any residual repeated Title prefixes
     if title_val:
+        title_val = re.sub(r'(?i)^[🎬📄📁🎥\s]*(?:title\s*[:\-\s]*)+', '', title_val).strip()
         title_val = re.sub(r'(?i)\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk)$', '', title_val).strip()
 
     formatted_parts = []
@@ -237,8 +232,9 @@ def clean_cloned_caption(
         formatted_parts.append(f"Title: {title_val}")
 
     if body_extra:
-        body_clean = re.sub(r'(?i)📚\s*\*{0,2}Kind Doctor & Team\*{0,2}', '', body_extra)
+        body_clean = re.sub(r'(?i)📚\s*\*{0,2}Kind Doctor & Team\*{0,2}.*', '', body_extra, flags=re.DOTALL)
         body_clean = re.sub(r'(?i)💬\s*Group Study Help.*', '', body_clean).strip()
+        body_clean = re.sub(r'(?i)^[🎬📄📁🎥\s]*(?:title\s*[:\-\s]*)+', '', body_clean).strip()
         if body_clean:
             formatted_parts.append(body_clean)
 
@@ -275,13 +271,13 @@ async def get_or_create_target_topic(
     # 1. Check local SQLite cache first to avoid redundant creations
     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
         row = conn.execute(
-            "SELECT topic_id FROM telegram_group_topics WHERE chat_id = ? AND LOWER(topic_title) = LOWER(?)",
+            "SELECT topic_id FROM telegram_group_topics WHERE chat_id = ? AND LOWER(TRIM(topic_title)) = LOWER(TRIM(?))",
             (target_chat_id, clean_title)
         ).fetchone()
         if row and row[0] > 0:
             return int(row[0])
 
-    # 2. Check live forum topics in target group via user_client to reuse matching existing topics
+    # 2. Check live forum topics in target group via user_client to reuse matching existing topics (Strict Exact Match)
     if user_client:
         try:
             target_peer = await _safe_resolve_entity(user_client, target_chat_id)
@@ -295,7 +291,7 @@ async def get_or_create_target_topic(
             for t in getattr(res, 'topics', []):
                 t_title = getattr(t, 'title', '')
                 t_id = getattr(t, 'id', 0)
-                if t_id and (clean_title.lower() in t_title.lower() or t_title.lower() in clean_title.lower()):
+                if t_id and clean_title.lower().strip() == t_title.lower().strip():
                     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
                         conn.execute(
                             "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
@@ -511,12 +507,11 @@ class DeepClonerEngine:
                                         break
                             tier1_success = False
                             try:
-                                # Tier 1: Instant Server-Side Cloud Pointer Copy (0.15s, 0 bytes bandwidth)
+                                # Tier 1: Instant Server-Side Cloud Pointer Copy (0.15s, 0 bytes bandwidth, 0 disk/RAM)
                                 await user_client.send_file(
                                     tgt_peer,
                                     file=msg.media,
                                     caption=cleaned_caption,
-                                    thumb=thumb_to_attach,
                                     reply_to=dest_thread
                                 )
                                 tier1_success = True

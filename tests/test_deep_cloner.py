@@ -124,4 +124,41 @@ def test_clone_status_card_and_reset_flow():
         conn.execute("DELETE FROM telegram_clone_jobs WHERE user_id = 999888")
         conn.commit()
 
+def test_title_repetition_sanitizer():
+    """Verify that multiple stacked 'Title: Title: ...' prefixes are collapsed to a single clean Title."""
+    raw = "Title: Title: Title: Anatomy Lecture 01 - Thorax Anatomy.mp4\n📚 **Kind Doctor & Team**\n💬 Group Study Help 😉"
+    cleaned = clean_cloned_caption(raw)
+    assert cleaned.startswith("Title: Anatomy Lecture 01 - Thorax Anatomy")
+    assert cleaned.count("Title:") == 1
+
+def test_user_isolation_status_card():
+    """Verify strict tenant isolation between User A and User B in cloner status cards."""
+    from devi.operator.telegram_bot import DeviTelegramBot
+    bot = DeviTelegramBot()
+
+    user_a = 111222333
+    user_b = 444555666
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM telegram_clone_jobs WHERE user_id IN (?, ?)", (user_a, user_b))
+        conn.commit()
+
+    # User A starts a job
+    job_a = create_clone_job(user_id=user_a, source_chat="-100111", target_chat="-100222", job_type="group")
+    
+    # User A checks status -> sees Job A
+    text_a, _ = bot._build_clone_status_card_data(admin_id=user_a)
+    assert f"Job #{job_a}" in text_a
+
+    # User B checks status -> MUST NOT see Job A!
+    text_b, _ = bot._build_clone_status_card_data(admin_id=user_b)
+    assert f"Job #{job_a}" not in text_b
+    assert "No active clone jobs running currently" in text_b
+
+    # Clean up
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM telegram_clone_jobs WHERE user_id IN (?, ?)", (user_a, user_b))
+        conn.commit()
+
+
 

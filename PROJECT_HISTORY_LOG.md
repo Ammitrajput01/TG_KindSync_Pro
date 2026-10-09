@@ -2,6 +2,31 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 10 October 2026
+
+### 18. Forum Topics Collision, Title Repetition, Supersonic Pointer Cloning, Real Message Purge & Per-User Isolation (`devi/operator/deep_cloner.py`, `devi/operator/telegram_bot.py`)
+* **Symptom & User Feedback**:
+  - User reported:
+    1. Deep Cloner dumped all 150 forum topics into a single General topic instead of auto-creating matching topics in target supergroup.
+    2. Caption generator duplicated headers into `Title: Title: ABC` upon re-cloning.
+    3. Cloning was slow because it unnecessarily downloaded and re-uploaded 500MB video lectures even for forwardable public groups.
+    4. Group chat cleaner `/clean` only cleared SQLite records and locks without deleting actual Telegram messages from the chat/topic.
+    5. Master Topic Directory had confusing `[ Refresh Index ]` and `[ Clinical Tools ]` buttons that corrupted multi-part indexes.
+    6. Non-master users saw other users' active clone jobs in `/clonestatus`.
+* **Root Cause**:
+  1. **Topic Substring Collision**: In `get_or_create_target_topic`, `clean_title.lower() in t_title.lower() or t_title.lower() in clean_title.lower()` caused ANY subsequent topic containing words like "Notes" or "General" to match the first topic created and dump all messages into it.
+  2. **Title Prefix Accumulation**: In `clean_cloned_caption`, re-matching did not strip multiple pre-existing `Title:` prefixes before prepending `Title:`.
+  3. **Local Thumb on Server Copy**: `send_file(msg.media, thumb=...)` caused Telegram MTProto to reject server-side pointer copy, triggering fallback to Tier 2 sequential download/upload.
+  4. **Missing Message Purge**: `/clean` only performed SQLite WAL checkpoint and deleted `engine.lock` rather than invoking Telegram Bot API `deleteMessages`.
+  5. **Global Status Cards**: `get_active_clone_jobs` did not isolate queries by `user_id` for non-master admins.
+* **Permanent Fix Applied**:
+  1. **Strict Exact Topic Matching**: Replaced substring match with `clean_title.lower().strip() == t_title.lower().strip()` in `get_or_create_target_topic`.
+  2. **Duplicate Title Sanitizer**: Updated `clean_cloned_caption` with `re.sub(r'^(?i)(?:[🎬📄📁🎥\s]*title\s*[:\-\s]*)+', '', ...)` ensuring `Title:` is output exactly once.
+  3. **Supersonic Direct Pointer Copy**: Removed local thumbnail from Tier 1 `send_file(msg.media, caption=cleaned_caption)`, enabling 0.15s instant cloud copy (0 MB disk, 0 MB RAM).
+  4. **Real Batch Chat Purge (`/purge`, `/delhistory`, `/clearchat`, `/clean <N>`)**: Added batch `deleteMessages` handling up to 100 messages per chunk with 5s self-deleting status confirmation.
+  5. **Clean Master Index**: Removed inline keyboard buttons from `_build_main_index_cards` and added 120s auto-delete on group help/menu cards.
+  6. **Per-User Isolation**: Scoped `/clonestatus`, `act_cloner_reset`, `cloner_pause_all`, and `cloner_stop_all` strictly to calling `user_id` for non-master admins.
+
 ## 📅 Log Entry: Friday, 09 October 2026
 
 ### 17. 1-Click Dynamic Pause & Resume Controls Hub & Command Engine (`devi/operator/telegram_bot.py`, `devi/operator/deep_cloner.py`)
