@@ -189,6 +189,59 @@ class DeviTelegramBot:
             return s
         return None
 
+    def _extract_chat_and_topic(self, arg: str) -> Tuple[Optional[int | str], int]:
+        """
+        Extracts (chat_id, topic_id) from an argument string.
+        Handles:
+        - Link with topic: https://t.me/c/3504807114/149081 -> (-1003504807114, 149081)
+        - Link with topic & msg: https://t.me/c/3504807114/149081/50 -> (-1003504807114, 149081)
+        - Link without topic: https://t.me/c/3504807114 -> (-1003504807114, 0)
+        - Public link with topic: https://t.me/channel/149081 -> ("@channel", 149081)
+        - Numeric chat ID: -1003504807114 or 3504807114 -> (-1003504807114, 0)
+        - Username: @channel -> ("@channel", 0)
+        """
+        if not arg:
+            return None, 0
+        s = str(arg).strip()
+
+        # 1. Private link with topic (2 or 3 segments: t.me/c/<chat>/<topic> or t.me/c/<chat>/<topic>/<msg>)
+        m_priv_top = re.search(r't\.me/c/(\d+)/(\d+)', s)
+        if m_priv_top:
+            chat_num = int(m_priv_top.group(1))
+            chat_id = int(f"-100{chat_num}") if not str(chat_num).startswith("-100") else chat_num
+            topic_id = int(m_priv_top.group(2))
+            return chat_id, topic_id
+
+        # 2. Private link without topic: t.me/c/<chat>
+        m_priv = re.search(r't\.me/c/(\d+)', s)
+        if m_priv:
+            chat_num = int(m_priv.group(1))
+            chat_id = int(f"-100{chat_num}") if not str(chat_num).startswith("-100") else chat_num
+            return chat_id, 0
+
+        # 3. Public link with topic: t.me/<group>/<topic>
+        m_pub_top = re.search(r't\.me/([a-zA-Z0-9_]+)/(\d+)', s)
+        if m_pub_top and not m_pub_top.group(1).lower() in ("c", "joinchat", "addlist"):
+            return f"@{m_pub_top.group(1)}", int(m_pub_top.group(2))
+
+        # 4. Public link without topic: t.me/<group>
+        m_pub = re.search(r't\.me/([a-zA-Z0-9_]+)', s)
+        if m_pub and not m_pub.group(1).lower() in ("c", "joinchat", "addlist"):
+            return f"@{m_pub.group(1)}", 0
+
+        # 5. Plain numeric chat ID
+        if s.lstrip("-").isdigit():
+            val = int(s)
+            if val > 0 and len(str(val)) >= 9 and not str(val).startswith("100"):
+                return int(f"-100{val}"), 0
+            return val, 0
+
+        # 6. Username
+        if s.startswith("@"):
+            return s, 0
+
+        return self._parse_chat_param(s), 0
+
 
     def _init_db(self):
         """Initialize bot tables and user dossier tracking in SQLite."""
@@ -3224,7 +3277,6 @@ class DeviTelegramBot:
                                 dest_cache = BASE_PROJECT_DIR / "tg_thumb_cached.jpg"
                                 try:
                                     from PIL import Image, ImageOps
-                                    import io
                                     img = Image.open(io.BytesIO(img_bytes))
                                     if img.mode in ("RGBA", "P"):
                                         img = img.convert("RGB")
@@ -4482,7 +4534,6 @@ class DeviTelegramBot:
 
         elif cmd in ("/myaccount", "/accountinfo"):
             from devi.operator.session_vault import get_user_linked_session, DB_PATH
-            import sqlite3
             s_str = get_user_linked_session(admin_id)
             if not s_str:
                 not_linked = (
@@ -5680,7 +5731,6 @@ class DeviTelegramBot:
                                     dest_cache = BASE_PROJECT_DIR / "tg_thumb_cached.jpg"
                                     try:
                                         from PIL import Image, ImageOps
-                                        import io
                                         img = Image.open(io.BytesIO(img_bytes))
                                         if img.mode in ("RGBA", "P"):
                                             img = img.convert("RGB")
@@ -5769,13 +5819,13 @@ class DeviTelegramBot:
 
             # CASE A: Full Forum / Entire Group / Specific Topic Clone (2 or more arguments)
             if len(parts) >= 3:
-                src_chat_input = self._parse_chat_param(parts[1])
-                tgt_chat_input = self._parse_chat_param(parts[2])
+                src_chat_input, src_top_url = self._extract_chat_and_topic(parts[1])
+                tgt_chat_input, tgt_top_url = self._extract_chat_and_topic(parts[2])
 
                 if src_chat_input and tgt_chat_input:
                     from devi.operator.deep_cloner import DeepClonerEngine, create_clone_job
-                    src_top = int(parts[3]) if len(parts) >= 4 and parts[3].isdigit() else 0
-                    tgt_top = int(parts[4]) if len(parts) >= 5 and parts[4].isdigit() else 0
+                    src_top = int(parts[3]) if len(parts) >= 4 and parts[3].isdigit() else src_top_url
+                    tgt_top = int(parts[4]) if len(parts) >= 5 and parts[4].isdigit() else tgt_top_url
 
                     job_type = "topic" if src_top > 0 else "group"
 
@@ -5830,22 +5880,47 @@ class DeviTelegramBot:
                                 update_clone_job_progress(job_id, total_topics=1, current_topic_title=real_title, status="running")
 
                                 resolved_tgt_top = tgt_top
-                                if not resolved_tgt_top:
+                                if not resolved_tgt_top or resolved_tgt_top <= 1:
                                     resolved_tgt_top = await get_or_create_target_topic(
                                         self.token, u_cl, tgt_chat_input, real_title
                                     )
-                                cloned, tot = await engine.clone_topic_stream(
-                                    job_id, u_cl, src_chat_input, src_top, tgt_chat_input, resolved_tgt_top,
-                                    topic_title=real_title,
-                                    progress_callback=lambda top, cur, tot, cl: _ui_progress(
-                                        f"🚀 <b>Topic Clone in Progress (Job #{job_id})</b>\n"
+
+                                async def _topic_telemetry_cb(top_name, cur_m, tot_m, top_cloned, file_name=None, cur_bytes=0, tot_bytes=0, phase="⚡ Processing", start_t=None):
+                                    file_extra = ""
+                                    if cur_bytes and tot_bytes and tot_bytes > 0:
+                                        file_pct = min(100.0, round((cur_bytes / max(1, tot_bytes)) * 100, 1))
+                                        cur_mb = round(cur_bytes / (1024 * 1024), 1)
+                                        tot_mb = round(tot_bytes / (1024 * 1024), 1)
+                                        elapsed = max(0.1, asyncio.get_event_loop().time() - (start_t or asyncio.get_event_loop().time()))
+                                        speed_mb = (cur_bytes / (1024 * 1024)) / elapsed
+                                        filled = int(file_pct / 100.0 * 10)
+                                        bar = "█" * filled + "░" * (10 - filled)
+                                        rem_b = max(0, tot_bytes - cur_bytes)
+                                        eta_s = int(rem_b / max(1, (speed_mb * 1024 * 1024))) if speed_mb > 0.05 else 0
+                                        eta_txt = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
+                                        file_extra = (
+                                            f"🎬 <b>File:</b> <code>{html.escape(file_name or 'Lecture Media')}</code>\n"
+                                            f"⚡ <b>Activity:</b> <code>{phase} [{bar}] {file_pct}%</code>\n"
+                                            f"🚀 <b>Speed:</b> <code>{speed_mb:.1f} MB/s</code> | <b>Size:</b> <code>{cur_mb}/{tot_mb} MB</code> | <b>ETA:</b> <code>{eta_txt}</code>\n"
+                                        )
+                                    pct = round((cur_m / max(1, tot_m)) * 100, 1) if tot_m > 0 else 0
+                                    await _ui_progress(
+                                        f"🚀 <b>Topic Clone in Progress (Job #{job_id})</b> 🩺\n"
                                         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                                         f"📂 <b>Topic:</b> <b>{html.escape(real_title)}</b>\n"
-                                        f"📊 <b>Cloned:</b> <code>{cl}</code> items 🚀\n"
+                                        f"{file_extra}"
+                                        f"📊 <b>Topic Messages:</b> <code>{cur_m}</code> / <code>{tot_m}</code> ({pct}%)\n"
+                                        f"💎 <b>Total Cloned:</b> <code>{top_cloned}</code> items 🚀\n"
                                         f"🛡️ <b>Clean Status:</b> ❌ Zero Tags | ✨ Stripped Watermarks\n\n"
                                         f"<i>(Aap jab chahe <code>/stopclone {job_id}</code> bhej kar stop kar sakte hain).</i>"
                                     )
+
+                                cloned_res = await engine.clone_topic_stream(
+                                    job_id, u_cl, src_chat_input, src_top, tgt_chat_input, resolved_tgt_top,
+                                    topic_title=real_title,
+                                    progress_callback=_topic_telemetry_cb
                                 )
+                                cloned = cloned_res[0] if isinstance(cloned_res, (tuple, list)) else (cloned_res or 0)
                                 update_clone_job_progress(job_id, status="completed", completed_topics=1)
                                 await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed (Job #{job_id})!</b>\n\nCloned <code>{cloned}</code> items into <b>{html.escape(real_title)}</b>.", message_thread_id=thread_id)
                             except Exception as ex_t:
@@ -5859,10 +5934,15 @@ class DeviTelegramBot:
                     else:
                         async def _run_group():
                             try:
-                                total_cloned, total_top = await engine.clone_entire_group(
+                                clone_res = await engine.clone_entire_group(
                                     job_id, admin_id, src_chat_input, tgt_chat_input,
                                     progress_updater=_ui_progress
                                 )
+                                if isinstance(clone_res, (tuple, list)):
+                                    total_cloned, total_top = clone_res[0], clone_res[1]
+                                else:
+                                    total_cloned, total_top = 0, 0
+
                                 if total_cloned > 0 or total_top > 0:
                                     await self._send_message(
                                         session, chat_id,
@@ -6436,7 +6516,6 @@ class DeviTelegramBot:
                     if not t.done():
                         t.cancel()
                 _running_user_jobs[uid] = []
-            import sqlite3
             try:
                 with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
                     conn.execute("DELETE FROM telegram_clone_jobs")

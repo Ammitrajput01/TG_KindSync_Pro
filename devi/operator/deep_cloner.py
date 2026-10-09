@@ -407,16 +407,30 @@ async def resolve_source_topic_title(client: TelegramClient, source_chat, topic_
         return "General Discussion & Study Media"
     try:
         src_peer = await _safe_resolve_entity(client, source_chat)
-        res = await client(GetForumTopicsRequest(
-            peer=src_peer,
-            offset_date=None,
-            offset_id=0,
-            offset_topic=0,
-            limit=100
-        ))
-        for t in getattr(res, 'topics', []):
-            if getattr(t, 'id', None) == topic_id:
-                return getattr(t, 'title', None) or f"Topic #{topic_id}"
+        offset_topic = 0
+        offset_id = 0
+        for _ in range(25):  # Check up to 2500 topics
+            res = await client(GetForumTopicsRequest(
+                peer=src_peer,
+                offset_date=None,
+                offset_id=offset_id,
+                offset_topic=offset_topic,
+                limit=100
+            ))
+            topics = getattr(res, 'topics', [])
+            if not topics:
+                break
+            for t in topics:
+                if getattr(t, 'id', None) == topic_id:
+                    return getattr(t, 'title', None) or f"Topic #{topic_id}"
+            if len(topics) < 100:
+                break
+            last_t = topics[-1]
+            last_id = getattr(last_t, 'id', 0)
+            if offset_topic == last_id:
+                break
+            offset_topic = last_id
+            offset_id = getattr(last_t, 'top_message', 0)
     except Exception as e:
         logger.warning(f"Could not resolve topic title for #{topic_id}: {e}")
     return f"Topic #{topic_id}"
@@ -709,7 +723,7 @@ class DeepClonerEngine:
             if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                 update_clone_job_progress(job_id, status="stopped", error_msg="User stopped the job.")
                 logger.info(f"🛑 Deep clone job #{job_id} stopped.")
-                return
+                return grand_total_cloned, total_topics
 
             update_clone_job_progress(job_id, current_topic_title=src_top_title, completed_topics=topic_idx - 1)
 

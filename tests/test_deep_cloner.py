@@ -161,4 +161,37 @@ def test_user_isolation_status_card():
         conn.commit()
 
 
+def test_extract_chat_and_topic():
+    """Verify link extraction for private, public, topic, and chat IDs."""
+    from devi.operator.telegram_bot import DeviTelegramBot
+    bot = DeviTelegramBot()
 
+    # Private topic link (2-part)
+    chat, top = bot._extract_chat_and_topic("https://t.me/c/3504807114/149081")
+    assert chat == -1003504807114
+    assert top == 149081
+
+    # Private target topic link
+    chat2, top2 = bot._extract_chat_and_topic("https://t.me/c/4313086843/1183")
+    assert chat2 == -1004313086843
+    assert top2 == 1183
+
+    # Private 3-part link
+    chat3, top3 = bot._extract_chat_and_topic("https://t.me/c/3504807114/149081/50")
+    assert chat3 == -1003504807114
+    assert top3 == 149081
+
+    # Private group without topic
+    chat4, top4 = bot._extract_chat_and_topic("https://t.me/c/3504807114")
+    assert chat4 == -1003504807114
+    assert top4 == 0
+
+    # Public topic link
+    chat5, top5 = bot._extract_chat_and_topic("https://t.me/medical_hub/2280")
+    assert chat5 == "@medical_hub"
+    assert top5 == 2280
+
+    # Numeric ID
+    chat6, top6 = bot._extract_chat_and_topic("-1003504807114")
+    assert chat6 == -1003504807114
+    assert top6 == 0

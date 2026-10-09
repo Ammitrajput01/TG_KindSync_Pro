@@ -4,6 +4,25 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Saturday, 10 October 2026
 
+### 19. Cloner Return Unpacking Resilience, Topic Link Auto-Routing & Sqlite3 Scope Fix (`devi/operator/deep_cloner.py`, `devi/operator/telegram_bot.py`)
+* **Symptom & User Feedback**:
+  - User reported 2 distinct runtime errors with screenshots:
+    1. Running `/clone https://t.me/c/3504807114/149081 https://t.me/c/4313086843/1183` gave error:
+       `❌ Group Clone Error (Job #1): cannot unpack non-iterable NoneType object`.
+    2. Clicking `/routes` gave error:
+       `Error listing routes: cannot access local variable 'sqlite3' where it is not associated with a value`.
+* **Root Cause**:
+  1. **Bare Return in `clone_entire_group`**: When early cancellation or job stop triggered in `clone_entire_group`, line 712 executed a bare `return` (returning `None`), causing `total_cloned, total_top = await engine.clone_entire_group(...)` to fail with `TypeError: cannot unpack non-iterable NoneType object`.
+  2. **Topic Link Ignored in `/clone`**: When users provided URLs containing topic IDs (e.g., `https://t.me/c/3504807114/149081`), the old parser only inspected `parts[3]` / `parts[4]`, discarding the topic ID in the URL and launching a whole-forum clone instead of a topic clone.
+  3. **Unbound Local Variable in `/routes`**: Local `import sqlite3` inside downstream handlers (`/myaccount` and `/resetjobs`) inside `_handle_admin_command` caused Python compiler to mark `sqlite3` as local across the entire 2000+ line function, raising `UnboundLocalError` when `/routes` executed earlier in the same scope.
+  4. **Positional Callback Signature Mismatch**: `_run_topic` passed a 4-argument positional lambda as `progress_callback`, but `clone_topic_stream` invoked it with keyword arguments (`top_name=...`), raising keyword argument errors.
+* **Permanent Fix Applied**:
+  1. **Tuple Return Invariant**: Updated `clone_entire_group` to return `(grand_total_cloned, total_topics)` across all termination paths, and guarded caller unpacking with `isinstance(clone_res, (tuple, list))`.
+  2. **Smart Topic URL Extractor (`_extract_chat_and_topic`)**: Added universal regex parser for private topic links (`t.me/c/<chat>/<topic>`), private chats, public topics (`t.me/<chat>/<topic>`), and numeric IDs, routing automatically to `job_type = "topic"` whenever topic IDs are present in URLs or CLI arguments.
+  3. **Clean Global Scope Imports**: Removed all nested `import sqlite3` and `import io` from inside methods, fully relying on top-level module imports.
+  4. **Rich Live Topic Telemetry Callback**: Replaced static lambda with async `_topic_telemetry_cb` rendering real-time download/upload progress bars, MB/s speed, file size, and ETA.
+* **Verification**: All 96/96 pytest tests passed (100%).
+
 ### 18. Forum Topics Collision, Title Repetition, Supersonic Pointer Cloning, Real Message Purge & Per-User Isolation (`devi/operator/deep_cloner.py`, `devi/operator/telegram_bot.py`)
 * **Symptom & User Feedback**:
   - User reported:
