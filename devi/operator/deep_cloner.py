@@ -268,22 +268,22 @@ async def get_or_create_target_topic(
     if clean_title.lower() in ("general", "general topic", "general discussion & study media") or clean_title == "1":
         return 1
 
-    # 1. Check local SQLite cache first to avoid redundant creations
+    # 1. Check local SQLite cache first to avoid redundant creations (Distinct topic_id > 1)
     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
         row = conn.execute(
             "SELECT topic_id FROM telegram_group_topics WHERE chat_id = ? AND LOWER(TRIM(topic_title)) = LOWER(TRIM(?))",
             (target_chat_id, clean_title)
         ).fetchone()
-        if row and row[0] > 0:
+        if row and row[0] > 1:
             return int(row[0])
 
-    # 2. Check live forum topics in target group via user_client to reuse matching existing topics (Strict Exact Match)
+    # 2. Check live forum topics in target group via user_client to reuse matching existing topics (Strict Exact Match, topic_id > 1)
     if user_client:
         try:
             target_peer = await _safe_resolve_entity(user_client, target_chat_id)
             res = await user_client(GetForumTopicsRequest(
                 peer=target_peer,
-                offset_date=None,
+                offset_date=0,
                 offset_id=0,
                 offset_topic=0,
                 limit=100
@@ -291,7 +291,7 @@ async def get_or_create_target_topic(
             for t in getattr(res, 'topics', []):
                 t_title = getattr(t, 'title', '')
                 t_id = getattr(t, 'id', 0)
-                if t_id and clean_title.lower().strip() == t_title.lower().strip():
+                if t_id and t_id > 1 and clean_title.lower().strip() == t_title.lower().strip():
                     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
                         conn.execute(
                             "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
@@ -325,6 +325,8 @@ async def get_or_create_target_topic(
                             conn.commit()
                         logger.info(f"✅ Created topic '{clean_title}' (#{t_id}) in {target_chat_id} via Bot API")
                         return t_id
+                    else:
+                        logger.warning(f"Bot API createForumTopic rejected: {res.get('description')}")
         except Exception as e:
             logger.warning(f"Bot API createForumTopic failed: {e}")
 
@@ -345,18 +347,20 @@ async def get_or_create_target_topic(
                 if hasattr(update, 'message') and hasattr(update.message, 'id'):
                     created_msg_id = update.message.id
                     break
-            with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                conn.execute(
-                    "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
-                    (target_chat_id, created_msg_id, clean_title)
-                )
-                conn.commit()
-            logger.info(f"✅ Created topic '{clean_title}' (#{created_msg_id}) in {target_chat_id} via MTProto")
-            return created_msg_id
+            if created_msg_id > 1:
+                with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
+                        (target_chat_id, created_msg_id, clean_title)
+                    )
+                    conn.commit()
+                logger.info(f"✅ Created topic '{clean_title}' (#{created_msg_id}) in {target_chat_id} via MTProto")
+                return created_msg_id
         except Exception as ex_mt:
             logger.error(f"MTProto CreateForumTopicRequest failed: {ex_mt}")
 
     # Default to general chat topic 0/1 if forum creation unavailable
+    logger.warning(f"⚠️ Topic creation fell back to General (#1) for '{clean_title}' in {target_chat_id}. Ensure Bot has 'Manage Topics' right!")
     return 1
 
 async def _safe_resolve_entity(client: TelegramClient, target):
