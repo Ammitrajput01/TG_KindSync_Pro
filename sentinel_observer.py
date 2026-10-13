@@ -907,10 +907,35 @@ def render_observer_hud(state: ObserverState, db_stats: dict):
 # ==============================================================================
 # MAIN ASYNC DAEMON ENTRYPOINT
 # ==============================================================================
+def cleanup_stale_temp_sessions(max_age_sec: int = 7200) -> int:
+    """Purge temporary scan and vault export session files older than TTL (2 hours)."""
+    cleaned = 0
+    now_ts = time.time()
+    patterns = [
+        "temp_scan_session_*.session*",
+        "temp_vault_export_session_*.session*",
+        "temp_test_session_*.session*"
+    ]
+    for pattern in patterns:
+        for p in BASE_DIR.glob(pattern):
+            try:
+                if now_ts - p.stat().st_mtime > max_age_sec:
+                    p.unlink(missing_ok=True)
+                    cleaned += 1
+            except Exception:
+                pass
+    return cleaned
+
+
 async def main():
     load_dotenv(ENV_FILE, override=True)
     api_id = int(os.getenv("API_ID", 0) or 0)
     api_hash = os.getenv("API_HASH", "").strip()
+
+    # Initial cleanup of stale temporary sessions
+    cleaned_count = cleanup_stale_temp_sessions()
+    if cleaned_count > 0:
+        STATE.add_event(f"[dim green]🧹 Purged {cleaned_count} stale temporary session file(s).[/]")
 
     if not api_id or not api_hash:
         console.print(f"[bold red]❌ Error: API_ID and API_HASH are required in .env for {DEVI_NAME} Sentinel.[/]")
@@ -948,7 +973,15 @@ async def main():
     async def _periodic_observer_loop(live_ctx=None):
         last_morning_date = ""
         last_night_date = ""
+        last_cleanup_monotonic = time.monotonic()
         while True:
+            # Hourly temp sessions TTL cleanup
+            if time.monotonic() - last_cleanup_monotonic >= 3600:
+                last_cleanup_monotonic = time.monotonic()
+                purged = cleanup_stale_temp_sessions()
+                if purged > 0:
+                    STATE.add_event(f"[dim green]🧹 Purged {purged} stale temp session file(s).[/]")
+
             events = BRIDGE.poll_logs()
             for ev in events:
                 if ev["type"] == "FLOOD_WAIT":

@@ -60,6 +60,9 @@ from devi.operator.medical_calculator import (
     calc_gcs,
     calc_curb65,
     calc_wells_pe,
+    calc_corrected_calcium,
+    calc_meld_na,
+    calc_ckd_epi_2021,
 )
 
 logger = logging.getLogger("DEVI.TelegramBot")
@@ -74,11 +77,14 @@ API_ID = int(os.getenv("API_ID", "36193727") or 36193727)
 API_HASH = os.getenv("API_HASH", "fef19b9b1434a3e66b009fd31053200b").strip()
 
 def get_db_conn() -> sqlite3.Connection:
-    """Thread-safe, locked-resistant SQLite connection with 60s timeout and WAL pragma."""
+    """Thread-safe, locked-resistant SQLite connection with 60s timeout, memory cache, and WAL pragma."""
     conn = sqlite3.connect(DB_PATH, timeout=60.0)
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 60000")
     conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA mmap_size = 268435456")
+    conn.execute("PRAGMA cache_size = -64000")
+    conn.execute("PRAGMA temp_store = MEMORY")
     return conn
 
 # Regex for Indian & International 10-12 digit numbers (handles spaces, dashes, +91)
@@ -5817,157 +5823,175 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, "⚠️ Access Denied: Group Admin rights required.", message_thread_id=thread_id)
                 return
 
-            # CASE A: Full Forum / Entire Group / Specific Topic Clone (2 or more arguments)
+            # SMART AUTO-CONTEXT DETECTION:
+            # If user sends `/clone <source_link>` inside a group or topic,
+            # automatically treat the CURRENT group/topic as the destination!
+            is_group_context = bool(chat_id and (chat_id < 0 or str(chat_id).startswith("-100")))
+            
+            src_chat_input = None
+            tgt_chat_input = None
+            src_top = 0
+            tgt_top = 0
+            job_type = "group"
+
             if len(parts) >= 3:
+                # Explicit two-argument mode: /clone <source> <target> [src_top] [tgt_top]
                 src_chat_input, src_top_url = self._extract_chat_and_topic(parts[1])
                 tgt_chat_input, tgt_top_url = self._extract_chat_and_topic(parts[2])
+                src_top = int(parts[3]) if len(parts) >= 4 and parts[3].isdigit() else src_top_url
+                tgt_top = int(parts[4]) if len(parts) >= 5 and parts[4].isdigit() else tgt_top_url
+                job_type = "topic" if (src_top > 0 or tgt_top > 0) else "group"
+            elif len(parts) == 2 and is_group_context and not reply_to:
+                # 1-Click Smart Context Mode: user typed /clone <source_link> directly in target group/topic
+                src_chat_input, src_top_url = self._extract_chat_and_topic(parts[1])
+                if src_chat_input:
+                    tgt_chat_input = chat_id
+                    tgt_top = thread_id if (thread_id and thread_id > 1) else 0
+                    src_top = src_top_url
+                    job_type = "topic" if (src_top > 0 or tgt_top > 0) else "group"
 
-                if src_chat_input and tgt_chat_input:
-                    from devi.operator.deep_cloner import DeepClonerEngine, create_clone_job
-                    src_top = int(parts[3]) if len(parts) >= 4 and parts[3].isdigit() else src_top_url
-                    tgt_top = int(parts[4]) if len(parts) >= 5 and parts[4].isdigit() else tgt_top_url
+            if src_chat_input and tgt_chat_input:
+                from devi.operator.deep_cloner import DeepClonerEngine, create_clone_job
 
-                    job_type = "topic" if src_top > 0 else "group"
+                job_id = create_clone_job(
+                    user_id=admin_id,
+                    source_chat=str(src_chat_input),
+                    target_chat=str(tgt_chat_input),
+                    job_type=job_type,
+                    source_topic_id=src_top,
+                    target_topic_id=tgt_top,
+                    progress_msg_id=0,
+                    progress_chat_id=chat_id
+                )
 
-                    job_id = create_clone_job(
-                        user_id=admin_id,
-                        source_chat=str(src_chat_input),
-                        target_chat=str(tgt_chat_input),
-                        job_type=job_type,
-                        source_topic_id=src_top,
-                        target_topic_id=tgt_top,
-                        progress_msg_id=0,
-                        progress_chat_id=chat_id
-                    )
+                progress_card = (
+                    f"🚀 <b>Deep Cloner Engine Initiated (Job #{job_id})!</b> 🩺\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📤 <b>Source Chat:</b> <code>{src_chat_input}</code>\n"
+                    f"📥 <b>Target Chat:</b> <code>{tgt_chat_input}</code>\n"
+                    f"⚙️ <b>Job Mode:</b> <code>{'Specific Topic #' + str(src_top) if job_type == 'topic' else 'Full Forum & All Topics'}</code>\n"
+                    f"🔒 <b>Security:</b> <code>Zero Forward Tags & Strip Words Active</code>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏳ <i>Connecting to MTProto session & discovering topics...</i>\n\n"
+                    f"🎮 <b>Helpful Commands (Click to use):</b>\n"
+                    f"• /clonestatus — <i>Check real-time progress</i>\n"
+                    f"• /stopclone {job_id} — <i>Cancel this clone job</i>\n"
+                    f"• /pauseclone {job_id} — <i>Pause cloning</i>\n"
+                    f"• /clonejobs — <i>List all active & historical jobs</i>\n"
+                    f"• /viewthumb — <i>Preview 16:9 cover thumbnail</i>\n"
+                    f"• /setthumb — <i>Upload custom cover thumbnail</i>\n"
+                    f"• /fullhelp — <i>Complete command manual</i>"
+                )
+                prog_msg_id = await self._send_message(session, chat_id, progress_card, message_thread_id=thread_id)
 
-                    progress_card = (
-                        f"🚀 <b>Deep Cloner Engine Initiated (Job #{job_id})!</b> 🩺\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"📤 <b>Source Chat:</b> <code>{src_chat_input}</code>\n"
-                        f"📥 <b>Target Chat:</b> <code>{tgt_chat_input}</code>\n"
-                        f"⚙️ <b>Job Mode:</b> <code>{'Specific Topic #' + str(src_top) if job_type == 'topic' else 'Full Forum & All Topics'}</code>\n"
-                        f"🔒 <b>Security:</b> <code>Zero Forward Tags & Strip Words Active</code>\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"⏳ <i>Connecting to MTProto session & discovering topics...</i>\n\n"
-                        f"🎮 <b>Helpful Commands (Click to use):</b>\n"
-                        f"• /clonestatus — <i>Check real-time progress</i>\n"
-                        f"• /stopclone {job_id} — <i>Cancel this clone job</i>\n"
-                        f"• /pauseclone {job_id} — <i>Pause cloning</i>\n"
-                        f"• /clonejobs — <i>List all active & historical jobs</i>\n"
-                        f"• /viewthumb — <i>Preview 16:9 cover thumbnail</i>\n"
-                        f"• /setthumb — <i>Upload custom cover thumbnail</i>\n"
-                        f"• /fullhelp — <i>Complete command manual</i>"
-                    )
-                    prog_msg_id = await self._send_message(session, chat_id, progress_card, message_thread_id=thread_id)
+                engine = DeepClonerEngine(self.token)
 
-                    engine = DeepClonerEngine(self.token)
+                async def _ui_progress(text_card: str):
+                    if prog_msg_id:
+                        with suppress(Exception):
+                            await self._edit_message(session, chat_id, prog_msg_id, text_card)
 
-                    async def _ui_progress(text_card: str):
-                        if prog_msg_id:
-                            with suppress(Exception):
-                                await self._edit_message(session, chat_id, prog_msg_id, text_card)
+                if job_type == "topic":
+                    async def _run_topic():
+                        try:
+                            from devi.operator.session_vault import get_vault_client_for_target
+                            u_cl, _ = await get_vault_client_for_target(preferred_user_id=admin_id)
+                            if not u_cl:
+                                await self._send_message(session, chat_id, "❌ No connected user session. Use /connect first.", message_thread_id=thread_id)
+                                return
+                            from devi.operator.deep_cloner import resolve_source_topic_title, get_or_create_target_topic, update_clone_job_progress
+                            real_title = await resolve_source_topic_title(u_cl, src_chat_input, src_top)
+                            update_clone_job_progress(job_id, total_topics=1, current_topic_title=real_title, status="running")
 
-                    if job_type == "topic":
-                        async def _run_topic():
-                            try:
-                                from devi.operator.session_vault import get_vault_client_for_target
-                                u_cl, _ = await get_vault_client_for_target(preferred_user_id=admin_id)
-                                if not u_cl:
-                                    await self._send_message(session, chat_id, "❌ No connected user session. Use /connect first.", message_thread_id=thread_id)
-                                    return
-                                from devi.operator.deep_cloner import resolve_source_topic_title, get_or_create_target_topic, update_clone_job_progress
-                                real_title = await resolve_source_topic_title(u_cl, src_chat_input, src_top)
-                                update_clone_job_progress(job_id, total_topics=1, current_topic_title=real_title, status="running")
-
-                                resolved_tgt_top = tgt_top
-                                if not resolved_tgt_top or resolved_tgt_top <= 1:
-                                    resolved_tgt_top = await get_or_create_target_topic(
-                                        self.token, u_cl, tgt_chat_input, real_title
-                                    )
-
-                                async def _topic_telemetry_cb(top_name, cur_m, tot_m, top_cloned, file_name=None, cur_bytes=0, tot_bytes=0, phase="⚡ Processing", start_t=None):
-                                    file_extra = ""
-                                    if cur_bytes and tot_bytes and tot_bytes > 0:
-                                        file_pct = min(100.0, round((cur_bytes / max(1, tot_bytes)) * 100, 1))
-                                        cur_mb = round(cur_bytes / (1024 * 1024), 1)
-                                        tot_mb = round(tot_bytes / (1024 * 1024), 1)
-                                        elapsed = max(0.1, asyncio.get_event_loop().time() - (start_t or asyncio.get_event_loop().time()))
-                                        speed_mb = (cur_bytes / (1024 * 1024)) / elapsed
-                                        filled = int(file_pct / 100.0 * 10)
-                                        bar = "█" * filled + "░" * (10 - filled)
-                                        rem_b = max(0, tot_bytes - cur_bytes)
-                                        eta_s = int(rem_b / max(1, (speed_mb * 1024 * 1024))) if speed_mb > 0.05 else 0
-                                        eta_txt = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
-                                        file_extra = (
-                                            f"🎬 <b>File:</b> <code>{html.escape(file_name or 'Lecture Media')}</code>\n"
-                                            f"⚡ <b>Activity:</b> <code>{phase} [{bar}] {file_pct}%</code>\n"
-                                            f"🚀 <b>Speed:</b> <code>{speed_mb:.1f} MB/s</code> | <b>Size:</b> <code>{cur_mb}/{tot_mb} MB</code> | <b>ETA:</b> <code>{eta_txt}</code>\n"
-                                        )
-                                    pct = round((cur_m / max(1, tot_m)) * 100, 1) if tot_m > 0 else 0
-                                    await _ui_progress(
-                                        f"🚀 <b>Topic Clone in Progress (Job #{job_id})</b> 🩺\n"
-                                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                                        f"📂 <b>Topic:</b> <b>{html.escape(real_title)}</b>\n"
-                                        f"{file_extra}"
-                                        f"📊 <b>Topic Messages:</b> <code>{cur_m}</code> / <code>{tot_m}</code> ({pct}%)\n"
-                                        f"💎 <b>Total Cloned:</b> <code>{top_cloned}</code> items 🚀\n"
-                                        f"🛡️ <b>Clean Status:</b> ❌ Zero Tags | ✨ Stripped Watermarks\n\n"
-                                        f"<i>(Aap jab chahe <code>/stopclone {job_id}</code> bhej kar stop kar sakte hain).</i>"
-                                    )
-
-                                cloned_res = await engine.clone_topic_stream(
-                                    job_id, u_cl, src_chat_input, src_top, tgt_chat_input, resolved_tgt_top,
-                                    topic_title=real_title,
-                                    progress_callback=_topic_telemetry_cb
+                            resolved_tgt_top = tgt_top
+                            if not resolved_tgt_top or resolved_tgt_top <= 1:
+                                resolved_tgt_top = await get_or_create_target_topic(
+                                    self.token, u_cl, tgt_chat_input, real_title
                                 )
-                                cloned = cloned_res[0] if isinstance(cloned_res, (tuple, list)) else (cloned_res or 0)
-                                update_clone_job_progress(job_id, status="completed", completed_topics=1)
-                                await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed (Job #{job_id})!</b>\n\nCloned <code>{cloned}</code> items into <b>{html.escape(real_title)}</b>.", message_thread_id=thread_id)
-                            except Exception as ex_t:
-                                logger.error(f"Topic clone error: {ex_t}", exc_info=True)
-                                from devi.operator.deep_cloner import update_clone_job_progress
-                                update_clone_job_progress(job_id, status="failed", error_msg=str(ex_t))
-                                await self._send_message(session, chat_id, f"❌ <b>Topic Clone Error:</b> {html.escape(str(ex_t))}", message_thread_id=thread_id)
-                        t = asyncio.create_task(_run_topic())
-                        from devi.operator.session_vault import register_user_job_task
-                        register_user_job_task(admin_id, t)
-                    else:
-                        async def _run_group():
-                            try:
-                                clone_res = await engine.clone_entire_group(
-                                    job_id, admin_id, src_chat_input, tgt_chat_input,
-                                    progress_updater=_ui_progress
+
+                            async def _topic_telemetry_cb(top_name, cur_m, tot_m, top_cloned, file_name=None, cur_bytes=0, tot_bytes=0, phase="⚡ Processing", start_t=None):
+                                file_extra = ""
+                                if cur_bytes and tot_bytes and tot_bytes > 0:
+                                    file_pct = min(100.0, round((cur_bytes / max(1, tot_bytes)) * 100, 1))
+                                    cur_mb = round(cur_bytes / (1024 * 1024), 1)
+                                    tot_mb = round(tot_bytes / (1024 * 1024), 1)
+                                    elapsed = max(0.1, asyncio.get_event_loop().time() - (start_t or asyncio.get_event_loop().time()))
+                                    speed_mb = (cur_bytes / (1024 * 1024)) / elapsed
+                                    filled = int(file_pct / 100.0 * 10)
+                                    bar = "█" * filled + "░" * (10 - filled)
+                                    rem_b = max(0, tot_bytes - cur_bytes)
+                                    eta_s = int(rem_b / max(1, (speed_mb * 1024 * 1024))) if speed_mb > 0.05 else 0
+                                    eta_txt = f"{eta_s}s" if eta_s < 60 else f"{eta_s//60}m {eta_s%60}s"
+                                    file_extra = (
+                                        f"🎬 <b>File:</b> <code>{html.escape(file_name or 'Lecture Media')}</code>\n"
+                                        f"⚡ <b>Activity:</b> <code>{phase} [{bar}] {file_pct}%</code>\n"
+                                        f"🚀 <b>Speed:</b> <code>{speed_mb:.1f} MB/s</code> | <b>Size:</b> <code>{cur_mb}/{tot_mb} MB</code> | <b>ETA:</b> <code>{eta_txt}</code>\n"
+                                    )
+                                pct = round((cur_m / max(1, tot_m)) * 100, 1) if tot_m > 0 else 0
+                                await _ui_progress(
+                                    f"🚀 <b>Topic Clone in Progress (Job #{job_id})</b> 🩺\n"
+                                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                    f"📂 <b>Topic:</b> <b>{html.escape(real_title)}</b>\n"
+                                    f"{file_extra}"
+                                    f"📊 <b>Topic Messages:</b> <code>{cur_m}</code> / <code>{tot_m}</code> ({pct}%)\n"
+                                    f"💎 <b>Total Cloned:</b> <code>{top_cloned}</code> items 🚀\n"
+                                    f"🛡️ <b>Clean Status:</b> ❌ Zero Tags | ✨ Stripped Watermarks\n\n"
+                                    f"<i>(Aap jab chahe <code>/stopclone {job_id}</code> bhej kar stop kar sakte hain).</i>"
                                 )
-                                if isinstance(clone_res, (tuple, list)):
-                                    total_cloned, total_top = clone_res[0], clone_res[1]
-                                else:
-                                    total_cloned, total_top = 0, 0
 
-                                if total_cloned > 0 or total_top > 0:
-                                    await self._send_message(
-                                        session, chat_id,
-                                        f"🎉 <b>Deep Forum Clone Completed (Job #{job_id})!</b> 🚀\n\n"
-                                        f"• <b>Total Topics:</b> <code>{total_top}</code>\n"
-                                        f"• <b>Total Messages:</b> <code>{total_cloned}</code>\n"
-                                        f"• <b>Status:</b> All lectures cloned with zero forward tags.",
-                                        message_thread_id=thread_id
-                                    )
-                                else:
-                                    await self._send_message(
-                                        session, chat_id,
-                                        f"⚠️ <b>Clone Job #{job_id} Finished:</b> No new messages or topics were cloned from source.",
-                                        message_thread_id=thread_id
-                                    )
-                            except Exception as ex_g:
-                                logger.error(f"Group clone error: {ex_g}", exc_info=True)
-                                from devi.operator.deep_cloner import update_clone_job_progress
-                                update_clone_job_progress(job_id, status="failed", error_msg=str(ex_g))
-                                await self._send_message(session, chat_id, f"❌ <b>Group Clone Error (Job #{job_id}):</b>\n<code>{html.escape(str(ex_g))}</code>", message_thread_id=thread_id)
-                        t = asyncio.create_task(_run_group())
-                        from devi.operator.session_vault import register_user_job_task
-                        register_user_job_task(admin_id, t)
+                            cloned_res = await engine.clone_topic_stream(
+                                job_id, u_cl, src_chat_input, src_top, tgt_chat_input, resolved_tgt_top,
+                                topic_title=real_title,
+                                progress_callback=_topic_telemetry_cb
+                            )
+                            cloned = cloned_res[0] if isinstance(cloned_res, (tuple, list)) else (cloned_res or 0)
+                            update_clone_job_progress(job_id, status="completed", completed_topics=1)
+                            await self._send_message(session, chat_id, f"🎉 <b>Topic Clone Completed (Job #{job_id})!</b>\n\nCloned <code>{cloned}</code> items into <b>{html.escape(real_title)}</b>.", message_thread_id=thread_id)
+                        except Exception as ex_t:
+                            logger.error(f"Topic clone error: {ex_t}", exc_info=True)
+                            from devi.operator.deep_cloner import update_clone_job_progress
+                            update_clone_job_progress(job_id, status="failed", error_msg=str(ex_t))
+                            await self._send_message(session, chat_id, f"❌ <b>Topic Clone Error:</b> {html.escape(str(ex_t))}", message_thread_id=thread_id)
+                    t = asyncio.create_task(_run_topic())
+                    from devi.operator.session_vault import register_user_job_task
+                    register_user_job_task(admin_id, t)
+                else:
+                    async def _run_group():
+                        try:
+                            clone_res = await engine.clone_entire_group(
+                                job_id, admin_id, src_chat_input, tgt_chat_input,
+                                progress_updater=_ui_progress
+                            )
+                            if isinstance(clone_res, (tuple, list)):
+                                total_cloned, total_top = clone_res[0], clone_res[1]
+                            else:
+                                total_cloned, total_top = 0, 0
 
-                    return
+                            if total_cloned > 0 or total_top > 0:
+                                await self._send_message(
+                                    session, chat_id,
+                                    f"🎉 <b>Deep Forum Clone Completed (Job #{job_id})!</b> 🚀\n\n"
+                                    f"• <b>Total Topics:</b> <code>{total_top}</code>\n"
+                                    f"• <b>Total Messages:</b> <code>{total_cloned}</code>\n"
+                                    f"• <b>Status:</b> All lectures cloned with zero forward tags.",
+                                    message_thread_id=thread_id
+                                )
+                            else:
+                                await self._send_message(
+                                    session, chat_id,
+                                    f"⚠️ <b>Clone Job #{job_id} Finished:</b> No new messages or topics were cloned from source.",
+                                    message_thread_id=thread_id
+                                )
+                        except Exception as ex_g:
+                            logger.error(f"Group clone error: {ex_g}", exc_info=True)
+                            from devi.operator.deep_cloner import update_clone_job_progress
+                            update_clone_job_progress(job_id, status="failed", error_msg=str(ex_g))
+                            await self._send_message(session, chat_id, f"❌ <b>Group Clone Error (Job #{job_id}):</b>\n<code>{html.escape(str(ex_g))}</code>", message_thread_id=thread_id)
+                    t = asyncio.create_task(_run_group())
+                    from devi.operator.session_vault import register_user_job_task
+                    register_user_job_task(admin_id, t)
+
+                return
 
             # CASE B: Single Message Clone (Link or Reply)
             from_chat = None
@@ -7147,7 +7171,7 @@ class DeviTelegramBot:
         # -------------------------------------------------------------
         # 4. SUBJECT-WISE CLINICAL MEDICAL FORMULA & DOSAGE ENGINE
         # -------------------------------------------------------------
-        elif cmd in ("/calc", "/dose", "/formula", "/score", "/bmi", "/bsa", "/gfr", "/pedia", "/burns", "/uop", "/edd", "/psm", "/drip", "/infusion", "/map", "/abg", "/sodium", "/gcs", "/curb65", "/wells"):
+        elif cmd in ("/calc", "/dose", "/formula", "/score", "/bmi", "/bsa", "/gfr", "/pedia", "/burns", "/uop", "/edd", "/psm", "/drip", "/infusion", "/map", "/abg", "/sodium", "/gcs", "/curb65", "/wells", "/ca", "/calcium", "/meld"):
             sub_cmd = cmd.lstrip("/").lower()
             if sub_cmd in ("calc", "dose", "formula", "score"):
                 sub_cmd = parts[1].lower() if len(parts) > 1 else "menu"
@@ -7170,7 +7194,9 @@ class DeviTelegramBot:
                     "🩺 **2. GENERAL MEDICINE & CRITICAL CARE:**\n"
                     "• `/bmi <weight_kg> <height_cm>` ➔ BMI & Devine Ideal Body Weight\n"
                     "• `/bsa <height_cm> <weight_kg>` ➔ Mosteller & DuBois Body Surface Area\n"
-                    "• `/gfr <age> <weight_kg> <serum_cr> <m/f>` ➔ Cockcroft-Gault CrCl & CKD Stage\n"
+                    "• `/gfr <age> <weight_kg> <serum_cr> <m/f>` ➔ CrCl (Cockcroft-Gault) & CKD-EPI 2021\n"
+                    "• `/ca <serum_ca> <serum_albumin>` ➔ Payne's Corrected Calcium\n"
+                    "• `/meld <bili> <inr> <cr> [na] [dialysis:0/1]` ➔ MELD-Na Liver Mortality Score\n"
                     "• `/map <sbp> <dbp>` ➔ Mean Arterial Pressure & Shock Perfusion\n"
                     "• `/abg <Na> <Cl> <HCO3> [Albumin]` ➔ Serum Anion Gap & Albumin Correction\n"
                     "• `/sodium <measured_na> <glucose>` ➔ Corrected Sodium in Hyperglycemia\n"
@@ -7188,7 +7214,7 @@ class DeviTelegramBot:
                     "• `/drip <volume_ml> <hours> [drop_factor]` ➔ IV Drip Rate in Drops/min\n"
                     "• `/infusion <drug_mg> <vol_ml> <dose_mcg_kg_min> <wt_kg>` ➔ Inotrope Syringe Pump (mL/hr)\n"
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    "💡 *Tip: Direct commands work anywhere, e.g. `/bmi 70 175` ya `/burns 60 30`*"
+                    "💡 *Tip: Direct commands work anywhere, e.g. `/bmi 70 175` ya `/gfr 55 70 1.2 m`*"
                 )
                 await self._send_message(session, chat_id, menu_card, message_thread_id=thread_id)
 
@@ -7234,7 +7260,7 @@ class DeviTelegramBot:
                 except ValueError:
                     await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/bsa 175 70`", message_thread_id=thread_id)
 
-            # D. GFR & RENAL FUNCTION (Cockcroft-Gault)
+            # D. GFR & RENAL FUNCTION (Cockcroft-Gault & CKD-EPI 2021)
             elif sub_cmd == "gfr":
                 if len(calc_args) < 3:
                     await self._send_message(session, chat_id, "Usage: `/gfr <age> <weight_kg> <serum_cr> [m/f]`\nExample: `/gfr 55 70 1.2 m`", message_thread_id=thread_id)
@@ -7244,12 +7270,13 @@ class DeviTelegramBot:
                     is_female = len(calc_args) > 3 and calc_args[3].lower().startswith("f")
                     res = calc_gfr(age, wt, cr, is_female=is_female)
                     card = (
-                        f"🫘 **Clinical Calculator: GFR / Creatinine Clearance (CrCl)** 🩺\n"
+                        f"🫘 **Clinical Calculator: GFR & Renal Function** 🩺\n"
                         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"• **Age**: `{age:.0f} yrs` | **Weight**: `{wt:.1f} kg` | **Cr**: `{cr:.2f} mg/dL` ({'Female' if is_female else 'Male'})\n"
-                        f"• **Calculated CrCl**: `{res['cr_cl_ml_min']} mL/min`\n"
-                        f"• **KDIGO CKD Staging**: **{res['ckd_stage']}**\n\n"
-                        f"💡 *Formula: Cockcroft-Gault equation [× 0.85 for female patients].*"
+                        f"• **Patient**: `{age:.0f} yrs` | `{wt:.1f} kg` | Cr: `{cr:.2f} mg/dL` ({'Female' if is_female else 'Male'})\n"
+                        f"• **Cockcroft-Gault CrCl**: **`{res['cr_cl_ml_min']} mL/min`** `({res['ckd_stage']})`\n"
+                        f"• **CKD-EPI 2021 eGFR**: **`{res['ckd_epi_egfr']} mL/min/1.73m²`**\n"
+                        f"• **KDIGO Staging**: **{res['kdigo_stage']}**\n\n"
+                        f"💡 *Cockcroft-Gault CrCl is standard for renal drug dosing; CKD-EPI 2021 (race-free) is gold standard for CKD diagnosis & prognosis.*"
                     )
                     await self._send_message(session, chat_id, card, message_thread_id=thread_id)
                 except ValueError:
@@ -7603,6 +7630,51 @@ class DeviTelegramBot:
                     await self._send_message(session, chat_id, card, message_thread_id=thread_id)
                 except ValueError:
                     await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/wells 1 1 1 0 0 0 0`", message_thread_id=thread_id)
+
+            # R. CORRECTED CALCIUM (Payne Formula)
+            elif sub_cmd in ("ca", "calcium"):
+                if len(calc_args) < 2:
+                    await self._send_message(session, chat_id, "Usage: `/ca <serum_ca_mg_dl> <serum_albumin_g_dl>`\nExample: `/ca 7.8 2.5`", message_thread_id=thread_id)
+                    return
+                try:
+                    ca_val, alb = float(calc_args[0]), float(calc_args[1])
+                    res = calc_corrected_calcium(ca_val, alb)
+                    card = (
+                        f"🧪 **Clinical Score: Corrected Calcium (Payne Formula)** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Total Serum Ca**: `{ca_val:.1f} mg/dL` | **Albumin**: `{alb:.1f} g/dL`\n"
+                        f"• **Corrected Calcium**: **`{res['corrected_ca']} mg/dL`**\n"
+                        f"• **Clinical Status**: **{res['status']}**\n\n"
+                        f"💡 *Formula: Serum Ca + 0.8 × (4.0 - Albumin). Required in hypoalbuminemia to prevent pseudo-hypocalcemia diagnosis.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/ca 7.8 2.5`", message_thread_id=thread_id)
+
+            # S. MELD-Na LIVER SCORE
+            elif sub_cmd == "meld":
+                if len(calc_args) < 3:
+                    await self._send_message(session, chat_id, "Usage: `/meld <bilirubin> <inr> <creatinine> [sodium:135] [dialysis:0/1]`\nExample: `/meld 2.5 1.8 1.4 130 0`", message_thread_id=thread_id)
+                    return
+                try:
+                    bili = float(calc_args[0])
+                    inr = float(calc_args[1])
+                    cr = float(calc_args[2])
+                    na = float(calc_args[3]) if len(calc_args) > 3 else 135.0
+                    dialysis = bool(int(calc_args[4])) if len(calc_args) > 4 else False
+                    res = calc_meld_na(bili, inr, cr, sodium_meq_l=na, on_dialysis=dialysis)
+                    dial_badge = " *(On Dialysis)*" if dialysis else ""
+                    card = (
+                        f"🫀 **Clinical Score: MELD-Na Liver Mortality Score** 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"• **Bilirubin**: `{bili:.1f}` | **INR**: `{inr:.1f}` | **Cr**: `{cr:.1f}`{dial_badge} | **Na⁺**: `{na:.0f}`\n"
+                        f"• **Calculated MELD-Na Score**: **`{res['meld_score']} Points`**\n"
+                        f"• **90-Day Estimated Mortality**: **{res['three_month_mortality']}**\n\n"
+                        f"💡 *Gold standard for liver cirrhosis prognosis and UNOS liver transplant prioritization.*"
+                    )
+                    await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                except ValueError:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/meld 2.5 1.8 1.4 130 0`", message_thread_id=thread_id)
 
         # -------------------------------------------------------------
         # 5. LEGACY EDUCATIONAL COMMANDS REDIRECT

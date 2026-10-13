@@ -579,6 +579,8 @@ def sanitize_filename(filename: str, fallback_ext: str = "", mime_type: str = ""
     name_str = str(filename).strip()
     # Strip any leading directory components to prevent path traversal
     name_str = os.path.basename(name_str.replace("\\", "/"))
+    # Pre-clean duplicate/nested extensions (e.g. video.mp4.mp4 -> video.mp4)
+    name_str = re.sub(r'(?i)(\.(mp4|mkv|avi|mov|webm|ts|m4v|3gp|flv|wmv|pdf|docx?|pptx?|xlsx?|epub|zip|rar|7z|tar|gz|mp3|m4a|wav|aac|ogg|flac|opus|jpg|jpeg|png|webp|gif|svg|txt|json|apk|bin)){2,}', r'\1', name_str)
     stem, ext = os.path.splitext(name_str)
     
     # Validate if ext is actually a valid file extension (e.g. .mp4, .pdf, .mkv, .jpg, .zip, etc.)
@@ -634,6 +636,10 @@ def sanitize_filename(filename: str, fallback_ext: str = "", mime_type: str = ""
     if not stem:
         stem = f"media_{generate_random_long()}"
     final_ext = ext if ext else (fallback_ext if fallback_ext.startswith(".") else (f".{fallback_ext}" if fallback_ext else ""))
+    
+    # Strip any trailing extension already embedded in stem so stem + final_ext never creates .mp4.mp4
+    if final_ext:
+        stem = re.sub(r'(?i)(\.(mp4|mkv|avi|mov|webm|ts|m4v|3gp|flv|wmv|pdf|docx?|pptx?|xlsx?|epub|zip|rar|7z|tar|gz|mp3|m4a|wav|aac|ogg|flac|opus|jpg|jpeg|png|webp|gif|svg|txt|json|apk|bin))+$', '', stem).strip(" .-_")
     return f"{stem}{final_ext}"
 
 def _parse_chat_id(val):
@@ -1252,9 +1258,9 @@ class StateManager:
         await self.db.executescript("""
             PRAGMA journal_mode=WAL;
             PRAGMA synchronous=NORMAL;
-            PRAGMA temp_store=FILE;
-            PRAGMA mmap_size=16777216;
-            PRAGMA cache_size=-2000;
+            PRAGMA temp_store=MEMORY;
+            PRAGMA mmap_size=268435456;
+            PRAGMA cache_size=-64000;
             PRAGMA busy_timeout=60000;
             CREATE TABLE IF NOT EXISTS forwarded (
                 source_chat TEXT NOT NULL,

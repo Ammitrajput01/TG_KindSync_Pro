@@ -195,29 +195,118 @@ def calc_bsa(height_cm: float, weight_kg: float) -> Dict[str, Any]:
     }
 
 
+def calc_ckd_epi_2021(age_years: float, serum_cr_mg_dl: float, is_female: bool = False) -> float:
+    """CKD-EPI 2021 Race-Free Equation for eGFR (mL/min/1.73m2). Recommended by KDIGO & NKF."""
+    if serum_cr_mg_dl <= 0:
+        return 0.0
+    kappa = 0.7 if is_female else 0.9
+    alpha = -0.241 if is_female else -0.302
+    mult = 1.012 if is_female else 1.0
+
+    scr_ratio = serum_cr_mg_dl / kappa
+    egfr = 142.0 * (min(scr_ratio, 1.0) ** alpha) * (max(scr_ratio, 1.0) ** -1.200) * (0.9938 ** age_years) * mult
+    return round(egfr, 1)
+
+
 def calc_gfr(age_years: float, weight_kg: float, serum_cr_mg_dl: float, is_female: bool = False) -> Dict[str, Any]:
-    """Cockcroft-Gault Creatinine Clearance & KDIGO CKD Staging."""
+    """Cockcroft-Gault Creatinine Clearance & CKD-EPI 2021 eGFR with KDIGO CKD Staging."""
     cr_cl = ((140.0 - age_years) * weight_kg) / (72.0 * serum_cr_mg_dl)
     if is_female:
         cr_cl *= 0.85
 
+    egfr_2021 = calc_ckd_epi_2021(age_years, serum_cr_mg_dl, is_female)
+
+    # Cockcroft-Gault CrCl Staging (Standard for renal drug dosing)
     if cr_cl >= 90:
-        ckd_stage = "Stage 1 (Normal / High GFR ≥ 90 mL/min) 🟢"
+        ckd_stage = "Stage 1 (Normal / High: ≥ 90 mL/min) 🟢"
     elif cr_cl >= 60:
         ckd_stage = "Stage 2 (Mildly Decreased: 60-89 mL/min) 🟢"
-    elif cr_cl >= 45:
-        ckd_stage = "Stage 3a (Mild-to-Moderate: 45-59 mL/min) 🟡"
     elif cr_cl >= 30:
-        ckd_stage = "Stage 3b (Moderate-to-Severe: 30-44 mL/min) 🟠"
+        ckd_stage = "Stage 3 (Moderate: 30-59 mL/min) 🟡"
     elif cr_cl >= 15:
-        ckd_stage = "Stage 4 (Severely Decreased: 15-29 mL/min) 🔴"
+        ckd_stage = "Stage 4 (Severe: 15-29 mL/min) 🔴"
     else:
-        ckd_stage = "Stage 5 (Kidney Failure / ESRD: < 15 mL/min) 🟣 (Dialysis Indicated)"
+        ckd_stage = "Stage 5 (Kidney Failure: < 15 mL/min) 🟣"
+
+    # KDIGO CKD-EPI 2021 Staging (Standard for clinical nephrology & CKD prognosis)
+    if egfr_2021 >= 90:
+        kdigo_stage = "KDIGO G1 (Normal / High: ≥ 90 mL/min/1.73m²) 🟢"
+    elif egfr_2021 >= 60:
+        kdigo_stage = "KDIGO G2 (Mildly Decreased: 60-89 mL/min/1.73m²) 🟢"
+    elif egfr_2021 >= 45:
+        kdigo_stage = "KDIGO G3a (Mild-to-Moderate: 45-59 mL/min/1.73m²) 🟡"
+    elif egfr_2021 >= 30:
+        kdigo_stage = "KDIGO G3b (Moderate-to-Severe: 30-44 mL/min/1.73m²) 🟠"
+    elif egfr_2021 >= 15:
+        kdigo_stage = "KDIGO G4 (Severely Decreased: 15-29 mL/min/1.73m²) 🔴"
+    else:
+        kdigo_stage = "KDIGO G5 (Kidney Failure / ESRD: < 15 mL/min/1.73m²) 🟣"
 
     return {
         "cr_cl_ml_min": round(cr_cl, 1),
+        "ckd_epi_egfr": egfr_2021,
         "ckd_stage": ckd_stage,
-        "is_female": is_female
+        "kdigo_stage": kdigo_stage,
+        "is_female": is_female,
+        "clinical_note": "Cockcroft-Gault (CrCl) is used for renal drug dosing; CKD-EPI 2021 (eGFR) is used for KDIGO CKD diagnosis & staging."
+    }
+
+
+def calc_corrected_calcium(serum_ca_mg_dl: float, serum_albumin_g_dl: float) -> Dict[str, Any]:
+    """Calculates Corrected Calcium using Payne's formula for hypoalbuminemia."""
+    corrected_ca = serum_ca_mg_dl + 0.8 * (4.0 - serum_albumin_g_dl)
+    if corrected_ca < 8.5:
+        status = "Hypocalcemia (< 8.5 mg/dL) 🔴"
+    elif corrected_ca <= 10.5:
+        status = "Normal Corrected Calcium (8.5 - 10.5 mg/dL) 🟢"
+    else:
+        status = "Hypercalcemia (> 10.5 mg/dL) 🔴"
+
+    return {
+        "measured_ca": serum_ca_mg_dl,
+        "albumin": serum_albumin_g_dl,
+        "corrected_ca": round(corrected_ca, 2),
+        "status": status,
+        "formula": "Payne's Formula: Measured Ca + 0.8 × (4.0 - Albumin)"
+    }
+
+
+def calc_meld_na(bilirubin_mg_dl: float, inr: float, creatinine_mg_dl: float, sodium_meq_l: float = 135.0, on_dialysis: bool = False) -> Dict[str, Any]:
+    """Calculates MELD-Na (Model for End-Stage Liver Disease) 90-day mortality risk."""
+    b = max(1.0, bilirubin_mg_dl)
+    i = max(1.0, inr)
+    c = 4.0 if on_dialysis else max(1.0, min(4.0, creatinine_mg_dl))
+    na = max(125.0, min(137.0, sodium_meq_l))
+
+    # Initial MELD(i)
+    meld_i = 9.57 * math.log(c) + 3.78 * math.log(b) + 11.2 * math.log(i) + 6.43
+    meld_initial = round(meld_i)
+
+    if meld_initial > 11:
+        meld_na = meld_initial + 1.32 * (137.0 - na) - (0.033 * meld_initial * (137.0 - na))
+        meld_score = round(max(meld_initial, min(40.0, meld_na)))
+    else:
+        meld_score = meld_initial
+
+    if meld_score <= 9:
+        mortality = "1.9% 🟢 (Low Risk)"
+    elif meld_score <= 19:
+        mortality = "6.0% 🟢"
+    elif meld_score <= 29:
+        mortality = "19.6% 🟡"
+    elif meld_score <= 39:
+        mortality = "52.6% 🔴"
+    else:
+        mortality = "71.3% 🟣 (Severe / Immediate Transplant Priority)"
+
+    return {
+        "meld_score": int(meld_score),
+        "three_month_mortality": mortality,
+        "bilirubin": bilirubin_mg_dl,
+        "inr": inr,
+        "creatinine": creatinine_mg_dl,
+        "sodium": sodium_meq_l,
+        "dialysis": on_dialysis
     }
 
 

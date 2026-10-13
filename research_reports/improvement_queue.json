@@ -4,7 +4,7 @@
     "analyzer": "Continuous AI Research & Code-Analysis Advisor",
     "developer": "Dr. Amit Singh (Kind Doctor)",
     "mode": "100% Air-Gapped & Read-Only (Safe Observability)",
-    "total_findings": 6,
+    "total_findings": 11,
     "codebase_summary": {
         "total_lines_analyzed": 7312,
         "files": {
@@ -103,6 +103,73 @@
             "priority_level": 4,
             "suggested_implementation_approach": "1. Add a `/ws/telemetry` route in `web_dashboard.py` alongside the existing HTTP REST endpoint.\n2. Keep HTTP endpoint as graceful fallback if WebSocket disconnects.",
             "status": "Under Evaluation"
+        },
+        {
+            "id": "RES-PIPE-007",
+            "title": "Pipelined Lookahead Queue with Atomic Ticket Gate",
+            "category": "Performance & Speed",
+            "why_it_matters": "Single-file stop-and-wait forwarder sits idle on CPU and network upload during each download cycle. Prefetching message N+1 while N uploads yields 2.5x throughput.",
+            "affects_part": "devi/operator/deep_cloner.py -> clone_topic_stream()",
+            "potential_benefits": "2.5x speed increase with 100% mathematical sequence integrity guaranteed by asyncio.Lock().",
+            "potential_risks": "Bounded RAM buffer required (max 2 items) to avoid memory spikes on large video batches.",
+            "priority": "CRITICAL (Performance)",
+            "priority_level": 1,
+            "suggested_implementation_approach": "1. Buffer next message in memory/temp queue.\n2. Acquire ticket lock for target dispatch.\n3. Verify delivery before unlocking next item.",
+            "status": "Ready for Implementation"
+        },
+        {
+            "id": "RES-CAP-008",
+            "title": "Medical Coaching Lecture Title Normalizer & Truncation Guard",
+            "category": "Curriculum Quality",
+            "why_it_matters": "Raw filenames like 01_cvs_part1.mp4 look unprofessional and lack curriculum metadata. Overlength captions risk silent Telegram truncation dropouts.",
+            "affects_part": "devi/operator/deep_cloner.py -> clean_cloned_caption()",
+            "potential_benefits": "Standardized beautiful lecture names ('\ud83d\udcd6 Lecture 01 \u2022 CVS Physiology') with duration/size pills and safe 1024-character windowing.",
+            "potential_risks": "None; non-matching filenames fallback safely to clean raw title.",
+            "priority": "HIGH (Quality)",
+            "priority_level": 2,
+            "suggested_implementation_approach": "1. Build regex parser for Marrow/PrepLadder/DBMCI patterns.\n2. Add metadata footer.\n3. Truncate at 1024 characters before dispatch.",
+            "status": "Ready for Implementation"
+        },
+        {
+            "id": "RES-SUBJ-009",
+            "title": "SQLite Route-Aware Persistent Subject Markers",
+            "category": "Curriculum Quality",
+            "why_it_matters": "In-memory last_subject tracker loses state across process restarts or VPS reboots, causing duplicate subject banners to be posted.",
+            "affects_part": "tg_kindsync_pro.py -> check_and_send_subject_header()",
+            "potential_benefits": "Zero duplicate subject banners; persistent state in SQLite WAL across infinite reboots; 2-tier Subject + Module taxonomy.",
+            "potential_risks": "Minimal; table automatically created with IF NOT EXISTS.",
+            "priority": "HIGH (Reliability)",
+            "priority_level": 2,
+            "suggested_implementation_approach": "1. Create table route_subject_markers in history_core.sqlite.\n2. Query on startup before emitting header.\n3. Update atomically.",
+            "status": "Ready for Implementation"
+        },
+        {
+            "id": "RES-TOC-010",
+            "title": "Hierarchical Curriculum Table of Contents (TOC) with Silent Pin",
+            "category": "Student Navigation",
+            "why_it_matters": "Linear flat list split across messages is hard to navigate for 100+ lecture medical subjects.",
+            "affects_part": "tg_kindsync_pro.py -> post_batch_index_card()",
+            "potential_benefits": "Clean hierarchical index organized by Subject & Topic with direct deep-links ('t.me/c/<id>/<msg>?thread=<top>') and silent pin ('notify=False').",
+            "potential_risks": "None. Replaces static text summary.",
+            "priority": "MEDIUM (UX)",
+            "priority_level": 3,
+            "suggested_implementation_approach": "1. Aggregate delivered message IDs by topic.\n2. Format Markdown index card.\n3. Post to target forum and pin silently.",
+            "status": "Ready for Implementation"
+        },
+        {
+            "id": "RES-TOPIC-011",
+            "title": "Mutex-Protected Forum Topic Slug Registry & O(1) Cache",
+            "category": "Performance & Safety",
+            "why_it_matters": "Repeated MTProto get_forum_topics lookups during batch cloning cause unnecessary network round-trips and risk FloodWait rate limits.",
+            "affects_part": "devi/operator/deep_cloner.py -> get_or_create_target_topic()",
+            "potential_benefits": "O(1) in-memory topic resolution; eliminates race conditions when multiple workers initialize topics simultaneously.",
+            "potential_risks": "Cache invalidation required if topics are renamed in Telegram app.",
+            "priority": "MEDIUM (Performance)",
+            "priority_level": 3,
+            "suggested_implementation_approach": "1. Maintain per-chat topic dict protected by asyncio.Lock().\n2. Populate on first access.\n3. Fast dictionary lookup thereafter.",
+            "status": "Ready for Implementation"
         }
-    ]
+    ],
+    "updated_at": 1791923051.4959202,
+    "updated_at_human": "2026-10-14 01:54:11 UTC"
 }

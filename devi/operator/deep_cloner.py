@@ -216,16 +216,17 @@ def clean_cloned_caption(
             body_extra = t_lines[1].strip()
 
     if not title_val and orig_filename:
-        clean_stem = Path(orig_filename).stem.replace("_", " ").replace("-", " ").strip()
-        title_val = clean_stem
+        # Strip any duplicate or nested extensions from filename before forming title (e.g. 01_cvs_part1.mp4.mp4 -> 01_cvs_part1)
+        clean_stem = re.sub(r'(?i)(\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk|webm|flv|m4v|opus|wav|ogg|iso|7z))+\s*$', '', orig_filename)
+        title_val = clean_stem.replace("_", " ").replace("-", " ").strip()
 
     if not title_val and topic_title:
         title_val = topic_title.strip()
 
-    # Clean file extensions if present in title (e.g. .mp4, .pdf) and any residual repeated Title prefixes
+    # Clean file extensions if present in title (strip duplicate, repeated, or single extensions like .mp4.mp4, .pdf.pdf)
     if title_val:
         title_val = re.sub(r'(?i)^[🎬📄📁🎥\s]*(?:title\s*[:\-\s]*)+', '', title_val).strip()
-        title_val = re.sub(r'(?i)\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk)$', '', title_val).strip()
+        title_val = re.sub(r'(?i)(\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk|webm|flv|m4v|opus|wav|ogg|iso|7z))+\s*$', '', title_val).strip()
 
     formatted_parts = []
     if title_val:
@@ -235,6 +236,8 @@ def clean_cloned_caption(
         body_clean = re.sub(r'(?i)📚\s*\*{0,2}Kind Doctor & Team\*{0,2}.*', '', body_extra, flags=re.DOTALL)
         body_clean = re.sub(r'(?i)💬\s*Group Study Help.*', '', body_clean).strip()
         body_clean = re.sub(r'(?i)^[🎬📄📁🎥\s]*(?:title\s*[:\-\s]*)+', '', body_clean).strip()
+        # Clean any accidental duplicate extensions inside body
+        body_clean = re.sub(r'(?i)(\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk|webm|flv|m4v|opus|wav|ogg|iso|7z)){2,}', r'\1', body_clean)
         if body_clean:
             formatted_parts.append(body_clean)
 
@@ -247,7 +250,7 @@ def clean_cloned_caption(
 
 
 # ---------------------------------------------------------------------------
-# Target Topic Auto-Creator (Dual MTProto & Bot API)
+# Target Topic Auto-Creator (Dual MTProto & Bot API with FloodWait Resilience)
 # ---------------------------------------------------------------------------
 
 async def get_or_create_target_topic(
@@ -259,6 +262,7 @@ async def get_or_create_target_topic(
 ) -> int:
     """
     Finds existing topic or automatically creates a new forum topic in the target group.
+    Handles Telegram Bot API rate limits (HTTP 429) & MTProto FloodWait with exponential backoff.
     Returns target message_thread_id (topic_id).
     """
     clean_title = (topic_name or "General Topic").strip()
@@ -277,90 +281,118 @@ async def get_or_create_target_topic(
         if row and row[0] > 1:
             return int(row[0])
 
-    # 2. Check live forum topics in target group via user_client to reuse matching existing topics (Strict Exact Match, topic_id > 1)
+    # 2. Check live forum topics in target group via user_client to reuse matching existing topics (Paging up to 300 topics)
     if user_client:
         try:
             target_peer = await _safe_resolve_entity(user_client, target_chat_id)
-            res = await user_client(GetForumTopicsRequest(
-                peer=target_peer,
-                offset_date=0,
-                offset_id=0,
-                offset_topic=0,
-                limit=100
-            ))
-            for t in getattr(res, 'topics', []):
-                t_title = getattr(t, 'title', '')
-                t_id = getattr(t, 'id', 0)
-                if t_id and t_id > 1 and clean_title.lower().strip() == t_title.lower().strip():
-                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                        conn.execute(
-                            "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
-                            (target_chat_id, t_id, t_title)
-                        )
-                        conn.commit()
-                    logger.info(f"✅ Reused existing target topic '{t_title}' (#{t_id})")
-                    return t_id
-        except Exception as ex_fetch_topics:
-            logger.debug(f"Target forum topic inspection skipped: {ex_fetch_topics}")
-
-    # 3. Method 1: Create via Telegram Bot API (Instant & Clean)
-    if bot_token:
-        try:
-            url = f"https://api.telegram.org/bot{bot_token}/createForumTopic"
-            payload = {
-                "chat_id": target_chat_id,
-                "name": clean_title,
-                "icon_color": icon_color
-            }
-            async with aiohttp.ClientSession() as sess:
-                async with sess.post(url, json=payload, timeout=12) as r:
-                    res = await r.json()
-                    if res.get("ok"):
-                        t_id = res["result"]["message_thread_id"]
+            offset_topic_chk = 0
+            offset_id_chk = 0
+            for _ in range(4):  # Check up to 400 existing topics
+                res = await user_client(GetForumTopicsRequest(
+                    peer=target_peer,
+                    offset_date=0,
+                    offset_id=offset_id_chk,
+                    offset_topic=offset_topic_chk,
+                    limit=100
+                ))
+                topics_chunk = getattr(res, 'topics', [])
+                if not topics_chunk:
+                    break
+                for t in topics_chunk:
+                    t_title = getattr(t, 'title', '')
+                    t_id = getattr(t, 'id', 0)
+                    if t_id and t_id > 1:
                         with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
                             conn.execute(
                                 "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
-                                (target_chat_id, t_id, clean_title)
+                                (target_chat_id, t_id, t_title)
                             )
                             conn.commit()
-                        logger.info(f"✅ Created topic '{clean_title}' (#{t_id}) in {target_chat_id} via Bot API")
-                        return t_id
-                    else:
-                        logger.warning(f"Bot API createForumTopic rejected: {res.get('description')}")
-        except Exception as e:
-            logger.warning(f"Bot API createForumTopic failed: {e}")
-
-    # Method 2: Create via User MTProto Client fallback
-    if user_client:
-        try:
-            from telethon.helpers import generate_random_long
-            target_peer = await _safe_resolve_entity(user_client, target_chat_id)
-            res = await user_client(CreateForumTopicRequest(
-                peer=target_peer,
-                title=clean_title,
-                icon_color=icon_color,
-                random_id=generate_random_long()
-            ))
-            # Extract topic_id from created action message
-            created_msg_id = getattr(res, 'id', None) or getattr(res, 'pts', None) or 1
-            for update in getattr(res, 'updates', []):
-                if hasattr(update, 'message') and hasattr(update.message, 'id'):
-                    created_msg_id = update.message.id
+                        if clean_title.lower().strip() == t_title.lower().strip():
+                            logger.info(f"✅ Reused existing target topic '{t_title}' (#{t_id})")
+                            return t_id
+                if len(topics_chunk) < 100:
                     break
-            if created_msg_id > 1:
-                with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                    conn.execute(
-                        "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
-                        (target_chat_id, created_msg_id, clean_title)
-                    )
-                    conn.commit()
-                logger.info(f"✅ Created topic '{clean_title}' (#{created_msg_id}) in {target_chat_id} via MTProto")
-                return created_msg_id
-        except Exception as ex_mt:
-            logger.error(f"MTProto CreateForumTopicRequest failed: {ex_mt}")
+                last_t = topics_chunk[-1]
+                if offset_topic_chk == last_t.id:
+                    break
+                offset_topic_chk = last_t.id
+                offset_id_chk = getattr(last_t, 'top_message', 0)
+        except Exception as ex_fetch_topics:
+            logger.debug(f"Target forum topic inspection skipped: {ex_fetch_topics}")
 
-    # Default to general chat topic 0/1 if forum creation unavailable
-    logger.warning(f"⚠️ Topic creation fell back to General (#1) for '{clean_title}' in {target_chat_id}. Ensure Bot has 'Manage Topics' right!")
+    # 3. Method 1: Create via Telegram Bot API with Flood/429 Retry Loop
+    if bot_token:
+        for attempt in range(4):
+            try:
+                url = f"https://api.telegram.org/bot{bot_token}/createForumTopic"
+                payload = {
+                    "chat_id": target_chat_id,
+                    "name": clean_title,
+                    "icon_color": icon_color
+                }
+                async with aiohttp.ClientSession() as sess:
+                    async with sess.post(url, json=payload, timeout=15) as r:
+                        res = await r.json()
+                        if res.get("ok"):
+                            t_id = res["result"]["message_thread_id"]
+                            with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                                conn.execute(
+                                    "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
+                                    (target_chat_id, t_id, clean_title)
+                                )
+                                conn.commit()
+                            logger.info(f"✅ Created forum topic '{clean_title}' (#{t_id}) in {target_chat_id} via Bot API")
+                            await asyncio.sleep(1.2)  # Healthy pacing to prevent 429 on bulk topic creation
+                            return t_id
+                        elif res.get("error_code") == 429 or "retry after" in res.get("description", "").lower():
+                            retry_after = res.get("parameters", {}).get("retry_after", 3 + attempt * 2)
+                            logger.warning(f"⚠️ Telegram Bot API rate limit on createForumTopic: waiting {retry_after}s (Attempt {attempt+1}/4)...")
+                            await asyncio.sleep(retry_after + 1)
+                            continue
+                        else:
+                            logger.warning(f"Bot API createForumTopic rejected: {res.get('description')}")
+                            break
+            except Exception as e:
+                logger.warning(f"Bot API createForumTopic error (attempt {attempt+1}): {e}")
+                await asyncio.sleep(1.5)
+
+    # 4. Method 2: Create via User MTProto Client fallback with FloodWait handler
+    if user_client:
+        for attempt in range(3):
+            try:
+                target_peer = await _safe_resolve_entity(user_client, target_chat_id)
+                res = await user_client(CreateForumTopicRequest(
+                    peer=target_peer,
+                    title=clean_title,
+                    icon_color=icon_color,
+                    random_id=generate_random_long()
+                ))
+                # Extract topic_id from created action message
+                created_msg_id = getattr(res, 'id', None) or getattr(res, 'pts', None) or 1
+                for update in getattr(res, 'updates', []):
+                    if hasattr(update, 'message') and hasattr(update.message, 'id'):
+                        created_msg_id = update.message.id
+                        break
+                if created_msg_id > 1:
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO telegram_group_topics (chat_id, topic_id, topic_title) VALUES (?, ?, ?)",
+                            (target_chat_id, created_msg_id, clean_title)
+                        )
+                        conn.commit()
+                    logger.info(f"✅ Created topic '{clean_title}' (#{created_msg_id}) in {target_chat_id} via MTProto")
+                    await asyncio.sleep(1.5)  # Safe MTProto delay
+                    return created_msg_id
+            except FloodWaitError as ex_flood:
+                logger.warning(f"⚠️ MTProto FloodWait in CreateForumTopicRequest: sleeping {ex_flood.seconds}s...")
+                await asyncio.sleep(ex_flood.seconds + 1)
+            except Exception as ex_mt:
+                logger.error(f"MTProto CreateForumTopicRequest failed (attempt {attempt+1}): {ex_mt}")
+                await asyncio.sleep(2.0)
+
+    # Default to general chat topic 1 if forum creation unavailable
+    logger.warning(f"⚠️ Topic creation fell back to General (#1) for '{clean_title}' in {target_chat_id}. Ensure Bot/User has 'Manage Topics' rights!")
     return 1
 
 async def _safe_resolve_entity(client: TelegramClient, target):
@@ -671,9 +703,8 @@ class DeepClonerEngine:
             update_clone_job_progress(job_id, status="failed", error_msg=err)
             raise RuntimeError(err)
 
-        # Step 1: Discover All Topics from Source Group
+        # Step 1: Discover All Topics from Source Group (Paginates through 200+ topics)
         discovered_topics: List[Tuple[int, str]] = []
-        offset_date = 0
         offset_id = 0
         offset_topic = 0
 
@@ -683,21 +714,22 @@ class DeepClonerEngine:
             try:
                 res = await user_client(GetForumTopicsRequest(
                     peer=src_peer,
-                    offset_date=None,
+                    offset_date=0,
                     offset_id=offset_id,
                     offset_topic=offset_topic,
                     limit=100
                 ))
-                if not getattr(res, 'topics', None) or len(res.topics) == 0:
+                topics_chunk = getattr(res, 'topics', [])
+                if not topics_chunk:
                     break
-                for t in res.topics:
+                for t in topics_chunk:
                     t_id = getattr(t, 'id', None)
                     t_title = getattr(t, 'title', None) or f"Topic #{t_id}"
                     if t_id and (t_id, t_title) not in discovered_topics:
                         discovered_topics.append((t_id, t_title))
-                if len(res.topics) < 100:
+                if len(topics_chunk) < 100:
                     break
-                last_t = res.topics[-1]
+                last_t = topics_chunk[-1]
                 if offset_topic == last_t.id:
                     break
                 offset_topic = last_t.id
@@ -709,6 +741,9 @@ class DeepClonerEngine:
         # If no forum topics returned, treat as single general topic / regular channel
         if not discovered_topics:
             discovered_topics = [(1, "General Discussion & Study Media")]
+        else:
+            # Sort topics ascending by topic ID to preserve natural curriculum sequence
+            discovered_topics.sort(key=lambda x: x[0])
 
         total_topics = len(discovered_topics)
         update_clone_job_progress(job_id, total_topics=total_topics, status="running")

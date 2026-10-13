@@ -26,7 +26,8 @@ from devi.operator.medical_calculator import (
     calc_parkland, calc_urine_output,
     calc_edd,
     calc_psm_matrix,
-    calc_iv_drip, calc_inotrope_infusion
+    calc_iv_drip, calc_inotrope_infusion,
+    calc_ckd_epi_2021, calc_corrected_calcium, calc_meld_na
 )
 
 
@@ -131,3 +132,35 @@ def test_pharmacology_infusions():
     # Rate = 420 / 80 = 5.25 mL/hr
     inotrope = calc_inotrope_infusion(drug_mg=4, volume_ml=50, dose_mcg_kg_min=0.1, weight_kg=70)
     assert inotrope["rate_ml_hr"] == 5.25
+
+
+def test_ckd_epi_2021_race_free():
+    # 50 yo male, Cr 1.0 -> ~91.7 mL/min/1.73m2
+    egfr_m = calc_ckd_epi_2021(age_years=50, serum_cr_mg_dl=1.0, is_female=False)
+    assert egfr_m == 91.7
+
+    # 60 yo female, Cr 1.2 -> ~51.8 mL/min/1.73m2
+    egfr_f = calc_ckd_epi_2021(age_years=60, serum_cr_mg_dl=1.2, is_female=True)
+    assert 50.0 <= egfr_f <= 53.0
+
+
+def test_corrected_calcium():
+    # Ca 7.8, Albumin 2.5 -> Payne: 7.8 + 0.8 * (4.0 - 2.5) = 7.8 + 1.2 = 9.0 (Normal)
+    ca_res = calc_corrected_calcium(serum_ca_mg_dl=7.8, serum_albumin_g_dl=2.5)
+    assert ca_res["corrected_ca"] == 9.0
+    assert "Normal" in ca_res["status"]
+
+    # Ca 11.5, Albumin 4.0 -> Payne: 11.5 + 0.8 * 0 = 11.5 (Hypercalcemia)
+    ca_high = calc_corrected_calcium(serum_ca_mg_dl=11.5, serum_albumin_g_dl=4.0)
+    assert ca_high["corrected_ca"] == 11.5
+    assert "Hypercalcemia" in ca_high["status"]
+
+
+def test_meld_na():
+    # Bilirubin 2.5, INR 1.8, Cr 1.4, Na 130
+    res = calc_meld_na(bilirubin_mg_dl=2.5, inr=1.8, creatinine_mg_dl=1.4, sodium_meq_l=130.0)
+    assert "meld_score" in res
+    assert "three_month_mortality" in res
+    assert res["meld_score"] >= 15
+
+

@@ -129,3 +129,69 @@ def test_dashboard_forward_routes_crud():
     deleted_r = next((r for r in server._get_forward_routes() if r["id"] == route_id), None)
     assert deleted_r is None
 
+
+def test_dashboard_diagnostic_analysis():
+    state = ObserverState()
+    server = DashboardServer(state=state)
+    diag = server._run_diagnostic_analysis()
+    
+    assert diag["success"] is True
+    assert "timestamp" in diag
+    assert "source_origin" in diag
+    assert "destination_target" in diag
+    assert "inventory" in diag
+    assert "total_files" in diag["inventory"]
+    assert "total_gb" in diag["inventory"]
+    assert "media_breakdown" in diag
+    assert "videos" in diag["media_breakdown"]
+    assert "timing" in diag
+    assert "uptime" in diag["timing"]
+    assert "active_processes" in diag
+    assert len(diag["active_processes"]) >= 6
+    assert any(p["name"] == "MTProto Streamer" for p in diag["active_processes"])
+    assert any(p["name"] == "Database WAL Engine" for p in diag["active_processes"])
+
+
+def test_dashboard_topics_breakdown():
+    state = ObserverState()
+    server = DashboardServer(state=state)
+    breakdown = server._get_topics_breakdown()
+
+    assert breakdown["success"] is True
+    assert "summary" in breakdown
+    assert "topics" in breakdown
+    assert "available_chats" in breakdown
+    assert "total_topics" in breakdown["summary"]
+    assert "pending_topics" in breakdown["summary"]
+    assert "total_files" in breakdown["summary"]
+    assert "remaining_files" in breakdown["summary"]
+    assert "total_gb" in breakdown["summary"]
+    assert "remaining_gb" in breakdown["summary"]
+
+    # Verify topic object structure if topics exist
+    if breakdown["topics"]:
+        top = breakdown["topics"][0]
+        assert "topic_id" in top
+        assert "topic_title" in top
+        assert "total_files" in top
+        assert "remaining_files" in top
+        assert "total_mb" in top
+        assert "remaining_mb" in top
+        assert "status" in top
+
+
+def test_dashboard_topic_items_detail():
+    state = ObserverState()
+    server = DashboardServer(state=state)
+    # Query with known or mock topic
+    detail = server._get_topic_items_detail(-1003794275870, 1320)
+
+    assert detail["success"] is True
+    assert "items" in detail
+    assert "count" in detail
+    assert "delivered_count" in detail
+    assert "pending_count" in detail
+    assert "topic_title" in detail
+
+
+
