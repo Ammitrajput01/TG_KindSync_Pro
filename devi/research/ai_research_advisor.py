@@ -12,7 +12,7 @@ if sys.stdout.encoding.lower() != 'utf-8':
 
 # ==============================================================================
 # 🧠 AI CONTINUOUS RESEARCH & CODE-ANALYSIS ADVISOR
-# Developer: Dr. Amit Singh (Kind Doctor)
+# Developer: Kind Doctor 🩺❤️
 # Status: 100% Air-Gapped & Read-Only Mode (Zero Production Code Modification)
 # ==============================================================================
 # This system serves as a long-term technical advisor and researcher.
@@ -151,7 +151,7 @@ def generate_report():
         "generated_at": time.time(),
         "generated_at_human": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
         "analyzer": "Continuous AI Research & Code-Analysis Advisor",
-        "developer": "Dr. Amit Singh (Kind Doctor)",
+        "developer": "Kind Doctor 🩺❤️",
         "mode": "100% Air-Gapped & Read-Only (Safe Observability)",
         "total_findings": len(sorted_findings),
         "codebase_summary": {
@@ -172,7 +172,7 @@ def main():
     print(r"""
  ╭──────────────────────────────────────────────────────────────────────────╮
  │  🧠 CONTINUOUS AI RESEARCH & IMPROVEMENT ADVISOR                         │
- │  Owner & Developer: Dr. Amit Singh (Kind Doctor)                         │
+ │  Owner & Developer: Kind Doctor 🩺❤️                                     │
  │  Mode: 100% Air-Gapped & Read-Only | Safety Guarantee: 100% Anti-Ban    │
  ╰──────────────────────────────────────────────────────────────────────────╯
 """)

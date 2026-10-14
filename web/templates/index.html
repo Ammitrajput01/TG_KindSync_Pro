@@ -1,0 +1,2109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TG KindSync Version X — Sentinel Enterprise Cockpit</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B0D13">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- Google Fonts: Outfit, Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Telegram Mini App WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+    <!-- Top 10 Website Benchmark Ambient Lighting Glow Orbs -->
+    <div class="ambient-glow-orb ambient-glow-1"></div>
+    <div class="ambient-glow-orb ambient-glow-2"></div>
+
+    <!-- Fullscreen High-Security Authentication Login Gate -->
+    <div id="auth-login-gate" class="auth-gate-overlay" style="display: none;">
+        <div class="auth-gate-card">
+            <div class="auth-gate-header">
+                <div class="brand-logo" style="width: 52px; height: 52px; font-size: 22px; margin: 0 auto var(--space-3); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #6366F1 0%, #38BDF8 100%); color: #fff; font-weight: 800;">KS</div>
+                <div style="font-size: 20px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px;">KindSync Pro Enterprise</div>
+                <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 4px;">Sentinel AI Mission Control Version X</div>
+                <div class="pill pill-neutral" style="margin-top: 10px; font-size: 11px; display: inline-flex; border-color: rgba(99,102,241,0.3); color: #38BDF8;">🔒 End-to-End Encrypted Session</div>
+            </div>
+
+            <form id="auth-gate-form" action="javascript:void(0);" onsubmit="handleGateLoginSubmit(event); return false;" style="margin-top: var(--space-4);">
+                <div style="margin-bottom: var(--space-3); font-size: 11px; color: #38BDF8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 7px 10px; text-align: center;">
+                    🔑 <b>Official Login:</b> <code>Amit</code> &middot; Password: <code>Amit@123</code>
+                </div>
+                <div class="form-group" style="margin-bottom: var(--space-3); text-align: left;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 600;">Username</label>
+                    <input type="text" class="text-input" id="gate-username" value="Amit" placeholder="Amit" required autocomplete="username" autofocus style="font-size: 14px; padding: 10px 14px; width: 100%;">
+                </div>
+                <div class="form-group" style="margin-bottom: var(--space-4); text-align: left;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 600;">Password</label>
+                    <input type="password" class="text-input" id="gate-password" value="Amit@123" placeholder="Amit@123" required autocomplete="current-password" style="font-size: 14px; padding: 10px 14px; width: 100%;">
+                </div>
+
+                <div id="gate-error-banner" style="display: none; font-size: 12px; color: var(--accent-danger); background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.25); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: var(--space-4); text-align: center;"></div>
+
+                <button type="button" id="gate-submit-btn" onclick="handleGateLoginSubmit(event)" class="btn btn-primary" style="width: 100%; height: 42px; font-size: 14px; font-weight: 700; justify-content: center; background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);">
+                    Unlock Mission Control
+                </button>
+                <div style="display: flex; align-items: center; gap: 8px; margin: 12px 0 8px 0;">
+                    <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+                    <span style="font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; font-weight: 700;">Localhost Direct</span>
+                    <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+                </div>
+                <button type="button" id="gate-local-unlock-btn" onclick="handleInstantLocalUnlock()" class="btn btn-secondary" style="width: 100%; height: 38px; font-size: 12px; font-weight: 700; justify-content: center; border-color: rgba(56, 189, 248, 0.4); color: #38BDF8; background: rgba(56, 189, 248, 0.08);">
+                    ⚡ Instant Local PC Unlock (Bypass Password)
+                </button>
+            </form>
+
+            <div style="margin-top: var(--space-5); font-size: 11px; color: var(--text-tertiary); text-align: center;">
+                Protected by <strong>PBKDF2-HMAC-SHA256</strong> & 192-bit Cryptographic Bearer Tokens
+            </div>
+        </div>
+    </div>
+
+    <div class="app-shell" id="main-app-shell">
+        <!-- Modernized Professional Sidebar Navigation -->
+        <aside class="sidebar" id="app-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo" title="KindSync Pro Enterprise Suite">KS</div>
+                <div class="brand-title">
+                    <span>KindSync Pro</span>
+                    <span class="brand-subtitle">Version X &bull; Enterprise Cockpit</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <!-- Group 1: Monitoring & Cloud Radar -->
+                <div class="nav-group">
+                    <div class="nav-group-title">
+                        <span>Monitoring & Radar</span>
+                        <span style="font-size: 8px; color: #38BDF8;">LIVE</span>
+                    </div>
+                    <ul class="nav-items">
+                        <li>
+                            <a href="#overview" class="nav-link active" onclick="switchView('overview'); return false;" id="nav-overview" role="tab" aria-selected="true">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                                <span>Overview</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#topics" class="nav-link" onclick="switchView('topics'); return false;" id="nav-topics" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+                                <span>Topic Intelligence</span>
+                                <span class="nav-badge info tabular" id="sidebar-topics-badge">90 Topics</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#operations" class="nav-link" onclick="switchView('operations'); return false;" id="nav-operations" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                                <span>Pipeline & Speed</span>
+                                <span class="nav-badge success tabular" id="sidebar-speed-badge">Turbo 8x</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#terminal" class="nav-link" onclick="switchView('terminal'); return false;" id="nav-terminal" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                                <span>Live Terminal</span>
+                                <span class="nav-badge success tabular" id="sidebar-terminal-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);">LIVE</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Group 2: Orchestration & Queue -->
+                <div class="nav-group">
+                    <div class="nav-group-title">
+                        <span>Management & Queue</span>
+                        <span style="font-size: 8px; color: #818CF8;">MTPROTO</span>
+                    </div>
+                    <ul class="nav-items">
+                        <li>
+                            <a href="#telegram" class="nav-link" onclick="switchView('telegram'); return false;" id="nav-telegram" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                <span>Telegram Accounts</span>
+                                <span class="nav-badge tabular" id="sidebar-tg-badge">3</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#dlq" class="nav-link" onclick="switchView('dlq'); return false;" id="nav-dlq" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                                <span>Dead Letter Queue</span>
+                                <span class="nav-badge danger tabular" id="sidebar-dlq-badge">0</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Group 3: Intelligence & Access -->
+                <div class="nav-group">
+                    <div class="nav-group-title">
+                        <span>Intelligence & Access</span>
+                        <span style="font-size: 8px; color: #F472B6;">AI</span>
+                    </div>
+                    <ul class="nav-items">
+                        <li>
+                            <a href="#devi" class="nav-link" onclick="switchView('devi'); return false;" id="nav-devi" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                                <span>Devi AI Studio</span>
+                                <span class="nav-badge tabular" style="background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3);">LVL 10</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#research" class="nav-link" onclick="switchView('research'); return false;" id="nav-research" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                <span>Sentinel Insights</span>
+                                <span class="nav-badge info tabular" id="sidebar-research-badge">11</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#security" class="nav-link" onclick="switchView('security'); return false;" id="nav-security" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                <span>Access & Users</span>
+                                <span class="nav-badge tabular" style="background: rgba(251, 146, 60, 0.15); color: #FB923C; border: 1px solid rgba(251, 146, 60, 0.3);">Amit</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Verified Doctor & Admin Contact Card -->
+            <div class="doctor-contact-sidebar" style="margin: 0 12px 10px 12px; padding: 10px 12px; background: rgba(16, 185, 129, 0.07); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                    <div style="font-weight: 800; font-size: 11.5px; color: #FFFFFF; display: flex; align-items: center; gap: 5px;">
+                        <span>👨‍⚕️</span> Kind Doctor 🩺❤️ (Dr. Amit Singh)
+                    </div>
+                    <span class="pill pill-success" style="font-size: 8px; padding: 1px 5px;">OWNER</span>
+                </div>
+                <div style="font-size: 10px; color: var(--text-tertiary); margin-bottom: 6px;">Kind Doctor • System Architect</div>
+                <div style="display: flex; gap: 4px; flex-direction: column;">
+                    <a href="https://t.me/Kinddoctor4u" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 3px 8px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 4px; color: #38BDF8; text-decoration: none; display: flex; justify-content: space-between;">
+                        <span>✈️ @Kinddoctor4u</span>
+                        <span style="opacity: 0.7;">Primary</span>
+                    </a>
+                    <a href="https://t.me/Ammitrajput1" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 3px 8px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 4px; color: #818CF8; text-decoration: none; display: flex; justify-content: space-between;">
+                        <span>✈️ @Ammitrajput1</span>
+                        <span style="opacity: 0.7;">Backup</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-profile-widget" onclick="openLoginModal()" style="flex: 1;" title="Manage Operator Session">
+                    <div class="user-avatar" id="footer-user-avatar">KD</div>
+                    <div class="user-details">
+                        <span class="user-name" id="footer-user-name">Kind Doctor 🩺❤️ (Dr. Amit Singh)</span>
+                        <span class="user-role" id="footer-user-role">ADMINISTRATOR</span>
+                    </div>
+                </div>
+                <button class="audio-ctrl-btn" onclick="handleLogout()" title="Lock Session / Log Out" style="color: var(--accent-danger);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+                <button class="audio-ctrl-btn" onclick="toggleSoundFX()" title="Toggle Web Audio Synthesizer Tones" id="audio-toggle-btn">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Viewport -->
+        <main class="main-viewport">
+            <!-- Top Application Header -->
+            <header class="app-header">
+                <div class="header-breadcrumbs">
+                    <span class="breadcrumb-root">Dashboard</span>
+                    <span class="breadcrumb-sep">/</span>
+                    <span class="breadcrumb-current" id="header-breadcrumb-view">Overview</span>
+                </div>
+
+                <div class="header-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="openCommandPalette()" title="Open Command Palette (Ctrl + K)" style="border: 1px solid var(--border-medium); background: rgba(255,255,255,0.04); display: flex; align-items: center; gap: 6px;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <span>Command</span>
+                        <kbd class="hud-kbd">Ctrl+K</kbd>
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="openRemoteModal()" title="Mobile Phone Access URL">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+                        <span id="header-wifi-label">Wi-Fi Phone URL</span>
+                    </button>
+                    <div class="system-status-indicator">
+                        <span class="status-dot"></span>
+                        <span id="header-engine-status">Engine Online (Synced)</span>
+                    </div>
+                    <div class="header-ping-badge" id="header-ping-badge" style="display: flex; align-items: center; gap: 5px; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #34D399; font-weight: 700; cursor: pointer;" onclick="checkServerPing()" title="Live Telemetry Round-Trip Latency">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background: #34D399; display: inline-block; box-shadow: 0 0 6px #34D399;"></span>
+                        <span id="ping-text">⚡ 2ms</span>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" onclick="openDoctorContactModal()" title="Kind Doctor 🩺❤️ (Dr. Amit Singh) Verified Contact & Profile" style="border: 1px solid rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.08); color: #34D399; display: flex; align-items: center; gap: 6px; font-weight: 700;">
+                        <span style="font-size: 13px;">👨‍⚕️</span>
+                        <span>Kind Doctor 🩺❤️ (Dr. Amit Singh)</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btn-smart-refresh" onclick="handleSmartRefresh()" title="Instant Smart Resync from Database (Alt + R)" style="background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.4); color: #38BDF8; font-weight: 700;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="refresh-spin-icon"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                        <span>Refresh</span>
+                        <kbd class="hud-kbd" style="font-size: 9px; padding: 1px 4px;">Alt+R</kbd>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btn-diag-analyzer" onclick="openDiagnosticModal()" title="Non-Blocking Live Diagnostic Analyzer (Alt + D)" style="background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.4); color: #4ADE80; font-weight: 700;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        <span>Diagnostic</span>
+                        <kbd class="hud-kbd" style="font-size: 9px; padding: 1px 4px;">Alt+D</kbd>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="openRouteMatrixModal()" title="Visual Forwarding Route Matrix">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="2" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+                        <span>Route Matrix</span>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="triggerCloudBackup()" title="Backup SQLite Database Snapshot">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                        <span>Snapshot</span>
+                    </button>
+                    <button class="btn btn-primary btn-sm" id="btn-pause-engine" onclick="togglePauseEngine()" title="Pause/Resume Pipeline Engine (Space)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
+                        <span id="pause-btn-text">Pause Engine</span>
+                        <kbd class="hud-kbd" style="font-size: 9px; padding: 1px 4px; background: rgba(0,0,0,0.3);">Space</kbd>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Active Subject Strip -->
+            <div class="active-subject-strip">
+                <div class="subject-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>ACTIVE CHANNEL / CLONE SOURCE:</span>
+                    <span class="subject-title-text" id="subject-name">Scanning Telegram Channel Stream...</span>
+                    <span class="pill pill-info tabular" id="header-channel-size" style="margin-left: 8px;">📦 Channel: 0.0 GB (0 Items)</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-tertiary);" id="uptime-pill">UPTIME: 0h 00m</div>
+            </div>
+
+            <!-- Scrollable View Content -->
+            <div class="view-content-area">
+
+                <!-- ==============================================================
+                     VIEW 1: MISSION CONTROL (OVERVIEW)
+                     ============================================================== -->
+                <section class="tab-view active" id="view-overview">
+                    
+                    <!-- Version X 1-Click Master Action Center -->
+                    <div class="card" style="background: #0E121B; border: 1px solid rgba(99,102,241,0.25); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 20px;">🎛️</span>
+                            <div>
+                                <div style="font-size: 13.5px; font-weight: 800; color: #fff;">Version X 1-Click Quick Controls</div>
+                                <div style="font-size: 11px; color: var(--text-tertiary);">Direct socket command bus & real-time actions</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+                            <button type="button" class="btn btn-secondary" onclick="handleQuickPauseResume()" id="btn-quick-pause" style="font-size: 12px; padding: 6px 14px;">
+                                ⏸️ Pause Stream
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="handleQuickReconnect()" style="font-size: 12px; padding: 6px 14px;">
+                                🔄 Reconnect MTProto
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="handleQuickTestAlert()" id="btn-quick-alert" style="font-size: 12px; padding: 6px 14px; border-color: rgba(16, 185, 129, 0.4); color: #34D399;">
+                                🔔 Test Multi-Channel Alert
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="handleQuickFlushStash()" style="font-size: 12px; padding: 6px 14px;">
+                                🧹 Flush Temp Cache
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="handleQuickExportSnapshot()" style="font-size: 12px; padding: 6px 14px;">
+                                📋 Download SQLite Snapshot
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Verified Doctor & Admin Master Profile Banner -->
+                    <div class="card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(56, 189, 248, 0.05) 50%, rgba(99, 102, 241, 0.06) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                            <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #10B981, #059669); display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.35); flex-shrink: 0;">
+                                👨‍⚕️
+                            </div>
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 14px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.2px;">Kind Doctor 🩺❤️ (Dr. Amit Singh)</span>
+                                    <span class="pill pill-success" style="font-size: 9px; padding: 1px 7px;">VERIFIED CREATOR & LEAD DOCTOR</span>
+                                    <span class="pill pill-info" style="font-size: 9px; padding: 1px 7px;">SYSTEM ARCHITECT</span>
+                                </div>
+                                <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                                    Kind Doctor Master Identity &middot; Instant Telemetry Relays &middot; Direct Support Line
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <a href="https://t.me/Kinddoctor4u" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size: 11.5px; padding: 5px 12px; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); color: #38BDF8; display: flex; align-items: center; gap: 6px; text-decoration: none;">
+                                <span>✈️</span>
+                                <span><strong>@Kinddoctor4u</strong> (Primary)</span>
+                            </a>
+                            <a href="https://t.me/Ammitrajput1" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size: 11.5px; padding: 5px 12px; background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.35); color: #818CF8; display: flex; align-items: center; gap: 6px; text-decoration: none;">
+                                <span>✈️</span>
+                                <span><strong>@Ammitrajput1</strong> (Secondary)</span>
+                            </a>
+                            <button type="button" class="btn btn-ghost" onclick="openDoctorContactModal()" style="font-size: 11.5px; padding: 5px 12px; border: 1px solid rgba(255,255,255,0.15); color: #E2E8F0;">
+                                ℹ️ Contact Details
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Top 2-Column Bento Hero Grid: Left Batch Storage & ETA / Right Single Speed Dial -->
+                    <div class="overview-hero-grid">
+                        
+                        <!-- Left Bento Box: Master Batch Transmission & Channel Storage Volume -->
+                        <div class="batch-hub-section" style="margin-bottom: 0;">
+                            <div class="batch-hub-header">
+                                <div class="batch-hub-title-group">
+                                    <span style="font-size: 22px;">📦</span>
+                                    <div>
+                                        <div style="font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px;">Channel Clone & Batch Transmission Ledger</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary);">Real-time synchronized transmission stats, discovered channel payload, and queue ETA</div>
+                                    </div>
+                                </div>
+                                <span class="pill pill-success tabular" id="ledger-sync-badge">BATCH SYNC ACTIVE</span>
+                            </div>
+
+                            <!-- Master Batch Progress Bar -->
+                            <div class="batch-prog-card">
+                                <div class="batch-prog-header">
+                                    <span>Master Sync Progress</span>
+                                    <span><strong class="tabular" id="ledger-progress-pct" style="color: var(--accent-cyan); font-size: 15px;">0%</strong> Complete</span>
+                                </div>
+                                <div class="batch-prog-track">
+                                    <div class="batch-prog-fill" id="ledger-progress-bar"></div>
+                                </div>
+                                <div class="batch-prog-meta">
+                                    <span>Estimated Time Remaining: <strong class="tabular" id="ledger-eta-val" style="color: #38BDF8;">Calculating...</strong></span>
+                                    <span>Forecast Finish: <strong class="tabular" id="ledger-finish-time" style="color: #4ADE80;">--:--</strong></span>
+                                </div>
+                            </div>
+
+                            <!-- 3 Macro Payload HUD Cards -->
+                            <div class="batch-hud-grid" style="grid-template-columns: repeat(3, 1fr);">
+                                <div class="batch-hud-item">
+                                    <div class="batch-hud-label"><span>💾</span> Total Discovered Volume</div>
+                                    <div class="batch-hud-val tabular" id="ledger-total-gb" style="color: #38BDF8;">0.0 GB</div>
+                                    <div class="batch-hud-sub">Channel Discovered: <strong class="tabular" id="ledger-total-files">0</strong> Items</div>
+                                </div>
+                                <div class="batch-hud-item">
+                                    <div class="batch-hud-label"><span>🚀</span> Dispatched Payload</div>
+                                    <div class="batch-hud-val tabular" id="ledger-uploaded-gb" style="color: #4ADE80;">0.0 GB</div>
+                                    <div class="batch-hud-sub">Completed: <strong class="tabular" id="ledger-files-sent" style="color: #4ADE80;">0</strong> Delivered</div>
+                                </div>
+                                <div class="batch-hud-item">
+                                    <div class="batch-hud-label"><span>⏳</span> Remaining Queue</div>
+                                    <div class="batch-hud-val tabular" id="ledger-remaining-gb" style="color: #FACC15;">0.0 GB</div>
+                                    <div class="batch-hud-sub">Queue: <strong class="tabular" id="ledger-files-remaining" style="color: #FACC15;">0</strong> Pending</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Bento Box: Single Clean Speedometer Dial -->
+                        <div class="perm-card perm-card-speed" style="justify-content: space-between; padding: var(--space-4); margin-bottom: 0;">
+                            <div class="perm-card-head" style="margin-bottom: var(--space-2);">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="perm-card-icon">⚡</span>
+                                    <span class="perm-card-title" style="font-size: 13px; font-weight: 800; color: #fff;">LIVE NETWORK VELOCITY</span>
+                                </div>
+                                <span class="gauge-tier-badge" id="gauge-tier-badge">⚪ STANDBY</span>
+                            </div>
+                            
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 4px 0;">
+                                <svg class="speedometer-svg" viewBox="0 0 220 120" style="width: 185px; height: 100px; overflow: visible;">
+                                    <defs>
+                                        <linearGradient id="speedGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stop-color="#6366F1"/>
+                                            <stop offset="50%" stop-color="#38BDF8"/>
+                                            <stop offset="100%" stop-color="#10B981"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path class="gauge-bg-arc" d="M 25 105 A 85 85 0 0 1 195 105" style="fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 14; stroke-linecap: round;"/>
+                                    <path class="gauge-val-arc" id="svg-gauge-val-arc" d="M 25 105 A 85 85 0 0 1 195 105" style="fill: none; stroke: url(#speedGaugeGrad); stroke-width: 14; stroke-linecap: round; stroke-dasharray: 267; stroke-dashoffset: 267; transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);"/>
+                                    <g class="gauge-needle" id="svg-gauge-needle" style="transform-origin: 110px 105px; transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);">
+                                        <circle cx="110" cy="105" r="6" fill="#F8FAFC"/>
+                                        <circle cx="110" cy="105" r="2.5" fill="#6366F1"/>
+                                        <polygon points="108,105 112,105 110,32" fill="#F8FAFC"/>
+                                    </g>
+                                </svg>
+                                <div class="gauge-readout" style="margin-top: -16px; text-align: center;">
+                                    <div class="gauge-speed-num tabular" id="gauge-speed-display" style="font-size: 26px; font-weight: 800; color: #fff; line-height: 1.1;">0.0</div>
+                                    <div class="gauge-speed-unit" id="gauge-unit-label" style="font-size: 11px; font-weight: 700; color: #38BDF8; letter-spacing: 0.5px; margin-top: 2px;">KB / SECOND</div>
+                                </div>
+                            </div>
+                            
+                            <div class="perm-card-footer" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: var(--space-2); margin-top: var(--space-2); display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary);">
+                                <span>Peak: <strong class="tabular" id="kpi-peak-speed" style="color: #38BDF8;">0.0 KB/s</strong></span>
+                                <span>Pipeline: <strong style="color: #4ADE80;">Turbo MTProto</strong></span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Apache ECharts Luxury HUD: Speedometer Dial & 60s Bandwidth Waveform -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);" class="echarts-hud-container">
+                        <!-- Chart 1: Real-Time Speedometer Velocity Gauge -->
+                        <div class="card" style="background: #0E121B; border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-lg); padding: var(--space-4);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
+                                    <span>⚡ Real-Time Transfer Velocity</span>
+                                    <span class="pill pill-success" style="font-size: 9px; padding: 1px 6px;">ECHARTS HUD</span>
+                                </div>
+                                <span class="tabular" id="echart-speed-badge" style="font-size: 13px; font-weight: 700; color: var(--accent-cyan);">0.0 MB/s</span>
+                            </div>
+                            <div id="echart-speed-gauge" style="width: 100%; height: 260px;"></div>
+                        </div>
+
+                        <!-- Chart 2: 60-Second Real-Time Network Throughput Wave -->
+                        <div class="card" style="background: #0E121B; border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-lg); padding: var(--space-4);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                <div style="font-size: 14px; font-weight: 700; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
+                                    <span>🌊 60-Second Bandwidth Waveform</span>
+                                    <span class="pill pill-neutral" style="font-size: 9px; padding: 1px 6px;">SUB-SECOND</span>
+                                </div>
+                                <span class="tabular" id="echart-peak-badge" style="font-size: 12px; color: var(--text-tertiary);">Peak: 0.0 MB/s</span>
+                            </div>
+                            <div id="echart-bandwidth-wave" style="width: 100%; height: 260px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 5-Category Detailed Media Breakdown Live Grid -->
+                    <div style="margin-bottom: var(--space-5);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 18px;">📂</span>
+                                <span style="font-size: 14px; font-weight: 800; color: #fff;">Media Category Breakdown</span>
+                            </div>
+                            <span class="pill pill-neutral tabular">5 Categories Segregated</span>
+                        </div>
+                        <div class="category-breakdown-grid">
+                            <!-- Videos -->
+                            <div class="category-card" style="border-color: rgba(99, 102, 241, 0.3);">
+                                <div>
+                                    <div class="cat-card-header"><span style="font-size: 16px;">🎬</span> Videos & Lectures</div>
+                                    <div class="cat-card-count tabular" id="ledger-cat-videos-count">0 Sent</div>
+                                    <div class="cat-card-gb tabular" id="ledger-cat-videos-gb">0.0 GB Payload</div>
+                                </div>
+                                <div>
+                                    <div class="cat-card-bar-track">
+                                        <div class="cat-card-bar-fill video-gradient" id="ledger-cat-videos-bar" style="width: 0%;"></div>
+                                    </div>
+                                    <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px; display: flex; justify-content: space-between;">
+                                        <span>Progress</span>
+                                        <span class="tabular" id="ledger-cat-videos-pct">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Documents -->
+                            <div class="category-card" style="border-color: rgba(74, 222, 128, 0.3);">
+                                <div>
+                                    <div class="cat-card-header"><span style="font-size: 16px;">📄</span> Documents & PDFs</div>
+                                    <div class="cat-card-count tabular" id="ledger-cat-docs-count">0 Sent</div>
+                                    <div class="cat-card-gb tabular" id="ledger-cat-docs-gb" style="color: #4ADE80;">0.0 GB Payload</div>
+                                </div>
+                                <div>
+                                    <div class="cat-card-bar-track">
+                                        <div class="cat-card-bar-fill docs-gradient" id="ledger-cat-docs-bar" style="width: 0%;"></div>
+                                    </div>
+                                    <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px; display: flex; justify-content: space-between;">
+                                        <span>Progress</span>
+                                        <span class="tabular" id="ledger-cat-docs-pct">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Photos -->
+                            <div class="category-card" style="border-color: rgba(244, 114, 182, 0.3);">
+                                <div>
+                                    <div class="cat-card-header"><span style="font-size: 16px;">🖼️</span> Photos & Diagrams</div>
+                                    <div class="cat-card-count tabular" id="ledger-cat-photos-count">0 Sent</div>
+                                    <div class="cat-card-gb tabular" id="ledger-cat-photos-gb" style="color: #F472B6;">0.0 GB Payload</div>
+                                </div>
+                                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
+                                    <span>Single & Album Stream</span>
+                                </div>
+                            </div>
+
+                            <!-- Audios -->
+                            <div class="category-card" style="border-color: rgba(250, 204, 21, 0.3);">
+                                <div>
+                                    <div class="cat-card-header"><span style="font-size: 16px;">🎵</span> Audios & Voice</div>
+                                    <div class="cat-card-count tabular" id="ledger-cat-audios-count">0 Sent</div>
+                                    <div class="cat-card-gb tabular" id="ledger-cat-audios-gb" style="color: #FACC15;">0.0 GB Payload</div>
+                                </div>
+                                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
+                                    <span>Voice Notes & Lectures</span>
+                                </div>
+                            </div>
+
+                            <!-- Text & Captions -->
+                            <div class="category-card" style="border-color: rgba(168, 85, 247, 0.3);">
+                                <div>
+                                    <div class="cat-card-header"><span style="font-size: 16px;">📝</span> Text & Captions</div>
+                                    <div class="cat-card-count tabular" id="ledger-cat-text-count">0 Sent</div>
+                                    <div class="cat-card-gb tabular" style="color: #C084FC;">Preserved Metadata</div>
+                                </div>
+                                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
+                                    <span>Strip Rules Active</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dedicated In-Flight Active File Transfer & Live Chunk Stream Card -->
+                    <div class="panel-section" id="active-transfer-box" style="margin-bottom: var(--space-5); background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: var(--radius-lg); padding: var(--space-4); box-shadow: 0 4px 20px rgba(56, 189, 248, 0.08);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: var(--space-2);">
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span style="font-size: 18px;">📡</span>
+                                <span style="font-size: 13px; font-weight: 800; color: #38BDF8; letter-spacing: 0.5px; text-transform: uppercase;">In-Flight Active File Transfer & Live Stream</span>
+                            </div>
+                            <span class="pill pill-success tabular" id="engine-status-pill" style="font-size: 11px;">🟢 MTPROTO SYNC ONLINE</span>
+                        </div>
+
+                        <!-- Active File Transfer Metadata & Progress Bar -->
+                        <div id="transfer-mode-busy" style="display: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); flex-wrap: wrap; gap: var(--space-2);">
+                                <div>
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase;">ACTIVE FILE NAME:</div>
+                                    <div style="font-size: 14px; font-weight: 800; color: #fff; word-break: break-all;" id="active-file-name">Streaming Medical Lecture.mp4</div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: var(--space-3);">
+                                    <span class="tabular" id="active-file-bytes" style="font-size: 13px; font-weight: 700; color: #94A3B8;">0 MB / 0 MB</span>
+                                    <span class="pill pill-primary tabular" id="active-file-pct" style="font-size: 13px; font-weight: 800;">0%</span>
+                                </div>
+                            </div>
+                            <div style="height: 10px; background: rgba(15, 23, 42, 0.8); border-radius: 999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-bottom: var(--space-2);">
+                                <div id="active-file-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #38BDF8, #818CF8); transition: width 0.3s ease;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-tertiary);">
+                                <span>Turbo MTProto Chunk Stream</span>
+                                <span class="tabular" id="active-file-eta" style="color: #38BDF8; font-weight: 700;">ETA: Calculating...</span>
+                            </div>
+                        </div>
+
+                        <!-- Standby State (Permanent) -->
+                        <div id="transfer-mode-idle" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-2) 0;">
+                            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                                <div style="width: 12px; height: 12px; border-radius: 50%; background: #10B981; box-shadow: 0 0 12px #10B981; animation: pulse-glow 2s infinite;"></div>
+                                <div>
+                                    <div style="font-size: 13px; font-weight: 700; color: #fff;" id="engine-live-mode-text">Pipeline Active & Monitoring Telegram Stream</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary);" id="engine-live-mode-sub">No active file chunk upload currently in-flight. Ready for next incoming media.</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                <span class="pill pill-neutral tabular" id="engine-heartbeat-pill" style="font-size: 11px;">Heartbeat: Optimal</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==============================================================
+                         FORUM TOPIC RADAR & EXECUTIVE DELIVERY SNAPSHOT
+                         ============================================================== -->
+                    <div class="topic-radar-section" id="overview-topic-radar-card" style="margin-bottom: var(--space-5);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-3);">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="radar-beacon" style="width: 40px; height: 40px; border-radius: 10px;">
+                                    <div class="radar-beacon-ping"></div>
+                                    <span class="radar-beacon-icon" style="font-size: 18px;">📑</span>
+                                </div>
+                                <div>
+                                    <div style="font-size: 16px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px;">
+                                        <span>Forum Topic Delivery Radar</span>
+                                        <span class="pill pill-success tabular" style="font-size: 10px; padding: 2px 8px;">LIVE SQLITE SYNC</span>
+                                    </div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">Granular forum inventory summary & real-time delivery payload status</div>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary btn-sm" onclick="switchView('topics')" style="box-shadow: 0 0 16px rgba(99, 102, 241, 0.35); display: flex; align-items: center; gap: 6px;">
+                                <span>Deep Topic Matrix (<span id="overview-btn-topic-count">--</span> Topics)</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                            </button>
+                        </div>
+
+                        <!-- 6-KPI Executive Strip for Overview Tab -->
+                        <div class="topic-kpi-grid">
+                            <div class="topic-kpi-card" style="border-color: rgba(56, 189, 248, 0.25);">
+                                <div class="topic-kpi-label"><span>📑</span> Total Topics</div>
+                                <div class="topic-kpi-val" id="overview-topkpi-total-topics" style="color: #38BDF8;">--</div>
+                                <div class="topic-kpi-sub">In Source Channel</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(16, 185, 129, 0.25);">
+                                <div class="topic-kpi-label"><span style="color: #34D399;">✅</span> Completed Topics</div>
+                                <div class="topic-kpi-val" id="overview-topkpi-completed-topics" style="color: #34D399;">--</div>
+                                <div class="topic-kpi-sub" id="overview-topkpi-completed-sub">100% Delivered</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(129, 140, 248, 0.25);">
+                                <div class="topic-kpi-label"><span style="color: #818CF8;">⚡</span> Active Streaming</div>
+                                <div class="topic-kpi-val" id="overview-topkpi-active-topics" style="color: #818CF8; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+                                <div class="topic-kpi-sub">Currently In-Flight</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(245, 158, 11, 0.25);">
+                                <div class="topic-kpi-label"><span style="color: #FBBF24;">⏳</span> Topics Left to Send</div>
+                                <div class="topic-kpi-val" id="overview-topkpi-remaining-topics" style="color: #FBBF24;">--</div>
+                                <div class="topic-kpi-sub">Queued in Pipeline</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(236, 72, 153, 0.25);">
+                                <div class="topic-kpi-label"><span>💾</span> Forum Total Data</div>
+                                <div class="topic-kpi-val" id="overview-topkpi-total-gb" style="color: #F472B6;">-- GB</div>
+                                <div class="topic-kpi-sub" id="overview-topkpi-total-files-sub">-- Total Files</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(251, 146, 60, 0.3); background: rgba(251, 146, 60, 0.08);">
+                                <div class="topic-kpi-label"><span style="color: #FB923C;">📦</span> Data Left to Send</div>
+                                <div class="topic-kpi-val" id="overview-topkpi-remaining-gb" style="color: #FB923C;">-- GB</div>
+                                <div class="topic-kpi-sub" id="overview-topkpi-remaining-files-sub">-- Files Remaining</div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Jump Live Topic Strip -->
+                        <div id="overview-active-topic-strip" style="margin-top: var(--space-3); padding: 12px 16px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;" onclick="switchView('topics')">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="pulse-neon-green" style="display: inline-block;"></span>
+                                <span style="font-size: 13px; font-weight: 700; color: #F1F5F9;" id="overview-active-strip-title">Forum Topic Inventory Ready</span>
+                                <span class="pill pill-neutral tabular" style="font-size: 11px;" id="overview-active-strip-meta">Click to inspect all topics & lectures</span>
+                            </div>
+                            <div style="font-size: 12px; color: #38BDF8; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                                <span>Open Matrix ➔</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Route Mapping & Topology Strip -->
+                    <div class="panel-section" style="margin-bottom: var(--space-5); background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: var(--space-4);">
+                        <div class="panel-header" style="margin-bottom: var(--space-3);">
+                            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                                <span style="font-size: 20px;">🗺️</span>
+                                <div>
+                                    <div style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Live Forwarding Route Topology & Destination Map</div>
+                                    <div style="font-size: 12px; color: var(--text-tertiary);">Active Source channel mapped to target study group & topic</div>
+                                </div>
+                            </div>
+                            <span class="pill pill-success tabular">ACTIVE ROUTE</span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr auto 1.5fr; gap: var(--space-4); align-items: center;" id="route-topology-grid">
+                            <!-- Source Card -->
+                            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: var(--radius-md); padding: var(--space-3);">
+                                <div style="font-size: 11px; font-weight: 700; color: #38BDF8; text-transform: uppercase; margin-bottom: 4px;">📡 SOURCE CHANNEL & TOPIC</div>
+                                <div style="font-size: 14px; font-weight: 800; color: #fff;" id="source-chat-name">Johari MBBS Stream</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;" id="source-topic-title">Topic: Johari 1st Year (#80184)</div>
+                                <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;" class="tabular" id="source-chat-id">ID: -1003968310888</div>
+                            </div>
+
+                            <!-- Flow Arrow -->
+                            <div style="text-align: center; color: #6366F1; font-size: 24px; font-weight: 800;">
+                                ⚡ ➔
+                            </div>
+
+                            <!-- Targets Container -->
+                            <div style="display: flex; flex-direction: column; gap: var(--space-2);" id="target-routes-list">
+                                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(74, 222, 128, 0.25); border-radius: var(--radius-md); padding: var(--space-3); display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-size: 13px; font-weight: 700; color: #fff;">Study Help 2.0 😉</div>
+                                        <div style="font-size: 11px; color: var(--text-secondary);">Target Topic: Johari 1st Year Videos (#459)</div>
+                                    </div>
+                                    <span class="pill pill-success tabular">Active Synced</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Sent Files Delivery Ledger Table -->
+                    <div class="panel-section" style="margin-bottom: var(--space-6);">
+                        <div class="panel-header">
+                            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                                <span style="font-size: 20px;">📋</span>
+                                <div>
+                                    <span class="panel-title">Live Dispatched Files Ledger (Sent History)</span>
+                                    <div style="font-size: 12px; color: var(--text-tertiary);">Real-time stream of recently delivered files, categorized lectures, and destination topics</div>
+                                </div>
+                            </div>
+                            <span class="pill pill-neutral tabular" id="ledger-count-pill">Live Database Sync</span>
+                        </div>
+                        <div class="table-controls-bar" style="padding: 0 var(--space-4); margin-top: var(--space-3); margin-bottom: var(--space-3);">
+                            <div class="filter-chips-group">
+                                <button class="filter-chip active" id="chip-ledger-all" onclick="filterDispatchedFiles('all', this)">All Media</button>
+                                <button class="filter-chip" id="chip-ledger-video" onclick="filterDispatchedFiles('video', this)">Videos 🎬</button>
+                                <button class="filter-chip" id="chip-ledger-document" onclick="filterDispatchedFiles('document', this)">Documents 📄</button>
+                                <button class="filter-chip" id="chip-ledger-photo" onclick="filterDispatchedFiles('photo', this)">Photos 🖼️</button>
+                                <button class="filter-chip" id="chip-ledger-audio" onclick="filterDispatchedFiles('audio', this)">Audios 🎵</button>
+                            </div>
+                            <div class="table-search-box">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <input type="text" id="ledger-search-input" placeholder="Filter dispatched files..." oninput="handleLedgerSearch(this.value)">
+                            </div>
+                        </div>
+                        <table class="data-table" id="sent-files-ledger-table">
+                            <thead>
+                                <tr>
+                                    <th>File / Lecture Name</th>
+                                    <th>Media Category</th>
+                                    <th>Estimated Size</th>
+                                    <th>Destination Topic</th>
+                                    <th>Delivered Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sent-files-ledger-tbody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-tertiary); padding: var(--space-5);">Loading dispatched file records from database...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Split Master-Detail Layout -->
+                    <div class="split-grid-overview">
+                        <!-- Left Column: Throughput Area Sparkline & Live Logs -->
+                        <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+                            <!-- Sparkline Chart Panel -->
+                            <div class="panel-section">
+                                <div class="panel-header">
+                                    <span class="panel-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                        <span>Real-Time Bandwidth Stream</span>
+                                    </span>
+                                    <span class="pill pill-neutral tabular">Last 60 Minutes</span>
+                                </div>
+                                <div class="chart-container">
+                                    <svg class="sparkline-svg" id="sparkline-chart" preserveAspectRatio="none" viewBox="0 0 500 105">
+                                        <defs>
+                                            <linearGradient id="area-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                <stop offset="0%" stop-color="#6366F1" stop-opacity="0.32"/>
+                                                <stop offset="100%" stop-color="#6366F1" stop-opacity="0.0"/>
+                                            </linearGradient>
+                                        </defs>
+                                        <path id="sparkline-area" d="M 0 105 L 500 105 Z" fill="url(#area-grad)"/>
+                                        <path id="sparkline-stroke" d="M 0 105" fill="none" stroke="#6366F1" stroke-width="2.4" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Terminal Activity Panel -->
+                            <div class="panel-section" style="flex: 1;">
+                                <div class="panel-header">
+                                    <span class="panel-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+                                        <span>Decoupled Engine Activity Log</span>
+                                    </span>
+                                    <div class="panel-actions">
+                                        <button class="btn btn-ghost btn-sm" onclick="clearTerminalLogs()">Clear</button>
+                                    </div>
+                                </div>
+                                <div class="terminal-container">
+                                    <div class="terminal-tabs">
+                                        <button class="terminal-tab-btn active" onclick="filterLogs('all', this)">ALL</button>
+                                        <button class="terminal-tab-btn" onclick="filterLogs('engine', this)">ENGINE</button>
+                                        <button class="terminal-tab-btn" onclick="filterLogs('telegram', this)">TELEGRAM</button>
+                                        <button class="terminal-tab-btn" onclick="filterLogs('sync', this)">SYNC</button>
+                                        <button class="terminal-tab-btn" onclick="filterLogs('error', this)">ERROR</button>
+                                    </div>
+                                    <div class="terminal-stream tabular" id="terminal-stream">
+                                        <div class="log-entry">
+                                            <span class="log-time">22:00:00</span>
+                                            <span class="log-tag engine">ENGINE</span>
+                                            <span class="log-msg">Decoupled telemetry engine initialized in high-throughput WAL mode</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Hardware Vitals & Worker Sessions -->
+                        <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+                            <!-- System Vitals Panel -->
+                            <div class="panel-section">
+                                <div class="panel-header">
+                                    <span class="panel-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="9" x2="9" y1="21" y2="9"/></svg>
+                                        <span>System Vitals</span>
+                                    </span>
+                                </div>
+                                <ul class="vitals-list">
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">Engine CPU Load</span>
+                                        <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                             <div class="vital-bar-track"><div class="vital-bar-fill" id="vital-cpu-bar" style="width: 14%;"></div></div>
+                                            <span class="vitals-data tabular" id="vital-cpu-pct">14.2%</span>
+                                        </div>
+                                    </li>
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">Memory Allocation</span>
+                                        <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                            <div class="vital-bar-track"><div class="vital-bar-fill" id="vital-ram-bar" style="width: 32%;"></div></div>
+                                            <span class="vitals-data tabular" id="vital-ram-val">48.4 MB</span>
+                                        </div>
+                                    </li>
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">FloodWaits Throttled</span>
+                                        <span class="vitals-data tabular" id="flood-count">0 Detected</span>
+                                    </li>
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">Total Flood Delay</span>
+                                        <span class="vitals-data tabular" id="flood-delay">0.0s</span>
+                                    </li>
+                                    <li class="vitals-item">
+                                        <span class="vitals-title">Sentinel Auto-Pacer</span>
+                                        <span class="pill pill-success" id="vital-autopacer">Optimal (Auto)</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- Connected Telegram Worker Sessions -->
+                            <div class="panel-section">
+                                <div class="panel-header">
+                                    <span class="panel-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                        <span>Telegram Workers</span>
+                                    </span>
+                                    <button class="btn btn-ghost btn-sm" onclick="switchView('telegram')">Manage</button>
+                                </div>
+                                <div id="overview-workers-list">
+                                    <div class="worker-session-row">
+                                        <div class="worker-identity">
+                                            <span class="worker-dot"></span>
+                                            <div>
+                                                <div class="worker-name" id="tg-acc-name">Primary Worker</div>
+                                                <div class="worker-dc" id="tg-acc-phone">Telegram DC4 Europe</div>
+                                            </div>
+                                        </div>
+                                        <span class="pill pill-success" id="tg-acc-status">Active</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                                <!-- ==============================================================
+                     VIEW 2: PIPELINE & SPEED
+                     ============================================================== -->
+                <section class="tab-view" id="view-operations">
+                    <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+                        <!-- MTProto Turbo Pipeline Health Matrix -->
+                        <div class="permanent-metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
+                            <div class="perm-card" style="border-color: rgba(56, 189, 248, 0.3);">
+                                <div class="perm-card-head"><span class="perm-card-icon">🚀</span><span class="perm-card-title">PARALLEL STREAMS</span></div>
+                                <div class="perm-card-main tabular" style="color: #38BDF8;">8x Turbo</div>
+                                <div class="perm-card-footer"><span>Concurrency: <strong>Max</strong></span><span class="pill pill-success">Active</span></div>
+                            </div>
+                            <div class="perm-card" style="border-color: rgba(74, 222, 128, 0.3);">
+                                <div class="perm-card-head"><span class="perm-card-icon">🌐</span><span class="perm-card-title">SOCKET LATENCY</span></div>
+                                <div class="perm-card-main tabular" style="color: #4ADE80;">24 ms</div>
+                                <div class="perm-card-footer"><span>Telegram DC4: <strong>Europe</strong></span><span class="pill pill-success">Optimal</span></div>
+                            </div>
+                            <div class="perm-card" style="border-color: rgba(168, 85, 247, 0.3);">
+                                <div class="perm-card-head"><span class="perm-card-icon">🛡️</span><span class="perm-card-title">PACKET INTEGRITY</span></div>
+                                <div class="perm-card-main tabular" style="color: #C084FC;">100%</div>
+                                <div class="perm-card-footer"><span>Lossless: <strong>Verified</strong></span><span class="pill pill-success">100% Synced</span></div>
+                            </div>
+                            <div class="perm-card" style="border-color: rgba(250, 204, 21, 0.3);">
+                                <div class="perm-card-head"><span class="perm-card-icon">⏱️</span><span class="perm-card-title">FLOOD RESILIENCE</span></div>
+                                <div class="perm-card-main tabular" style="color: #FACC15;">Optimal</div>
+                                <div class="perm-card-footer"><span>Sentinel Pacer: <strong>Enabled</strong></span><span class="pill pill-info">Protected</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Media Categories Volume Ledger -->
+                        <div class="panel-section">
+                            <div class="panel-header">
+                                <span class="panel-title">Media Categories Transfer & Volume Ledger</span>
+                                <span class="pill pill-info tabular">Live Synchronized</span>
+                            </div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Media Category</th>
+                                        <th>Items Dispatched</th>
+                                        <th>Estimated Payload Volume</th>
+                                        <th>Pipeline State</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>🎬 Videos & Lectures</strong></td>
+                                        <td class="tabular" id="tab2-videos-sent">0 items</td>
+                                        <td class="tabular" id="tab2-videos-gb" style="color: #38BDF8;">0.0 GB</td>
+                                        <td><span class="pill pill-success">Streaming Active</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>📄 Medical Documents & PDFs</strong></td>
+                                        <td class="tabular" id="tab2-docs-sent">0 items</td>
+                                        <td class="tabular" id="tab2-docs-gb" style="color: #4ADE80;">0.0 GB</td>
+                                        <td><span class="pill pill-success">Streaming Active</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>🖼️ Clinical Photos & Diagrams</strong></td>
+                                        <td class="tabular" id="tab2-photos-sent">0 items</td>
+                                        <td class="tabular" id="tab2-photos-gb" style="color: #F472B6;">0.0 GB</td>
+                                        <td><span class="pill pill-success">Streaming Active</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>🎵 Audios & Voice Notes</strong></td>
+                                        <td class="tabular" id="tab2-audios-sent">0 items</td>
+                                        <td class="tabular" id="tab2-audios-gb" style="color: #FACC15;">0.0 GB</td>
+                                        <td><span class="pill pill-success">Streaming Active</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>📝 Preserved Captions & Metadata</strong></td>
+                                        <td class="tabular" id="tab2-text-sent">0 items</td>
+                                        <td class="tabular" style="color: #C084FC;">Preserved Captions</td>
+                                        <td><span class="pill pill-neutral">Clean Filtered</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Speed Throttling Control Panel -->
+                        <div class="panel-section">
+                            <div class="panel-header">
+                                <span class="panel-title">Engine Pacer & Bandwidth Throttling</span>
+                            </div>
+                            <div style="padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4);">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span class="form-label">Transfer Speed Rate Limit</span>
+                                    <span class="tabular" id="throttle-speed-val" style="font-weight: 700; color: var(--accent-primary);">Unlimited (Max Network)</span>
+                                </div>
+                                <input type="range" min="500" max="10000" step="250" value="10000" id="speed-slider" oninput="handleSpeedChange(this.value)" style="accent-color: var(--accent-primary);">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW: LIVE TERMINAL & LOG STREAM (VERSION X)
+                     ============================================================== -->
+                <section class="tab-view" id="view-terminal">
+                    <div class="card" style="padding: var(--space-4); margin-bottom: var(--space-4); background: #0E121B; border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-lg);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3);">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: linear-gradient(135deg, #10B981 0%, #06B6D4 100%); display: flex; align-items: center; justify-content: center; color: white;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+                                </div>
+                                <div>
+                                    <div style="font-size: 16px; font-weight: 800; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
+                                        <span>KindSync Version X Live Terminal Console</span>
+                                        <span class="pill pill-success" id="terminal-status-pill" style="font-size: 10px; padding: 2px 8px;">● STREAM CONNECTED</span>
+                                    </div>
+                                    <div style="font-size: 12px; color: var(--text-tertiary);">Zero-lag bidirectional WebSocket log feed directly from Oracle VPS and Python engine</div>
+                                </div>
+                            </div>
+                            <!-- Terminal Controls Toolbar -->
+                            <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+                                <div style="position: relative;">
+                                    <input type="text" id="terminal-search-input" placeholder="🔍 Search logs..." oninput="handleTerminalSearch(this.value)" class="text-input" style="font-size: 12px; padding: 6px 12px; width: 170px; height: 32px; background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.15); color: #fff;">
+                                </div>
+                                <select id="terminal-filter-select" onchange="handleTerminalFilter(this.value)" class="text-input" style="font-size: 12px; padding: 4px 10px; height: 32px; background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.15); color: #fff;">
+                                    <option value="ALL">All Levels</option>
+                                    <option value="SUCCESS">Success Only</option>
+                                    <option value="INFO">Info</option>
+                                    <option value="WARN">Warnings</option>
+                                    <option value="ERROR">Errors</option>
+                                </select>
+                                <button type="button" class="btn btn-secondary" id="terminal-autoscroll-btn" onclick="toggleTerminalAutoScroll()" style="font-size: 12px; padding: 6px 12px; height: 32px;">
+                                    📌 Auto-Scroll: ON
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="clearTerminalLogs()" style="font-size: 12px; padding: 6px 12px; height: 32px;">
+                                    🧹 Clear
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="copyTerminalLogs()" style="font-size: 12px; padding: 6px 12px; height: 32px;">
+                                    📋 Copy
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Terminal Screen Box -->
+                        <div id="terminal-log-container" style="background: #06080D; border: 1px solid #1A2130; border-radius: 8px; padding: 14px 16px; height: 560px; overflow-y: auto; font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-size: 12px; line-height: 1.6; color: #D1D5DB; box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);">
+                            <div id="terminal-log-output">
+                                <!-- Dynamic log lines rendered by dashboard.js -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 2: FORUM TOPIC INTELLIGENCE (RADAR & MATRIX)
+                     ============================================================== -->
+                <section class="tab-view" id="view-topics">
+                    <div class="topic-radar-section">
+                        <!-- Top Header & Forum Selector -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-3);">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="radar-beacon">
+                                    <div class="radar-beacon-ping"></div>
+                                    <span class="radar-beacon-icon">📑</span>
+                                </div>
+                                <div>
+                                    <div style="font-size: 18px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px;">
+                                        <span>Forum Topic Intelligence & Delivery Matrix</span>
+                                        <span class="pill pill-success tabular" style="font-size: 10px; padding: 2px 8px;">LIVE SQLITE SYNC</span>
+                                    </div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">Granular per-topic inventory: Total files, delivered payload, remaining queue, and exact MB/GB left to send</div>
+                                </div>
+                            </div>
+
+                            <!-- Channel / Forum Selector Dropdown -->
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <label style="font-size: 11px; font-weight: 700; color: #38BDF8; text-transform: uppercase;">Channel Forum:</label>
+                                <select id="topic-forum-dropdown" onchange="handleTopicForumChange(this.value)" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(56, 189, 248, 0.4); color: #F8FAFC; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; outline: none; cursor: pointer; box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);">
+                                    <option value="">Loading forum channels...</option>
+                                </select>
+                                <button class="btn btn-secondary btn-sm" onclick="loadTopicsBreakdown()" title="Refresh Topic Intelligence" style="padding: 7px 10px;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 6-KPI Executive Strip (Answers All 4 Voice Note Questions Explicitly!) -->
+                        <div class="topic-kpi-grid">
+                            <div class="topic-kpi-card" style="border-color: rgba(56, 189, 248, 0.25);">
+                                <div class="topic-kpi-label"><span>📑</span> Total Topics</div>
+                                <div class="topic-kpi-val" id="topkpi-total-topics" style="color: #38BDF8;">--</div>
+                                <div class="topic-kpi-sub">In Source Channel</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(16, 185, 129, 0.25);">
+                                <div class="topic-kpi-label"><span style="color: #34D399;">✅</span> Completed Topics</div>
+                                <div class="topic-kpi-val" id="topkpi-completed-topics" style="color: #34D399;">--</div>
+                                <div class="topic-kpi-sub" id="topkpi-completed-sub">100% Delivered</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(129, 140, 248, 0.25);">
+                                <div class="topic-kpi-label"><span style="color: #818CF8;">⚡</span> Active Streaming</div>
+                                <div class="topic-kpi-val" id="topkpi-active-topics" style="color: #818CF8; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+                                <div class="topic-kpi-sub">Currently In-Flight</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(245, 158, 11, 0.25);">
+                                <div class="topic-kpi-label"><span style="color: #FBBF24;">⏳</span> Topics Left to Send</div>
+                                <div class="topic-kpi-val" id="topkpi-remaining-topics" style="color: #FBBF24;">--</div>
+                                <div class="topic-kpi-sub">Queued in Pipeline</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(236, 72, 153, 0.25);">
+                                <div class="topic-kpi-label"><span>💾</span> Forum Total Data</div>
+                                <div class="topic-kpi-val" id="topkpi-total-gb" style="color: #F472B6;">-- GB</div>
+                                <div class="topic-kpi-sub" id="topkpi-total-files-sub">-- Total Files</div>
+                            </div>
+                            <div class="topic-kpi-card" style="border-color: rgba(251, 146, 60, 0.3); background: rgba(251, 146, 60, 0.08);">
+                                <div class="topic-kpi-label"><span style="color: #FB923C;">📦</span> Data Left to Send</div>
+                                <div class="topic-kpi-val" id="topkpi-remaining-gb" style="color: #FB923C;">-- GB</div>
+                                <div class="topic-kpi-sub" id="topkpi-remaining-files-sub">-- Files Remaining</div>
+                            </div>
+                        </div>
+
+                        <!-- Live Delivery Queue Timeline Ribbon -->
+                        <div id="topic-queue-timeline" class="topic-timeline-ribbon" style="margin-top: var(--space-4); margin-bottom: var(--space-4);">
+                            <!-- Dynamic: renderQueueTimeline() -->
+                        </div>
+
+                        <!-- Storage Payload Distribution Bar -->
+                        <div id="topic-payload-dist" class="payload-dist-wrap" style="margin-bottom: var(--space-4);">
+                            <!-- Dynamic: renderPayloadDistribution() -->
+                        </div>
+
+                        <!-- Medical Discipline Subject Filter Pills -->
+                        <div id="topic-subject-pills-bar" class="topic-subject-filter-bar" style="margin-bottom: var(--space-4);">
+                            <!-- Dynamic: renderSubjectPills() -->
+                        </div>
+
+                        <!-- Medical Specialty & Topic Distribution Visual Chart -->
+                        <div class="card" style="margin-bottom: var(--space-4); padding: var(--space-3) var(--space-4); background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: var(--radius-lg);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 18px;">📊</span>
+                                    <div>
+                                        <div style="font-size: 13.5px; font-weight: 800; color: #FFFFFF;">Medical Specialty & Curriculum Volume Matrix</div>
+                                        <div style="font-size: 11px; color: var(--text-secondary);">Interactive topic distribution, files per discipline, and completed progress</div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button class="btn btn-secondary btn-sm" onclick="renderSpecialtyChart()" style="font-size: 11px; padding: 3px 10px; background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.3); color: #38BDF8;">
+                                        <span>🔄 Redraw Chart</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="echarts-specialty-distribution" style="height: 260px; width: 100%;"></div>
+                        </div>
+
+                        <!-- Toolbar: Search + Filter Tabs + View Mode + Sort -->
+                        <div class="topic-toolbar">
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div class="view-switch-tabs">
+                                    <button class="view-switch-btn active" id="btn-topic-view-table" onclick="setTopicViewMode('table')" title="Dense Linear DataGrid (Curriculum Table)">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                                        <span>Linear Table</span>
+                                    </button>
+                                    <button class="view-switch-btn" id="btn-topic-view-cards" onclick="setTopicViewMode('cards')" title="Visual Cyber Cards">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                        <span>Cyber Cards</span>
+                                    </button>
+                                </div>
+
+                                <div class="topic-filter-tabs" style="margin-bottom: 0;">
+                                    <button class="topic-filter-btn active" onclick="setTopicFilter('all', this)">All Topics (<span id="tfilter-cnt-all">0</span>)</button>
+                                    <button class="topic-filter-btn" onclick="setTopicFilter('active', this)">In-Flight / Active (<span id="tfilter-cnt-active">0</span>)</button>
+                                    <button class="topic-filter-btn" onclick="setTopicFilter('pending', this)">Left to Send (<span id="tfilter-cnt-pending">0</span>)</button>
+                                    <button class="topic-filter-btn" onclick="setTopicFilter('completed', this)">Completed (<span id="tfilter-cnt-completed">0</span>)</button>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div class="table-search-box" style="margin-left: 0;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    <input type="text" id="topic-search-input" placeholder="Search topic by name, ID, or subject..." oninput="handleTopicSearch(this.value)" style="width: 220px;">
+                                </div>
+                                <select id="topic-sort-select" onchange="handleTopicSort(this.value)" style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-medium); color: var(--text-secondary); border-radius: var(--radius-full); padding: 5px 12px; font-size: 11px; outline: none; cursor: pointer;">
+                                    <option value="seq_asc" selected>Sort: Strict Curriculum Order (Natural)</option>
+                                    <option value="files_desc">Sort: Most Files First</option>
+                                    <option value="rem_data_desc">Sort: Most Data Left First</option>
+                                    <option value="progress_asc">Sort: Lowest Progress First</option>
+                                    <option value="progress_desc">Sort: Highest Progress First</option>
+                                    <option value="title_asc">Sort: Topic Name (A-Z)</option>
+                                    <option value="id_asc">Sort: Topic ID</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Dense Linear DataGrid Table View (Default View) -->
+                        <div id="topic-table-container" style="display: block; margin-bottom: var(--space-4); overflow-x: auto;">
+                            <!-- Dynamic: renderTopicTable() -->
+                        </div>
+
+                        <!-- Topic Cards Dynamic Grid (Secondary View) -->
+                        <div class="topic-cards-grid" id="topic-cards-container" style="display: none;">
+                            <div style="text-align: center; color: var(--text-tertiary); padding: 50px 20px; grid-column: 1 / -1;">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin360 1s linear infinite; margin-bottom: 12px;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                                <div style="font-size: 14px; font-weight: 600; color: #F1F5F9;">Loading granular topic intelligence from SQLite engine...</div>
+                                <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 4px;">Analyzing forum topics, items, and payload distribution</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 3: TELEGRAM ACCOUNTS (ORCHESTRATION)
+                     ============================================================== -->
+                <section class="tab-view" id="view-telegram">
+                    <div class="panel-section">
+                        <div class="panel-header">
+                            <span class="panel-title">Connected Telegram Telethon Sessions</span>
+                            <button class="btn btn-primary btn-sm" onclick="openTgLoginModal()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                <span>Add Telegram Account</span>
+                            </button>
+                        </div>
+                        <table class="data-table" id="telegram-sessions-table">
+                            <thead>
+                                <tr>
+                                    <th>Session Name</th>
+                                    <th>Phone / User ID</th>
+                                    <th>Data Center</th>
+                                    <th>Role Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tg-sessions-tbody">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-tertiary);">Loading accounts...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 4: DEVI AI COPILOT STUDIO
+                     ============================================================== -->
+                <!-- ==============================================================
+                     VIEW 4: DEVI AI SOVEREIGN COPILOT STUDIO (16 FLAGSHIP MODELS)
+                     ============================================================== -->
+                <section class="tab-view" id="view-devi">
+                    <!-- Sovereign Hub Header Banner -->
+                    <div class="devi-banner-card">
+                        <div class="devi-banner-left">
+                            <div class="devi-avatar-pulse">
+                                <span>🎓</span>
+                                <span class="devi-pulse-ring"></span>
+                            </div>
+                            <div>
+                                <div class="devi-banner-title">
+                                    <span>Devi Ji Autonomous Multi-Model Hub</span>
+                                    <span class="pill pill-success" style="font-size: 10px; padding: 2px 8px;">LEVEL 10 FULL AUTONOMY</span>
+                                    <span class="pill pill-info" style="font-size: 10px; padding: 2px 8px;">16 MODELS &bull; 12 PROVIDERS</span>
+                                </div>
+                                <div class="devi-banner-sub">
+                                    Continuous unconstrained cognitive synthesis across Groq, Cerebras, SambaNova, Mistral, Gemini, OpenRouter, SiliconFlow, NVIDIA NIM, DeepSeek, Cloudflare &amp; HuggingFace.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="devi-banner-actions">
+                            <button class="btn btn-primary btn-sm" id="btn-devi-adapt" onclick="triggerDeviAdapt()" title="Autonomously scan API keys, discover endpoints and re-sync pool">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                <span>Auto-Adapt Pool</span>
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="runCouncilDebate()" title="Multi-Model Consensus Deliberation">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                                <span>3-Way AI Council</span>
+                            </button>
+                            <button class="btn btn-ghost btn-sm" onclick="speakDeviStatus()" title="Voice Briefing">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                                <span>Voice Briefing</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Top 4-KPI Metric Strip for Devi Hub -->
+                    <div class="devi-metric-strip">
+                        <div class="devi-kpi-card">
+                            <div class="devi-kpi-num" id="devi-kpi-models">16</div>
+                            <div class="devi-kpi-label">Flagship Models</div>
+                            <div class="devi-kpi-sub">LPUs &bull; Reasoning &bull; Coding</div>
+                        </div>
+                        <div class="devi-kpi-card">
+                            <div class="devi-kpi-num" id="devi-kpi-providers">12</div>
+                            <div class="devi-kpi-label">Active Providers</div>
+                            <div class="devi-kpi-sub">Groq, Cerebras, Mistral, Gemini+</div>
+                        </div>
+                        <div class="devi-kpi-card">
+                            <div class="devi-kpi-num" id="devi-kpi-keys">8+</div>
+                            <div class="devi-kpi-label">Discovered Credentials</div>
+                            <div class="devi-kpi-sub">Continuous Vault Hunting</div>
+                        </div>
+                        <div class="devi-kpi-card">
+                            <div class="devi-kpi-num" style="color: #34D399;">100%</div>
+                            <div class="devi-kpi-label">Health &amp; Self-Healing</div>
+                            <div class="devi-kpi-sub" id="devi-kpi-status">Vibrant &amp; Protected</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Devi Studio Split Grid -->
+                    <div class="devi-studio-split">
+                        <!-- Left Panel: 16-Model Autonomous Grid -->
+                        <div class="panel-section devi-models-panel">
+                            <div class="panel-header" style="flex-wrap: wrap; gap: 8px;">
+                                <div>
+                                    <span class="panel-title">Autonomous Model Pool</span>
+                                    <span class="pill pill-success" style="margin-left: 6px; font-size: 10px;" id="devi-active-count-pill">16 Active</span>
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-tertiary);">Click any model to select for chat</div>
+                            </div>
+
+                            <!-- Category Filter Chips -->
+                            <div class="devi-category-filters">
+                                <button type="button" class="devi-filter-btn active" onclick="filterDeviModels('all', this)">All (16)</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Ultra-Fast LPU', this)">⚡ Fast LPUs</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Deep Reasoning', this)">🧠 Reasoning</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Medical & Code', this)">💻 Medical &amp; Code</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Multimodal', this)">👁️ Multimodal</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Open Mesh', this)">🌐 Edge Mesh</button>
+                            </div>
+
+                            <!-- Scrollable 16-Model Grid Container -->
+                            <div class="devi-models-scroll" id="devi-models-grid">
+                                <!-- Populated dynamically by renderDeviModelsRoster() -->
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Interactive Copilot Chat -->
+                        <div class="devi-chat-card">
+                            <div class="panel-header" style="flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="panel-title">Devi AI Operations Mentor</span>
+                                    <span class="pill pill-neutral">Decoupled Copilot</span>
+                                </div>
+                                <!-- Model Selector Dropdown -->
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <label for="devi-model-select" style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">Engine:</label>
+                                    <select class="text-input" id="devi-model-select" onchange="onDeviModelSelectChange(this.value)" style="padding: 4px 8px; font-size: 11.5px; height: 30px; width: auto; max-width: 240px; background: rgba(15,23,42,0.9); border-color: rgba(99,102,241,0.35);">
+                                        <option value="auto">✨ Auto-Orchestrated Flagship Cascade</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="chat-thread-box" id="chat-thread">
+                                <div class="chat-msg assistant">
+                                    Namaste Kind Doctor 🩺❤️! Main Devi AI hoon. 16 Flagship models aur 12 autonomous providers ke sath mera cognitive pool fully synchronized aur unrestricted hai. Telegram pipeline, deep sequencing parity, ya speed tuning me main aapki kaise madad kar sakti hoon?
+                                </div>
+                            </div>
+                            <!-- Quick Prompt Suggestions Chips -->
+                            <div style="padding: 6px var(--space-4); display: flex; gap: 6px; overflow-x: auto; background: rgba(8,11,18,0.6); border-top: 1px solid var(--border-subtle);">
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Optimize speed and rate pacing for current channel stream')">⚡ Optimize Speed</button>
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Check current system health and floodwait risk')">🛡️ Health Check</button>
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Explain current forward route matrix architecture')">🗺️ Route Audit</button>
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Verify FIFO message sequencing parity across target channels')">🔄 Verify FIFO Sequence</button>
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Suggest next evolutionary upgrades for TG KindSync Pro')">💡 Next Upgrades</button>
+                            </div>
+                            <form class="chat-input-bar" onsubmit="handleDeviChatSubmit(event)">
+                                <input type="text" class="text-input" id="devi-chat-input" placeholder="Ask Devi AI anything about sync pipeline, FIFO sequence, or models..." autocomplete="off">
+                                <button type="submit" class="btn btn-primary" id="btn-devi-chat-send">Send</button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 5: DEAD LETTER QUEUE (DLQ)
+                     ============================================================== -->
+                <section class="tab-view" id="view-dlq">
+                    <div class="panel-section">
+                        <div class="panel-header">
+                            <span class="panel-title">Dead Letter Queue (Failed Messages)</span>
+                            <div class="panel-actions" style="display: flex; gap: var(--space-3); align-items: center;">
+                                <div class="table-search-box">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    <input type="text" id="dlq-search-input" placeholder="Search failed messages..." oninput="handleDlqSearch(this.value)">
+                                </div>
+                                <button class="btn btn-danger btn-sm" onclick="clearDlqErrors()">Purge DLQ</button>
+                            </div>
+                        </div>
+                        <table class="data-table" id="dlq-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Target Channel</th>
+                                    <th>Failure Cause</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dlq-tbody">
+                                <tr>
+                                    <td colspan="3" style="text-align: center; color: var(--text-tertiary);">No failed messages in Dead Letter Queue (100% Healthy)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 6: DEEP RESEARCH & RECOMMENDATIONS
+                     ============================================================== -->
+                <!-- ==============================================================
+                     VIEW 6: SENTINEL OBSERVER & CONTINUOUS AI RESEARCH ADVISOR
+                     ============================================================== -->
+                <section class="tab-view" id="view-research">
+                    <!-- Top Metric Cards -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
+                        <div class="card" style="padding: var(--space-4); background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-medium); border-radius: var(--radius-lg);">
+                            <div style="font-size: 11px; color: var(--text-tertiary); font-weight: 700; text-transform: uppercase;">Total Observer Insights</div>
+                            <div style="font-size: 24px; font-weight: 800; color: #38BDF8; margin-top: 4px;" id="obs-kpi-total">0</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Saved in continuous learning queue</div>
+                        </div>
+                        <div class="card" style="padding: var(--space-4); background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: var(--radius-lg);">
+                            <div style="font-size: 11px; color: #F43F5E; font-weight: 700; text-transform: uppercase;">Critical Priority</div>
+                            <div style="font-size: 24px; font-weight: 800; color: #F43F5E; margin-top: 4px;" id="obs-kpi-critical">0</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Safety & anti-ban hardening</div>
+                        </div>
+                        <div class="card" style="padding: var(--space-4); background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-lg);">
+                            <div style="font-size: 11px; color: #FBBF24; font-weight: 700; text-transform: uppercase;">High Priority</div>
+                            <div style="font-size: 24px; font-weight: 800; color: #FBBF24; margin-top: 4px;" id="obs-kpi-high">0</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Throughput & curriculum logic</div>
+                        </div>
+                        <div class="card" style="padding: var(--space-4); background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: var(--radius-lg);">
+                            <div style="font-size: 11px; color: #4ADE80; font-weight: 700; text-transform: uppercase;">Devi Ji Autonomy</div>
+                            <div style="font-size: 24px; font-weight: 800; color: #4ADE80; margin-top: 4px;">Level 10 ⚡</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Sovereign Unconstrained Learner</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Panel Section -->
+                    <div class="panel-section">
+                        <div class="panel-header" style="flex-wrap: wrap; gap: 12px; align-items: center;">
+                            <div>
+                                <span class="panel-title">🛡️ Sentinel Observer & Autonomous Research Hub</span>
+                                <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 2px;">Continuous live codebase observation, architectural optimizations & AI recommendations</div>
+                            </div>
+                            <!-- Action Buttons -->
+                            <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
+                                <button class="btn btn-secondary btn-sm" onclick="triggerSentinelScan()" id="btn-trigger-scan" title="Run Sentinel Observer code audit">
+                                    ⚡ Run Observer Scan
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="copySelectedInsights()" title="Copy selected suggestions formatted for AI Developer">
+                                    📋 Copy Selected for AI
+                                </button>
+                                <button class="btn btn-ghost btn-sm" onclick="copyAllInsights()" title="Copy all suggestions formatted for AI Developer">
+                                    📋 Copy All
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteSelectedInsights()" title="Delete selected suggestions">
+                                    🗑️ Delete Selected
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filter and Selection Toolbar -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: 10px; background: rgba(15, 23, 42, 0.5); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <button class="topic-filter-btn active" id="obs-filt-all" onclick="setObserverFilter('all', this)">All (<span id="obs-cnt-all">0</span>)</button>
+                                <button class="topic-filter-btn" id="obs-filt-safety" onclick="setObserverFilter('safety', this)">Safety & Ban (<span id="obs-cnt-safety">0</span>)</button>
+                                <button class="topic-filter-btn" id="obs-filt-perf" onclick="setObserverFilter('perf', this)">Performance (<span id="obs-cnt-perf">0</span>)</button>
+                                <button class="topic-filter-btn" id="obs-filt-curriculum" onclick="setObserverFilter('curriculum', this)">Curriculum (<span id="obs-cnt-curriculum">0</span>)</button>
+                                <button class="topic-filter-btn" id="obs-filt-db" onclick="setObserverFilter('db', this)">Database & UX (<span id="obs-cnt-db">0</span>)</button>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="obs-select-all-chk" onchange="toggleSelectAllInsights(this.checked)" style="cursor: pointer; width: 16px; height: 16px;">
+                                <label for="obs-select-all-chk" style="font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none;">Select All (<span id="obs-selected-count">0</span> selected)</label>
+                            </div>
+                        </div>
+
+                        <!-- Suggestions Cards / Accordion List -->
+                        <div id="observer-insights-container" style="display: flex; flex-direction: column; gap: 12px;">
+                            <div style="text-align: center; padding: 30px; color: var(--text-tertiary);">Loading Sentinel Observer suggestions...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 7: ACCESS CONTROL & USERS
+                     ============================================================== -->
+                <section class="tab-view" id="view-security">
+                    <div class="panel-section">
+                        <div class="panel-header">
+                            <span class="panel-title">Dashboard Role-Based Access Control (RBAC)</span>
+                            <div style="display: flex; gap: var(--space-2);">
+                                <button class="btn btn-secondary btn-sm" onclick="openChangePasswordModal()" title="Update account password">🔑 Change Password</button>
+                                <button class="btn btn-primary btn-sm" onclick="openCreateUserModal()">➕ Add Member</button>
+                            </div>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Access Role</th>
+                                    <th>Created Timestamp</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-tbody">
+                                <tr>
+                                    <td><strong>Amit</strong></td>
+                                    <td><span class="pill pill-success">Admin</span></td>
+                                    <td class="tabular">2026-09-18</td>
+                                    <td><span style="color: var(--text-muted);">Root</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div>
+            
+            <!-- Floating Interactive Shortcut HUD -->
+            <div class="floating-shortcut-hud" id="floating-shortcut-hud">
+                <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="openCommandPalette()" title="Open Command Palette (Ctrl+K)">
+                    <span style="color: #818CF8;">⚡</span>
+                    <span style="font-weight: 600; color: #F8FAFC;">Command Palette</span>
+                    <kbd class="hud-kbd">Ctrl+K</kbd>
+                </div>
+                <div style="width: 1px; height: 12px; background: var(--border-medium);"></div>
+                <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="handleResetDisplayCounters()" title="Clean Display (Alt+C)">
+                    <span>Clean:</span>
+                    <kbd class="hud-kbd">Alt+C</kbd>
+                </div>
+                <div style="width: 1px; height: 12px; background: var(--border-medium);"></div>
+                <div style="display: flex; align-items: center; gap: 6px;" title="Switch Views (Keys 1-7)">
+                    <span>Views:</span>
+                    <kbd class="hud-kbd">1-7</kbd>
+                </div>
+                <div style="width: 1px; height: 12px; background: var(--border-medium);"></div>
+                <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="togglePauseEngine()" title="Pause / Resume Engine (Space)">
+                    <span>Pause:</span>
+                    <kbd class="hud-kbd">Space</kbd>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- 1. Wi-Fi / Remote Mobile Access Modal -->
+    <div class="modal-backdrop" id="remote-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Mobile Phone Wi-Fi Access</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeRemoteModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align: center; margin-bottom: var(--space-3);">
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: var(--space-4);">
+                        Apne phone ke browser me neeche diya hua address open karein (ensure both phone and PC are on the same Wi-Fi):
+                    </div>
+                    <div class="tabular" style="font-size: 16px; font-weight: 700; color: var(--accent-info); padding: 12px; background-color: var(--bg-canvas); border-radius: var(--radius-md); border: 1px solid var(--border-medium); word-break: break-all;" id="wifi-modal-url">
+                        http://172.16.0.2:8080
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="copyWifiUrl()">Copy Address</button>
+                <button class="btn btn-primary" onclick="closeRemoteModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Telegram Login Modal -->
+    <div class="modal-backdrop" id="tg-login-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Connect Telegram Account</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeTgLoginModal()">&times;</button>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <button class="btn btn-secondary btn-sm" id="btn-tab-phone-modal" onclick="switchTgModalTab('phone')" style="flex: 1; font-weight: 600;">📞 Phone OTP</button>
+                <button class="btn btn-ghost btn-sm" id="btn-tab-string-modal" onclick="switchTgModalTab('string')" style="flex: 1; font-weight: 600;">🔑 String Session</button>
+            </div>
+            <div class="modal-body">
+                <div id="tg-modal-tab-phone">
+                    <div class="form-group" id="tg-phone-group">
+                        <label class="form-label">Phone Number (with Country Code)</label>
+                        <input type="text" class="text-input" id="tg-input-phone" placeholder="+919876543210">
+                    </div>
+                    <div class="form-group" id="tg-code-group" style="display: none;">
+                        <label class="form-label">Telegram OTP Code</label>
+                        <input type="text" class="text-input" id="tg-input-code" placeholder="12345">
+                    </div>
+                    <div class="form-group" id="tg-2fa-group" style="display: none;">
+                        <label class="form-label">2FA Cloud Password (Optional)</label>
+                        <input type="password" class="text-input" id="tg-input-2fa" placeholder="••••••••">
+                    </div>
+                </div>
+                <div id="tg-modal-tab-string" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">Telethon / Pyrogram String Session</label>
+                        <textarea class="text-input" id="tg-input-string" placeholder="1BVtsOHQBu7... (Paste 1-line String Session here)" style="min-height: 80px; font-family: monospace; font-size: 11px;"></textarea>
+                    </div>
+                </div>
+                <div id="tg-modal-feedback" style="font-size: 12px; color: var(--accent-danger); display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTgLoginModal()">Cancel</button>
+                <button class="btn btn-primary" id="tg-modal-submit-btn" onclick="handleTgSendCode()">Send OTP Code</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Dashboard User Login Modal -->
+    <div class="modal-backdrop" id="login-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Admin Authentication</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeLoginModal()">&times;</button>
+            </div>
+            <form onsubmit="handleLoginSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="text-input" id="login-username" placeholder="Enter username" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="text-input" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+                    <div id="login-error-msg" style="font-size: 12px; color: var(--accent-danger); display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeLoginModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Log In</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. Add Member Modal -->
+    <div class="modal-backdrop" id="create-user-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Add Team Member</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeCreateUserModal()">&times;</button>
+            </div>
+            <form onsubmit="handleCreateUserSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="text-input" id="new-user-name" placeholder="Username (min 3 chars)" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="text-input" id="new-user-pass" placeholder="••••••••" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Role</label>
+                        <select class="text-input" id="new-user-role">
+                            <option value="operator">Operator</option>
+                            <option value="viewer">Viewer</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. Change Password Modal -->
+    <div class="modal-backdrop" id="change-password-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span class="modal-title">Change Account Password</span>
+                <button class="btn btn-ghost btn-icon-only" onclick="closeChangePasswordModal()">&times;</button>
+            </div>
+            <form onsubmit="handleChangePasswordSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" class="text-input" id="change-pass-current" placeholder="Enter current password" required autocomplete="current-password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">New Password (min. 6 characters)</label>
+                        <input type="password" class="text-input" id="change-pass-new" placeholder="Enter new secure password" required autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password</label>
+                        <input type="password" class="text-input" id="change-pass-confirm" placeholder="Re-enter new password" required autocomplete="new-password">
+                    </div>
+                    <div id="change-pass-error-msg" style="font-size: 12px; color: var(--accent-danger); display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeChangePasswordModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="change-pass-submit-btn">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOPIC LECTURE ITEMS & PAYLOAD DETAIL INSPECTOR MODAL -->
+    <div class="modal-overlay" id="modal-topic-details" style="display: none; align-items: center; justify-content: center; z-index: 1060;" onclick="if(event.target===this) closeTopicDetailsModal()">
+        <div class="modal-dialog topic-modal-dialog" style="max-width: 980px; width: 95%; max-height: 90vh; overflow-y: auto; background: #070B14; border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0 25px 70px rgba(0, 0, 0, 0.85), 0 0 45px rgba(56, 189, 248, 0.15); border-radius: var(--radius-lg);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: #070B14; z-index: 10;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; color: #38BDF8; font-size: 20px;">
+                        <span id="topic-modal-icon">📑</span>
+                    </div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: #F8FAFC; letter-spacing: -0.01em;" id="topic-modal-title">Topic Lectures & Payload</h3>
+                            <span class="pill pill-neutral tabular" id="topic-modal-id-badge" style="font-size: 11px;">Topic ID: --</span>
+                        </div>
+                        <p style="margin: 2px 0 0 0; font-size: 12px; color: #94A3B8;" id="topic-modal-subtitle">Forum lecture catalog &middot; Real-time delivery verification</p>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeTopicDetailsModal()" style="background: none; border: none; color: #64748B; cursor: pointer; padding: 4px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 18px;">
+                <!-- Summary KPI Strip for this Topic -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: #94A3B8; text-transform: uppercase; font-weight: 700;">Total Files</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #38BDF8; margin-top: 4px;" id="topic-modal-total-files">--</div>
+                    </div>
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: #34D399; text-transform: uppercase; font-weight: 700;">Delivered Files</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #34D399; margin-top: 4px;" id="topic-modal-delivered-files">--</div>
+                    </div>
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: #FBBF24; text-transform: uppercase; font-weight: 700;">Files Left to Send</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #FBBF24; margin-top: 4px;" id="topic-modal-pending-files">--</div>
+                    </div>
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: #818CF8; text-transform: uppercase; font-weight: 700;">Delivery Progress</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #818CF8; margin-top: 4px;" id="topic-modal-progress-pct">--%</div>
+                    </div>
+                </div>
+
+                <!-- Animated Shimmer Progress Bar -->
+                <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px 16px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                        <span style="color: #94A3B8; font-weight: 600;">Overall Topic Fulfillment</span>
+                        <span class="tabular" style="color: #38BDF8; font-weight: 700;" id="topic-modal-progress-label">0 / 0 Delivered</span>
+                    </div>
+                    <div style="height: 8px; background: rgba(255, 255, 255, 0.08); border-radius: 4px; overflow: hidden; position: relative;">
+                        <div id="topic-modal-progress-bar" class="shimmer-bar" style="width: 0%; height: 100%; border-radius: 4px; transition: width 0.4s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Lecture Search & Filters Toolbar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <div class="table-search-box" style="margin-left: 0; flex: 1; max-width: 320px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="topic-items-search-input" placeholder="Search files/lectures by title or msg id..." oninput="handleTopicItemsSearch(this.value)">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div class="topic-filter-tabs" style="margin: 0;">
+                            <button class="topic-filter-btn active" onclick="setTopicItemsFilter('all', this)">All Items (<span id="titem-filter-all">0</span>)</button>
+                            <button class="topic-filter-btn" onclick="setTopicItemsFilter('pending', this)">Left to Send (<span id="titem-filter-pending">0</span>)</button>
+                            <button class="topic-filter-btn" onclick="setTopicItemsFilter('delivered', this)">Delivered (<span id="titem-filter-delivered">0</span>)</button>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="btn-export-topic-csv" onclick="exportTopicLecturesCsv()" title="Export strict sequential curriculum manifest as CSV" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 11px; font-weight: 700; border-color: rgba(56, 189, 248, 0.4); color: #38BDF8;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span>Export Manifest (CSV)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Items Table Container -->
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; background: rgba(15, 23, 42, 0.4);">
+                    <table class="data-table" style="width: 100%; margin: 0;">
+                        <thead>
+                            <tr style="position: sticky; top: 0; background: #0D1424; z-index: 5;">
+                                <th style="width: 50px;">#</th>
+                                <th style="width: 110px;">Status</th>
+                                <th>Lecture Title / File Name</th>
+                                <th style="width: 100px;">Media Type</th>
+                                <th style="width: 90px;">Message ID</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topic-items-tbody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-tertiary); padding: 30px;">Loading lectures...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 12px; color: #64748B;" id="topic-items-footer-info">
+                    Showing lectures & files inside this topic &middot; SQLite read-only WAL
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="closeTopicDetailsModal()">Close Inspector</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 360° LIVE PIPELINE DIAGNOSTIC ANALYZER MODAL -->
+    <div class="modal-overlay" id="modal-diagnostic-analyzer" style="display: none; align-items: center; justify-content: center; z-index: 1050;" onclick="if(event.target===this) closeDiagnosticModal()">
+        <div class="modal-dialog diag-modal-dialog" style="max-width: 920px; width: 95%; max-height: 90vh; overflow-y: auto; background: #070B14; border: 1px solid rgba(56, 189, 248, 0.25); box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(56, 189, 248, 0.1);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; color: #38BDF8;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #F1F5F9; letter-spacing: -0.01em;">360° Live Pipeline Diagnostic Analyzer</h3>
+                        <p style="margin: 2px 0 0 0; font-size: 12px; color: #94A3B8;">Real-time non-blocking audit &middot; Live telemetry &middot; SQLite read-only WAL</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="btn btn-secondary btn-sm" onclick="runDiagnosticScan()" id="diag-refresh-btn" style="background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.3); color: #38BDF8;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="diag-btn-spin-icon"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                        <span>Re-Analyze</span>
+                    </button>
+                    <button class="modal-close" onclick="closeDiagnosticModal()" style="background: none; border: none; color: #64748B; cursor: pointer; padding: 4px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-body" style="padding: 22px 24px; display: flex; flex-direction: column; gap: 18px;">
+                <!-- Lineage & Route Matrix Bar -->
+                <div class="diag-lineage-box" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #38BDF8; font-weight: 700; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                            <span>SOURCE ORIGIN</span>
+                            <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; font-size: 10px; padding: 1px 6px;">LIVE CLONE</span>
+                        </div>
+                        <div style="font-size: 14px; font-weight: 700; color: #F8FAFC; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="diag-source-name">Loading source channel...</div>
+                        <div style="font-size: 11px; color: #94A3B8; margin-top: 2px; font-family: monospace;" id="diag-source-meta">ID: -- | Topic: All Lectures</div>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: center; color: #38BDF8; font-size: 18px; padding: 0 8px;">
+                        ➔
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #4ADE80; font-weight: 700; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                            <span>DESTINATION TARGET</span>
+                            <span class="badge" style="background: rgba(74, 222, 128, 0.15); color: #4ADE80; font-size: 10px; padding: 1px 6px;">SYNC RELAY</span>
+                        </div>
+                        <div style="font-size: 14px; font-weight: 700; color: #F8FAFC; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="diag-dest-name">Loading target destination...</div>
+                        <div style="font-size: 11px; color: #94A3B8; margin-top: 2px; font-family: monospace;" id="diag-dest-meta">ID: -- | Topic: Auto Routing</div>
+                    </div>
+                </div>
+
+                <!-- 4-Grid Balance Sheet -->
+                <div class="diag-grid-4" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                    <div class="diag-card" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: #94A3B8; text-transform: uppercase; font-weight: 600;">Total Channel Files</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #F8FAFC; margin-top: 4px; font-variant-numeric: tabular-nums;" id="diag-total-files">0</div>
+                        <div style="font-size: 11px; color: #64748B; margin-top: 2px; font-variant-numeric: tabular-nums;" id="diag-total-gb">0.0 GB Total</div>
+                    </div>
+                    <div class="diag-card" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: #4ADE80; text-transform: uppercase; font-weight: 600;">Delivered & Verified</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #4ADE80; margin-top: 4px; font-variant-numeric: tabular-nums;" id="diag-completed-files">0</div>
+                        <div style="font-size: 11px; color: #64748B; margin-top: 2px; font-variant-numeric: tabular-nums;" id="diag-completed-gb">0.0 GB Delivered</div>
+                    </div>
+                    <div class="diag-card" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: #FBBF24; text-transform: uppercase; font-weight: 600;">Pending In Queue</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #FBBF24; margin-top: 4px; font-variant-numeric: tabular-nums;" id="diag-remaining-files">0</div>
+                        <div style="font-size: 11px; color: #64748B; margin-top: 2px; font-variant-numeric: tabular-nums;" id="diag-remaining-gb">0.0 GB Remaining</div>
+                    </div>
+                    <div class="diag-card" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: #38BDF8; text-transform: uppercase; font-weight: 600;">Batch Progress</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #38BDF8; margin-top: 4px; font-variant-numeric: tabular-nums;" id="diag-progress-pct">0.0%</div>
+                        <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 6px; overflow: hidden;">
+                            <div id="diag-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38BDF8, #818CF8); transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current In-Flight Stream Status -->
+                <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 14px 18px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #94A3B8; font-weight: 700; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #38BDF8; animation: pulse 1.5s infinite;"></span>
+                            <span>IN-FLIGHT STREAMING FILE</span>
+                        </div>
+                        <div style="font-size: 12px; font-weight: 700; color: #38BDF8; font-variant-numeric: tabular-nums;" id="diag-active-pct">0%</div>
+                    </div>
+                    <div style="font-size: 13px; font-weight: 600; color: #F1F5F9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="diag-active-name">No active file transfer in progress (Standby)</div>
+                    <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; margin: 8px 0; overflow: hidden;">
+                        <div id="diag-active-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38BDF8, #34D399); transition: width 0.2s ease;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: #64748B; font-variant-numeric: tabular-nums;">
+                        <span id="diag-active-transferred">0 MB / 0 MB</span>
+                        <span id="diag-active-eta">ETA: --</span>
+                    </div>
+                </div>
+
+                <!-- Media Breakdown & Timing Balance -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <!-- Media Ledger -->
+                    <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 14px 16px;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 10px;">Media Inventory Ledger</div>
+                        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94A3B8;">🎥 Videos Sent / Total:</span>
+                                <span style="font-weight: 700; color: #F1F5F9; font-variant-numeric: tabular-nums;" id="diag-videos-stat">0 / 0 (0.0 GB)</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94A3B8;">📄 Documents / PDFs:</span>
+                                <span style="font-weight: 700; color: #F1F5F9; font-variant-numeric: tabular-nums;" id="diag-docs-stat">0 / 0 (0.0 GB)</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94A3B8;">🖼️ Photos & Audios:</span>
+                                <span style="font-weight: 700; color: #F1F5F9; font-variant-numeric: tabular-nums;" id="diag-photos-stat">0 photos &middot; 0 audios</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94A3B8;">💬 Text / Captions:</span>
+                                <span style="font-weight: 700; color: #F1F5F9; font-variant-numeric: tabular-nums;" id="diag-text-stat">0 messages formatted</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timing & Pipeline Velocity -->
+                    <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 14px 16px;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 10px;">Velocity & Completion Horizon</div>
+                        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94A3B8;">⏱️ Current Uptime:</span>
+                                <span style="font-weight: 700; color: #F1F5F9; font-variant-numeric: tabular-nums;" id="diag-uptime">00:00:00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94A3B8;">🚀 Current Speed:</span>
+                                <span style="font-weight: 700; color: #38BDF8; font-variant-numeric: tabular-nums;" id="diag-curr-speed">0.00 KB/s</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94A3B8;">📈 Peak Speed Recorded:</span>
+                                <span style="font-weight: 700; color: #4ADE80; font-variant-numeric: tabular-nums;" id="diag-peak-speed">0.00 KB/s</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #94A3B8;">⏳ Estimated Finish (ETA):</span>
+                                <span style="font-weight: 700; color: #FBBF24; font-variant-numeric: tabular-nums;" id="diag-finish-time">Calculating...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-Processes & Worker Status Grid -->
+                <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 14px 16px;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Core Sub-Processes & Subsystems</span>
+                        <span style="font-size: 10px; color: #64748B;" id="diag-scan-timestamp">Last check: --</span>
+                    </div>
+                    <div id="diag-processes-container" class="diag-processes-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <!-- Process Cards populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 12px; color: #64748B;">
+                    Press <kbd class="hud-kbd" style="font-size: 10px; padding: 2px 5px;">Esc</kbd> to close &middot; Non-blocking SQLite read-only
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="closeDiagnosticModal()">Close Inspector</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- JavaScript Application Logic -->
+    <script src="/static/js/dashboard.js"></script>
+
+    <!-- Command Palette Floating Modal (Spotlight Style) -->
+    <div class="cmd-palette-backdrop" id="modal-command-palette" onclick="if (event.target === this) closeCommandPalette()">
+        <div class="cmd-palette-box">
+            <div class="cmd-palette-search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-primary);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="cmd-palette-input" id="cmd-palette-input" placeholder="Type a command or search mission control..." oninput="handleCommandSearch(this.value)">
+                <kbd class="hud-kbd">Esc to close</kbd>
+            </div>
+            <div class="cmd-palette-results" id="cmd-palette-results">
+                <!-- Dynamically rendered by renderCommandPaletteResults -->
+            </div>
+            <div class="cmd-palette-footer">
+                <div style="display: flex; gap: var(--space-4);">
+                    <span>Navigate <kbd class="hud-kbd">↑</kbd> <kbd class="hud-kbd">↓</kbd></span>
+                    <span>Select <kbd class="hud-kbd">↵</kbd></span>
+                </div>
+                <div>KindSync Pro Version X Enterprise</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visual Forwarding Route Matrix Modal -->
+    <div class="modal-backdrop" id="modal-route-matrix">
+        <div class="modal-dialog" style="max-width: 720px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: var(--space-3);">
+                    <div style="width: 32px; height: 32px; border-radius: var(--radius-md); background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%); display: flex; align-items: center; justify-content: center; color: white;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="modal-title">Visual Forwarding Route Matrix</div>
+                        <div style="font-size: 12px; color: var(--text-tertiary);">Real-time mapping of Telegram source channels to target study groups & topics</div>
+                    </div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="closeRouteMatrixModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <!-- Add New Route Quick Form -->
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-medium); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-3);">➕ Add New Forwarding Route</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 120px auto; gap: var(--space-3); align-items: flex-end;">
+                        <div class="form-group">
+                            <label class="form-label">Source Chat ID</label>
+                            <input type="text" class="text-input" id="new-route-src" placeholder="-1001234567890">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Target Chat ID</label>
+                            <input type="text" class="text-input" id="new-route-tgt" placeholder="-1009876543210">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Target Topic ID</label>
+                            <input type="number" class="text-input" id="new-route-topic" placeholder="0">
+                        </div>
+                        <button class="btn btn-primary" onclick="handleCreateRoute()" style="height: 38px;">Add Route</button>
+                    </div>
+                </div>
+
+                <!-- Active Routes Grid Controls & Search -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
+                    <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Configured Forwarding Routes</div>
+                    <div class="table-search-box">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" placeholder="Search routes..." oninput="handleRouteSearch(this.value)">
+                    </div>
+                </div>
+                <div class="route-grid" id="route-matrix-container">
+                    <div style="text-align: center; padding: var(--space-6); color: var(--text-tertiary);">Loading routes...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRouteMatrixModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOCTOR AMIT SINGH VERIFIED CONTACT & PROFILE MODAL -->
+    <div class="modal-overlay" id="modal-doctor-contact" style="display: none; align-items: center; justify-content: center; z-index: 1060;" onclick="if(event.target===this) closeDoctorContactModal()">
+        <div class="modal-dialog" style="max-width: 580px; width: 95%; background: #0A0E17; border: 1px solid rgba(16, 185, 129, 0.3); box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(16, 185, 129, 0.15); border-radius: 14px; overflow: hidden;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(56, 189, 248, 0.05));">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #10B981, #059669); display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);">
+                        👨‍⚕️
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #F1F5F9; letter-spacing: -0.01em;">Kind Doctor 🩺❤️ (Dr. Amit Singh)</h3>
+                        <p style="margin: 2px 0 0 0; font-size: 12px; color: #34D399; font-weight: 600;">Kind Doctor • Project Creator & Lead Architect</p>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeDoctorContactModal()" style="background: none; border: none; color: #64748B; cursor: pointer; padding: 4px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="modal-body" style="padding: 22px 24px; display: flex; flex-direction: column; gap: 16px;">
+                <!-- Badges & Verification -->
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <span class="pill pill-success" style="font-size: 10px; padding: 3px 9px;">VERIFIED CREATOR</span>
+                    <span class="pill pill-info" style="font-size: 10px; padding: 3px 9px;">SYSTEM ARCHITECT</span>
+                    <span class="pill pill-warning" style="font-size: 10px; padding: 3px 9px;">KIND DOCTOR MASTER</span>
+                </div>
+
+                <!-- Telegram Direct Connect Grid -->
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px 16px;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: #38BDF8; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 10px;">
+                        Direct Verified Telegram Accounts
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <a href="https://t.me/Kinddoctor4u" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; text-decoration: none; color: #F8FAFC; transition: all 0.2s ease;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 18px;">✈️</span>
+                                <div>
+                                    <div style="font-weight: 700; font-size: 13px; color: #38BDF8;">@Kinddoctor4u</div>
+                                    <div style="font-size: 11px; color: #94A3B8;">Primary Doctor Account (ID: 1553619403)</div>
+                                </div>
+                            </div>
+                            <span class="pill pill-info" style="font-size: 9px;">OPEN CHAT ↗</span>
+                        </a>
+
+                        <a href="https://t.me/Ammitrajput1" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; text-decoration: none; color: #F8FAFC; transition: all 0.2s ease;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 18px;">✈️</span>
+                                <div>
+                                    <div style="font-weight: 700; font-size: 13px; color: #818CF8;">@Ammitrajput1</div>
+                                    <div style="font-size: 11px; color: #94A3B8;">Secondary Administrator Account (ID: 759038032)</div>
+                                </div>
+                            </div>
+                            <span class="pill pill-neutral" style="font-size: 9px;">OPEN CHAT ↗</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Kind Doctor Bot Relay Info -->
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 16px;">
+                    <div style="font-size: 12px; font-weight: 700; color: #34D399; margin-bottom: 4px;">
+                        🤖 Kind Doctor Telegram Bot Direct Relay
+                    </div>
+                    <div style="font-size: 11.5px; color: #CBD5E1; line-height: 1.5;">
+                        You can send any message directly to the Kind Doctor bot using <code>/contact &lt;your query&gt;</code>. Your message will be instantly and securely forwarded directly to Kind Doctor 🩺❤️.
+                    </div>
+                </div>
+
+                <!-- Invariant Security Assurance -->
+                <div style="font-size: 10.5px; color: #64748B; text-align: center;">
+                    🛡️ Strict Admin Policy: Only the above two verified accounts hold master control & telemetry relay authority.
+                </div>
+            </div>
+
+            <div class="modal-footer" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 24px; display: flex; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeDoctorContactModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Telegram Mini App Auto-Expand & Viewport Synchronization
+        if (window.Telegram && window.Telegram.WebApp) {
+            try {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+                if (window.Telegram.WebApp.setHeaderColor) {
+                    window.Telegram.WebApp.setHeaderColor('#05070B');
+                }
+                if (window.Telegram.WebApp.setBackgroundColor) {
+                    window.Telegram.WebApp.setBackgroundColor('#05070B');
+                }
+            } catch (e) {
+                console.debug("Telegram WebApp init:", e);
+            }
+        }
+    </script>
+</body>
+</html>

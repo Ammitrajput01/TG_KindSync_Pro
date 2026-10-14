@@ -1,0 +1,21 @@
+{
+  "name": "KindSync Version X Enterprise Cockpit",
+  "short_name": "KindSync X",
+  "description": "Telegram KindSync Pro & Sentinel AI Mission Control Version X",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0D13",
+  "theme_color": "#0B0D13",
+  "icons": [
+    {
+      "src": "/static/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

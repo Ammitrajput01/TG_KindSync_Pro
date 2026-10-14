@@ -273,7 +273,7 @@ class AdminTelemetry:
                 f"📅 **Timestamp**: `{display_time}`\n"
                 f"📦 **Backup File**: `{filename}`\n"
                 f"📊 **Archive Size**: `{size_mb:.2f} MB`\n"
-                f"👑 **Owner**: Dr. Amit Singh (Kind Doctor)\n"
+                f"👑 **Owner**: Kind Doctor 🩺❤️\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"🔒 _100% Consistent SQLite WAL Online Snapshot_"
             )
@@ -2037,6 +2037,8 @@ class MultiSessionManager:
         session_files = sorted([
             f for f in os.listdir(".") 
             if f.endswith(".session") and not f.startswith(".")
+            and not f.startswith("temp_")
+            and not f.startswith("test_")
             and not f.startswith("session_scanner")
             and not f.startswith("session_bot_scanner")
             and "scanner" not in f.lower()

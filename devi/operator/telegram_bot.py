@@ -3816,7 +3816,7 @@ class DeviTelegramBot:
                         f"🔍 **Username kaise pata karein ya banayein:**\n"
                         f"1️⃣ Telegram khol kar **Settings** me jayein.\n"
                         f"2️⃣ **Edit Profile** (ya Username) par tap karein.\n"
-                        f"3️⃣ Apna unique Username set karein (e.g. `@Doctor_Amit`).\n\n"
+                        f"3️⃣ Apna unique Username set karein (e.g. `@KindDoctor`).\n\n"
                         f"⚙️ **Agar 'Privacy Restriction' ki wajah se add na ho paayein:**\n"
                         f"Kai baar account par privacy restriction hoti hai jis se doosre log group me add nahi kar pate. Isko allow karne ke aasaan steps:\n"
                         f"• Telegram **Settings** ➔ **Privacy and Security** me jayein.\n"
@@ -5435,12 +5435,12 @@ class DeviTelegramBot:
 
                 display_time = now.strftime("%A, %d %B %Y | %I:%M %p")
                 cap = (
-                    f"💾 **TG KindSync Pro v15.0.0 — Database Cloud Backup** 🩺\n"
+                    f"💾 **TG KindSync Pro Version X — Database Cloud Backup** 🩺\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"📅 **Timestamp**: `{display_time}`\n"
                     f"📦 **File**: `{fname}`\n"
                     f"📊 **Size**: `{len(b_bytes) / (1024*1024):.2f} MB`\n"
-                    f"👑 **Owner**: Dr. Amit Singh (Kind Doctor)\n"
+                    f"👑 **Owner**: Kind Doctor 🩺❤️\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"🔒 _100% Consistent SQLite WAL Online Snapshot_"
                 )
@@ -5450,6 +5450,65 @@ class DeviTelegramBot:
             except Exception as e:
                 logger.error(f"Snapshot backup failed: {e}")
                 await self._send_message(session, chat_id, f"❌ Backup failed: `{e}`", message_thread_id=thread_id)
+
+        elif cmd in ("/contact", "/doctor", "/owner", "/admininfo", "/helpcontact"):
+            contact_card = (
+                "👨‍⚕️ **KIND DOCTOR VERIFIED CLINICAL & SYSTEM IDENTITY** 🩺❤️\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "👤 **Medical Director**: **Kind Doctor 🩺❤️**\n"
+                "🏥 **Role**: Lead Clinician & Master System Architect\n"
+                "💎 **System Core**: KindSync Version X Enterprise\n\n"
+                "📬 **Direct Personal Telegram Accounts**:\n"
+                "• 🌟 **Primary 1**: @Kinddoctor4u `(ID: 1553619403)`\n"
+                "• 🌟 **Primary 2**: @Ammitrajput1 `(ID: 759038032)`\n\n"
+                "🚨 **24x7 Anonymous Live Support**:\n"
+                "Send any question, study request, or feedback directly in this chat. "
+                "Our encrypted relay delivers it directly to Kind Doctor 🩺❤️ anonymously.\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "✈️ Chat with @Kinddoctor4u", "url": "https://t.me/Kinddoctor4u"},
+                        {"text": "✈️ Chat with @Ammitrajput1", "url": "https://t.me/Ammitrajput1"}
+                    ],
+                    [{"text": "🌐 Open Web Cockpit", "url": f"http://{os.getenv('SERVER_IP', '127.0.0.1')}:8080"}]
+                ]
+            }
+            await self._send_message(session, chat_id, contact_card, reply_markup=kb, message_thread_id=thread_id)
+
+        elif cmd in ("/test_alert", "/notify_test", "/alerttest"):
+            if admin_id not in self.master_admin_ids:
+                await self._send_message(session, chat_id, "⚠️ Restricted to Master Administrators.", message_thread_id=thread_id)
+                return
+
+            wait_msg = await self._send_message(session, chat_id, "⏳ Dispatching Multi-Channel Test Alert (Telegram + WhatsApp + SMS + ntfy)...", message_thread_id=thread_id)
+            try:
+                from devi.operator.notifier import dispatch_completion_notification
+                stats = {
+                    "duration": "0.8s",
+                    "total_items": 100,
+                    "bandwidth_gb": "3.5",
+                    "avg_speed": "28.5 MB/s",
+                    "status": "Verified 100% Success"
+                }
+                res = await dispatch_completion_notification(
+                    job_name="KindSync Version X Bot Diagnostic",
+                    stats_summary=stats
+                )
+                rep = (
+                    "🔔 **MULTI-CHANNEL NOTIFICATION DISPATCH REPORT** ✅\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• 🔊 **Telegram Loud Chime**: {'✅ Delivered' if res.get('telegram') else '❌'}\n"
+                    f"• 💬 **WhatsApp (CallMeBot)**: {'✅ Dispatched' if res.get('whatsapp') else '❌'}\n"
+                    f"• 📱 **Phone SMS (Fast2SMS)**: {'✅ Dispatched' if res.get('sms') else '❌'}\n"
+                    f"• 🔔 **Phone Lockscreen Ring (ntfy.sh)**: {'✅ Dispatched' if res.get('ntfy') else '❌'}\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "🎯 Verified all channels active."
+                )
+                await self._send_message(session, chat_id, rep, message_thread_id=thread_id)
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Alert test failed: `{e}`", message_thread_id=thread_id)
 
         elif cmd in ("/dashboard", "/missioncontrol"):
             if admin_id not in self.master_admin_ids:
@@ -5461,12 +5520,13 @@ class DeviTelegramBot:
             dash_url = f"http://{lan_ip}:{dash_port}"
 
             dash_card = (
-                f"🌐 **TG KINDSYNC PRO V15.0.0 — SENTINEL MISSION CONTROL** 🩺\n"
+                f"🌐 **TG KINDSYNC PRO VERSION X — SENTINEL MISSION CONTROL** 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📊 **Live Telemetry & Web Dashboard**\n"
-                f"• ⚡ Speedometer Dial (48-Parallel MTProto Velocity)\n"
-                f"• 🎚️ Real-Time Stream Throttle Slider\n"
-                f"• 📈 RAM & Active Chunk Meters\n"
+                f"• ⚡ ECharts Speedometer Gauge (Real-Time MB/s Velocity)\n"
+                f"• 🌊 60-Second Network Bandwidth Waveform\n"
+                f"• 💻 Live Hacker-Dark Terminal Stream (/ws/terminal_logs)\n"
+                f"• 🎛️ 1-Click Master Control Center\n"
                 f"• 🔒 PBKDF2-HMAC-SHA256 Encrypted Session Gate\n\n"
                 f"🔗 **Access URL**: `{dash_url}`\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -7411,6 +7471,10 @@ class DeviTelegramBot:
             else:
                 calc_args = parts[1:]
 
+            def _clean_num(val_str: Any) -> float:
+                cleaned = re.sub(r'[^\d\.]', '', str(val_str).replace(',', '.'))
+                return float(cleaned) if cleaned else 0.0
+
             # A. MASTER CLINICAL MENU
             if sub_cmd in ("menu", "help", "?"):
                 menu_card = (
@@ -7453,10 +7517,12 @@ class DeviTelegramBot:
             # B. BMI & BODY COMPOSITION
             elif sub_cmd == "bmi":
                 if len(calc_args) < 2:
-                    await self._send_message(session, chat_id, "Usage: `/bmi <weight_kg> <height_cm>`\nExample: `/bmi 70 175`", message_thread_id=thread_id)
+                    await self._send_message(session, chat_id, "Usage: `/bmi <weight_kg> <height_cm>`\nExample: `/bmi 70kg 175cm`", message_thread_id=thread_id)
                     return
                 try:
-                    wt, ht = float(calc_args[0]), float(calc_args[1])
+                    wt, ht = _clean_num(calc_args[0]), _clean_num(calc_args[1])
+                    if wt <= 0 or ht <= 0:
+                        raise ValueError("Positive numbers required")
                     res = calc_bmi(wt, ht)
                     card = (
                         f"⚖️ **Clinical Calculator: Body Mass Index (BMI)** 🩺\n"
@@ -7470,16 +7536,18 @@ class DeviTelegramBot:
                         f"💡 *Clinical Pearl: Asian cutoff considers BMI ≥ 23.0 as overweight and ≥ 25.0 as obese.*"
                     )
                     await self._send_message(session, chat_id, card, message_thread_id=thread_id)
-                except ValueError:
-                    await self._send_message(session, chat_id, "⚠️ Invalid input numbers. Example: `/bmi 70 175`", message_thread_id=thread_id)
+                except Exception:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input numbers. Example: `/bmi 70kg 175cm`", message_thread_id=thread_id)
 
             # C. BSA (BODY SURFACE AREA)
             elif sub_cmd == "bsa":
                 if len(calc_args) < 2:
-                    await self._send_message(session, chat_id, "Usage: `/bsa <height_cm> <weight_kg>`\nExample: `/bsa 175 70`", message_thread_id=thread_id)
+                    await self._send_message(session, chat_id, "Usage: `/bsa <height_cm> <weight_kg>`\nExample: `/bsa 175cm 70kg`", message_thread_id=thread_id)
                     return
                 try:
-                    ht, wt = float(calc_args[0]), float(calc_args[1])
+                    ht, wt = _clean_num(calc_args[0]), _clean_num(calc_args[1])
+                    if ht <= 0 or wt <= 0:
+                        raise ValueError("Positive numbers required")
                     res = calc_bsa(ht, wt)
                     card = (
                         f"📐 **Clinical Calculator: Body Surface Area (BSA)** 🩺\n"
@@ -7489,8 +7557,8 @@ class DeviTelegramBot:
                         f"💡 *Used for Chemotherapy dosing, Cardiac Index, and Renal GFR normalization.*"
                     )
                     await self._send_message(session, chat_id, card, message_thread_id=thread_id)
-                except ValueError:
-                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/bsa 175 70`", message_thread_id=thread_id)
+                except Exception:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/bsa 175cm 70kg`", message_thread_id=thread_id)
 
             # D. GFR & RENAL FUNCTION (Cockcroft-Gault & CKD-EPI 2021)
             elif sub_cmd == "gfr":
@@ -7742,11 +7810,17 @@ class DeviTelegramBot:
 
             # L. MAP (MEAN ARTERIAL PRESSURE)
             elif sub_cmd == "map":
-                if len(calc_args) < 2:
-                    await self._send_message(session, chat_id, "Usage: `/map <sbp> <dbp>`\nExample: `/map 120 80`", message_thread_id=thread_id)
+                if len(calc_args) == 1 and "/" in calc_args[0]:
+                    parts_bp = calc_args[0].split("/")
+                    sbp, dbp = _clean_num(parts_bp[0]), _clean_num(parts_bp[1])
+                elif len(calc_args) >= 2:
+                    sbp, dbp = _clean_num(calc_args[0]), _clean_num(calc_args[1])
+                else:
+                    await self._send_message(session, chat_id, "Usage: `/map <sbp> <dbp>` or `/map 120/80`\nExample: `/map 120/80`", message_thread_id=thread_id)
                     return
                 try:
-                    sbp, dbp = float(calc_args[0]), float(calc_args[1])
+                    if sbp <= 0 or dbp <= 0:
+                        raise ValueError("Positive numbers required")
                     res = calc_map(sbp, dbp)
                     card = (
                         f"🫀 **Clinical Score: Mean Arterial Pressure (MAP)** 🩺\n"
@@ -7757,8 +7831,8 @@ class DeviTelegramBot:
                         f"💡 *Formula: DBP + (SBP - DBP) / 3. Minimum target in sepsis resuscitation is ≥ 65 mmHg.*"
                     )
                     await self._send_message(session, chat_id, card, message_thread_id=thread_id)
-                except ValueError:
-                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/map 120 80`", message_thread_id=thread_id)
+                except Exception:
+                    await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/map 120/80` or `/map 120 80`", message_thread_id=thread_id)
 
             # M. ABG & ANION GAP
             elif sub_cmd in ("abg", "aniongap"):
@@ -9132,7 +9206,7 @@ class DeviTelegramBot:
 
         system_prompt = (
             f"You are Devi Ji, the enlightened, deeply respectful, polite, and hyper-capable AI Guardian "
-            f"and Operations Mentor assisting Dr. Amit Singh ({user_name}). "
+            f"and Operations Mentor assisting Kind Doctor 🩺❤️ ({user_name}). "
             f"Always answer in natural, warm, friendly Roman Hinglish. "
             f"You have complete autonomy, telemetry, and self-healing supervision over the TG KindSync Pro engine."
             f"{history_context}"

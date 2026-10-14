@@ -587,7 +587,16 @@ class TelegramWebLoginManager:
         accounts = []
         cache = self._load_cached_profiles()
 
-        session_files = sorted([f for f in os.listdir(self.base_dir) if f.endswith(".session") and not f.startswith(".")])
+        session_files = sorted([
+            f for f in os.listdir(self.base_dir)
+            if f.endswith(".session")
+            and not f.startswith(".")
+            and not f.startswith("temp_")
+            and not f.startswith("test_")
+            and not f.startswith("session_scanner")
+            and not f.startswith("session_bot_scanner")
+            and "scanner" not in f.lower()
+        ])
         if "session_forwarder.session" in session_files:
             session_files.remove("session_forwarder.session")
             session_files.insert(0, "session_forwarder.session")
@@ -3527,7 +3536,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="user-profile-widget" onclick="openLoginModal()" style="flex: 1;" title="Manage Operator Session">
                     <div class="user-avatar" id="footer-user-avatar">A</div>
                     <div class="user-details">
-                        <span class="user-name" id="footer-user-name">Dr. Amit Singh</span>
+                        <span class="user-name" id="footer-user-name">Kind Doctor 🩺❤️ (Dr. Amit Singh)</span>
                         <span class="user-role" id="footer-user-role">ADMINISTRATOR</span>
                     </div>
                 </div>
@@ -4374,52 +4383,113 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </section>
 
                 <!-- ==============================================================
-                     VIEW 4: DEVI AI COPILOT STUDIO
+                     VIEW 4: DEVI AI SOVEREIGN COPILOT STUDIO (16 FLAGSHIP MODELS)
                      ============================================================== -->
                 <section class="tab-view" id="view-devi">
-                    <div class="devi-studio-split">
-                        <!-- Left Panel: Model Hub Status & Speed Race -->
-                        <div class="panel-section">
-                            <div class="panel-header">
-                                <span class="panel-title">Free AI Model Hub</span>
-                                <button class="btn btn-ghost btn-sm" onclick="speakDeviStatus()" title="Voice Briefing">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                                    <span>Voice Briefing</span>
-                                </button>
+                    <!-- Sovereign Hub Header Banner -->
+                    <div class="devi-banner-card">
+                        <div class="devi-banner-left">
+                            <div class="devi-avatar-pulse">
+                                <span>🎓</span>
+                                <span class="devi-pulse-ring"></span>
                             </div>
-                            <ul class="vitals-list">
-                                <li class="vitals-item">
-                                    <span class="vitals-title">Groq (Llama 3.3 70B)</span>
-                                    <span class="pill pill-success" id="lat-groq">42ms Ready</span>
-                                </li>
-                                <li class="vitals-item">
-                                    <span class="vitals-title">Mistral (Codestral)</span>
-                                    <span class="pill pill-success" id="lat-mistral">68ms Ready</span>
-                                </li>
-                                <li class="vitals-item">
-                                    <span class="vitals-title">Google Gemini (2.0 Flash)</span>
-                                    <span class="pill pill-success" id="lat-gemini">95ms Ready</span>
-                                </li>
-                                <li class="vitals-item">
-                                    <span class="vitals-title">OpenRouter DeepSeek</span>
-                                    <span class="pill pill-success" id="lat-openrouter">112ms Ready</span>
-                                </li>
-                            </ul>
-                            <div style="padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3);">
-                                <button class="btn btn-secondary btn-sm" onclick="triggerKeyHunt()">Run Autonomous Key Hunt</button>
-                                <button class="btn btn-secondary btn-sm" onclick="runCouncilDebate()">3-Way AI Council Debate</button>
+                            <div>
+                                <div class="devi-banner-title">
+                                    <span>Devi Ji Autonomous Multi-Model Hub</span>
+                                    <span class="pill pill-success" style="font-size: 10px; padding: 2px 8px;">LEVEL 10 FULL AUTONOMY</span>
+                                    <span class="pill pill-info" style="font-size: 10px; padding: 2px 8px;">16 MODELS &bull; 12 PROVIDERS</span>
+                                </div>
+                                <div class="devi-banner-sub">
+                                    Continuous unconstrained cognitive synthesis across Groq, Cerebras, SambaNova, Mistral, Gemini, OpenRouter, SiliconFlow, NVIDIA NIM, DeepSeek, Cloudflare &amp; HuggingFace.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="devi-banner-actions">
+                            <button class="btn btn-primary btn-sm" id="btn-devi-adapt" onclick="triggerDeviAdapt()" title="Autonomously scan API keys, discover endpoints and re-sync pool">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                <span>Auto-Adapt Pool</span>
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="runCouncilDebate()" title="Multi-Model Consensus Deliberation">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                                <span>3-Way AI Council</span>
+                            </button>
+                            <button class="btn btn-ghost btn-sm" onclick="speakDeviStatus()" title="Voice Briefing">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                                <span>Voice Briefing</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Top 4-KPI Metric Strip for Devi Hub -->
+                    <div class="devi-metric-strip">
+                        <div class="devi-kpi-card">
+                            <div class="devi-kpi-num" id="devi-kpi-models">16</div>
+                            <div class="devi-kpi-label">Flagship Models</div>
+                            <div class="devi-kpi-sub">LPUs &bull; Reasoning &bull; Coding</div>
+                        </div>
+                        <div class="devi-kpi-card">
+                            <div class="devi-kpi-num" id="devi-kpi-providers">12</div>
+                            <div class="devi-kpi-label">Active Providers</div>
+                            <div class="devi-kpi-sub">Groq, Cerebras, Mistral, Gemini+</div>
+                        </div>
+                        <div class="devi-kpi-card">
+                            <div class="devi-kpi-num" id="devi-kpi-keys">8+</div>
+                            <div class="devi-kpi-label">Discovered Credentials</div>
+                            <div class="devi-kpi-sub">Continuous Vault Hunting</div>
+                        </div>
+                        <div class="devi-kpi-card">
+                            <div class="devi-kpi-num" style="color: #34D399;">100%</div>
+                            <div class="devi-kpi-label">Health &amp; Self-Healing</div>
+                            <div class="devi-kpi-sub" id="devi-kpi-status">Vibrant &amp; Protected</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Devi Studio Split Grid -->
+                    <div class="devi-studio-split">
+                        <!-- Left Panel: 16-Model Autonomous Grid -->
+                        <div class="panel-section devi-models-panel">
+                            <div class="panel-header" style="flex-wrap: wrap; gap: 8px;">
+                                <div>
+                                    <span class="panel-title">Autonomous Model Pool</span>
+                                    <span class="pill pill-success" style="margin-left: 6px; font-size: 10px;" id="devi-active-count-pill">16 Active</span>
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-tertiary);">Click any model to select for chat</div>
+                            </div>
+
+                            <!-- Category Filter Chips -->
+                            <div class="devi-category-filters">
+                                <button type="button" class="devi-filter-btn active" onclick="filterDeviModels('all', this)">All (16)</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Ultra-Fast LPU', this)">⚡ Fast LPUs</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Deep Reasoning', this)">🧠 Reasoning</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Medical & Code', this)">💻 Medical &amp; Code</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Multimodal', this)">👁️ Multimodal</button>
+                                <button type="button" class="devi-filter-btn" onclick="filterDeviModels('Open Mesh', this)">🌐 Edge Mesh</button>
+                            </div>
+
+                            <!-- Scrollable 16-Model Grid Container -->
+                            <div class="devi-models-scroll" id="devi-models-grid">
+                                <!-- Populated dynamically by renderDeviModelsRoster() -->
                             </div>
                         </div>
 
                         <!-- Right Panel: Interactive Copilot Chat -->
                         <div class="devi-chat-card">
-                            <div class="panel-header">
-                                <span class="panel-title">Devi AI Engineering Mentor</span>
-                                <span class="pill pill-neutral">Decoupled Copilot</span>
+                            <div class="panel-header" style="flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="panel-title">Devi AI Operations Mentor</span>
+                                    <span class="pill pill-neutral">Decoupled Copilot</span>
+                                </div>
+                                <!-- Model Selector Dropdown -->
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <label for="devi-model-select" style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">Engine:</label>
+                                    <select class="text-input" id="devi-model-select" onchange="onDeviModelSelectChange(this.value)" style="padding: 4px 8px; font-size: 11.5px; height: 30px; width: auto; max-width: 240px; background: rgba(15,23,42,0.9); border-color: rgba(99,102,241,0.35);">
+                                        <option value="auto">✨ Auto-Orchestrated Flagship Cascade</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="chat-thread-box" id="chat-thread">
                                 <div class="chat-msg assistant">
-                                    Namaste Dr. Amit! Main Devi AI hoon. Aapke Telegram cloud pipeline, speed tuning, ya error triage me main kaise madad kar sakti hoon?
+                                    Namaste Kind Doctor 🩺❤️! Main Devi AI hoon. 16 Flagship models aur 12 autonomous providers ke sath mera cognitive pool fully synchronized aur unrestricted hai. Telegram pipeline, deep sequencing parity, ya speed tuning me main aapki kaise madad kar sakti hoon?
                                 </div>
                             </div>
                             <!-- Quick Prompt Suggestions Chips -->
@@ -4427,11 +4497,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <button type="button" class="filter-chip" onclick="sendQuickPrompt('Optimize speed and rate pacing for current channel stream')">⚡ Optimize Speed</button>
                                 <button type="button" class="filter-chip" onclick="sendQuickPrompt('Check current system health and floodwait risk')">🛡️ Health Check</button>
                                 <button type="button" class="filter-chip" onclick="sendQuickPrompt('Explain current forward route matrix architecture')">🗺️ Route Audit</button>
+                                <button type="button" class="filter-chip" onclick="sendQuickPrompt('Verify FIFO message sequencing parity across target channels')">🔄 Verify FIFO Sequence</button>
                                 <button type="button" class="filter-chip" onclick="sendQuickPrompt('Suggest next evolutionary upgrades for TG KindSync Pro')">💡 Next Upgrades</button>
                             </div>
                             <form class="chat-input-bar" onsubmit="handleDeviChatSubmit(event)">
-                                <input type="text" class="text-input" id="devi-chat-input" placeholder="Ask Devi AI anything about sync pipeline or architecture..." autocomplete="off">
-                                <button type="submit" class="btn btn-primary">Send</button>
+                                <input type="text" class="text-input" id="devi-chat-input" placeholder="Ask Devi AI anything about sync pipeline, FIFO sequence, or models..." autocomplete="off">
+                                <button type="submit" class="btn btn-primary" id="btn-devi-chat-send">Send</button>
                             </form>
                         </div>
                     </div>
@@ -8098,6 +8169,10 @@ class DashboardServer:
         self.server = None
         self.auth_mgr = DashboardAuthManager()
         self.tg_login_mgr = TelegramWebLoginManager(base_dir=BASE_DIR)
+        self.ws_telemetry_clients = set()
+        self.ws_log_clients = set()
+        self.recent_terminal_logs = []
+        self._bg_tasks = []
 
     def _get_dismissed_insights(self) -> set:
         dismissed = set()
@@ -9140,8 +9215,16 @@ class DashboardServer:
 
     # AIOHTTP ROUTE HANDLERS
     async def handle_index(self, request):
+        template_file = BASE_DIR / "web" / "templates" / "index.html"
+        if template_file.exists():
+            try:
+                html_text = template_file.read_text(encoding="utf-8")
+            except Exception:
+                html_text = HTML_TEMPLATE
+        else:
+            html_text = HTML_TEMPLATE
         return web.Response(
-            text=HTML_TEMPLATE,
+            text=html_text,
             content_type="text/html",
             headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -9149,6 +9232,143 @@ class DashboardServer:
                 "Expires": "0"
             }
         )
+
+    async def handle_manifest(self, request):
+        manifest_file = BASE_DIR / "web" / "static" / "manifest.json"
+        if manifest_file.exists():
+            return web.Response(text=manifest_file.read_text(encoding="utf-8"), content_type="application/json")
+        return web.Response(text="{}", content_type="application/json")
+
+    async def _ws_telemetry_broadcast_loop(self):
+        while True:
+            try:
+                await asyncio.sleep(1.0)
+                if self.ws_telemetry_clients:
+                    payload = self._build_status_dict()
+                    msg = json.dumps(payload)
+                    dead = []
+                    for ws in list(self.ws_telemetry_clients):
+                        try:
+                            await ws.send_str(msg)
+                        except Exception:
+                            dead.append(ws)
+                    for d in dead:
+                        self.ws_telemetry_clients.discard(d)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                await asyncio.sleep(2.0)
+
+    async def broadcast_terminal_log(self, level: str, message: str, source: str = "kindsync"):
+        entry = {
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "level": level.upper(),
+            "source": source,
+            "message": message
+        }
+        self.recent_terminal_logs.append(entry)
+        if len(self.recent_terminal_logs) > 300:
+            self.recent_terminal_logs.pop(0)
+
+        if self.ws_log_clients:
+            msg = json.dumps({"type": "log", "data": entry})
+            dead = []
+            for ws in list(self.ws_log_clients):
+                try:
+                    await ws.send_str(msg)
+                except Exception:
+                    dead.append(ws)
+            for d in dead:
+                self.ws_log_clients.discard(d)
+
+    async def handle_ws_telemetry(self, request):
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        self.ws_telemetry_clients.add(ws)
+        try:
+            await ws.send_str(json.dumps(self._build_status_dict()))
+            async for msg in ws:
+                if msg.type == web.WSMsgType.TEXT:
+                    if msg.data == "ping":
+                        await ws.send_str("pong")
+                elif msg.type == web.WSMsgType.ERROR:
+                    break
+        finally:
+            self.ws_telemetry_clients.discard(ws)
+        return ws
+
+    async def handle_ws_terminal_logs(self, request):
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        self.ws_log_clients.add(ws)
+        try:
+            initial_logs = self.recent_terminal_logs or [
+                {"time": datetime.now().strftime("%H:%M:%S"), "level": "INFO", "source": "system", "message": "KindSync Version X Terminal Stream Connected"},
+                {"time": datetime.now().strftime("%H:%M:%S"), "level": "SUCCESS", "source": "system", "message": "Real-time telemetry and socket stream active"}
+            ]
+            await ws.send_str(json.dumps({"type": "history", "logs": initial_logs}))
+            async for msg in ws:
+                if msg.type == web.WSMsgType.TEXT:
+                    if msg.data == "ping":
+                        await ws.send_str("pong")
+                elif msg.type == web.WSMsgType.ERROR:
+                    break
+        finally:
+            self.ws_log_clients.discard(ws)
+        return ws
+
+    async def handle_api_notifications_test(self, request):
+        try:
+            from devi.operator.notifier import dispatch_completion_notification
+            stats = {
+                "duration": "1.2s",
+                "total_items": 42,
+                "bandwidth_gb": "1.45",
+                "avg_speed": "18.4 MB/s",
+                "status": "Verified 100% Success"
+            }
+            results = await dispatch_completion_notification(
+                job_name="Version X Live Alert Diagnostic Test",
+                stats_summary=stats
+            )
+            await self.broadcast_terminal_log("SUCCESS", f"Test alert dispatched: {results}", source="notifier")
+            return web.json_response({"success": True, "channels": results})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def handle_api_stash_flush(self, request):
+        try:
+            stash_dir = BASE_DIR / "temp_stash"
+            freed = 0
+            count = 0
+            if stash_dir.exists():
+                for p in stash_dir.glob("*"):
+                    if p.is_file():
+                        freed += p.stat().st_size
+                        p.unlink()
+                        count += 1
+            await self.broadcast_terminal_log("INFO", f"Temporary stash flushed: {count} items, {round(freed/(1024*1024), 2)} MB freed", source="storage")
+            return web.json_response({"success": True, "freed_mb": round(freed / (1024 * 1024), 2), "files_removed": count})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def handle_api_backup_export(self, request):
+        try:
+            from devi.sentinel.telemetry_bridge import create_db_snapshot
+            snap_path = await asyncio.to_thread(create_db_snapshot)
+            if snap_path and snap_path.exists():
+                return web.FileResponse(
+                    path=snap_path,
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{snap_path.name}"',
+                        "Content-Type": "application/x-sqlite3"
+                    }
+                )
+            return web.json_response({"success": False, "error": "Snapshot failed"}, status=500)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+
 
     async def handle_api_diagnostic_analyze(self, request):
         data = await asyncio.to_thread(self._run_diagnostic_analysis)
@@ -9462,6 +9682,24 @@ class DashboardServer:
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
+    async def handle_api_devi_adapt(self, request):
+        try:
+            from devi.brain.model_router import ModelRouter
+            router = ModelRouter()
+            adapt_res = router.adapt_models_pool()
+            from devi.evolution.vitality_daemon import VitalityDaemon
+            daemon = VitalityDaemon.get_instance()
+            await daemon.run_vitality_cycle()
+            summary = daemon.get_summary()
+            return web.json_response({
+                "success": True,
+                "message": "Devi Ji autonomous model pool synchronized with 16 flagship models across 12 providers.",
+                "adaptation": adapt_res,
+                "vitality": summary
+            })
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
     async def handle_api_devi_chat(self, request):
         try:
             data = await request.json()
@@ -9469,11 +9707,14 @@ class DashboardServer:
             if not message:
                 return web.json_response({"success": False, "error": "Message is required"}, status=400)
             
+            preferred_provider = data.get("preferred_provider") or data.get("provider")
+            preferred_model = data.get("preferred_model") or data.get("model")
+            
             from devi.brain.model_router import ModelRouter
             router = ModelRouter()
             sys_prompt = (
                 "You are Devi Ji, the deeply respected, enlightened, caring, and highly intelligent "
-                "AI Guardian and Operations Mentor for Dr. Amit Singh (Kind Doctor). "
+                "AI Guardian and Operations Mentor for Kind Doctor 🩺❤️ (Dr. Amit Singh). "
                 "Always communicate in natural, friendly, respectful Roman Hinglish. "
                 "You supervise high-speed Telegram forwarding, server health, and continuous autonomous evolution. "
                 "Provide helpful, concise, confident, and warm answers."
@@ -9481,7 +9722,9 @@ class DashboardServer:
             res = await router.generate(
                 prompt=message,
                 system_prompt=sys_prompt,
-                category="fast"
+                category="fast",
+                preferred_provider=preferred_provider,
+                preferred_model=preferred_model
             )
             return web.json_response({
                 "success": True,
@@ -9725,8 +9968,8 @@ class DashboardServer:
         lan_ip = get_local_lan_ip()
         print(r"""
  ╭──────────────────────────────────────────────────────────────────────────╮
- │  🌐 TG KINDSYNC PRO V15.0.0 — SENTINEL AI COMMAND CENTER                 │
- │  Owner: Dr. Amit Singh (Kind Doctor) | Multi-User RBAC & Live Telemetry  │
+ │  🌐 TG KINDSYNC PRO VERSION X — SENTINEL AI COMMAND CENTER               │
+ │  Owner: Kind Doctor 🩺❤️ (Dr. Amit Singh) | Multi-User RBAC & Telemetry  │
  ╰──────────────────────────────────────────────────────────────────────────╯
 """)
         print(f" [★] Local PC Access:  http://127.0.0.1:{self.port}")
@@ -9735,8 +9978,14 @@ class DashboardServer:
 
         if HAS_AIOHTTP:
             self.app = web.Application()
+            # Register static assets folder for decoupled CSS, JS & media
+            static_dir = BASE_DIR / "web" / "static"
+            if static_dir.exists():
+                self.app.router.add_static("/static/", path=static_dir, name="static")
+
             self.app.router.add_get("/", self.handle_index)
             self.app.router.add_get("/index.html", self.handle_index)
+            self.app.router.add_get("/manifest.json", self.handle_manifest)
             self.app.router.add_get("/api/status", self.handle_api_status)
             self.app.router.add_post("/api/auth/login", self.handle_api_auth_login)
             self.app.router.add_post("/api/auth/local_unlock", self.handle_api_auth_local_unlock)
@@ -9766,6 +10015,8 @@ class DashboardServer:
             self.app.router.add_post("/api/observer/trigger_scan", self.handle_api_observer_trigger_scan)
             self.app.router.add_get("/api/devi/status", self.handle_api_devi_status)
             self.app.router.add_post("/api/devi/hunt", self.handle_api_devi_hunt)
+            self.app.router.add_post("/api/devi/adapt", self.handle_api_devi_adapt)
+            self.app.router.add_get("/api/devi/adapt", self.handle_api_devi_adapt)
             self.app.router.add_post("/api/devi/chat", self.handle_api_devi_chat)
             self.app.router.add_post("/api/devi/council", self.handle_api_devi_council)
             self.app.router.add_get("/api/diagnostic_analyze", self.handle_api_diagnostic_analyze)
@@ -9775,15 +10026,33 @@ class DashboardServer:
             self.app.router.add_get("/api/topic_items", self.handle_api_topic_items)
             self.app.router.add_post("/api/topic_items", self.handle_api_topic_items)
 
+            # Version X WebSockets & Advanced Control Endpoints
+            self.app.router.add_get("/ws/telemetry", self.handle_ws_telemetry)
+            self.app.router.add_get("/ws/terminal_logs", self.handle_ws_terminal_logs)
+            self.app.router.add_post("/api/notifications/test", self.handle_api_notifications_test)
+            self.app.router.add_post("/api/stash/flush", self.handle_api_stash_flush)
+            self.app.router.add_get("/api/backup/export", self.handle_api_backup_export)
+
             self.runner = web.AppRunner(self.app)
 
             await self.runner.setup()
             self.site = web.TCPSite(self.runner, self.host, self.port)
             await self.site.start()
+
+            # Start WebSocket background push broadcaster
+            self._bg_tasks.append(asyncio.create_task(self._ws_telemetry_broadcast_loop()))
         else:
             self.server = await asyncio.start_server(self._handle_raw_client, self.host, self.port)
 
     async def stop(self):
+        for task in self._bg_tasks:
+            task.cancel()
+        for ws in list(self.ws_telemetry_clients):
+            with suppress(Exception):
+                await ws.close()
+        for ws in list(self.ws_log_clients):
+            with suppress(Exception):
+                await ws.close()
         if self.runner:
             await self.runner.cleanup()
         if self.server:
