@@ -2875,7 +2875,18 @@ class MemoryStreamer:
             file_id = generate_random_long()
 
             try:
-                stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
+                # ⚡ FAST MTPROTO MULTI-SOCKET PARALLEL ACCELERATOR (25+ MB/s Wire Speed)
+                if size >= 2 * 1024 * 1024:
+                    try:
+                        from fast_transfer import ParallelTransferrer
+                        dc_id, input_loc = utils.get_input_location(msg.media)
+                        downloader = ParallelTransferrer(client, dc_id=dc_id)
+                        stream = downloader.download(input_loc, file_size=size, part_size_kb=512, connection_count=8)
+                    except Exception as fe:
+                        stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
+                else:
+                    stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
+
                 async for chunk in stream:
                     if stop_event.is_set(): raise asyncio.CancelledError()
                     if not chunk: continue
@@ -3901,6 +3912,8 @@ class PipelineProcessor:
                 elif getattr(m, "text", None):
                     self.metrics["text_sent"] = self.metrics.get("text_sent", 0) + 1
             self.metrics["messages_forwarded"] += len(active_messages)
+            with suppress(Exception):
+                self._write_engine_telemetry()
 
             if self.metrics["messages_forwarded"] > 0 and self.metrics["messages_forwarded"] % 50 == 0:
                 v_s = self.metrics.get('videos_sent', 0)
@@ -4752,6 +4765,8 @@ class TerminalPlatform:
     def render_dashboard(self):
         global THUMB_MODE
         self.update_live_metrics()
+        with suppress(Exception):
+            self._write_engine_telemetry()
         
         uptime_seconds = int(time.monotonic() - self.start_time)
         hours, rem = divmod(uptime_seconds, 3600)
@@ -4798,8 +4813,17 @@ class TerminalPlatform:
         full_div = "─" * min(76, max(20, w - 8))
 
         live_badge = "[bold red blink]🔴 LIVE 24/7 LISTENER ACTIVE[/]\n" if self.cfg.live_mode else ""
+        
+        # Compact multi-route display to prevent terminal viewport clipping
+        src_raw = str(self.src_info or "")
+        src_lines = src_raw.splitlines()
+        if len(src_lines) > 5:
+            compact_src = "\n".join(src_lines[:4]) + f"\n[dim]↳ ... +{len(src_lines) - 4} more active rules (Alt+M in Dashboard)[/]"
+        else:
+            compact_src = src_raw
+
         routing_panel = Panel(
-            Text.from_markup(f"{live_badge}[bold cyan]🛰️ ROUTING & NODES[/]\n{sub_div}\n{self.src_info}\n\n{self.tgt_info}"),
+            Text.from_markup(f"{live_badge}[bold cyan]🛰️ ROUTING & NODES[/]\n{sub_div}\n{compact_src}\n\n{self.tgt_info}"),
             border_style="red" if self.cfg.live_mode else "blue", box=box.ROUNDED, padding=(1, 2)
         )
 
@@ -5034,6 +5058,18 @@ class TerminalPlatform:
                             if msvcrt.kbhit():
                                 k = msvcrt.getch().lower()
                                 if k in (b'd', b'm'):
+                                    self.detached = True
+                                    self.log("[bold yellow]⚡ Detaching to Main Menu... (Forwarder continues running in background)[/]")
+                                    break
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            import select
+                            r, _, _ = select.select([sys.stdin], [], [], 0)
+                            if r:
+                                k = sys.stdin.read(1).lower()
+                                if k in ('d', 'm'):
                                     self.detached = True
                                     self.log("[bold yellow]⚡ Detaching to Main Menu... (Forwarder continues running in background)[/]")
                                     break

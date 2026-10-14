@@ -8680,6 +8680,40 @@ class DeviTelegramBot:
             ram_used_mb = (ram.total - ram.available) / (1024 * 1024)
             ram_pct = ram.percent
 
+            # Live Engine Batch Telemetry
+            telem_data = {}
+            telem_file = BASE_PROJECT_DIR / "logs" / "engine_telemetry.json"
+            if telem_file.exists():
+                with suppress(Exception):
+                    with open(telem_file, "r", encoding="utf-8") as tf:
+                        telem_data = json.load(tf)
+
+            active_job_section = ""
+            if telem_data and (telem_data.get("total_files") or telem_data.get("discovered")):
+                tot_f = int(telem_data.get("total_files") or telem_data.get("discovered", 0))
+                fwd_f = int(telem_data.get("files_completed") or telem_data.get("messages_forwarded", 0))
+                rem_f = max(0, tot_f - fwd_f)
+                pct_f = float(telem_data.get("batch_progress_pct") or (round((fwd_f / max(1, tot_f)) * 100.0, 1) if tot_f > 0 else 0.0))
+                v_s = telem_data.get("videos_sent", 0)
+                d_s = telem_data.get("docs_sent", 0)
+                p_s = telem_data.get("photos_sent", 0)
+                t_s = telem_data.get("text_sent", 0)
+                cur_spd = telem_data.get("current_speed_formatted") or f"{telem_data.get('current_speed_mb', 0.0)} MB/s"
+                cur_file = telem_data.get("active_file_name", "")
+
+                active_job_section = (
+                    f"🚀 **Active Forwarder Job:**\n"
+                    f"• **Batch Progress:** `{fwd_f} / {tot_f}` messages (`{pct_f:.1f}%`)\n"
+                    f"• **Remaining:** `{rem_f}` messages pending\n"
+                    f"• **Delivered Types:** `{v_s}` 🎥 | `{d_s}` 📄 | `{p_s}` 🖼️ | `{t_s}` 💬\n"
+                    f"• **Transfer Velocity:** `{cur_spd}`\n"
+                )
+                if cur_file:
+                    cur_prog = telem_data.get("active_file_progress", 0.0)
+                    cur_tot = telem_data.get("active_file_total", "")
+                    active_job_section += f"• **Current File:** `{cur_file}` (`{cur_prog}%` of {cur_tot})\n"
+                active_job_section += "\n"
+
             cur_direct = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
             cur_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
             cur_thumb = os.getenv("THUMB_MODE", "custom").strip().lower()
@@ -8692,10 +8726,11 @@ class DeviTelegramBot:
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"⚡ **Engine State:** {engine_status_badge}\n"
                 f"💻 **Host System RAM:** `{ram_pct}%` ({ram_used_mb:.0f} MB / {ram.total/(1024*1024):.0f} MB)\n\n"
-                f"📊 **Database Metrics (history_core.sqlite):**\n"
+                f"{active_job_section}"
+                f"📊 **All-Time Database Archive (history_core.sqlite):**\n"
                 f"• **Forum Topics Indexed:** `{total_topics}`\n"
                 f"• **Lectures & Files Indexed:** `{total_items}`\n"
-                f"• **Total Mapped Transfers:** `{total_mapped}`\n\n"
+                f"• **Total Historical Mappings:** `{total_mapped}`\n\n"
                 f"⚙️ **Active Configuration:**\n"
                 f"• **Source Channel:** `{src_chat}`\n"
                 f"• **Target Group/Chat:** `{tgt_chat}`\n"

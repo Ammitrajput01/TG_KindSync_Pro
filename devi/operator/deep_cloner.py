@@ -32,6 +32,7 @@ from devi.operator.session_vault import (
     get_vault_client_for_target, get_user_client,
     register_user_job_task, DB_PATH
 )
+from fast_transfer import fast_download, fast_upload
 
 logger = logging.getLogger("DeepCloner")
 
@@ -646,26 +647,57 @@ class DeepClonerEngine:
                                     return _inner_cb
 
                                 try:
-                                    dl_res = await user_client.download_media(
-                                        msg,
-                                        file=str(tmp_path),
-                                        progress_callback=_make_stream_cb("⬇️ Downloading")
-                                    )
+                                    try:
+                                        dl_res = await fast_download(
+                                            user_client,
+                                            msg,
+                                            str(tmp_path),
+                                            progress_callback=_make_stream_cb("⚡ ⬇️ Fast DC Download"),
+                                            max_connections=12,
+                                        )
+                                    except Exception as fe_dl:
+                                        logger.warning("Fast download encountered %s, falling back to standard download", fe_dl)
+                                        dl_res = await user_client.download_media(
+                                            msg,
+                                            file=str(tmp_path),
+                                            progress_callback=_make_stream_cb("⬇️ Downloading")
+                                        )
+
                                     if dl_res and Path(dl_res).exists():
                                         if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                                             break
                                         dl_start_t = asyncio.get_event_loop().time()
                                         last_cb_t[0] = 0.0
-                                        await user_client.send_file(
-                                            tgt_peer,
-                                            file=str(dl_res),
-                                            caption=cleaned_caption,
-                                            thumb=thumb_to_attach,
-                                            attributes=doc_attrs,
-                                            reply_to=dest_thread,
-                                            part_size_kb=512,
-                                            progress_callback=_make_stream_cb("⬆️ Uploading")
-                                        )
+
+                                        # Fast MTProto Parallel Upload
+                                        try:
+                                            uploaded_handle = await fast_upload(
+                                                user_client,
+                                                str(dl_res),
+                                                file_name=safe_name,
+                                                progress_callback=_make_stream_cb("⚡ ⬆️ Fast DC Upload"),
+                                                max_connections=12,
+                                            )
+                                            await user_client.send_file(
+                                                tgt_peer,
+                                                file=uploaded_handle,
+                                                caption=cleaned_caption,
+                                                thumb=thumb_to_attach,
+                                                attributes=doc_attrs,
+                                                reply_to=dest_thread,
+                                            )
+                                        except Exception as fe_up:
+                                            logger.warning("Fast upload encountered %s, falling back to standard send_file", fe_up)
+                                            await user_client.send_file(
+                                                tgt_peer,
+                                                file=str(dl_res),
+                                                caption=cleaned_caption,
+                                                thumb=thumb_to_attach,
+                                                attributes=doc_attrs,
+                                                reply_to=dest_thread,
+                                                part_size_kb=512,
+                                                progress_callback=_make_stream_cb("⬆️ Uploading")
+                                            )
                                     else:
                                         raise RuntimeError(f"Download returned empty for msg #{msg.id}")
                                 finally:

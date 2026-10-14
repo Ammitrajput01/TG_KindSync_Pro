@@ -579,6 +579,8 @@ def sanitize_filename(filename: str, fallback_ext: str = "", mime_type: str = ""
     name_str = str(filename).strip()
     # Strip any leading directory components to prevent path traversal
     name_str = os.path.basename(name_str.replace("\\", "/"))
+    # Pre-clean duplicate/nested extensions (e.g. video.mp4.mp4 -> video.mp4)
+    name_str = re.sub(r'(?i)(\.(mp4|mkv|avi|mov|webm|ts|m4v|3gp|flv|wmv|pdf|docx?|pptx?|xlsx?|epub|zip|rar|7z|tar|gz|mp3|m4a|wav|aac|ogg|flac|opus|jpg|jpeg|png|webp|gif|svg|txt|json|apk|bin)){2,}', r'\1', name_str)
     stem, ext = os.path.splitext(name_str)
     
     # Validate if ext is actually a valid file extension (e.g. .mp4, .pdf, .mkv, .jpg, .zip, etc.)
@@ -634,6 +636,10 @@ def sanitize_filename(filename: str, fallback_ext: str = "", mime_type: str = ""
     if not stem:
         stem = f"media_{generate_random_long()}"
     final_ext = ext if ext else (fallback_ext if fallback_ext.startswith(".") else (f".{fallback_ext}" if fallback_ext else ""))
+    
+    # Strip any trailing extension already embedded in stem so stem + final_ext never creates .mp4.mp4
+    if final_ext:
+        stem = re.sub(r'(?i)(\.(mp4|mkv|avi|mov|webm|ts|m4v|3gp|flv|wmv|pdf|docx?|pptx?|xlsx?|epub|zip|rar|7z|tar|gz|mp3|m4a|wav|aac|ogg|flac|opus|jpg|jpeg|png|webp|gif|svg|txt|json|apk|bin))+$', '', stem).strip(" .-_")
     return f"{stem}{final_ext}"
 
 def _parse_chat_id(val):
@@ -1252,9 +1258,9 @@ class StateManager:
         await self.db.executescript("""
             PRAGMA journal_mode=WAL;
             PRAGMA synchronous=NORMAL;
-            PRAGMA temp_store=FILE;
-            PRAGMA mmap_size=16777216;
-            PRAGMA cache_size=-2000;
+            PRAGMA temp_store=MEMORY;
+            PRAGMA mmap_size=268435456;
+            PRAGMA cache_size=-64000;
             PRAGMA busy_timeout=60000;
             CREATE TABLE IF NOT EXISTS forwarded (
                 source_chat TEXT NOT NULL,
@@ -2869,7 +2875,18 @@ class MemoryStreamer:
             file_id = generate_random_long()
 
             try:
-                stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
+                # ⚡ FAST MTPROTO MULTI-SOCKET PARALLEL ACCELERATOR (25+ MB/s Wire Speed)
+                if size >= 2 * 1024 * 1024:
+                    try:
+                        from fast_transfer import ParallelTransferrer
+                        dc_id, input_loc = utils.get_input_location(msg.media)
+                        downloader = ParallelTransferrer(client, dc_id=dc_id)
+                        stream = downloader.download(input_loc, file_size=size, part_size_kb=512, connection_count=8)
+                    except Exception as fe:
+                        stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
+                else:
+                    stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
+
                 async for chunk in stream:
                     if stop_event.is_set(): raise asyncio.CancelledError()
                     if not chunk: continue
@@ -3895,6 +3912,8 @@ class PipelineProcessor:
                 elif getattr(m, "text", None):
                     self.metrics["text_sent"] = self.metrics.get("text_sent", 0) + 1
             self.metrics["messages_forwarded"] += len(active_messages)
+            with suppress(Exception):
+                self._write_engine_telemetry()
 
             if self.metrics["messages_forwarded"] > 0 and self.metrics["messages_forwarded"] % 50 == 0:
                 v_s = self.metrics.get('videos_sent', 0)
@@ -3937,11 +3956,17 @@ class PipelineProcessor:
 # ============================================================
 # 12. UNIFIED TERMINAL PLATFORM & RESPONSIVE DASHBOARD
 # ============================================================
+_GLOBAL_ACTIVE_PLATFORM: Optional['TerminalPlatform'] = None
+
 class TerminalPlatform:
     def __init__(self, cfg: AppConfig, session_mgr: MultiSessionManager = None):
         self.cfg = cfg
         self.state = StateManager()
         self.session_mgr = session_mgr or MultiSessionManager(self.cfg.api_id, self.cfg.api_hash)
+        self.detached = False
+        self._workers = []
+        self._scan_task = None
+        self._proc = None
         self.metrics = {
             "discovered": 0, "messages_forwarded": 0, "albums_forwarded": 0, "errors_count": 0,
             "bytes_downloaded": 0, "bytes_uploaded": 0, "api_calls": 0, "retries": 0, "flood_waits": 0,
@@ -4740,6 +4765,8 @@ class TerminalPlatform:
     def render_dashboard(self):
         global THUMB_MODE
         self.update_live_metrics()
+        with suppress(Exception):
+            self._write_engine_telemetry()
         
         uptime_seconds = int(time.monotonic() - self.start_time)
         hours, rem = divmod(uptime_seconds, 3600)
@@ -4786,8 +4813,17 @@ class TerminalPlatform:
         full_div = "─" * min(76, max(20, w - 8))
 
         live_badge = "[bold red blink]🔴 LIVE 24/7 LISTENER ACTIVE[/]\n" if self.cfg.live_mode else ""
+        
+        # Compact multi-route display to prevent terminal viewport clipping
+        src_raw = str(self.src_info or "")
+        src_lines = src_raw.splitlines()
+        if len(src_lines) > 5:
+            compact_src = "\n".join(src_lines[:4]) + f"\n[dim]↳ ... +{len(src_lines) - 4} more active rules (Alt+M in Dashboard)[/]"
+        else:
+            compact_src = src_raw
+
         routing_panel = Panel(
-            Text.from_markup(f"{live_badge}[bold cyan]🛰️ ROUTING & NODES[/]\n{sub_div}\n{self.src_info}\n\n{self.tgt_info}"),
+            Text.from_markup(f"{live_badge}[bold cyan]🛰️ ROUTING & NODES[/]\n{sub_div}\n{compact_src}\n\n{self.tgt_info}"),
             border_style="red" if self.cfg.live_mode else "blue", box=box.ROUNDED, padding=(1, 2)
         )
 
@@ -4881,9 +4917,11 @@ class TerminalPlatform:
             table.add_row(routing_panel, transfer_panel)
             table.add_row(file_panel, performance_panel)
 
-        return Group(get_persistent_header(), table, system_panel, log_panel)
+        detach_hint = Text.from_markup("  [dim]💡 Tip: Press [/][bold yellow][D][/][dim] or [/][bold yellow][Ctrl+C][/][dim] to Detach to Menu (Forwarder runs safely in background)[/]")
+        return Group(get_persistent_header(), table, system_panel, log_panel, detach_hint)
 
     async def boot(self):
+        global _GLOBAL_ACTIVE_PLATFORM
         acquire_instance_lock()
         if not self.cfg.api_id or not self.cfg.api_hash:
             await self.session_mgr._prompt_credentials()
@@ -5008,11 +5046,37 @@ class TerminalPlatform:
             self.setup_remote_control_listener()
             scan_task = asyncio.create_task(self.scanner())
 
-            with Live(self.render_dashboard(), console=console, refresh_per_second=1, screen=True, transient=False) as live:
+            self.detached = False
+            with Live(self.render_dashboard(), console=console, refresh_per_second=1, screen=False, transient=False) as live:
+                self._current_live = live
                 while not self.stop_evt.is_set():
                     live.update(self.render_dashboard())
                     if not self.cfg.live_mode and scan_task.done() and self.queue.empty(): break
+                    if sys.platform == "win32":
+                        try:
+                            import msvcrt
+                            if msvcrt.kbhit():
+                                k = msvcrt.getch().lower()
+                                if k in (b'd', b'm'):
+                                    self.detached = True
+                                    self.log("[bold yellow]⚡ Detaching to Main Menu... (Forwarder continues running in background)[/]")
+                                    break
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            import select
+                            r, _, _ = select.select([sys.stdin], [], [], 0)
+                            if r:
+                                k = sys.stdin.read(1).lower()
+                                if k in ('d', 'm'):
+                                    self.detached = True
+                                    self.log("[bold yellow]⚡ Detaching to Main Menu... (Forwarder continues running in background)[/]")
+                                    break
+                        except Exception:
+                            pass
                     await asyncio.sleep(1.0)
+                self._current_live = None
                 
                 try:
                     await asyncio.wait_for(self.queue.join(), timeout=30.0)
@@ -5081,15 +5145,35 @@ class TerminalPlatform:
                     border_style="yellow", box=box.ROUNDED
                 ))
         except (KeyboardInterrupt, asyncio.CancelledError):
-            interrupted = True
+            console.print("\n[bold yellow]⚡ PAUSE / DETACH OPTIONS:[/]")
+            console.print("  [bold green][D][/] 🔙 [bold white]Detach to Menu[/] [dim](Forwarder continues running in background)[/]")
+            console.print("  [bold red][S][/] 🛑 [bold white]Stop Forwarder[/] [dim](Save bookmarks and shutdown)[/]")
+            try:
+                user_opt = await asyncio.wait_for(
+                    safe_input("Choose [D to Detach / S to Stop] (Default: D)", allow_cancel=False, default_val="D"),
+                    timeout=8.0
+                )
+                if user_opt and user_opt.strip().lower() in ("s", "stop"):
+                    interrupted = True
+                else:
+                    self.detached = True
+            except Exception:
+                self.detached = True
         finally:
-            self.stop_evt.set()
-            for w in workers:
-                w.cancel()
-            if 'scan_task' in locals() and not scan_task.done():
-                scan_task.cancel()
-            with suppress(Exception):
-                await self.state.close()
+            if not self.detached:
+                self.stop_evt.set()
+                for w in workers:
+                    w.cancel()
+                if 'scan_task' in locals() and not scan_task.done():
+                    scan_task.cancel()
+                with suppress(Exception):
+                    await self.state.close()
+                _GLOBAL_ACTIVE_PLATFORM = None
+            else:
+                _GLOBAL_ACTIVE_PLATFORM = self
+                self._workers = workers
+                self._scan_task = scan_task
+                self._proc = proc
 
         if interrupted:
             clear_screen()
@@ -5102,6 +5186,50 @@ class TerminalPlatform:
                 border_style="yellow", box=box.ROUNDED
             ))
             await asyncio.sleep(0.5)
+        elif self.detached:
+            clear_screen()
+            console.print(get_persistent_header())
+            console.print(Panel(
+                "[bold green]✔ FORWARDER DETACHED TO BACKGROUND SUCCESSFULLY![/]\n\n"
+                "[cyan]• Streaming jobs and worker tasks are running smoothly in the background.[/]\n"
+                "[yellow]• You can now use the Menu (e.g. Generate Index, Check Routes, Caption Studio).[/]\n"
+                "[dim]• Press [A] from the Main Menu anytime to re-attach to the Live Dashboard.[/]",
+                border_style="green", box=box.ROUNDED
+            ))
+            await asyncio.sleep(1.0)
+
+    async def resume_live_dashboard(self):
+        """Re-attaches to the live dashboard for the active background forwarder."""
+        self.detached = False
+        with Live(self.render_dashboard(), console=console, refresh_per_second=1, screen=False, transient=False) as live:
+            self._current_live = live
+            while not self.stop_evt.is_set():
+                live.update(self.render_dashboard())
+                if not self.cfg.live_mode and hasattr(self, "_scan_task") and self._scan_task and self._scan_task.done() and self.queue.empty(): break
+                if sys.platform == "win32":
+                    try:
+                        import msvcrt
+                        if msvcrt.kbhit():
+                            k = msvcrt.getch().lower()
+                            if k in (b'd', b'm'):
+                                self.detached = True
+                                break
+                    except Exception:
+                        pass
+                await asyncio.sleep(1.0)
+            self._current_live = None
+
+    async def stop(self):
+        """Safely stops the detached background forwarder and closes state."""
+        self.stop_evt.set()
+        for w in getattr(self, "_workers", []):
+            w.cancel()
+        if hasattr(self, "_scan_task") and self._scan_task and not self._scan_task.done():
+            self._scan_task.cancel()
+        with suppress(Exception):
+            await self.state.close()
+        global _GLOBAL_ACTIVE_PLATFORM
+        _GLOBAL_ACTIVE_PLATFORM = None
 
 # ============================================================
 # 13. EMBEDDED EXTRACTOR TOOL & CLI MENUS
@@ -8712,6 +8840,16 @@ async def run_menu(session_mgr):
 
         # ── Prompt bar ─────────────────────────────────────────────────────────
         prompt_lines = []
+        if _GLOBAL_ACTIVE_PLATFORM and not _GLOBAL_ACTIVE_PLATFORM.stop_evt.is_set():
+            bg_fwd = _GLOBAL_ACTIVE_PLATFORM.metrics.get("messages_forwarded", 0)
+            bg_spd = _GLOBAL_ACTIVE_PLATFORM.metrics.get("peak_speed", 0.0)
+            console.print(Panel(
+                f"[bold green]🟢 ACTIVE BACKGROUND FORWARDER RUNNING[/]\n"
+                f"• Forwarded: [bold white]{bg_fwd} msgs[/]  ·  Peak Speed: [bold cyan]{format_network_speed(bg_spd)['formatted']}[/]\n"
+                f"• Press [bold yellow][A][/] to [bold yellow]Re-Attach Live Dashboard[/]  ·  Press [bold red][S][/] to [bold red]Stop Background Forwarder[/]",
+                border_style="green", box=box.ROUNDED, padding=(0, 1)
+            ))
+
         if has_active_session:
             route_preview = f"{cur_src} ➔ {cur_tgt}" if (cur_src and cur_tgt) else f"{len(cur_rules.split(','))} Topic Rules Configured"
             prompt_lines.append(f"  [bold green]⚡ Active Route:[/] [yellow]{route_preview}[/]  ·  Press [bold green][0][/] or [bold green][R][/] to [bold green]Resume Instantly[/]")
@@ -8725,6 +8863,17 @@ async def run_menu(session_mgr):
         ))
         ch = await safe_input("👉 Enter Choice [0-19 / R] (Default: 2 - Balanced Mode)", allow_cancel=False, default_val="2")
         ch_clean = ch.strip().lower()
+
+        # Attach / Stop background forwarder shortcuts
+        if ch_clean in ("a", "attach") and _GLOBAL_ACTIVE_PLATFORM and not _GLOBAL_ACTIVE_PLATFORM.stop_evt.is_set():
+            clear_screen()
+            await _GLOBAL_ACTIVE_PLATFORM.resume_live_dashboard()
+            continue
+        elif ch_clean in ("s", "stop") and _GLOBAL_ACTIVE_PLATFORM and not _GLOBAL_ACTIVE_PLATFORM.stop_evt.is_set():
+            await _GLOBAL_ACTIVE_PLATFORM.stop()
+            console.print("[bold yellow]🛑 Background Forwarder safely stopped.[/]")
+            await asyncio.sleep(1.5)
+            continue
 
         # 0 or R: Instant Auto-Resume Previous Session
         if ch_clean in ("0", "r", "resume", "20"):
@@ -8985,7 +9134,10 @@ async def start_platform(auto_start: bool = False):
             platform = TerminalPlatform(cfg, session_mgr=session_mgr)
             await platform.boot()
             if not is_auto:
-                await safe_input("\nPress Enter to return to Main Menu", allow_cancel=False)
+                if not getattr(platform, "detached", False):
+                    await safe_input("\nPress Enter to return to Main Menu", allow_cancel=False)
+                else:
+                    await asyncio.sleep(0.5)
             else:
                 await asyncio.sleep(5)
                 first_run = True
