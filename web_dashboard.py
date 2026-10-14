@@ -3445,20 +3445,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                     <ul class="nav-items">
                         <li>
-                            <a href="javascript:void(0);" class="nav-link active" onclick="switchView('overview')" id="nav-overview" role="tab" aria-selected="true">
+                            <a href="#overview" class="nav-link active" onclick="switchView('overview'); return false;" id="nav-overview" role="tab" aria-selected="true">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
                                 <span>Overview</span>
                             </a>
                         </li>
                         <li>
-                            <a href="javascript:void(0);" class="nav-link" onclick="switchView('topics')" id="nav-topics" role="tab" aria-selected="false">
+                            <a href="#topics" class="nav-link" onclick="switchView('topics'); return false;" id="nav-topics" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
                                 <span>Topic Intelligence</span>
                                 <span class="nav-badge info tabular" id="sidebar-topics-badge">90 Topics</span>
                             </a>
                         </li>
                         <li>
-                            <a href="javascript:void(0);" class="nav-link" onclick="switchView('operations')" id="nav-operations" role="tab" aria-selected="false">
+                            <a href="#operations" class="nav-link" onclick="switchView('operations'); return false;" id="nav-operations" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                                 <span>Pipeline & Speed</span>
                                 <span class="nav-badge success tabular" id="sidebar-speed-badge">Turbo 8x</span>
@@ -3475,14 +3475,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                     <ul class="nav-items">
                         <li>
-                            <a href="javascript:void(0);" class="nav-link" onclick="switchView('telegram')" id="nav-telegram" role="tab" aria-selected="false">
+                            <a href="#telegram" class="nav-link" onclick="switchView('telegram'); return false;" id="nav-telegram" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                 <span>Telegram Accounts</span>
                                 <span class="nav-badge tabular" id="sidebar-tg-badge">3</span>
                             </a>
                         </li>
                         <li>
-                            <a href="javascript:void(0);" class="nav-link" onclick="switchView('dlq')" id="nav-dlq" role="tab" aria-selected="false">
+                            <a href="#dlq" class="nav-link" onclick="switchView('dlq'); return false;" id="nav-dlq" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
                                 <span>Dead Letter Queue</span>
                                 <span class="nav-badge danger tabular" id="sidebar-dlq-badge">0</span>
@@ -3499,21 +3499,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                     <ul class="nav-items">
                         <li>
-                            <a href="javascript:void(0);" class="nav-link" onclick="switchView('devi')" id="nav-devi" role="tab" aria-selected="false">
+                            <a href="#devi" class="nav-link" onclick="switchView('devi'); return false;" id="nav-devi" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
                                 <span>Devi AI Studio</span>
                                 <span class="nav-badge tabular" style="background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3);">LVL 10</span>
                             </a>
                         </li>
                         <li>
-                            <a href="javascript:void(0);" class="nav-link" onclick="switchView('research')" id="nav-research" role="tab" aria-selected="false">
+                            <a href="#research" class="nav-link" onclick="switchView('research'); return false;" id="nav-research" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                                 <span>Sentinel Insights</span>
                                 <span class="nav-badge info tabular" id="sidebar-research-badge">11</span>
                             </a>
                         </li>
                         <li>
-                            <a href="javascript:void(0);" class="nav-link" onclick="switchView('security')" id="nav-security" role="tab" aria-selected="false">
+                            <a href="#security" class="nav-link" onclick="switchView('security'); return false;" id="nav-security" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                                 <span>Access & Users</span>
                                 <span class="nav-badge tabular" style="background: rgba(251, 146, 60, 0.15); color: #FB923C; border: 1px solid rgba(251, 146, 60, 0.3);">Amit</span>
@@ -6568,17 +6568,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function formatInsightForAi(ins) {
-            let md = '### 🔬 [' + (ins.id || 'INSIGHT') + '] ' + (ins.title || 'Codebase Optimization') + '\n';
-            md += '- **Category**: ' + (ins.category || 'General') + '\n';
-            md += '- **Priority**: ' + (ins.priority || 'Normal') + '\n';
-            if (ins.affects_part) md += '- **Affected File/Module**: `' + ins.affects_part + '`\n';
-            if (ins.why_it_matters) md += '- **Why It Matters**: ' + ins.why_it_matters + '\n';
-            if (ins.potential_benefits) md += '- **Expected Benefits**: ' + ins.potential_benefits + '\n';
-            if (ins.potential_risks) md += '- **Risks / Constraints**: ' + ins.potential_risks + '\n';
+            let md = '### 🔬 [' + (ins.id || 'INSIGHT') + '] ' + (ins.title || 'Codebase Optimization') + '\\n';
+            md += '- **Category**: ' + (ins.category || 'General') + '\\n';
+            md += '- **Priority**: ' + (ins.priority || 'Normal') + '\\n';
+            if (ins.affects_part) md += '- **Affected File/Module**: `' + ins.affects_part + '`\\n';
+            if (ins.why_it_matters) md += '- **Why It Matters**: ' + ins.why_it_matters + '\\n';
+            if (ins.potential_benefits) md += '- **Expected Benefits**: ' + ins.potential_benefits + '\\n';
+            if (ins.potential_risks) md += '- **Risks / Constraints**: ' + ins.potential_risks + '\\n';
             if (ins.suggested_implementation_approach) {
-                md += '- **Implementation Plan**:\n```\n' + ins.suggested_implementation_approach + '\n```\n';
+                md += '- **Implementation Plan**:\\n```\\n' + ins.suggested_implementation_approach + '\\n```\\n';
             }
-            md += '\n';
+            md += '\\n';
             return md;
         }
 
@@ -7792,7 +7792,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return [seq, status, type, msgId, title].join(',');
             });
 
-            const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+            const csvContent = '\\uFEFF' + [headers.join(','), ...rows].join('\\r\\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
