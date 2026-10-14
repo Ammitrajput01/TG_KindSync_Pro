@@ -125,7 +125,9 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/drip", "/infusion", "/map", "/abg", "/sodium", "/gcs", "/curb65", "/wells",
     "/save", "/get", "/note", "/notes", "/saved", "/clear", "/delnote",
     "/filter", "/setfilter", "/stop", "/delfilter", "/filters",
-    "/mcq", "/pearl", "/pomodoro", "/ask"
+    "/mcq", "/pearl", "/pomodoro", "/ask",
+    "/panel", "/settings", "/control", "/botpanel",
+    "/welcome", "/welcomemenu", "/welcometimeout", "/welcomettl", "/timeoutwelcome", "/jointrack"
 )
 STUDENT_ALLOWED_COMMANDS = PUBLIC_ALLOWED_COMMANDS
 
@@ -447,6 +449,10 @@ class DeviTelegramBot:
                 # Safe migration: Ensure language column exists if table was pre-existing
                 try:
                     conn.execute("ALTER TABLE telegram_group_settings ADD COLUMN language TEXT DEFAULT 'en'")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE telegram_group_settings ADD COLUMN join_track_dest TEXT DEFAULT 'pm'")
                 except Exception:
                     pass
 
@@ -945,8 +951,9 @@ class DeviTelegramBot:
             "welcome_text": None,
             "welcome_enabled": 1,
             "join_track_enabled": 1,
+            "join_track_dest": "pm",
             "rules_text": None,
-            "welcome_timeout": 90,
+            "welcome_timeout": 60,
             "language": "en"
         }
         try:
@@ -2015,16 +2022,24 @@ class DeviTelegramBot:
 
                 # 1. Short & sweet tagged Welcome Message (as requested by user)
                 if g_settings.get("welcome_enabled", 1):
-                    welcome_text = (
-                        f"👋 <b>Welcome {user_tag} to {safe_grp_title}!</b> ✨\n\n"
-                        f"🩺 <i>Wishing you all the best for your medical studies! 🌟</i>"
-                    )
+                    custom_w_text = g_settings.get("welcome_text")
+                    if custom_w_text:
+                        welcome_text = custom_w_text.replace("{name}", user_tag).replace("{group}", safe_grp_title).replace("{rules}", "/rules")
+                    else:
+                        welcome_text = (
+                            f"👋 <b>Welcome {user_tag} to {safe_grp_title}!</b> ✨\n\n"
+                            f"🩺 <i>Wishing you all the best for your medical studies! 🌟</i>"
+                        )
                     
                     sent_welcome_id = await self._send_message(
                         session, chat_id, welcome_text, parse_mode="HTML"
                     )
                     if sent_welcome_id:
                         self._log_welcome_message(chat_id, sent_welcome_id)
+                        # Auto-delete Welcome Card after TTL seconds if configured
+                        w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
+                        if w_timeout > 0:
+                            self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_welcome_id, w_timeout))
                 
                 # 2. SangMata / Dossier Intelligence Card
                 if g_settings.get("join_track_enabled", 1):
@@ -2040,11 +2055,17 @@ class DeviTelegramBot:
                             ]
                         ]
                     }
-                    # Send to Group
-                    await self._send_message(
-                        session, chat_id, sangmata_card, reply_markup=admin_markup, parse_mode="HTML"
-                    )
-                    # Also notify master admins in DM
+                    track_dest = str(g_settings.get("join_track_dest", "pm")).lower().strip()
+                    # Only send to public group if explicitly configured as 'group'
+                    if track_dest in ("group", "public", "both"):
+                        sent_sm_id = await self._send_message(
+                            session, chat_id, sangmata_card, reply_markup=admin_markup, parse_mode="HTML"
+                        )
+                        w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
+                        if sent_sm_id and w_timeout > 0:
+                            self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_sm_id, w_timeout * 2))
+
+                    # Master admins ALWAYS receive private PM audit alert
                     for adm_id in self.master_admin_ids:
                         await self._send_message(
                             session,
@@ -2087,6 +2108,75 @@ class DeviTelegramBot:
         except Exception as e:
             logger.warning(f"Failed to send poll to {chat_id}: {e}")
         return None
+
+    async def _render_control_panel_card(
+        self,
+        session: aiohttp.ClientSession,
+        chat_id: int,
+        admin_id: int,
+        message_thread_id: int = 0,
+        edit_message_id: Optional[int] = None
+    ):
+        """Renders the Master Interactive Control Center card with 1-click inline button toggles."""
+        target_chat_id = self._resolve_study_group_id(chat_id)
+        g_settings = self._get_group_settings(target_chat_id)
+        w_enabled = bool(g_settings.get("welcome_enabled", 1))
+        w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
+        w_ttl_str = f"{w_timeout}s" if w_timeout > 0 else "Never (Permanent)"
+
+        j_enabled = bool(g_settings.get("join_track_enabled", 1))
+        j_dest = str(g_settings.get("join_track_dest", "pm")).lower().strip()
+        if not j_enabled or j_dest in ("off", "disabled", "0"):
+            j_str = "❌ Disabled"
+        elif j_dest in ("pm", "admin_pm", "dm"):
+            j_str = "🛡️ Admin PM Only"
+        else:
+            j_str = "📢 Public Group"
+
+        load_dotenv(override=True)
+        cur_df = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
+        cur_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
+
+        panel_card = (
+            "🎛️ <b>KIND DOCTOR MASTER CONTROL PANEL</b> 🩺\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🏛️ <b>Active Target:</b> <code>{target_chat_id}</code>\n\n"
+            f"👋 <b>Welcome Greetings:</b> <b>{'✅ Active' if w_enabled else '❌ Inactive'}</b>\n"
+            f"⏱️ <b>Welcome Auto-Delete (TTL):</b> <code>{w_ttl_str}</code>\n"
+            f"🕵️‍♂️ <b>SangMata Join Radar:</b> <b>{j_str}</b>\n"
+            f"⚡ <b>Cloner Velocity:</b> <b>{'⚡ Fast Direct (0.2s Pointer)' if cur_df else '🔄 Stream (Re-Upload)'}</b>\n"
+            f"👑 <b>Branding Signature:</b> <b>{'🏷️ Active' if cur_sig else '🚫 Clean'}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 <i>Tap any button below to toggle settings instantly without typing commands!</i>"
+        )
+
+        next_ttl = 60 if w_timeout == 30 else (120 if w_timeout == 60 else (0 if w_timeout == 120 else 30))
+        ttl_btn_text = f"⏱️ TTL: {w_ttl_str} ➔ {next_ttl}s" if next_ttl > 0 else f"⏱️ TTL: {w_ttl_str} ➔ Never"
+
+        markup = {
+            "inline_keyboard": [
+                [
+                    {"text": f"👋 Welcome: {'✅ ON' if w_enabled else '❌ OFF'}", "callback_data": f"pnl_w_tog_{target_chat_id}"},
+                    {"text": ttl_btn_text, "callback_data": f"pnl_w_ttl_{target_chat_id}_{next_ttl}"}
+                ],
+                [
+                    {"text": f"🕵️‍♂️ SangMata: {j_str}", "callback_data": f"pnl_sm_tog_{target_chat_id}"}
+                ],
+                [
+                    {"text": f"⚡ Fast Direct: {'ON' if cur_df else 'OFF'}", "callback_data": "toggle_direct"},
+                    {"text": f"👑 Signature: {'ON' if cur_sig else 'OFF'}", "callback_data": "toggle_sig"}
+                ],
+                [
+                    {"text": "🧹 Clean Welcomes Now", "callback_data": "cleanwelcome"},
+                    {"text": "🔄 Refresh Panel", "callback_data": f"pnl_refresh_{target_chat_id}"}
+                ]
+            ]
+        }
+
+        if edit_message_id:
+            await self._edit_message_text(session, chat_id, edit_message_id, panel_card, reply_markup=markup, parse_mode="HTML")
+        else:
+            await self._send_message(session, chat_id, panel_card, reply_markup=markup, parse_mode="HTML", message_thread_id=message_thread_id)
 
     async def _delete_message(self, session: aiohttp.ClientSession, chat_id: int, message_id: int):
         """Silently delete a message from a chat/group with 429 FloodWait handling."""
@@ -2732,6 +2822,49 @@ class DeviTelegramBot:
             elif action.startswith("view_members_"):
                 g_id = int(action.replace("view_members_", ""))
                 await self._handle_admin_command(session, chat_id, admin_id, f"/members {g_id}", message=msg_obj)
+            elif action.startswith("pnl_w_tog_"):
+                tgt_c = int(action.replace("pnl_w_tog_", ""))
+                curr_s = self._get_group_settings(tgt_c)
+                new_w = 0 if curr_s.get("welcome_enabled", 1) else 1
+                self._save_group_setting(tgt_c, "welcome_enabled", new_w)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Welcome: {'ENABLED' if new_w else 'DISABLED'}"})
+                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+            elif action.startswith("pnl_w_ttl_"):
+                parts_ttl = action.split("_")
+                tgt_c = int(parts_ttl[3])
+                new_ttl = int(parts_ttl[4])
+                self._save_group_setting(tgt_c, "welcome_timeout", new_ttl)
+                ttl_disp = f"{new_ttl}s" if new_ttl > 0 else "Never (Permanent)"
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Auto-Delete TTL: {ttl_disp}"})
+                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+            elif action.startswith("pnl_sm_tog_"):
+                tgt_c = int(action.replace("pnl_sm_tog_", ""))
+                curr_s = self._get_group_settings(tgt_c)
+                cur_dest = str(curr_s.get("join_track_dest", "pm")).lower().strip()
+                cur_en = curr_s.get("join_track_enabled", 1)
+                # Cycle: pm -> group -> off -> pm
+                if not cur_en or cur_dest == "off":
+                    new_dest = "pm"
+                    new_en = 1
+                    msg_txt = "SangMata: Admin PM Only (Group Clean)"
+                elif cur_dest in ("pm", "admin_pm"):
+                    new_dest = "group"
+                    new_en = 1
+                    msg_txt = "SangMata: Public Group"
+                else:
+                    new_dest = "off"
+                    new_en = 0
+                    msg_txt = "SangMata: Disabled"
+                self._save_group_setting(tgt_c, "join_track_dest", new_dest)
+                self._save_group_setting(tgt_c, "join_track_enabled", new_en)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": msg_txt})
+                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+            elif action.startswith("pnl_refresh_"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Panel Refreshed"})
+                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+            elif action == "act_panel":
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Opening Master Control Panel..."})
+                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id)
             return
 
         if not self.is_admin(admin_id):
@@ -4035,7 +4168,7 @@ class DeviTelegramBot:
         reply_to = message.get("reply_to_message") if message else None
         clean_chat_id = str(chat_id).replace("-100", "").replace("-", "").lstrip("@")
 
-        if cmd in ("/help", "/start", "/menu", "/settings", "/mode"):
+        if cmd in ("/help", "/start", "/menu", "/mode"):
             load_dotenv(override=True)
             cur_direct = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
             cur_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
@@ -4375,6 +4508,14 @@ class DeviTelegramBot:
                 "🛡️ <b>Kind Doctor Moderation, Security & Sanitation Guide</b> 🩺\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "Group ko spam, raids aur ghost accounts se 100% safe rakhne ke liye built-in command suite:\n\n"
+                "🎛️ <b>CONTROL CENTER & AUTOMATION:</b>\n"
+                "• 🎛️ <code>/panel</code> or <code>/settings</code> — Master interactive 1-click control center\n"
+                "• 👋 <code>/welcome [on|off]</code> — Welcome greetings toggle & quick menu\n"
+                "• ⏱️ <code>/welcometimeout &lt;seconds&gt;</code> — Auto-delete welcome message TTL (e.g. 60s, or 0 for permanent)\n"
+                "• 🕵️‍♂️ <code>/jointrack [pm|group|off]</code> — SangMata radar destination (default: PM keeps chat clean)\n"
+                "• 📜 <code>/setwelcome &lt;text&gt;</code> — Custom greeting template ({name}, {group}, {rules})\n"
+                "• 📜 <code>/setrules &lt;rules&gt;</code> — Set study group guidelines\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "👮 <b>MODERATION & RESTRICTION:</b>\n"
                 "• 🔇 <code>/mute &lt;reply/user_id&gt; [minutes]</code> — Member ko temporary mute karein\n"
                 "• 🔊 <code>/unmute &lt;reply/user_id&gt;</code> — Member ki restriction remove karein\n"
@@ -4394,6 +4535,7 @@ class DeviTelegramBot:
             )
             markup = {
                 "inline_keyboard": [
+                    [{"text": "🎛️ Master Control Panel (/panel)", "callback_data": "act_panel"}],
                     [{"text": "👻 Purge Ghost Accounts (/cleandeleted)", "callback_data": "act_cleandeleted"}],
                     [{"text": "🧹 Clean Welcomes (/cleanwelcome)", "callback_data": "act_cleanwelcome"}],
                     [{"text": "🔙 Main Help Menu", "callback_data": "act_menu"}]
@@ -5309,7 +5451,7 @@ class DeviTelegramBot:
                 logger.error(f"Snapshot backup failed: {e}")
                 await self._send_message(session, chat_id, f"❌ Backup failed: `{e}`", message_thread_id=thread_id)
 
-        elif cmd in ("/dashboard", "/missioncontrol", "/panel"):
+        elif cmd in ("/dashboard", "/missioncontrol"):
             if admin_id not in self.master_admin_ids:
                 await self._send_message(session, chat_id, "⚠️ Mission Control Dashboard is restricted strictly to Bot Owners.", message_thread_id=thread_id)
                 return
@@ -5332,14 +5474,74 @@ class DeviTelegramBot:
             kb = {
                 "inline_keyboard": [
                     [{"text": "🌐 Open Mission Control Web App", "web_app": {"url": dash_url}}],
+                    [{"text": "🎛️ Master Interactive Control Panel", "callback_data": "act_panel"}],
                     [{"text": "💾 Instant SQLite Backup", "callback_data": "act_quick_backup"}]
                 ]
             }
             await self._send_message(session, chat_id, dash_card, reply_markup=kb, message_thread_id=thread_id)
 
+        elif cmd in ("/panel", "/settings", "/control", "/botpanel"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Group Admin rights required for Control Panel.", message_thread_id=thread_id)
+                return
+            await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id)
+
         # -------------------------------------------------------------
         # 2B. GROUP CUSTOMIZATION & RULES MANAGEMENT (Admin Controls)
         # -------------------------------------------------------------
+        elif cmd in ("/welcome", "/welcomemenu"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Group Admin rights required.", message_thread_id=thread_id)
+                return
+
+            if len(parts) > 1 and parts[1].lower() in ("on", "true", "enable", "1", "off", "false", "disable", "0"):
+                new_val = 1 if parts[1].lower() in ("on", "true", "enable", "1") else 0
+                self._save_group_setting(target_chat_id, "welcome_enabled", new_val)
+                status_str = "✅ **ENABLED**" if new_val else "❌ **DISABLED**"
+                await self._send_message(session, chat_id, f"🔔 **Welcome Greetings:** {status_str} for group `{target_chat_id}`", message_thread_id=thread_id)
+            else:
+                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id)
+
+        elif cmd in ("/welcometimeout", "/welcomettl", "/timeoutwelcome"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Group Admin rights required.", message_thread_id=thread_id)
+                return
+
+            if len(parts) < 2:
+                curr_s = self._get_group_settings(target_chat_id)
+                curr_ttl = curr_s.get("welcome_timeout", 60)
+                txt = (
+                    "⏱️ **Welcome Message Auto-Delete (TTL):**\n\n"
+                    f"Current setting: `{curr_ttl} seconds` " + ("(Permanent / No Delete)" if curr_ttl <= 0 else "") + "\n\n"
+                    "Usage: `/welcometimeout <seconds>`\n"
+                    "• `/welcometimeout 60` — Auto-delete after 60 seconds (Clean chat)\n"
+                    "• `/welcometimeout 120` — Auto-delete after 2 minutes\n"
+                    "• `/welcometimeout 0` — Keep forever (Never delete)"
+                )
+                await self._send_message(session, chat_id, txt, message_thread_id=thread_id)
+                return
+
+            try:
+                ttl_val = int(parts[1].strip())
+                if ttl_val < 0:
+                    ttl_val = 0
+                self._save_group_setting(target_chat_id, "welcome_timeout", ttl_val)
+                ttl_desc = f"{ttl_val} seconds" if ttl_val > 0 else "Never (Permanent)"
+                await self._send_message(
+                    session,
+                    chat_id,
+                    f"✅ **Welcome Auto-Delete Updated!**\n\nWelcome messages will now delete after: **{ttl_desc}**",
+                    message_thread_id=thread_id
+                )
+            except ValueError:
+                await self._send_message(session, chat_id, "❌ Please specify valid seconds, e.g. `/welcometimeout 60` or `0` for permanent.", message_thread_id=thread_id)
+
         elif cmd == "/setwelcome":
             target_chat_id = self._resolve_study_group_id(chat_id)
             is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
@@ -5403,20 +5605,50 @@ class DeviTelegramBot:
                 return
 
             curr_settings = self._get_group_settings(target_chat_id)
-            curr_val = curr_settings.get("join_track_enabled", 1)
-            
-            if len(parts) > 1:
-                arg = parts[1].lower()
-                new_val = 1 if arg in ("on", "true", "enable", "1") else 0
-            else:
-                new_val = 0 if curr_val else 1
+            curr_dest = str(curr_settings.get("join_track_dest", "pm")).lower().strip()
+            curr_en = curr_settings.get("join_track_enabled", 1)
 
-            self._save_group_setting(target_chat_id, "join_track_enabled", new_val)
-            status_str = "✅ **ENABLED**" if new_val else "❌ **DISABLED**"
+            if len(parts) > 1:
+                arg = parts[1].lower().strip()
+                if arg in ("pm", "admin_pm", "dm", "private"):
+                    self._save_group_setting(target_chat_id, "join_track_dest", "pm")
+                    self._save_group_setting(target_chat_id, "join_track_enabled", 1)
+                    res_txt = "🛡️ **SangMata Radar Destination:** Set to **Admin PM Only** (Student study group remains 100% clean)."
+                elif arg in ("group", "public", "both", "chat"):
+                    self._save_group_setting(target_chat_id, "join_track_dest", "group")
+                    self._save_group_setting(target_chat_id, "join_track_enabled", 1)
+                    res_txt = "📢 **SangMata Radar Destination:** Set to **Public Group**."
+                elif arg in ("off", "disable", "false", "0"):
+                    self._save_group_setting(target_chat_id, "join_track_dest", "off")
+                    self._save_group_setting(target_chat_id, "join_track_enabled", 0)
+                    res_txt = "❌ **SangMata Join Radar:** **DISABLED**."
+                elif arg in ("on", "enable", "true", "1"):
+                    self._save_group_setting(target_chat_id, "join_track_dest", "pm")
+                    self._save_group_setting(target_chat_id, "join_track_enabled", 1)
+                    res_txt = "✅ **SangMata Join Radar:** **ENABLED** (Destination: Admin PM Only)."
+                else:
+                    res_txt = "ℹ️ Usage: `/jointrack pm` (Admin DM only) | `/jointrack group` (Public chat) | `/jointrack off`"
+            else:
+                # Cycle if invoked bare: pm -> group -> off -> pm
+                if not curr_en or curr_dest == "off":
+                    new_dest = "pm"
+                    new_en = 1
+                    res_txt = "🛡️ **SangMata Join Radar:** Set to **Admin PM Only** (Group remains clean)."
+                elif curr_dest in ("pm", "admin_pm"):
+                    new_dest = "group"
+                    new_en = 1
+                    res_txt = "📢 **SangMata Join Radar:** Set to **Public Group**."
+                else:
+                    new_dest = "off"
+                    new_en = 0
+                    res_txt = "❌ **SangMata Join Radar:** **DISABLED**."
+                self._save_group_setting(target_chat_id, "join_track_dest", new_dest)
+                self._save_group_setting(target_chat_id, "join_track_enabled", new_en)
+
             await self._send_message(
                 session, 
                 chat_id, 
-                f"🛡️ **Member Join Intel Tracking:** {status_str} for group `{target_chat_id}`",
+                res_txt,
                 message_thread_id=thread_id
             )
 

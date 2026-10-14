@@ -4,6 +4,48 @@ This log permanently documents root causes, architectural patterns, historical b
 
 ## 📅 Log Entry: Wednesday, 14 October 2026
 
+### 27. Master Interactive Control Center (`/panel`), Welcome Message Auto-Delete TTL, SangMata Privacy Routing, Terminal Scrollback Restoration & Multi-Task Detach Mechanism
+* **User Directive & Problem Reported**:
+  - User requested: *"unko update kar lo, implement kar lo aur aaram se dhyan se ek ek feature karke karna, ek ek line karke karna... check karke karna ki current program kharab na ho aur har jagah update push kar dena."*
+  - Key focus areas:
+    1. Interactive Control Panel card (`/panel`, `/settings`) with 1-click inline button toggles for Welcome greetings, TTL timeouts, SangMata destinations, and streaming velocity.
+    2. Welcome Message Auto-Delete TTL (`/welcometimeout <seconds>`) with default 60s auto-delete to keep student groups clean and free of greeting clutter.
+    3. SangMata join tracking destination privacy toggle (`/jointrack pm` vs `/jointrack group` vs `off`), defaulting to private DM audit alerts for Master Admins to maintain student chat purity.
+    4. Terminal viewport scrollback freeze fix in `tg_kindsync_pro.py`: Rich `Live(..., screen=True)` locked PowerShell/Windows Terminal inside the alternate screen buffer, preventing mouse wheel scrollback.
+    5. Non-destructive background detach mechanism: allowing users to multitask (e.g. generate clickable topic indexes, manage routes, configure covers) from the main menu without killing running forwarders or streams.
+    6. Non-premium 4GB file safety in `deep_cloner.py`: direct pointer copy handles 4GB files on non-premium accounts with zero bandwidth; for restricted channels requiring re-upload, safely guard against 2GB limits by logging to DLQ instead of crashing.
+* **Root Cause & Technical Implementation**:
+  1. **Master Interactive Control Center (`devi/operator/telegram_bot.py`)**:
+     - Added `_render_control_panel_card()` on `DeviTelegramBot` rendering live status and 1-click inline buttons:
+       - `👋 Welcome: [ON/OFF]` (`pnl_w_tog_<chat_id>`)
+       - `⏱️ TTL: [30s ➔ 60s ➔ 120s ➔ Never]` (`pnl_w_ttl_<chat_id>_<next_ttl>`)
+       - `🕵️‍♂️ SangMata: [Admin PM Only ➔ Public Group ➔ Disabled]` (`pnl_sm_tog_<chat_id>`)
+       - `⚡ Fast Direct: [ON/OFF]` & `👑 Signature: [ON/OFF]`
+       - `🧹 Clean Welcomes Now` & `🔄 Refresh Panel`
+     - Wired up `/panel`, `/settings`, `/control`, `/botpanel` in `_handle_admin_command` with admin verification.
+     - Added `/welcome` (bare opens `/panel`; args toggle), `/welcometimeout <seconds>` (`/welcomettl`), and enhanced `/jointrack [pm|group|off]`.
+     - Updated `/adminhelp` text and keyboard markup with direct access to `/panel`.
+  2. **SangMata Privacy Routing & Welcome TTL (`devi/operator/telegram_bot.py`)**:
+     - Added SQLite schema migration: `ALTER TABLE telegram_group_settings ADD COLUMN join_track_dest TEXT DEFAULT 'pm'`.
+     - In `_handle_chat_member`:
+       - If `join_track_dest` is `pm` (default), public join dossier posts are suppressed in the group and dispatched strictly to Master Admins (`1553619403`, `759038032`) in DM.
+       - Dispatched welcome message triggers background task `_auto_delete_message` with timeout TTL (`welcome_timeout`, default 60s).
+  3. **Terminal Scrollback Restoration (`tg_kindsync_pro.py`)**:
+     - Switched `Live(..., screen=True)` to `Live(..., screen=False)` in `TerminalPlatform.boot()`.
+     - This preserves standard terminal scrollback buffer in Windows Terminal and PowerShell, eliminating mouse wheel freezing and layout clipping.
+  4. **Multi-Task Detach Mechanism (`tg_kindsync_pro.py`)**:
+     - Added non-blocking detach detection using `msvcrt.kbhit()` (keys `D` or `M`) during live forwarder loops.
+     - Added interactive prompt on `KeyboardInterrupt` (`Ctrl+C`): allows choosing between `[D] Detach to Menu (keep running)` or `[S] Stop Forwarder`.
+     - If detached, workers, queue, and scanner remain actively running in background; state is registered in `_GLOBAL_ACTIVE_PLATFORM`.
+     - Main menu dynamically renders `🟢 ACTIVE BACKGROUND FORWARDER RUNNING` status with `[A]` to re-attach live dashboard and `[S]` to stop safely.
+     - Allows users to freely run Option 8 (Topic & Group Indexer), Option 7 (Cloner), or Option 10 (Caption Studio) concurrently.
+  5. **4GB / 2GB Non-Premium Guard (`devi/operator/deep_cloner.py`)**:
+     - In Tier 2 streaming fallback, added file size check: if `file_size > 2000 * 1024 * 1024` and account is not Telegram Premium, gracefully logs message to `dead_letter.jsonl`, notifies telemetry callback, and skips to next message without raising `FilePartsInvalidError`.
+* **Verification & Testing**:
+  - `python tests/run_all_tests.py`: **9/9 test suites passed (100% HEALTHY)**.
+  - `python -m pytest tests/test_medical_calculator.py tests/test_dashboard_deep.py tests/test_filename_extension_and_caption_fix.py tests/test_v15_control_panel_and_detach.py -v`: **29/29 tests passed (100%)**.
+  - All modified files compiled cleanly via `python -m py_compile`.
+
 ### 26. Dashboard Tab Switching Scroll Persistence Fix, Glassmorphic Sidebar Redesign, Forum Topic Radar Beacon, Kind Doctor Bot Rate-Limit (429) Resilience, Smart 1-Click `/clone` & Extension Deduplication
 * **User Directive & Problem Reported (5 Voice Notes)**:
   - User feedback:

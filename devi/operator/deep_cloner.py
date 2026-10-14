@@ -11,9 +11,11 @@ watermark/promo stripping, and SQLite WAL checkpoint resilience.
 import os
 import re
 import html
+import json
 import asyncio
 import logging
 import sqlite3
+from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple
 from contextlib import suppress
 from pathlib import Path
@@ -569,6 +571,46 @@ class DeepClonerEngine:
                                 logger.info(f"Tier 1 copy failed for msg #{msg.id} ({ex_fwd}). Falling back to Tier 2 Protected Content Streamer...")
 
                             if not tier1_success:
+                                # Guard against Non-Premium 2GB limit on Protected/Restricted Content
+                                file_size = getattr(msg, "file", None) and getattr(msg.file, "size", 0) or 0
+                                if not hasattr(self, "_is_premium"):
+                                    try:
+                                        me_acc = await user_client.get_me()
+                                        self._is_premium = bool(getattr(me_acc, "premium", False))
+                                    except Exception:
+                                        self._is_premium = False
+
+                                if file_size > 2000 * 1024 * 1024 and not self._is_premium:
+                                    dlq_err = f"File exceeds non-premium 2GB limit ({file_size / (1024*1024):.1f}MB) in protected channel. Direct pointer copy failed; re-upload skipped."
+                                    logger.warning(f"⚠️ msg #{msg.id}: {dlq_err}")
+                                    dlq_file = ROOT_DIR / "dead_letter.jsonl"
+                                    with suppress(Exception):
+                                        rec = {
+                                            "ts": datetime.now(timezone.utc).isoformat(),
+                                            "chat": str(source_chat_id),
+                                            "msg": int(msg.id),
+                                            "error": dlq_err,
+                                            "target_chat": str(target_chat_id),
+                                            "target_topic": int(target_topic_id or 0),
+                                            "file_name": orig_filename or "large_file",
+                                            "file_size_mb": round(file_size / (1024*1024), 2)
+                                        }
+                                        with open(dlq_file, "a", encoding="utf-8") as df:
+                                            df.write(json.dumps(rec) + "\n")
+                                    if progress_callback:
+                                        with suppress(Exception):
+                                            await progress_callback(
+                                                top_name=topic_title,
+                                                cur_m=cloned_count + 1,
+                                                tot_m=total_count,
+                                                top_cloned=cloned_count,
+                                                file_name=orig_filename or "4GB Protected File",
+                                                phase="⚠️ Skipped (>2GB Non-Premium)"
+                                            )
+                                    cloned_count += 1
+                                    success = True
+                                    break
+
                                 # Tier 2: Protected Content High-Speed Streaming Fallback with Original Filename & Attributes
                                 import tempfile
                                 ext = ""
