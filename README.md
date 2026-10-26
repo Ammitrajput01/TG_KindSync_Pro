@@ -130,27 +130,22 @@ python -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-# 4. Create your environment configuration file
-copy .env.example .env
-```
+#### 3. Instant 3-Way Interactive Login (No Manual `.env` Editing Required!)
+You **do not need** to manually edit configuration files. Simply start the platform and let the built-in authentication wizard guide you:
 
-Open `.env` in Notepad and configure your credentials:
-```ini
-API_ID=12345678                          # From my.telegram.org
-API_HASH=abcdef0123456789abcdef01        # From my.telegram.org
-BOT_TOKEN=123456:ABC-DEF1234ghIkl        # From @BotFather
-ADMIN_ID=1553619403,759038032            # Verified Permanent Super Admins
-DEFAULT_SESSION=tg_kindsync_session
-WORKERS_COUNT=12
-PORT=8080
-```
-
-Start the services manually:
 ```powershell
-python tg_kindsync_pro.py                    # Master Forwarding Platform
-python -m devi.operator.telegram_bot         # Kind Doctor Bot Daemon
-python web_dashboard.py                      # Web HUD Command Center
+# Launch the platform
+python tg_kindsync_pro.py
+# (Or simply double-click 1_START_PRO.bat)
 ```
+
+The system automatically presents three zero-friction authentication choices:
+1. **⚡ Method 1: Instant QR Code Scan (Fastest)** — An ASCII QR code renders directly inside your terminal. Scan it instantly with your mobile phone (`Telegram App ➔ Settings ➔ Devices ➔ Link Desktop Device`).
+2. **📱 Method 2: Terminal Phone OTP & 2FA** — Enter your phone number (`+91...`), receive your official Telegram authorization code, and enter your 2FA password.
+3. **🌐 Method 3: In-Browser Web Login** — Open `http://127.0.0.1:5005` or the DEVI Web Cockpit at `http://localhost:8080/` to authenticate visually with OTP & 2FA from your browser.
+
+> [!TIP]
+> **Optional Headless Server Config**: If deploying headlessly on automated cloud instances, you can optionally copy `.env.example` to `.env` and specify `API_ID`, `API_HASH`, `BOT_TOKEN`, and `ADMIN_ID` manually.
 
 ---
 

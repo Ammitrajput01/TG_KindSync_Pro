@@ -1028,15 +1028,16 @@ python -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-# 4. Copy configuration template & configure .env
-copy .env.example .env</pre>
+# 4. Launch & Log In (No manual .env editing needed!)
+python tg_kindsync_pro.py
+# -> Choose [1] Scan QR Code, [2] Mobile OTP, or [3] Web Login (http://127.0.0.1:5005)</pre>
           </div>
 
-          <h4 style="margin: 20px 0 10px; font-size: 1rem; color: #FFFFFF;">1-Click Launchers Suite (Double-Click to Run):</h4>
+          <h4 style="margin: 20px 0 10px; font-size: 1rem; color: #FFFFFF;">1-Click Launchers Suite (Double-Click in Explorer):</h4>
           <p style="color: var(--text-muted); font-size: 0.9rem;">
-            • <code>1_START_PRO.bat</code> — Master Forwarding Engine (19 Options TUI)<br>
+            • <code>1_START_PRO.bat</code> — Master Forwarding Engine (Prompts QR/OTP Login + 19 Quadrants TUI)<br>
             • <code>2_START_KIND_DOCTOR_BOT.bat</code> — Standalone Kind Doctor Operator Bot Daemon<br>
-            • <code>3_START_WEB_DASHBOARD.bat</code> — Web Cockpit on <code>http://localhost:8080</code><br>
+            • <code>3_START_WEB_DASHBOARD.bat</code> — Web Cockpit on <code>http://localhost:8080</code> (Features In-Browser Account Login)<br>
             • <code>1_START_MY_ORACLE_DIRECT.bat</code> — Direct Oracle Cloud VPS SSH Terminal
           </p>
         </div>
