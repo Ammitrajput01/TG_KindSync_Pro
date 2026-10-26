@@ -1465,6 +1465,19 @@ class DeviTelegramBot:
         if shifts_count >= 3:
             risk_str = f"⚡ **Shift Velocity:** 🚨 High Velocity ({shifts_count} Identity Shifts Detected)\n"
 
+        cross_platform_text = dossier.get("cross_platform_text", "")
+        extra_cp = f"\n{cross_platform_text}" if cross_platform_text else ""
+
+        links_str = ""
+        clean_u = uname.lstrip("@") if uname and uname != "No Username" else ""
+        if clean_u and not clean_u.isdigit():
+            links_str = (
+                f"\n🔍 **Deep OSINT Links (osint4all radar):**\n"
+                f"• [📊 TGStat Analytics](https://tgstat.com/user/@{clean_u}) | "
+                f"[🔎 Telegago Search](https://cse.google.com/cse?cx=006368593537057042503:efxu7xprihg&q={clean_u}) | "
+                f"[📈 Telemetr](https://telemetr.io/en/channels?query={clean_u})\n"
+            )
+
         card = (
             f"👤 **{title_prefix} — USER INTELLIGENCE** 🩺\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1477,6 +1490,8 @@ class DeviTelegramBot:
             f"{phone_str}\n"
             f"📜 **Name History (SangMata Timeline):**\n" + "\n".join(name_lines) + "\n\n"
             f"🏷️ **Username History (SangMata Timeline):**\n" + "\n".join(uname_lines) + "\n"
+            f"{extra_cp}"
+            f"{links_str}"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"🛡️ *Kind Doctor Live Sentinel • SangMata Biometrics*"
         )
@@ -2020,6 +2035,17 @@ class DeviTelegramBot:
                 except Exception as ex:
                     logger.debug(f"SangMata fetch error in _handle_chat_member: {ex}")
 
+                # Deep OSINT Cross-Platform Username Probe (osint4all integration)
+                if username:
+                    try:
+                        from devi.operator.osint_resolver import osint_resolver
+                        probe_res = await osint_resolver.probe_cross_platform_username(username)
+                        if probe_res:
+                            dossier["cross_platform_text"] = osint_resolver.format_cross_platform_card(probe_res)
+                            dossier["cross_platform_findings"] = probe_res.get("findings", [])
+                    except Exception as ex:
+                        logger.debug(f"Cross-platform probe error in _handle_chat_member: {ex}")
+
                 # 1. Short & sweet tagged Welcome Message (as requested by user)
                 if g_settings.get("welcome_enabled", 1):
                     custom_w_text = g_settings.get("welcome_text")
@@ -2052,6 +2078,9 @@ class DeviTelegramBot:
                             [
                                 {"text": "👢 Kick Member", "callback_data": f"kick_{chat_id}_{user_id}"},
                                 {"text": "🚫 Ban & Block", "callback_data": f"ban_{chat_id}_{user_id}"}
+                            ],
+                            [
+                                {"text": "🌐 Full OSINT Dossier", "callback_data": f"osint_user_{user_id}"}
                             ]
                         ]
                     }
@@ -2396,6 +2425,206 @@ class DeviTelegramBot:
         }
         return "\n".join(lines), keyboard
 
+    def _build_interactive_help_card(self, category: str = "main", is_admin: bool = False) -> Tuple[str, dict]:
+        """Builds interactive nested help card with in-place category switching."""
+        cat = str(category).lower().strip()
+        
+        if cat in ("study", "lectures", "navigation"):
+            text = (
+                f"📚 <b>STUDY &amp; LECTURE NAVIGATION MANUAL</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• <code>/mainindex</code> — Generate Alphabetical (A-Z) Master Topic Directory\n"
+                f"• <code>/topicindex</code> — Generate Table of Contents (TOC) inside current topic\n"
+                f"• <code>/find &lt;keyword&gt;</code> — Search indexed lectures, topics &amp; notes\n"
+                f"• <code>/rules</code> — View official community guidelines &amp; study etiquette\n"
+                f"• <code>/support &lt;msg&gt;</code> — Direct confidential message line to Kind Doctor\n"
+                f"• <code>/id</code> — View your Telegram User ID safely without exposing phone\n"
+                f"• <code>/pomodoro [mins]</code> — Start focused deep-study sprint (25m/50m)\n"
+                f"• <code>/stats</code> — View community study metrics &amp; engagement\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🕵️ OSINT & Radar", "callback_data": "act_help_osint"},
+                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"}
+                    ],
+                    [
+                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"},
+                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        elif cat in ("osint", "forensics", "intelligence"):
+            text = (
+                f"🕵️ <b>OSINT &amp; FORENSIC INTELLIGENCE MANUAL</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• <code>/userinfo &lt;id|@user|reply&gt;</code> — Full SangMata timeline, DC, age &amp; risk score\n"
+                f"• <code>/osint &lt;target&gt;</code> — Cross-platform probe (GitHub, GitLab, Docker, Dev.to) + TGStat\n"
+                f"• <code>/phone &lt;number&gt;</code> — Telecom circle, Truecaller, WhatsApp &amp; group cross-match\n"
+                f"• <code>/email &lt;address&gt;</code> — Disposable check, corporate provider &amp; Gravatar profile\n"
+                f"• <code>/members</code> — Audit member roster, join dates &amp; name changes\n"
+                f"• <code>/exportmembers</code> — Export full member list as Excel/CSV\n"
+                f"• <code>/jointrack [on/off]</code> — Toggle deep forensic join alerts to admin PM\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
+                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"}
+                    ],
+                    [
+                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"},
+                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        elif cat in ("cloner", "cloning", "deepclone"):
+            text = (
+                f"🚀 <b>DEEP CLONER &amp; ROUTING MANUAL</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• <code>/clonegroup [Src] [Tgt]</code> — Entire supergroup clone (auto-creates topics)\n"
+                f"• <code>/clonetopic [Src] [Tgt]</code> — Clone single topic with thousands of lectures\n"
+                f"• <code>/batchclone [Start] [End]</code> — Sequence clone of specific message range\n"
+                f"• <code>/clone [Link | Reply]</code> — 1-Click single post clone\n"
+                f"• <code>/clonejobs</code> — Live dashboard of all active and running clone jobs\n"
+                f"• <code>/clonestatus</code> — Real-time cloning speed &amp; ETA\n"
+                f"• <code>/clonepause [Job ID]</code> &amp; <code>/cloneresume [Job ID]</code> — Pause/resume\n"
+                f"• <code>/clonestop [Job ID]</code> — Abort or safely stop a running clone job\n"
+                f"• <code>/setroute [Src] [Tgt]</code> — Auto-mirror live posts with zero forward tag\n"
+                f"• <code>/routes</code> — List and manage all active forward routes\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
+                        {"text": "🕵️ OSINT & Radar", "callback_data": "act_help_osint"}
+                    ],
+                    [
+                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"},
+                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        elif cat in ("calc", "calculator", "clinical"):
+            text = (
+                f"🩺 <b>CLINICAL &amp; BEDSIDE CALCULATORS MANUAL</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• <code>/bmi &lt;weight_kg&gt; &lt;height_cm&gt;</code> — BMI &amp; WHO nutritional category\n"
+                f"• <code>/bsa &lt;weight_kg&gt; &lt;height_cm&gt;</code> — Body Surface Area (Mosteller/DuBois)\n"
+                f"• <code>/map &lt;sbp&gt; &lt;dbp&gt;</code> — Mean Arterial Pressure &amp; perfusion status\n"
+                f"• <code>/dose &lt;mg/kg&gt; &lt;wt&gt; &lt;conc_mg/ml&gt;</code> — Pediatric &amp; emergency dosing\n"
+                f"• <code>/maintenance &lt;weight_kg&gt;</code> — Holliday-Segar 4-2-1 hourly fluid rate\n"
+                f"• <code>/gfr &lt;cr&gt; &lt;age&gt; &lt;sex&gt;</code> — CKD-EPI Glomerular Filtration Rate\n"
+                f"• <code>/gcs &lt;E&gt; &lt;V&gt; &lt;M&gt;</code> — Glasgow Coma Scale &amp; head injury triage\n"
+                f"• <code>/curb65 &lt;score 0-5&gt;</code> — Pneumonia mortality risk &amp; triage\n"
+                f"• <code>/parkland &lt;wt&gt; &lt;tbsa%&gt;</code> — Parkland 24-hour burn resuscitation fluid\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
+                        {"text": "🕵️ OSINT & Radar", "callback_data": "act_help_osint"}
+                    ],
+                    [
+                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"},
+                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        elif cat in ("admin", "security", "mod"):
+            text = (
+                f"🛡️ <b>GROUP ADMINISTRATION &amp; SECURITY MANUAL</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• <code>/cleanwelcome</code> — 1-Click batch purge of all previous welcome cards\n"
+                f"• <code>/cleandeleted</code> — Scan and remove ghost &amp; 'Deleted Accounts'\n"
+                f"• <code>/purge [count]</code> — Mass-delete recent messages in emergencies\n"
+                f"• <code>/setwelcome &lt;text&gt;</code> — Set custom welcome message\n"
+                f"• <code>/welcometoggle [on/off]</code> — Enable or disable welcome greetings\n"
+                f"• <code>/jointrack [on/off]</code> — Toggle deep forensic join alerts to admin PM\n"
+                f"• <code>/setrules &lt;text&gt;</code> — Set official group rules &amp; guidelines\n"
+                f"• <code>/backup</code> — Zero-downtime full SQLite snapshot export\n"
+                f"• <code>/health</code> — Real-time telemetry, RAM &amp; database status\n"
+                f"• <code>/update</code> — 1-Click Code Sync &amp; Auto-Updater\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
+                        {"text": "🕵️ OSINT & Radar", "callback_data": "act_help_osint"}
+                    ],
+                    [
+                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"},
+                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        else: # Main Menu
+            text = (
+                f"👨‍⚕️ <b>Kind Doctor — Interactive Command Encyclopedia</b> 📖\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Welcome! Bot ke saare 40+ features categorized hain.\n"
+                f"Neeche diye <b>Interactive Buttons</b> par click karke kisi bhi section ka complete guide dekhein:\n\n"
+                f"• 📚 <b>Study &amp; Navigation</b>: Master Topic Directory, TOC, search &amp; study tools\n"
+                f"• 🕵️ <b>OSINT &amp; Forensics</b>: SangMata biometrics, username footprint, phone/email lookup\n"
+                f"• 🚀 <b>Deep Cloner &amp; Routing</b>: 200k+ cloner, topic mirror, live sync streams\n"
+                f"• 🩺 <b>Clinical Calculators</b>: Bedside BMI, GFR, MAP, GCS, fluid maintenance\n"
+                f"• 🛡️ <b>Admin &amp; Security</b>: Ghost purge, welcome cleaner, automated forensic alerts\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Direct Jump: Type <code>/help &lt;study|osint|cloner|calc|admin&gt;</code></i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📚 Study & Navigation", "callback_data": "act_help_study"},
+                        {"text": "🕵️ OSINT & Forensics", "callback_data": "act_help_osint"}
+                    ],
+                    [
+                        {"text": "🚀 Deep Cloner & Routing", "callback_data": "act_help_cloner"},
+                        {"text": "🩺 Clinical Calculators", "callback_data": "act_help_calc"}
+                    ],
+                    [
+                        {"text": "🛡️ Group Admin & Security", "callback_data": "act_help_admin"},
+                        {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
+                    ]
+                ]
+            }
+            return text, kb
+
     async def _handle_callback_query(self, session: aiohttp.ClientSession, cb: dict):
         """Handle inline button clicks from Admins."""
         cb_id = cb.get("id")
@@ -2403,6 +2632,13 @@ class DeviTelegramBot:
         from_user = cb.get("from", {})
         admin_id = from_user.get("id")
         chat_id = cb.get("message", {}).get("chat", {}).get("id")
+
+        # Direct OSINT User Lookup from Member Join Alert
+        if data.startswith("osint_user_"):
+            target_uid = data.replace("osint_user_", "").strip()
+            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Fetching Full OSINT Dossier..."})
+            await self._handle_admin_command(session, chat_id, admin_id, f"/userinfo {target_uid}", message=cb.get("message"))
+            return
 
         # Admin 1-Click Card Purge
         if data.startswith("purge_card"):
@@ -2422,8 +2658,30 @@ class DeviTelegramBot:
             msg_obj = cb.get("message", {})
             thread_id = msg_obj.get("message_thread_id")
             
+            # --- INTERACTIVE HELP ENCYCLOPEDIA ACTIONS ---
+            if action.startswith("help_"):
+                cat = action.replace("help_", "")
+                card_text, kb = self._build_interactive_help_card(cat, is_admin=self.is_admin(admin_id))
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Loaded {cat.title()} Guide ✨"})
+                return
+
+            elif action in ("manual", "fullhelp"):
+                card_text, kb = self._build_interactive_help_card("main", is_admin=self.is_admin(admin_id))
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Encyclopedia Opened ✨"})
+                return
+
             # --- AUTO FORWARD HUB BUTTON ACTIONS ---
-            if action in ("fwd_hub", "fwd_panel"):
+            elif action in ("fwd_hub", "fwd_panel"):
                 card_text, kb = self._build_autoforward_panel_data(admin_id)
                 msg_id = msg_obj.get("message_id")
                 if msg_id:
@@ -3610,6 +3868,18 @@ class DeviTelegramBot:
                     except Exception as ex:
                         logger.debug(f"SangMata fetch on join: {ex}")
 
+                    # Deep OSINT Cross-Platform Username Probe (osint4all integration)
+                    nm_uname = new_m.get("username")
+                    if nm_uname:
+                        try:
+                            from devi.operator.osint_resolver import osint_resolver
+                            probe_res = await osint_resolver.probe_cross_platform_username(nm_uname)
+                            if probe_res:
+                                dossier["cross_platform_text"] = osint_resolver.format_cross_platform_card(probe_res)
+                                dossier["cross_platform_findings"] = probe_res.get("findings", [])
+                        except Exception as ex:
+                            logger.debug(f"Cross-platform probe on join error: {ex}")
+
                     full_osint_card = self._format_sangmata_dossier(
                         dossier,
                         title_prefix="MEMBER JOIN INTELLIGENCE & SANGMATA OSINT RADAR"
@@ -3620,6 +3890,9 @@ class DeviTelegramBot:
                             [
                                 {"text": "👢 Kick Member", "callback_data": f"kick_{chat_id}_{nm_id}"},
                                 {"text": "🚫 Ban & Block", "callback_data": f"ban_{chat_id}_{nm_id}"}
+                            ],
+                            [
+                                {"text": "🌐 Full OSINT Dossier", "callback_data": f"osint_user_{nm_id}"}
                             ]
                         ]
                     }
@@ -4168,6 +4441,12 @@ class DeviTelegramBot:
         reply_to = message.get("reply_to_message") if message else None
         clean_chat_id = str(chat_id).replace("-100", "").replace("-", "").lstrip("@")
 
+        if cmd == "/help" and len(parts) > 1:
+            subcat = parts[1].lower().strip()
+            card_text, kb = self._build_interactive_help_card(subcat, is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id, parse_mode="HTML")
+            return
+
         if cmd in ("/help", "/start", "/menu", "/mode"):
             load_dotenv(override=True)
             cur_direct = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
@@ -4290,70 +4569,9 @@ class DeviTelegramBot:
             await self._send_message(session, chat_id, "\n".join(lines), message_thread_id=thread_id)
 
         elif cmd in ("/fullhelp", "/manual"):
-            part1 = (
-                f"👨‍⚕️ **Kind Doctor — Official Command Manual (Part 1/3)** 📖\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📚 **STUDY & LECTURE NAVIGATION:**\n"
-                f"• `/mainindex` — Generate Alphabetical (A-Z) Master Topic Directory\n"
-                f"• `/topicindex` — Generate Table of Contents (TOC) inside current topic\n"
-                f"• `/find <keyword>` — Search indexed lectures, topics & notes with instant links\n"
-                f"• `/rules` — View official community guidelines & study etiquette\n"
-                f"• `/support` — Direct confidential message line to Kind Doctor Desk\n"
-                f"• `/id` — View your Telegram User ID safely without sharing phone numbers\n\n"
-                f"🩺 **CLINICAL & STUDY TOOLS:**\n"
-                f"• `/score <type>` — Bedside clinical calculators (BMI, MAP, GCS, Wells, Curb-65)\n"
-                f"• `/pomodoro [mins]` — Start focused deep-study sprint (25m or 50m)\n"
-                f"• `/ask <doubt>` — Submit clinical question to study group & faculty\n"
-                f"• `/stats` — View community study metrics & active student engagement"
-            )
-            part2 = (
-                f"👨‍⚕️ **Kind Doctor — Official Command Manual (Part 2/3)** 📖\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"⚙️ **GROUP ADMINISTRATION & FORENSIC AUDITING:**\n"
-                f"• `/members` — Audit group member history, join dates & identity shifts\n"
-                f"• `/exportmembers` — Export full member list as an Excel/CSV spreadsheet\n"
-                f"• `/userinfo <id|@user|reply>` — Comprehensive dossier (Account age, changes, stats)\n"
-                f"• `/setwelcome <text>` — Set custom welcome message (`{{name}}`, `{{group}}`, `{{rules}}`)\n"
-                f"• `/welcometoggle [on/off]` — Enable or disable new member welcome greetings\n"
-                f"• `/jointrack [on/off]` — Toggle forensic member join tracking alerts\n"
-                f"• `/setrules <text>` — Set official group rules & study guidelines\n"
-                f"• `/cleanwelcome` — 1-Click batch purge of all previous welcome cards\n"
-                f"• `/cleandeleted` — Scan and remove ghost & 'Deleted Accounts' from group\n"
-                f"• `/setlang <en|hi>` — Switch bot language (English or Hinglish)\n"
-                f"• `/scan` — 1-Click auto-scan group media and update topic directory"
-            )
-            part3 = (
-                f"👨‍⚕️ <b>Kind Doctor — Official Command Manual (Part 3/3)</b> 📖\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🚀 <b>INFINITE DEEP CLONER SUITE (200k+ Msgs & 2k+ Topics):</b>\n"
-                f"• <code>/clonegroup [Source Group Link] [Target Group Link]</code> — Entire supergroup clone (auto-creates all 2,000+ forum topics)\n"
-                f"• <code>/clonetopic [Source Topic Link] [Target Topic Name]</code> — Full single topic clone (thousands of lectures & media)\n"
-                f"• <code>/batchclone [Start Msg Link] [End Msg Link]</code> — Sequence clone of specific message range\n"
-                f"• <code>/clone [Message Link | Reply]</code> — 1-Click single post clone\n"
-                f"• <code>/clonejobs</code> — Live dashboard of all active and running clone jobs\n"
-                f"• <code>/stopclone [Job ID]</code> — Abort or safely stop a running clone job\n\n"
-                f"🔄 <b>CLOUD FORWARDER & ROUTING (Auto-Sync Streams):</b>\n"
-                f"• <code>/setroute [Source Chat ID] [Target Topic ID]</code> — Auto-mirror live posts with zero forward tag\n"
-                f"• <code>/settopicroute [Src Chat] [Src Topic] [Tgt Topic]</code> — Topic-to-topic live stream forward\n"
-                f"• <code>/routes</code> — List and manage all active forward routes\n"
-                f"• <code>/pauseroute [Route ID]</code> & <code>/resumeroute [Route ID]</code> — Pause/resume live route\n"
-                f"• <code>/delroute [Route ID]</code> — Delete an existing forward route\n\n"
-                f"🔑 <b>ACCOUNT VAULT & MULTI-TENANT:</b>\n"
-                f"• <code>/connect</code> — Securely link your Telegram account (OTP) to clone restricted private groups\n"
-                f"• <code>/disconnect</code> — Revoke and wipe linked Telegram account session\n\n"
-                f"👑 <b>MASTER ADMIN CONTROLS:</b>\n"
-                f"• <code>/backup</code> — Zero-downtime full SQLite snapshot export\n"
-                f"• <code>/update</code> — 1-Click Code Sync & Auto-Updater\n"
-                f"• <code>/health</code> — Real-time telemetry, RAM & database status\n"
-                f"• <code>/purge [count]</code> — Mass-delete recent messages in case of emergency\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Tip: Tap /menu anytime for interactive 1-click button controls.</i>"
-            )
-            await self._send_message(session, chat_id, part1, message_thread_id=thread_id)
-            await asyncio.sleep(0.3)
-            await self._send_message(session, chat_id, part2, message_thread_id=thread_id)
-            await asyncio.sleep(0.3)
-            await self._send_message(session, chat_id, part3, message_thread_id=thread_id)
+            subcat = parts[1].lower().strip() if len(parts) > 1 else "main"
+            card_text, kb = self._build_interactive_help_card(subcat, is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id, parse_mode="HTML")
 
         elif cmd in ("/botinfo", "/about"):
             bot_card = (
@@ -5444,7 +5662,26 @@ class DeviTelegramBot:
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"🔒 _100% Consistent SQLite WAL Online Snapshot_"
                 )
-                success = await self._send_document(session, chat_id, b_bytes, fname, caption=cap, message_thread_id=thread_id)
+                success = False
+                if len(b_bytes) <= 48 * 1024 * 1024:
+                    success = await self._send_document(session, chat_id, b_bytes, fname, caption=cap, message_thread_id=thread_id)
+
+                if not success:
+                    # MTProto direct streaming bypass (supports files up to 2GB)
+                    try:
+                        from devi.operator.session_vault import get_vault_client
+                        mt_client, _ = await get_vault_client(preferred_type="any")
+                        if mt_client:
+                            await mt_client.send_file(
+                                chat_id,
+                                str(out_path),
+                                caption=cap,
+                                reply_to=thread_id
+                            )
+                            success = True
+                    except Exception as mt_err:
+                        logger.warning(f"MTProto direct backup stream fallback error: {mt_err}")
+
                 if not success:
                     await self._send_message(session, chat_id, f"✅ Backup created locally at `{out_path}`.", message_thread_id=thread_id)
             except Exception as e:
@@ -6972,7 +7209,7 @@ class DeviTelegramBot:
                 )
             return
 
-        elif cmd in ("/userinfo", "/whois", "/info", "/sangmata", "/history"):
+        elif cmd in ("/userinfo", "/whois", "/info", "/sangmata", "/history", "/osint"):
             target_user_id = None
             target_username = None
             fwd_origin_notice = ""
@@ -7281,6 +7518,26 @@ class DeviTelegramBot:
             extra_intel_str = "\n".join(extra_intel_lines) + "\n" if extra_intel_lines else ""
 
             phone_line = f"📱 **Phone**: `{phone_val}`\n" if phone_val and phone_val != "Not Shared" else ""
+
+            cross_platform_section = ""
+            deep_osint_links_str = ""
+            clean_uname = uname.lstrip("@") if uname and uname != "No Username" else ""
+            if clean_uname and not clean_uname.isdigit():
+                try:
+                    from devi.operator.osint_resolver import osint_resolver
+                    probe_data = await osint_resolver.probe_cross_platform_username(clean_uname)
+                    if probe_data:
+                        cross_platform_section = "\n" + osint_resolver.format_cross_platform_card(probe_data)
+                except Exception as ex:
+                    logger.debug(f"Cross-platform probe error in /userinfo: {ex}")
+
+                deep_osint_links_str = (
+                    f"🔍 **Deep OSINT Links (osint4all radar):**\n"
+                    f"• [📊 TGStat User Analytics](https://tgstat.com/user/@{clean_uname}) | "
+                    f"[🔎 Telegago Search](https://cse.google.com/cse?cx=006368593537057042503:efxu7xprihg&q={clean_uname}) | "
+                    f"[📈 Telemetr](https://telemetr.io/en/channels?query={clean_uname})\n\n"
+                )
+
             card = (
                 f"👤 **USER INTELLIGENCE & SANGMATA DOSSIER** 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -7297,21 +7554,27 @@ class DeviTelegramBot:
                 f"{name_hist_text}\n\n"
                 f"🏷️ **Username History (SangMata Timeline):**\n"
                 f"{uname_hist_text}\n"
+                f"{cross_platform_section}"
+                f"{deep_osint_links_str}"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"🛡️ *Kind Doctor Live Sentinel • SangMata Biometrics*"
             )
 
-
             whois_markup = None
-            if self.is_admin(admin_id) and u_id != admin_id:
-                whois_markup = {
-                    "inline_keyboard": [
-                        [
-                            {"text": "🚫 Ban Member", "callback_data": f"ban_{u_id}"},
-                            {"text": "👢 Kick Member", "callback_data": f"kick_{u_id}"}
-                        ]
-                    ]
-                }
+            if self.is_admin(admin_id):
+                btn_row = []
+                if u_id != admin_id:
+                    btn_row.extend([
+                        {"text": "🚫 Ban Member", "callback_data": f"ban_{u_id}"},
+                        {"text": "👢 Kick Member", "callback_data": f"kick_{u_id}"}
+                    ])
+                kb_rows = [btn_row] if btn_row else []
+                if clean_uname:
+                    kb_rows.append([
+                        {"text": "📊 TGStat", "url": f"https://tgstat.com/user/@{clean_uname}"},
+                        {"text": "🔎 Telegago", "url": f"https://cse.google.com/cse?cx=006368593537057042503:efxu7xprihg&q={clean_uname}"}
+                    ])
+                whois_markup = {"inline_keyboard": kb_rows} if kb_rows else None
 
             await self._send_message(session, chat_id, card, reply_markup=whois_markup, message_thread_id=thread_id)
 

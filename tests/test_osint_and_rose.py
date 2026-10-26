@@ -143,3 +143,41 @@ def test_osint_local_sqlite_fallback():
     assert isinstance(sangmata_hist, dict)
     assert "name_history" in sangmata_hist
     assert "username_history" in sangmata_hist
+
+
+def test_osint_search_links():
+    """Verify curated OSINT investigation links generation (osint4all radar)."""
+    links = GlobalOSINTResolver.get_osint_search_links("Kinddoctor4u")
+    assert "tgstat.com/user/@Kinddoctor4u" in links["tgstat_user"]
+    assert "telemetr.io/en/channels" in links["telemetr"]
+    assert "cse.google.com" in links["telegago"]
+    assert "lyzem.com" in links["lyzem"]
+
+
+@pytest.mark.asyncio
+async def test_probe_cross_platform_username():
+    """Verify concurrent lightweight username footprint reconnaissance."""
+    resolver = GlobalOSINTResolver()
+    res = await resolver.probe_cross_platform_username("torvalds")
+    assert isinstance(res, dict)
+    assert res["username"] == "torvalds"
+    assert "findings" in res
+    assert "scanned_count" in res
+    assert res["scanned_count"] >= 5
+    card_md = resolver.format_cross_platform_card(res)
+    assert "Cross-Platform" in card_md
+
+
+def test_interactive_help_cards(bot_and_db):
+    """Verify nested category help cards generation and navigation buttons."""
+    bot = bot_and_db
+    categories = ["main", "study", "osint", "cloner", "calc", "admin"]
+    for cat in categories:
+        card_text, kb = bot._build_interactive_help_card(cat, is_admin=True)
+        assert len(card_text) > 50
+        assert "inline_keyboard" in kb
+        assert len(kb["inline_keyboard"]) >= 2
+        # Check that buttons have act_help_ callbacks
+        flattened_cbs = [btn["callback_data"] for row in kb["inline_keyboard"] for btn in row if "callback_data" in btn]
+        assert any("act_help_" in cb for cb in flattened_cbs)
+

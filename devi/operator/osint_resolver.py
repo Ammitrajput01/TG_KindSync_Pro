@@ -17,6 +17,7 @@ import shutil
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 from contextlib import suppress
+import aiohttp
 
 from telethon import TelegramClient
 from telethon.tl.functions.users import GetFullUserRequest
@@ -484,8 +485,201 @@ class GlobalOSINTResolver:
             "total_shifts": len(name_history) + len(username_history)
         }
 
+    @staticmethod
+    def get_osint_search_links(target: str) -> Dict[str, str]:
+        """
+        Generates curated OSINT investigation links (from osint4all directory):
+        TGStat analytics, Telemetr, Telegago Google CSE, Lyzem search, and Google Dorks.
+        """
+        clean = str(target).strip().lstrip("@")
+        return {
+            "query": clean,
+            "tgstat_user": f"https://tgstat.com/user/@{clean}",
+            "tgstat_channel": f"https://tgstat.com/channel/@{clean}",
+            "telemetr": f"https://telemetr.io/en/channels?query={clean}",
+            "telegago": f"https://cse.google.com/cse?cx=006368593537057042503:efxu7xprihg&q={clean}",
+            "lyzem": f"https://lyzem.com/search?q={clean}",
+            "google_dork": f"https://www.google.com/search?q=site:t.me+{clean}",
+            "truecaller": f"https://www.truecaller.com/search/in/{clean}" if clean.isdigit() else ""
+        }
+
+    async def probe_cross_platform_username(self, username: str) -> Dict[str, Any]:
+        """
+        Sherlock / WhatsMyName style lightweight concurrent username reconnaissance.
+        Probes 7+ top developer, creator, and social networks without requiring API keys.
+        Completes in under 2 seconds using non-blocking aiohttp.
+        """
+        clean_u = str(username).strip().lstrip("@")
+        if not clean_u or len(clean_u) < 3 or clean_u.isdigit():
+            return {
+                "username": clean_u,
+                "found_count": 0,
+                "findings": [],
+                "scanned_count": 0,
+                "search_links": self.get_osint_search_links(clean_u)
+            }
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/json,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
+        findings: List[Dict[str, str]] = []
+
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async def check_github():
+                try:
+                    url = f"https://api.github.com/users/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            repos = data.get("public_repos", 0)
+                            name = data.get("name") or clean_u
+                            findings.append({
+                                "platform": "GitHub",
+                                "icon": "🐙",
+                                "url": f"https://github.com/{clean_u}",
+                                "detail": f"{name} ({repos} public repos)"
+                            })
+                except Exception:
+                    pass
+
+            async def check_gitlab():
+                try:
+                    url = f"https://gitlab.com/api/v4/users?username={clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            if isinstance(data, list) and len(data) > 0:
+                                findings.append({
+                                    "platform": "GitLab",
+                                    "icon": "🦊",
+                                    "url": f"https://gitlab.com/{clean_u}",
+                                    "detail": "Verified Active Account"
+                                })
+                except Exception:
+                    pass
+
+            async def check_dockerhub():
+                try:
+                    url = f"https://hub.docker.com/v2/users/{clean_u}/"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "DockerHub",
+                                "icon": "🐳",
+                                "url": f"https://hub.docker.com/u/{clean_u}",
+                                "detail": "Container Developer Account"
+                            })
+                except Exception:
+                    pass
+
+            async def check_devto():
+                try:
+                    url = f"https://dev.to/api/users/by_username?url={clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            name = data.get("name") or clean_u
+                            findings.append({
+                                "platform": "Dev.to",
+                                "icon": "✍️",
+                                "url": f"https://dev.to/{clean_u}",
+                                "detail": f"Tech Author: {name}"
+                            })
+                except Exception:
+                    pass
+
+            async def check_hackernews():
+                try:
+                    url = f"https://hacker-news.firebaseio.com/v0/user/{clean_u}.json"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            if data and isinstance(data, dict) and data.get("id"):
+                                karma = data.get("karma", 0)
+                                findings.append({
+                                    "platform": "HackerNews",
+                                    "icon": "🟧",
+                                    "url": f"https://news.ycombinator.com/user?id={clean_u}",
+                                    "detail": f"{karma} Karma Points"
+                                })
+                except Exception:
+                    pass
+
+            async def check_telegram_web():
+                try:
+                    url = f"https://t.me/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            body = await r.text()
+                            if "tgme_action_button_new" in body:
+                                findings.append({
+                                    "platform": "Telegram Web",
+                                    "icon": "✈️",
+                                    "url": f"https://t.me/{clean_u}",
+                                    "detail": "Active Telegram Entity"
+                                })
+                except Exception:
+                    pass
+
+            async def check_codeforces():
+                try:
+                    url = f"https://codeforces.com/api/user.info?handles={clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            if data.get("status") == "OK" and data.get("result"):
+                                rank = data["result"][0].get("rank", "Coder")
+                                findings.append({
+                                    "platform": "Codeforces",
+                                    "icon": "🏆",
+                                    "url": f"https://codeforces.com/profile/{clean_u}",
+                                    "detail": f"Rank: {rank.title()}"
+                                })
+                except Exception:
+                    pass
+
+            await asyncio.gather(
+                check_github(),
+                check_gitlab(),
+                check_dockerhub(),
+                check_devto(),
+                check_hackernews(),
+                check_telegram_web(),
+                check_codeforces(),
+                return_exceptions=True
+            )
+
+        return {
+            "username": clean_u,
+            "found_count": len(findings),
+            "findings": findings,
+            "scanned_count": 7,
+            "search_links": self.get_osint_search_links(clean_u)
+        }
+
+    def format_cross_platform_card(self, scan_result: Dict[str, Any]) -> str:
+        """Formats cross-platform username findings into clean Markdown for Telegram."""
+        findings = scan_result.get("findings", [])
+        u = scan_result.get("username", "")
+        if not findings:
+            return (
+                f"🌐 **Cross-Platform Footprint (`@{u}`):**\n"
+                f"• *Clean: No matching public developer/creator profiles detected.*\n"
+            )
+
+        lines = [f"🌐 **Cross-Platform Footprint (`@{u}`):**"]
+        for f in findings:
+            icon = f.get("icon", "•")
+            plat = f.get("platform", "Platform")
+            url = f.get("url", "#")
+            detail = f.get("detail", "Found")
+            lines.append(f"{icon} [{plat}]({url}) — `{detail}`")
+        return "\n".join(lines) + "\n"
+
 
 # Global Singleton Instance & Backward-Compatible Aliases
 GlobalOSINTResolver._find_candidate_sessions = GlobalOSINTResolver.get_candidate_sessions
 OSINTResolver = GlobalOSINTResolver
 osint_resolver = GlobalOSINTResolver()
+

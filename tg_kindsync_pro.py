@@ -1651,11 +1651,16 @@ class ThumbEnforcer:
                 for y in range(720):
                     c = int(20 + (y / 720) * 35)
                     draw.line((0, y, 1280, y), fill=(c, c + 5, c + 15))
-                try:
-                    main_f = ImageFont.truetype("arialbd.ttf", 90)
-                    sub_f = ImageFont.truetype("arial.ttf", 50)
-                except Exception:
-                    main_f = sub_f = ImageFont.load_default()
+                def _resolve_best_font(font_list, font_size):
+                    for fn in font_list:
+                        try:
+                            return ImageFont.truetype(fn, font_size)
+                        except Exception:
+                            continue
+                    return ImageFont.load_default()
+
+                main_f = _resolve_best_font(["arialbd.ttf", "segoeuib.ttf", "mangal.ttf", "nirmala.ttf", "calibrib.ttf", "Roboto-Bold.ttf"], 90)
+                sub_f = _resolve_best_font(["arial.ttf", "segoeui.ttf", "mangal.ttf", "nirmala.ttf", "calibri.ttf", "Roboto-Regular.ttf"], 50)
                 draw.text((200, 250), GROUP_BRAND, fill=(0, 255, 127), font=main_f)
                 draw.text((250, 400), f"By {TELEGRAM_BRAND.replace('**', '')}", fill=(255, 255, 255), font=sub_f)
                 img.save(self.raw, quality=85, optimize=True)
