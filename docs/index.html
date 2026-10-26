@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TG KindSync Pro v16.0.0 Enterprise — Official System Portal</title>
+  <meta name="description" content="Official showcase & documentation for TG KindSync Pro v16.0.0 Enterprise Turbo Masterpiece by Dr. Amit Singh (Kind Doctor). Autonomous Telegram MTProto in-memory streaming suite.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #07090E;
+      --bg-panel: rgba(13, 18, 31, 0.75);
+      --bg-panel-solid: #0D121F;
+      --bg-card: rgba(19, 26, 45, 0.6);
+      --bg-card-hover: rgba(28, 38, 66, 0.8);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(0, 240, 255, 0.35);
+      --border-accent: rgba(139, 92, 246, 0.4);
+      --accent-cyan: #00F0FF;
+      --accent-purple: #8B5CF6;
+      --accent-emerald: #10B981;
+      --accent-amber: #F59E0B;
+      --accent-rose: #FF3366;
+      --text-main: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --text-dim: #6B7280;
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 22px;
+      --radius-full: 9999px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.09) 0%, transparent 45%),
+        radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 50%);
+      background-attachment: fixed;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-main);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1F293D;
+      border-radius: var(--radius-full);
+      border: 2px solid var(--bg-main);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-cyan);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Navigation */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(7, 9, 14, 0.82);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 76px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-full);
+      object-fit: cover;
+      border: 2px solid var(--accent-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+    }
+
+    .brand-text h1 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #FFFFFF 40%, var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .nav-links a {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent-cyan);
+      text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), #0099FF);
+      color: #050B14;
+      box-shadow: 0 4px 20px rgba(0, 240, 255, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 28px rgba(0, 240, 255, 0.55);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+      backdrop-filter: blur(10px);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 70px 0 50px;
+      text-align: center;
+      position: relative;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: var(--radius-full);
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      color: var(--accent-cyan);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.4rem, 5.5vw, 4.2rem);
+      font-weight: 900;
+      line-height: 1.12;
+      letter-spacing: -0.03em;
+      max-width: 960px;
+      margin: 0 auto 20px;
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #00F0FF 10%, #7000FF 90%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 820px;
+      margin: 0 auto 36px;
+      font-weight: 400;
+    }
+
+    .hero-cta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 50px;
+    }
+
+    .banner-preview-wrapper {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 240, 255, 0.15);
+      transition: all 0.4s ease;
+    }
+
+    .banner-preview-wrapper:hover {
+      border-color: var(--border-glow);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.9), 0 0 60px rgba(0, 240, 255, 0.25);
+    }
+
+    .banner-preview-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Key Metric Bar */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin: 50px 0 80px;
+    }
+
+    .metric-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      text-align: left;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-glow);
+    }
+
+    .metric-card .label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .metric-card .value {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 4px;
+    }
+
+    .metric-card .desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Section Headers */
+    .section-header {
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto 50px;
+    }
+
+    .section-header .tag {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .section-header h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 3.5vw, 2.7rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+    }
+
+    .section-header p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+
+    /* Standalone MTProto Comparison Card */
+    .independence-card {
+      background: linear-gradient(145deg, rgba(13, 18, 31, 0.95), rgba(20, 28, 48, 0.95));
+      border: 1px solid var(--accent-cyan);
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.15);
+      border-radius: var(--radius-lg);
+      padding: 40px;
+      margin-bottom: 80px;
+    }
+
+    .independence-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-top: 30px;
+    }
+
+    .ind-col {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 24px;
+    }
+
+    .ind-col.active {
+      border-color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.06);
+    }
+
+    .ind-col h3 {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ind-col ul {
+      list-style: none;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ind-col ul li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    /* Visual Showcase Cards */
+    .showcase-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 50px;
+      margin-bottom: 90px;
+    }
+
+    .showcase-item {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 40px;
+      align-items: center;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      backdrop-filter: blur(16px);
+      transition: border-color 0.3s ease;
+    }
+
+    .showcase-item:hover {
+      border-color: var(--border-glow);
+    }
+
+    .showcase-item.reverse {
+      grid-template-columns: 0.9fr 1.1fr;
+    }
+
+    .showcase-img-wrap {
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .showcase-img-wrap img {
+      width: 100%;
+      height: auto;
+      display: block;
+      transition: transform 0.4s ease;
+    }
+
+    .showcase-img-wrap:hover img {
+      transform: scale(1.02);
+    }
+
+    .showcase-content h3 {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+      color: #FFFFFF;
+    }
+
+    .showcase-content p {
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+    }
+
+    .feature-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .feature-tag {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 4px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-full);
+      color: var(--accent-cyan);
+    }
+
+    /* Multi-OS Installation Tabs */
+    .tabs-wrapper {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      margin-bottom: 90px;
+      backdrop-filter: blur(16px);
+    }
+
+    .tab-buttons {
+      display: flex;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      color: #050B14;
+      background: var(--accent-cyan);
+      box-shadow: 0 2px 14px rgba(0, 240, 255, 0.4);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .code-terminal {
+      background: #05070B;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin: 18px 0;
+    }
+
+    .code-terminal-header {
+      background: #0B0E16;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+
+    .dot-red { background: #FF5F56; }
+    .dot-yellow { background: #FFBD2E; }
+    .dot-green { background: #27C93F; }
+
+    .code-terminal pre {
+      padding: 18px;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: #38BDF8;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all 0.2s ease;
+    }
+
+    .copy-btn:hover {
+      background: var(--accent-cyan);
+      color: #000;
+    }
+
+    /* 19-Quadrant Bento Matrix */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 16px;
+      margin-bottom: 90px;
+    }
+
+    .bento-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      transition: all 0.25s ease;
+    }
+
+    .bento-card:hover {
+      border-color: var(--accent-cyan);
+      transform: translateY(-3px);
+    }
+
+    .bento-card .opt-num {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      background: rgba(0, 240, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+
+    .bento-card h4 {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+    }
+
+    .bento-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* Verified Contact Hub */
+    .contact-section {
+      background: linear-gradient(180deg, var(--bg-panel-solid) 0%, #05070A 100%);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 50px 40px;
+      margin-bottom: 90px;
+    }
+
+    .creator-profile-card {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding-bottom: 36px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 36px;
+      flex-wrap: wrap;
+    }
+
+    .creator-avatar {
+      width: 90px;
+      height: 90px;
+      border-radius: var(--radius-full);
+      object-fit: cover;
+      border: 3px solid var(--accent-cyan);
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.4);
+    }
+
+    .creator-meta h3 {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #FFFFFF;
+    }
+
+    .creator-meta .title {
+      color: var(--accent-cyan);
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+    }
+
+    .creator-meta .group {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+
+    .contact-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+      transition: all 0.2s ease;
+    }
+
+    .contact-card:hover {
+      border-color: var(--border-glow);
+      background: var(--bg-card-hover);
+      transform: translateY(-2px);
+    }
+
+    .contact-card .card-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .contact-icon {
+      font-size: 1.8rem;
+    }
+
+    .contact-card h4 {
+      font-size: 0.95rem;
+      color: #FFFFFF;
+      font-weight: 700;
+    }
+
+    .contact-card .handle {
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .contact-card .btn {
+      width: 100%;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 40px 0;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.88rem;
+    }
+
+    footer a {
+      color: var(--text-muted);
+    }
+
+    footer a:hover {
+      color: var(--accent-cyan);
+    }
+
+    /* Toast */
+    #toast {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: var(--accent-emerald);
+      color: #000;
+      text-align: center;
+      border-radius: var(--radius-sm);
+      padding: 12px 20px;
+      position: fixed;
+      z-index: 1000;
+      bottom: 30px;
+      right: 30px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+      opacity: 0;
+      transition: opacity 0.3s, bottom 0.3s;
+    }
+
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+      bottom: 40px;
+    }
+
+    @media (max-width: 868px) {
+      .showcase-item, .showcase-item.reverse {
+        grid-template-columns: 1fr;
+      }
+      .nav-links {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="container nav-inner">
+      <div class="brand">
+        <img src="assets/kinddoc_avatar.jpg" alt="Dr. Amit Singh" class="brand-avatar">
+        <div class="brand-text">
+          <h1>TG KINDSYNC PRO</h1>
+          <p>Version X • v16.0.0 Enterprise</p>
+        </div>
+      </div>
+      <div class="nav-links">
+        <a href="#architecture">Architecture</a>
+        <a href="#quickstart">Multi-OS Setup</a>
+        <a href="#showcase">Visuals</a>
+        <a href="#quadrants">19 CLI Quadrants</a>
+        <a href="#bot">Kind Doctor Bot</a>
+        <a href="#contact">Contact</a>
+      </div>
+      <div>
+        <a href="https://t.me/Kinddoctor4u" target="_blank" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+          Direct Contact
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="container">
+      <div class="badge-pill">
+        <div class="pulse-dot"></div>
+        Autonomous Telegram MTProto In-Memory Streaming Core
+      </div>
+      <h1 class="hero-title">
+        High-Velocity Telegram Streaming & <span>Zero-Disk RAM Migration</span>
+      </h1>
+      <p class="hero-subtitle">
+        Engineered by <strong>Dr. Amit Singh (Kind Doctor)</strong> for medical education archives, forum topic hierarchies, and 24/7 continuous channel synchronization across Windows 11, Kali Linux, and Android.
+      </p>
+      <div class="hero-cta">
+        <a href="#quickstart" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
+          Multi-OS Install Guides
+        </a>
+        <a href="https://t.me/KindDoc_bot" target="_blank" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path></svg>
+          Open @KindDoc_bot
+        </a>
+        <a href="#contact" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          Verified Contacts
+        </a>
+      </div>
+
+      <!-- Main Showcase Banner -->
+      <div class="banner-preview-wrapper">
+        <img src="assets/header_banner.jpg" alt="TG KindSync Pro Official Showcase Banner">
+      </div>
+
+      <!-- Metric Badges -->
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="label">Protocol Engine</div>
+          <div class="value">MTProto v2.0</div>
+          <div class="desc">Raw binary streaming bypassing Bot API limits</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Worker Concurrency</div>
+          <div class="value">48 Parallel</div>
+          <div class="desc">Deterministic FIFO sequence ticketing</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">File Size Capacity</div>
+          <div class="value">Up to 4.0 GB</div>
+          <div class="desc">Direct zero-disk in-memory RAM pipelining</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Database Concurrency</div>
+          <div class="value">SQLite WAL</div>
+          <div class="desc">Microsecond query latency with zero locks</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Standalone MTProto Declaration -->
+    <section id="architecture" class="independence-card">
+      <div style="text-align: center; max-width: 800px; margin: 0 auto 20px;">
+        <span class="badge-pill" style="border-color: var(--accent-emerald); color: var(--accent-emerald);">
+          100% Autonomous Standalone Architecture
+        </span>
+        <h2 style="font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; margin-bottom: 12px;">
+          Zero Third-Party Client Mod Dependencies
+        </h2>
+        <p style="color: var(--text-muted); font-size: 1rem;">
+          TG KindSync Pro is built from the ground up on Python Telethon MTProto Client. It does <strong>NOT</strong> require or bundle external client modifications (such as AyuGram, Eugram, or modified TG Desktop forks) or HTTP Bot API wrappers.
+        </p>
+      </div>
+
+      <div class="independence-grid">
+        <div class="ind-col">
+          <h3 style="color: var(--accent-rose);">❌ HTTP Bot API Wrappers</h3>
+          <ul>
+            <li>⚠️ 50MB file size ceiling (fails on large videos)</li>
+            <li>⚠️ Cannot forward from restricted/copy-protected chats</li>
+            <li>⚠️ Heavy JSON/HTTP polling overhead</li>
+            <li>⚠️ Rate limits trigger immediate hard 429 exceptions</li>
+          </ul>
+        </div>
+        <div class="ind-col">
+          <h3 style="color: var(--accent-amber);">⚠️ Third-Party Desktop Forks</h3>
+          <ul>
+            <li>⚠️ Requires desktop GUI running continuously</li>
+            <li>⚠️ Prone to local database lock contention</li>
+            <li>⚠️ Cannot run headlessly on Oracle Cloud VPS</li>
+            <li>⚠️ Lacks programmatic routing & API telemetry</li>
+          </ul>
+        </div>
+        <div class="ind-col active">
+          <h3 style="color: var(--accent-emerald);">✅ TG KindSync Pro MTProto</h3>
+          <ul>
+            <li>✨ 2GB to 4GB pure in-memory streaming</li>
+            <li>✨ Bypasses forward & copy restrictions seamlessly</li>
+            <li>✨ 24/7 headless operation on Windows, Linux & Termux</li>
+            <li>✨ Automated DLQ recovery & topic hierarchy locks</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Visual Showcase -->
+    <section id="showcase">
+      <div class="section-header">
+        <span class="tag">Visual Telemetry</span>
+        <h2>Obsidian Cyber-Glass UI & Kind Doctor Bot</h2>
+        <p>A dual command surface providing complete operational oversight from desktop, cloud VPS, or your smartphone.</p>
+      </div>
+
+      <div class="showcase-grid">
+        <!-- Showcase 1 -->
+        <div class="showcase-item">
+          <div class="showcase-img-wrap">
+            <img src="assets/web_dashboard_preview.jpg" alt="DEVI Web Command Center Preview">
+          </div>
+          <div class="showcase-content">
+            <h3>🖥️ Web Command Center HUD (:8080)</h3>
+            <p>
+              High-contrast Obsidian Bento dashboard featuring real-time speedometer dials, MTProto chunk bandwidth gauges, SQLite WAL latency monitors, active worker cards, and in-browser Telegram account login with SMS OTP & 2FA support.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">Speedometer Gauge</span>
+              <span class="feature-tag">Live Log Terminal</span>
+              <span class="feature-tag">1-Click Snapshots</span>
+              <span class="feature-tag">RBAC User Security</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Showcase 2 -->
+        <div class="showcase-item reverse">
+          <div class="showcase-content">
+            <h3>🤖 Kind Doctor Operator Bot (@KindDoc_bot)</h3>
+            <p>
+              Autonomous Telegram bot daemon serving medical students and administrators alike. Provides interactive study category cards (/mainindex), Sangmata OSINT user radar (/userinfo), live speed checks, and remote emergency lockdown controls.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">Interactive Study Cards</span>
+              <span class="feature-tag">Sangmata OSINT Radar</span>
+              <span class="feature-tag">Emergency Lockdown</span>
+              <span class="feature-tag">Timestamped DB Exports</span>
+            </div>
+          </div>
+          <div class="showcase-img-wrap">
+            <img src="assets/telegram_bot_preview.jpg" alt="Kind Doctor Telegram Operator Bot Preview">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Multi-OS Installation Wizard -->
+    <section id="quickstart">
+      <div class="section-header">
+        <span class="tag">Production Deployment</span>
+        <h2>Step-by-Step Multi-OS Setup Guides</h2>
+        <p>Verified, copy-paste terminal instructions with concrete command line examples for all major environments.</p>
+      </div>
+
+      <div class="tabs-wrapper">
+        <div class="tab-buttons">
+          <button class="tab-btn active" onclick="switchOsTab('win')">💻 Windows 11 / 10</button>
+          <button class="tab-btn" onclick="switchOsTab('linux')">🐧 Kali Linux & Ubuntu (VPS)</button>
+          <button class="tab-btn" onclick="switchOsTab('termux')">📱 Android (Termux 24/7)</button>
+          <button class="tab-btn" onclick="switchOsTab('macos')">🍎 macOS (Apple Silicon)</button>
+        </div>
+
+        <!-- Windows Tab -->
+        <div id="tab-win" class="tab-pane active">
+          <h3 style="font-family: var(--font-display); font-size: 1.3rem; margin-bottom: 10px;">Windows 11 Workstation Setup</h3>
+          <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;">
+            Prerequisites: Python 3.10-3.12 (check <code>Add python.exe to PATH</code> during setup) and Git for Windows.
+          </p>
+
+          <div class="code-terminal">
+            <div class="code-terminal-header">
+              <div class="terminal-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+              <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">PowerShell / CMD Setup</span>
+              <button class="copy-btn" onclick="copyText('win-code')">Copy</button>
+            </div>
+            <pre id="win-code"># 1. Clone repository & enter workspace
+git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
+cd TG_KindSync_Pro
+
+# 2. Create isolated virtual environment & activate
+python -m venv .venv
+.\.venv\Scripts\activate
+
+# 3. Upgrade pip and install production requirements
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+# 4. Copy configuration template & configure .env
+copy .env.example .env</pre>
+          </div>
+
+          <h4 style="margin: 20px 0 10px; font-size: 1rem; color: #FFFFFF;">1-Click Launchers Suite (Double-Click to Run):</h4>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">
+            • <code>1_START_PRO.bat</code> — Master Forwarding Engine (19 Options TUI)<br>
+            • <code>2_START_KIND_DOCTOR_BOT.bat</code> — Standalone Kind Doctor Operator Bot Daemon<br>
+            • <code>3_START_WEB_DASHBOARD.bat</code> — Web Cockpit on <code>http://localhost:8080</code><br>
+            • <code>1_START_MY_ORACLE_DIRECT.bat</code> — Direct Oracle Cloud VPS SSH Terminal
+          </p>
+        </div>
+
+        <!-- Linux Tab -->
+        <div id="tab-linux" class="tab-pane">
+          <h3 style="font-family: var(--font-display); font-size: 1.3rem; margin-bottom: 10px;">Kali Linux & Ubuntu 24.04 LTS (Oracle VPS)</h3>
+          <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;">
+            Engineered for headless 24/7 cloud operation with zero memory leaks and automatic crash recovery.
+          </p>
+
+          <div class="code-terminal">
+            <div class="code-terminal-header">
+              <div class="terminal-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+              <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">Ubuntu / Debian Terminal</span>
+              <button class="copy-btn" onclick="copyText('linux-code')">Copy</button>
+            </div>
+            <pre id="linux-code"># 1. Install multimedia and system packages
+sudo apt update && sudo apt install -y python3 python3-pip python3-venv git ffmpeg libgl1 fonts-dejavu-core tmux curl
+
+# 2. Clone repo and create virtual environment
+git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
+cd TG_KindSync_Pro
+python3 -m venv .venv && source .venv/bin/activate
+pip install --upgrade pip && pip install -r requirements.txt
+
+# 3. Setup credentials
+cp .env.example .env && nano .env
+
+# 4. Run interactive persistent session via tmux
+tmux new -s kindsync
+source .venv/bin/activate
+python3 tg_kindsync_pro.py
+# Detach: Press Ctrl+B, then D | Re-attach: tmux attach -t kindsync</pre>
+          </div>
+        </div>
+
+        <!-- Termux Tab -->
+        <div id="tab-termux" class="tab-pane">
+          <h3 style="font-family: var(--font-display); font-size: 1.3rem; margin-bottom: 10px;">Android Smartphone & Tablet (Termux 24/7 Autopilot)</h3>
+          <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;">
+            Run the entire forwarding core and bot 24/7 on an Android device without needing a computer!
+          </p>
+
+          <div class="code-terminal">
+            <div class="code-terminal-header">
+              <div class="terminal-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+              <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">Termux Bash Commands</span>
+              <button class="copy-btn" onclick="copyText('termux-code')">Copy</button>
+            </div>
+            <pre id="termux-code"># 1. Acquire Android Wake Lock (prevents CPU sleep when screen is off)
+termux-wake-lock
+
+# 2. Install build dependencies and clone
+pkg update -y && pkg install -y python git ffmpeg clang openssl
+git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
+cd TG_KindSync_Pro
+pip install -r requirements.txt
+
+# 3. Configure credentials
+cp .env.example .env && nano .env
+
+# 4. Start 24/7 background autopilot daemon
+bash deploy/RUN_24_7_TERMUX.sh
+
+# 5. Monitor live streaming logs
+tail -f logs/forwarder_service.log</pre>
+          </div>
+        </div>
+
+        <!-- macOS Tab -->
+        <div id="tab-macos" class="tab-pane">
+          <h3 style="font-family: var(--font-display); font-size: 1.3rem; margin-bottom: 10px;">macOS (Apple Silicon & Intel)</h3>
+          <div class="code-terminal">
+            <div class="code-terminal-header">
+              <div class="terminal-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+              <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">macOS Terminal</span>
+              <button class="copy-btn" onclick="copyText('mac-code')">Copy</button>
+            </div>
+            <pre id="mac-code">brew install python@3.11 ffmpeg git
+git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
+cd TG_KindSync_Pro
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python3 tg_kindsync_pro.py</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 19-Quadrant Bento Explorer -->
+    <section id="quadrants">
+      <div class="section-header">
+        <span class="tag">Terminal Architecture</span>
+        <h2>Comprehensive 19-Option CLI Menu Matrix</h2>
+        <p>Four distinct operational quadrants engineered for specialized transmission and maintenance workloads.</p>
+      </div>
+
+      <div class="bento-grid">
+        <!-- Q1 -->
+        <div class="bento-card">
+          <span class="opt-num">OPT-01 • Safe Mode</span>
+          <h4>🟢 Safe Transmission</h4>
+          <p>4 parallel workers with anti-flood rate pacing. Ideal for sensitive accounts, fresh sessions, or mobile hotspots.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-02 • Balanced Mode</span>
+          <h4>⚖️ Production Default</h4>
+          <p>12 parallel workers with dynamic backpressure. Recommended default mode for 24/7 channel mirroring.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-03 • God Mode</span>
+          <h4>🔥 Turbo Gigabit Chunker</h4>
+          <p>40 parallel workers for high-speed VPS connections, massive 2GB-4GB video archives, and gigabit fiber.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-04 • Live Mode</span>
+          <h4>🔴 24/7 Instant Listener</h4>
+          <p>Real-time channel event daemon that intercepts and forwards incoming source messages the second they are published.</p>
+        </div>
+
+        <!-- Q2 -->
+        <div class="bento-card">
+          <span class="opt-num">OPT-05 • Link Extractor</span>
+          <h4>🔗 Quick Link Wizard</h4>
+          <p>Interactive setup tool that parses Telegram invite links, resolves numeric IDs, and writes them into <code>.env</code>.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-06 • Multi-Route</span>
+          <h4>🔀 Route Matrix Manager</h4>
+          <p>Visual routing table mapping content from multiple source channels into dedicated target forum topics simultaneously.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-07 • Content Cloner</span>
+          <h4>🎯 Cloner & Cherry-Picker</h4>
+          <p>Select specific message ranges, forward single lectures, mirror discussion members, or recursively clone forums.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-08 • Topic Indexer</span>
+          <h4>📑 Topic & Group Indexer</h4>
+          <p>Generates rich, clickable Telegram master Table of Contents (TOC) posts with direct deep-links to files.</p>
+        </div>
+
+        <!-- Q3 -->
+        <div class="bento-card">
+          <span class="opt-num">OPT-09 • Disk Batch</span>
+          <h4>📁 Folder Batch Uploader</h4>
+          <p>Scans local directories, extracts durations, splits oversized files, and uploads with strict numerical sequencing.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-10 • Caption Studio</span>
+          <h4>✍️ Watermark Sanitizer</h4>
+          <p>Regex engine that scrubs promotional spam bots (e.g. <code>@Dams_new_robot</code>), appending custom branding.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-11 • 16:9 Cover</span>
+          <h4>🖼️ 16:9 Thumbnail Enforcer</h4>
+          <p>Generates and injects uniform 16:9 HD video thumbnails with native cross-platform font fallbacks.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-12 • DLQ Recovery</span>
+          <h4>📮 Dead Letter Auto-Retry</h4>
+          <p>Inspects failed transmissions, exports JSON diagnostics, and executes 1-click batch retries with exponential backoff.</p>
+        </div>
+
+        <!-- Q4 -->
+        <div class="bento-card">
+          <span class="opt-num">OPT-13 • Diagnostics</span>
+          <h4>🩺 System Diagnostics</h4>
+          <p>Real-time MTProto ping to Telegram Data Centers, SQLite WAL integrity check, and RAM profiling.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-14 • Reset DB</span>
+          <h4>♻️ Clean-Slate Rebuild</h4>
+          <p>Backs up existing SQLite transactions and resets state, enabling channels to be re-synced from Message #1.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-15 • Advanced Purge</span>
+          <h4>🧹 Lock & Cache Cleaner</h4>
+          <p>Flushes stale file locks (<code>engine.lock</code>), ephemeral auth sessions, and temporary thumbnail caches.</p>
+        </div>
+        <div class="bento-card">
+          <span class="opt-num">OPT-16 • Safe Exit</span>
+          <h4>❌ Zero-Loss Graceful Exit</h4>
+          <p>Flushes SQLite WAL memory buffers to disk and closes active MTProto sockets cleanly without data loss.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Verified Contact & Support Directory -->
+    <section id="contact" class="contact-section">
+      <div class="creator-profile-card">
+        <img src="assets/kinddoc_avatar.jpg" alt="Dr. Amit Singh (Kind Doctor)" class="creator-avatar">
+        <div class="creator-meta">
+          <h3>Dr. Amit Singh (Kind Doctor)</h3>
+          <div class="title">Lead Systems Architect & Founder</div>
+          <div class="group">Official Community: <strong>Kind Doctor & Team • Group Study Help 😉</strong></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 28px;">
+        <h3 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: #FFFFFF; margin-bottom: 6px;">
+          Verified Official Contacts & Support Channels
+        </h3>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">
+          To prevent impersonation, only contact the verified IDs listed below. No other Telegram accounts or emails belong to the lead developer.
+        </p>
+      </div>
+
+      <div class="contact-grid">
+        <!-- Contact 1 -->
+        <div class="contact-card">
+          <div class="card-top">
+            <div class="contact-icon">🩺</div>
+            <div>
+              <h4>Primary Admin 1</h4>
+              <div class="handle">@Kinddoctor4u (ID: 1553619403)</div>
+            </div>
+          </div>
+          <a href="https://t.me/Kinddoctor4u" target="_blank" class="btn btn-primary">
+            Chat on Telegram
+          </a>
+        </div>
+
+        <!-- Contact 2 -->
+        <div class="contact-card">
+          <div class="card-top">
+            <div class="contact-icon">👑</div>
+            <div>
+              <h4>Super Admin 2</h4>
+              <div class="handle">@Ammitrajput1 (ID: 759038032)</div>
+            </div>
+          </div>
+          <a href="https://t.me/Ammitrajput1" target="_blank" class="btn btn-primary">
+            Chat on Telegram
+          </a>
+        </div>
+
+        <!-- Contact 3 -->
+        <div class="contact-card">
+          <div class="card-top">
+            <div class="contact-icon">📸</div>
+            <div>
+              <h4>Official Instagram</h4>
+              <div class="handle">@ammmitrajput1</div>
+            </div>
+          </div>
+          <a href="https://www.instagram.com/ammmitrajput1" target="_blank" class="btn btn-secondary">
+            View Instagram
+          </a>
+        </div>
+
+        <!-- Contact 4 -->
+        <div class="contact-card">
+          <div class="card-top">
+            <div class="contact-icon">📧</div>
+            <div>
+              <h4>Official Email</h4>
+              <div class="handle">Ammitrajput1@gmail.com</div>
+            </div>
+          </div>
+          <a href="mailto:Ammitrajput1@gmail.com" class="btn btn-secondary">
+            Send Email
+          </a>
+        </div>
+
+        <!-- Contact 5 -->
+        <div class="contact-card">
+          <div class="card-top">
+            <div class="contact-icon">🤖</div>
+            <div>
+              <h4>Operator Bot</h4>
+              <div class="handle">@KindDoc_bot</div>
+            </div>
+          </div>
+          <a href="https://t.me/KindDoc_bot" target="_blank" class="btn btn-primary">
+            Launch @KindDoc_bot
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p style="margin-bottom: 8px;">
+        © 2026 <strong>TG KindSync Pro Enterprise</strong>. Handcrafted with pride by <strong>Dr. Amit Singh (Kind Doctor)</strong>.
+      </p>
+      <p style="font-size: 0.8rem; color: var(--text-dim);">
+        Kind Doctor & Team • Group Study Help 😉 • Autonomous Telegram MTProto In-Memory Streaming Suite • v16.0.0
+      </p>
+    </div>
+  </footer>
+
+  <div id="toast">Command Copied to Clipboard!</div>
+
+  <script>
+    function switchOsTab(os) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+      }
+      const targetPane = document.getElementById('tab-' + os);
+      if (targetPane) targetPane.classList.add('active');
+    }
+
+    function copyText(elemId) {
+      const text = document.getElementById(elemId).innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast();
+      });
+    }
+
+    function showToast() {
+      const toast = document.getElementById("toast");
+      toast.className = "show";
+      setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
+    }
+  </script>
+</body>
+</html>

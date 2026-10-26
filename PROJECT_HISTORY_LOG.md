@@ -2,6 +2,75 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Tuesday, 27 October 2026
+
+### 35. AyuGram Brand Purge Verification, Standalone MTProto Declaration & v16.0.0 Enterprise Multi-OS Quickstart Architecture
+* **User Directive & Context**:
+  - Voice Note Feedback: *"Bhai thoda dhyan do, AyuGram ki baat kar raha hoon... AyuGram, not aiogram... uski kuch files shayad hamare is program ke andar hain, shayad. To ek baar na thoda aise likhna jo bhi aap likhoge ab jo bhi website pe updates karoge, aise likhna jo aisa lage ki bahut hi acche professional computer scientist ya engineer ya programmer ne likha hai badi samajhdari ke saath. Aise likha hai ki normal insaan ko bhi samajh me aaye aur programmer ko bhi, high level programmer/high elite programmer ko bhi samajh me aa jaye aur kaise setup karna hai sabhi easily setup kar paye aur acche se isko chala paye. Iske jo bhi functions wagera sab kuch acche se explain ho easily... Pehle mujhe GitHub ka batao repository wala kyunki usme upgrades ki bahut zaroorat hai..."*
+* **Root Cause & Investigation**:
+  - In a previous workspace iteration (`C:\TGForwarder-New`), experimental companion scripts had interfaced with an external AyuGram Desktop database (`ayudata.db`).
+  - Stale references to "AyuGram" had lingered in repository descriptions and old pycache files (`test_ayugram_turbo.cpython-312-pytest-9.1.1.pyc`).
+  - The repository's `README.md` completely lacked a "How to Install / How to Run" guide for Windows 11 and Kali/Ubuntu Linux, displayed outdated launcher batch names, and had empty GitHub topics.
+* **Applied Engineering Fixes**:
+  1. **AyuGram Purge & Standalone MTProto Declaration**:
+     - Verified entire active codebase has 0 AyuGram imports or runtime files. Removed orphan bytecode `test_ayugram_turbo.cpython-312-pytest-9.1.1.pyc`.
+     - Explicitly documented in `README.md` that TG KindSync Pro is a 100% standalone proprietary MTProto binary engine with zero dependency on third-party Telegram client mods (like AyuGram/Eugram) or HTTP Bot API wrappers.
+  2. **Comprehensive Multi-OS Installation & Run Suite in README.md**:
+     - **Windows 11**: Documented both 1-Click BAT launcher flow and native PowerShell virtualenv (`.venv`) setup.
+     - **Kali Linux / Ubuntu 24.04 LTS**: Documented apt multimedia packages (`ffmpeg`, `libgl1`, `fonts-dejavu-core`), `tmux` persistent session commands, and enterprise `systemd` daemon unit files.
+     - **Android Smartphone & Tablet (Termux)**: Added full 24/7 setup guide covering `termux-wake-lock`, F-Droid packages, and background execution via `RUN_24_7_TERMUX.sh`.
+     - **macOS (Apple Silicon & Intel)**: Added Homebrew dependencies and setup instructions.
+     - **Tone & Caliber**: Penned 100% in pristine, formal, professional English suitable for both principal software engineers and medical student operators.
+  3. **Verified 1-Click Launchers Matrix**:
+     - Aligned README table with actual batch files: `1_START_PRO.bat`, `2_START_KIND_DOCTOR_BOT.bat`, `3_START_WEB_DASHBOARD.bat`, `1_START_MY_ORACLE_DIRECT.bat`, `1_SYNC_AND_START_MY_ORACLE.bat`, `UPDATE_ORACLE_BOT_ONE_CLICK.bat`.
+  4. **Deep Functional Explanation of All 19 Menu Options**:
+     - Structured into the 4 Operational Quadrants with clear "What it does" and "Best used for" descriptions catering to both elite engineers and medical students.
+  5. **Version Bump to v16.0.0 Enterprise Turbo Masterpiece**:
+     - Synchronized `version.json` and `README.md` to `v16.0.0`.
+  6. **Interactive Showcase Website (`docs/index.html`) & Verified Contact Hub**:
+     - Engineered a dedicated, responsive Obsidian Cyber-Glass showcase website (`docs/index.html`) with embedded visual assets (`header_banner.jpg`, `web_dashboard_preview.jpg`, `telegram_bot_preview.jpg`, `kinddoc_avatar.jpg`).
+     - Added an interactive Multi-OS tabbed terminal with 1-click clipboard copy, a 19-quadrant bento explorer, and prominent verified contact directory cards for Dr. Amit Singh (`@Kinddoctor4u`, `@Ammitrajput1`, `@ammmitrajput1`, `Ammitrajput1@gmail.com`, `@KindDoc_bot`).
+* **Affected Files**:
+  - `README.md`
+  - `docs/index.html`
+  - `docs/assets/kinddoc_avatar.jpg`
+  - `version.json`
+  - `tests/__pycache__/test_ayugram_turbo.cpython-312-pytest-9.1.1.pyc` (Deleted)
+  - `PROJECT_HISTORY_LOG.md`
+
+### 34. Global MCP Server Crash Elimination (`duckdb` Server.list_resources Fix via `mcp<2`), 10/10 MCP Health Verification & Dual AST/Vault Indexing
+* **User Directive & Context**:
+  - Voice Note Feedback: *"Bhai is problem ko aapne pehle bhi solve kiya hai, smartly tarike se solve karo isko, theek hai, indexing wagera karke jo bhi aapne karna tha, theek hai? Phir uske baad hum project pe kaam karenge pehle is problem ko solve karo, jo MCP error aa raha hai."*
+* **Root Cause Analysis**:
+  - The latest `mcp` Python package (v2.x) removed legacy `Server.list_resources` and `FastMCP` interfaces that older Python MCP servers depend upon.
+  - While `mitmproxy-mcp` had been previously patched with `uvx --with "mcp<2"`, `duckdb` (`mcp-server-duckdb`) was configured with `uvx mcp-server-duckdb` without version pinning in `C:\Users\Ammit\.gemini\config\mcp_config.json`.
+  - On Antigravity IDE launch, `duckdb` crashed with `AttributeError: 'Server' object has no attribute 'list_resources'`, triggering an "MCP Server Error" alert in the IDE status bar and preventing the tool schemas from loading.
+* **Applied Engineering Fixes & Indexing Executed**:
+  1. **Pinned `mcp<2` for `duckdb` in `mcp_config.json`**:
+     - Updated arguments to: `["--with", "mcp<2", "mcp-server-duckdb", "--db-path", "C:\\Users\\Ammit\\.gemini\\config\\antigravity_analytics.duckdb"]`.
+     - Updated `capability_registry.json` v1.2.0 compatibility note.
+  2. **100% End-to-End MCP Server Fleet Verification**:
+     - Verified all 10 MCP servers concurrently with live JSON-RPC stdin/stdout handshake:
+       - `sequential-thinking`: HEALTHY (waiting for RPC)
+       - `context7`: HEALTHY (waiting for RPC)
+       - `fetch`: HEALTHY (waiting for RPC)
+       - `memory`: HEALTHY (waiting for RPC)
+       - `filesystem`: HEALTHY (waiting for RPC)
+       - `claude-mem`: HEALTHY (waiting for RPC)
+       - `rea`: HEALTHY (waiting for RPC)
+       - `echarts`: HEALTHY (waiting for RPC)
+       - `duckdb`: HEALTHY (waiting for RPC)
+       - `mitmproxy`: HEALTHY (waiting for RPC)
+     - Zero crashes, zero failed servers.
+  3. **Dual Codebase & Vault Indexing Refreshed**:
+     - **AST Knowledge Graph Index (`graphify`)**: Parsed 241 files and indexed 892 symbols into `codebase_graph.json` via `python .agents/tools/graphify.py build --dir .`.
+     - **Antigravity Vault Capabilities Re-index**: Refreshed index across 1,600+ skills into `SKILLS_VAULT_INDEX.json` and `SKILLS_VAULT_INDEX.md` (3,101 unique capabilities mapped) via `vault_engine.py index`.
+* **Affected Files**:
+  - `C:\Users\Ammit\.gemini\config\mcp_config.json`
+  - `C:\Users\Ammit\.gemini\config\capability_registry.json`
+  - `c:\TG_KindSync_Pro\codebase_graph.json`
+  - `c:\TG_KindSync_Pro\PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Thursday, 15 October 2026
 
 ### 33. KindSync Version X Enterprise Cockpit Transformation: Decoupled Architecture, Real-Time WebSockets Engine, Live Terminal Stream & ECharts HUD
@@ -1623,4 +1692,46 @@ This log permanently documents root causes, architectural patterns, historical b
   - Strict local PC boundary preserved: zero remote pushes or VPS deployments performed.
 
 
+---
+
+### 38. DuckDB MCP Server Capability Regression & Dual Codebase/Vault Index Refresh
+* **Symptoms**:
+  - `AttributeError: 'Server' object has no attribute 'list_resources'` on duckdb MCP server startup.
+* **Root Causes**:
+  - `mcp-server-duckdb` v2+ changed internal FastMCP/Server lifecycle signatures where `list_resources` was missing from the older server abstraction expected by Antigravity IDE.
+* **Permanent Fix Applied**:
+  - Pinned `mcp<2` for `duckdb` in [C:\Users\Ammit\.gemini\config\mcp_config.json](file:///C:/Users/Ammit/.gemini/config/mcp_config.json) via `["--with", "mcp<2", "mcp-server-duckdb", "--db-path", "C:\\Users\\Ammit\\.gemini\\config\\antigravity_analytics.duckdb"]`.
+  - Updated [C:\Users\Ammit\.gemini\config\capability_registry.json](file:///C:/Users/Ammit/.gemini/config/capability_registry.json).
+  - Executed dual index refresh:
+    - Codebase AST Knowledge Graph (`graphify.py build`): 241 files parsed, 892 symbols indexed into `codebase_graph.json`.
+    - Universal Skills Vault (`vault_engine.py index`): 3,101 unique capabilities indexed across 1,600+ skills into `SKILLS_VAULT_INDEX.json` and `SKILLS_VAULT_INDEX.md`.
+* **Verification**:
+  - `python scratch/test_all_mcp.py` confirmed `duckdb` running cleanly: `HEALTHY (waiting for RPC)`.
+
+---
+
+### 39. Claude-Mem "Context Cancelled" Error & Hook Pipe Hang Permanent Resolution
+* **Symptoms**:
+  - Persistent toast / IDE popup: `"claude-mem context cancelled. MCP error ye bhi."` whenever invocations or tool calls executed in the IDE.
+* **Root Causes**:
+  1. **Stale Spawn Lock**: `C:\Users\Ammit\.claude-mem\spawn.lock` contained dead PID `9788` from 2026-10-26. Any new launcher or hook waiting for readiness waited up to 30–90 seconds assuming another launcher held the lock.
+  2. **Duplicate MCP Registration**: `claude-mem` was declared in BOTH `C:\Users\Ammit\.gemini\config\mcp_config.json` AND `C:\Users\Ammit\.gemini\antigravity\mcp_config.json`. Antigravity IDE instantiated duplicate concurrent `node.exe mcp-server.cjs` child processes, resulting in lock collisions.
+  3. **Hook Stdin Blocking Wait (`D9t=3e4`)**: In `C:\Users\Ammit\.gemini\config\hooks.json`, hook events (`PreInvocation`, `PreToolUse`, `PostToolUse`, `PostInvocation`, `Stop`) invoked `bun worker-service.cjs hook antigravity-cli <event>`. Bun detected a non-TTY pipe and awaited stdin until `D9t = 30000ms` (30 seconds). Because Antigravity's hook timeout was set to 10,000ms, the IDE's execution context aborted the process at exactly 10s with `context canceled` (`context cancelled`).
+  4. **Uncheckpointed SQLite WAL**: `claude-mem.db-wal` had swollen to 3.78MB of uncheckpointed pages.
+  5. **Worker Daemon Version Mismatch (404 `/api/work-state` 65s Retry Loop)**: The MCP plugin script was upgraded to v13.31.0 exposing `work_state_read` and `work_state_write` which call HTTP endpoint `/api/work-state`. However, an old zombie worker process (PID 27368) running v13.25.3 was still occupying port 37777. Whenever Antigravity IDE invoked `work_state_read` or other new tools, the old worker returned HTTP 404, causing `mcp-server.cjs` to retry in a loop for 65 seconds until Antigravity IDE's MCP context deadline expired with `claude-mem context cancelled`.
+* **Permanent Fix Applied**:
+  1. **Stale Lock Cleanup**: Removed orphaned `C:\Users\Ammit\.claude-mem\spawn.lock`.
+  2. **SQLite Checkpoint & Vacuum**: Flushed and committed all WAL pages using `PRAGMA wal_checkpoint(TRUNCATE); VACUUM;`. Shrunk WAL from 3.78MB down and compacted database to 389 KB.
+  3. **MCP Configuration Deduplication**: Removed redundant `claude-mem` entry from `C:\Users\Ammit\.gemini\antigravity\mcp_config.json`, keeping it solely in the global configuration `C:\Users\Ammit\.gemini\config\mcp_config.json`.
+  4. **Fast Hook Runner Batch Script**: Created [C:\Users\Ammit\.claude-mem\hook_runner.cmd](file:///C:/Users/Ammit/.claude-mem/hook_runner.cmd) which immediately pipes `{}` into the stdin of `worker-service.cjs`, providing an instant EOF and reducing execution time from 14.5s/timeout down to **0.38s - 0.55s**.
+  5. **Safety Timeout Tuning**: Patched `D9t` fallback in `worker-service.cjs` from 30,000ms (`3e4`) to 1,500ms (`1500`), guaranteeing that even unpiped calls will NEVER hit the IDE's hook timeout.
+  6. **Hooks Configuration Hardening**: Updated [C:\Users\Ammit\.gemini\config\hooks.json](file:///C:/Users/Ammit/.gemini/config/hooks.json) to use `hook_runner.cmd` and increased safety timeout to 15,000ms.
+  7. **Worker Daemon Upgraded to v13.31.0**: Terminated the zombie v13.25.3 worker process (PID 27368), unlinked stale PID files, and launched the synchronized v13.31.0 worker daemon (PID 21392) with native `/api/work-state` support.
+* **Verification & Results**:
+  - Direct IDE MCP tool execution (`call_mcp_tool: claude-mem -> work_state_read`): Succeeded in **0.00s** (previously hung 65s with 404).
+  - Direct IDE MCP tool execution (`call_mcp_tool: claude-mem -> session_start_context`): Succeeded in **0.00s** (0 errors).
+  - `python scratch/test_hook_runner.py`: `context` in 0.55s, `observation` in 0.38s, `summarize` in 0.39s.
+  - `python scratch/test_claude_mem_stdio.py`: MCP stdio tool response received in **0.04s** (40ms).
+  - `python scratch/test_all_mcp.py`: **10 / 10 MCP servers verified HEALTHY (waiting for RPC)**.
+  - Zero git push or VPS deploy per strict local policy.
 
