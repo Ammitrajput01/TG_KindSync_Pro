@@ -45,6 +45,12 @@ Designed for medical education archives, high-volume curriculum migrations, and 
 4. **Dead-Letter-Queue (DLQ) Auto-Healing**: Intercepts network disconnects, Telegram FloodWait rate limits, and chunk timeouts into an SQLite WAL queue with automated exponential backoff retries.
 5. **Obsidian Cyber-Glass Web Cockpit (:8080)**: Real-time telemetry dashboard featuring live speedometer gauges, worker cards, account login manager, and 1-click database snapshots.
 6. **Kind Doctor Bot Daemon (`@KindDoc_bot`)**: Autonomous Telegram operator bot providing interactive study category cards (`/mainindex`), OSINT user intelligence, and remote administration.
+7. **Universal In-Topic Media Downloader & Uploader Engine**: Direct in-topic download and delivery from YouTube, Playlists (sequential numbering), Instagram Reels, TikTok, Twitter/X, and direct web files with HD thumbnails, `#MedicalLecture #KindDoctor` clinical tags, and 100% temporary disk cleanup.
+8. **Permanent Vault Architecture (Zero Deletion Sync)**: Strictly rejects source deletion propagation. Destructive events or takedowns on source channels NEVER delete resources in the target backup vault, ensuring permanent archive security.
+9. **Multi-Group Forum Topic Routing & Remote Switcher (`/setgroup`, `/newtopic`)**: Complete multi-group isolation. Commands issued inside any group are strictly scoped to that group. When commanding remotely from Private DM, the interactive `/setgroup` selector routes topics and media to the selected active target group with persistent SQLite memory.
+10. **Universal Strip Words Synchronization Bridge (`strip_sync.py`)**: Seamless two-way bridge unifying `strip_words.txt`, `Friend_Edition/strip_words.txt`, and SQLite database with case-insensitive deduplication, interactive pagination cards (`/stripwords`), and automatic safety backups before deletions.
+11. **Multi-Tenant Worker Session Isolation & Pool Protection**: Strict session isolation preventing non-master users from borrowing the master `session_forwarder.session`, cleanly dispatching them to an isolated worker session pool (`session_account2`, `session_account3`, `session_bot_scanner`).
+12. **Dual-Process Split Status Radar & Pacing Presets (`/clonestatus`, `/pacing`)**: Unified split dashboard segregating the 24/7 Forwarder Daemon from active In-Bot Deep Cloner tasks with real-time ETA, velocity gauges, and 1-click delay presets (0.0s to 2.0s).
 
 ---
 
@@ -357,6 +363,14 @@ An enterprise Telegram management bot providing complete operational oversight d
 | `/topicindex [id]` | Public | Generates a direct clickable catalog of all messages inside a specific forum topic. |
 | `/userinfo [id/@user]`| Admin | Sangmata OSINT radar: displays name history, ID, username changes, and profile metadata. |
 | `/status` | Admin | Real-time system health: CPU load, RAM consumption, MTProto socket status, and active worker count. |
+| `/ytdl [url] [topic]` | Public | Downloads YouTube video/Short and uploads directly inside current or specified Forum Topic. |
+| `/upload [url] [topic]` | Public | Universal uploader for Instagram Reels, Twitter/X videos, TikTok, and direct web files. |
+| `/playlist [url] [topic]`| Public | Sequentially downloads and uploads full YouTube lecture playlist into the topic. |
+| `/newtopic [name]` | Admin | Dynamically creates a new Forum Topic in the group or active target chat. |
+| `/setgroup` | Admin | Displays interactive buttons to select active working group when commanding from Private DM. |
+| `/mediahelp` | Public | Interactive quick manual for in-topic media leeching and format capabilities. |
+| `/clone [src] [tgt]`| Admin | 1-Click Deep Cloner for entire forum groups, topics, or single messages (Zero deletion sync). |
+| `/clonestatus` | Admin | Live cloning progress radar, throughput gauge, and non-destructive pause/resume controls. |
 | `/stats` | Admin | Aggregate statistics: total messages forwarded, video volume, transfer speed, and DLQ errors. |
 | `/speed` | Admin | Current throughput velocity gauge and MTProto network latency. |
 | `/backup` | Admin | Triggers full SQLite database snapshot export with standardized timestamps sent to private chat. |

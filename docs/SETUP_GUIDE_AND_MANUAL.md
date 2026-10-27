@@ -82,6 +82,19 @@ Sentinel Observer hosts an interactive dark-mode telemetry dashboard on port 808
   - 1-Tap DLQ failure records reset.
   - Live auto-scrolling terminal logs.
 
+### 7. 🎥 Universal In-Topic Media Downloader & Multi-Group Forum Engine
+- **In-Topic Video & Lecture Leeching:** When you drop a link in any forum topic with `/ytdl <url>` or `/upload <url>`, Kind Doctor Bot downloads the video, attaches an HD thumbnail, applies `#MedicalLecture #KindDoctor` clinical tags, and posts it **directly inside that specific Forum Topic**.
+- **Multi-Group Isolation Guarantee:** If the bot is active in multiple groups (e.g. `Group Study Help 😉`, `NEET PG Hub`, `Test Medicos`), commands executed inside Group A are strictly isolated to Group A. Different groups never collide.
+- **Remote Group Switching via `/setgroup`:** When interacting with the bot via **Private DM**, use `/setgroup` to view an interactive menu of all registered groups. Select your desired working group, and all subsequent DM commands (`/newtopic DAMS`, `/ytdl <link> DAMS`) automatically route to that group.
+- **Dynamic Topic Creation (`/newtopic`):** Instantly create dedicated forum topics on the fly (e.g. `/newtopic DAMS`, `/newtopic Prepladder Pharmacology`).
+- **Sequential Playlist Uploader:** Use `/playlist <playlist_url> [Topic]` to download entire courses or lecture modules (e.g. YouTube playlists). The bot sequentially uploads Lecture 01, Lecture 02, etc. directly into your topic in perfect curriculum order.
+- **Universal Multi-Platform Support:** Works with YouTube, YouTube Shorts, Instagram Reels, Twitter/X videos, TikTok, and direct web file downloads (`.mp4`, `.pdf`, `.zip`, `.mkv`).
+- **Zero Disk Waste:** Temporary media downloads and thumbnail artifacts are immediately deleted from disk once delivered to Telegram.
+
+### 8. 🛡️ Permanent Vault Architecture (Zero Deletion Sync)
+- **Immutable Backup Guarantee:** Cloned and downloaded archives are designed to serve as a **permanent backup vault**.
+- **Strictly No Deletion Propagation:** If a primary source channel or group deletes messages (or is taken down), your cloned vault **NEVER deletes them**. Your study notes, video archives, and lecture collections remain permanently safe.
+
 ---
 
 ## 💡 Frequently Asked Questions (FAQ)
