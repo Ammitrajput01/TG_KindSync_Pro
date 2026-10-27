@@ -64,6 +64,15 @@ from devi.operator.medical_calculator import (
     calc_meld_na,
     calc_ckd_epi_2021,
 )
+from devi.operator.strip_sync import (
+    get_all_raw_rules,
+    get_parsed_rules_cached,
+    add_strip_rules,
+    delete_strip_rule,
+    search_strip_rule,
+    deduplicate_and_clean,
+    sync_strip_words_file_to_db,
+)
 
 logger = logging.getLogger("DEVI.TelegramBot")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -107,7 +116,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/find", "/search", "/faq", "/faqs", 
     "/indexhelp", "/clonehelp", "/cloninghelp", "/clonerhelp", "/cloner", "/routehelp", "/forwardhelp", "/routinghelp",
     "/adminhelp", "/modhelp", "/securityhelp", "/calchelp", "/dosehelp", "/scorehelp",
-    "/stripwords", "/striplist",
+    "/stripwords", "/striplist", "/stripcard", "/pacing", "/speed", "/delay",
     "/setthumb", "/thumb", "/setcover", "/viewthumb", "/getthumb", "/showthumb", "/delthumb", "/resetthumb",
     "/topics", "/help",
     "/mainindex", "/topicindex", "/indexmaster", "/index",
@@ -157,6 +166,8 @@ class DeviTelegramBot:
         self.pending_fwd_setup: Dict[int, Dict[str, Any]] = {}
         # Thumbnail Upload State: user_id -> True
         self.pending_thumb_upload: Dict[int, bool] = {}
+        # Interactive Strip Words State: user_id -> dict(action, chat_id, msg_id, thread_id)
+        self.pending_strip_input: Dict[int, Dict[str, Any]] = {}
         # Rate Limiting for /connect: user_id -> list of attempt timestamps within 1 hour
         self.connect_rate_limits: Dict[int, list] = {}
         
@@ -2362,68 +2373,215 @@ class DeviTelegramBot:
         return card_text, keyboard
 
     def _build_clone_status_card_data(self, admin_id: int) -> Tuple[str, dict]:
-        """Constructs real-time cloner status card with 1-click Reset, Refresh, Pause, Resume, and Stop buttons."""
+        """Constructs Dual-Process Split Status Radar cleanly distinguishing Terminal Forwarder vs In-Bot Cloner."""
         from devi.operator.deep_cloner import get_active_clone_jobs
+        is_master = admin_id in self.master_admin_ids
         # Strict User Isolation: Non-master admins only see their own jobs
-        user_filter = None if admin_id in self.master_admin_ids else admin_id
+        user_filter = None if is_master else admin_id
         jobs = get_active_clone_jobs(user_id=user_filter)
         
-        if not jobs:
-            text = (
-                "📋 <b>Kind Doctor Deep Cloner Status:</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                "ℹ️ <b>No active clone jobs running currently.</b>\n\n"
-                "🚀 <b>Ready for Deep Forum & Topic Cloning:</b>\n"
-                "• <code>/clone &lt;source_chat&gt; &lt;target_chat&gt;</code>\n"
-                "• <code>/clonegroup &lt;source&gt; &lt;target&gt;</code>\n"
-                "• <code>/clonetopic &lt;source_topic_link&gt;</code>\n\n"
-                "🔒 <i>Restricted / Protected Channels & 4GB files supported with Zero Forward tags.</i>"
-            )
-            keyboard = {
-                "inline_keyboard": [
-                    [
-                        {"text": "🔄 Refresh Status", "callback_data": "act_cloner_refresh"},
-                        {"text": "🧹 Reset Job History (#0)", "callback_data": "act_cloner_reset"}
-                    ],
-                    [
-                        {"text": "🚀 Start New Clone Guide", "callback_data": "act_cloner_help"},
-                        {"text": "🖼️ Cover Thumbnail", "callback_data": "act_cloner_thumb"}
-                    ]
-                ]
-            }
-            return text, keyboard
+        # --- SECTION 1: TG KindSync Pro Terminal Engine Telemetry ---
+        engine_locked = (BASE_PROJECT_DIR / "engine.lock").exists()
+        telem_data = {}
+        telem_file = BASE_PROJECT_DIR / "logs" / "engine_telemetry.json"
+        if telem_file.exists():
+            with suppress(Exception):
+                with open(telem_file, "r", encoding="utf-8") as tf:
+                    telem_data = json.load(tf)
+        
+        engine_status_badge = "🟢 ONLINE / ACTIVE" if engine_locked else "🟡 STANDBY / READY"
+        
+        total_topics = 0
+        total_items = 0
+        total_mapped = 0
+        with suppress(Exception):
+            with get_db_conn() as conn:
+                total_topics = conn.execute("SELECT COUNT(*) FROM telegram_group_topics").fetchone()[0]
+                total_items = conn.execute("SELECT COUNT(*) FROM telegram_topic_items").fetchone()[0]
+                total_mapped = conn.execute("SELECT COUNT(*) FROM forwarded").fetchone()[0]
 
-        lines = ["📋 <b>Active Deep Clone Jobs:</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
-        any_paused = any(j.get('status') == 'paused' for j in jobs)
-        for j in jobs[:8]:
-            status_icon = "⏸️ PAUSED" if j['status'] == 'paused' else f"🟢 {j['status'].upper()}"
-            lines.append(
-                f"• <b>Job #{j['id']}</b> ({j['job_type'].upper()}): "
-                f"<code>{status_icon}</code>\n"
-                f"  Source: <code>{j['source_chat']}</code> ➔ Target: <code>{j['target_chat']}</code>\n"
-                f"  Topics: <code>{j['completed_topics']}/{j['total_topics']}</code> | "
-                f"Msgs: <code>{j['cloned_messages']}</code> cloned\n"
-                f"  Current: <i>{html.escape(j['current_topic_title'] or 'Processing...')}</i>\n"
-                f"  Stop: <code>/stopclone {j['id']}</code>\n"
-            )
-        lines.append(
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🎮 <b>1-Click Control Actions:</b>"
-        )
-        cloner_pause_btn = {"text": "▶️ Resume All Jobs", "callback_data": "act_cloner_resume_all"} if any_paused else {"text": "⏸️ Pause All Jobs", "callback_data": "act_cloner_pause_all"}
+        cur_delay_str = os.getenv("MESSAGE_DELAY", "0.0").strip()
+        cur_direct = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
+
+        sec1_lines = [
+            "📡 <b>TG KINDSYNC PRO — DUAL RUNTIME RADAR</b> 🩺",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "🖥️ <b>SECTION 1: Terminal Forwarder Engine</b>",
+            f"• <b>Status:</b> <code>{engine_status_badge}</code>",
+            f"• <b>Pipeline:</b> <code>{'⚡ Fast Direct' if cur_direct else '🔄 Streaming Engine'}</code> | <b>Delay:</b> <code>{cur_delay_str or '0.0'}s</code>",
+            f"• <b>Database:</b> <code>{total_topics}</code> topics | <code>{total_items}</code> items | <code>{total_mapped}</code> mapped"
+        ]
+        
+        if telem_data and (telem_data.get("total_files") or telem_data.get("discovered")):
+            tot_f = int(telem_data.get("total_files") or telem_data.get("discovered", 0))
+            fwd_f = int(telem_data.get("files_completed") or telem_data.get("messages_forwarded", 0))
+            pct_f = float(telem_data.get("batch_progress_pct") or (round((fwd_f / max(1, tot_f)) * 100.0, 1) if tot_f > 0 else 0.0))
+            cur_spd = telem_data.get("current_speed_formatted") or f"{telem_data.get('current_speed_mb', 0.0)} MB/s"
+            sec1_lines.append(f"• <b>Batch Forward:</b> <code>{fwd_f}/{tot_f}</code> ({pct_f:.1f}%) | Speed: <code>{cur_spd}</code>")
+
+        # --- SECTION 2: In-Bot Deep Cloner Jobs ---
+        sec2_lines = [
+            "",
+            "🤖 <b>SECTION 2: In-Bot Deep Cloner Jobs</b>"
+        ]
+        
+        any_paused = False
+        if not jobs:
+            sec2_lines.append("• <i>No active in-bot clone jobs running currently.</i>")
+            sec2_lines.append("• Ready: <code>/clone &lt;source&gt; &lt;target&gt;</code>")
+        else:
+            any_paused = any(j.get('status') == 'paused' for j in jobs)
+            for j in jobs[:6]:
+                status_icon = "⏸️ PAUSED" if j['status'] == 'paused' else f"🟢 {j['status'].upper()}"
+                sec2_lines.append(
+                    f"• <b>Job #{j['id']}</b> ({j['job_type'].upper()}): <code>{status_icon}</code>\n"
+                    f"  Source: <code>{j['source_chat']}</code> ➔ Target: <code>{j['target_chat']}</code>\n"
+                    f"  Progress: <code>{j['completed_topics']}/{j['total_topics']}</code> topics | <code>{j['cloned_messages']}</code> msgs\n"
+                    f"  Current: <i>{html.escape(j['current_topic_title'] or 'Processing...')}</i>"
+                )
+
+        full_text = "\n".join(sec1_lines + sec2_lines) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎮 <b>Interactive Radar Controls:</b>"
+
+        cloner_pause_btn = {"text": "▶️ Resume Cloner", "callback_data": "act_cloner_resume_all"} if any_paused else {"text": "⏸️ Pause Cloner", "callback_data": "act_cloner_pause_all"}
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "🔄 Refresh Progress", "callback_data": "act_cloner_refresh"},
+                    {"text": "🔄 Refresh Radar", "callback_data": "act_cloner_refresh"},
                     cloner_pause_btn
                 ],
                 [
-                    {"text": "🛑 Stop All Jobs", "callback_data": "act_cloner_stop_all"},
-                    {"text": "🧹 Reset & Clear History", "callback_data": "act_cloner_reset"}
+                    {"text": "🛑 Stop Cloner Jobs", "callback_data": "act_cloner_stop_all"},
+                    {"text": "🧹 Reset Cloner (#0)", "callback_data": "act_cloner_reset"}
+                ],
+                [
+                    {"text": "🛡️ Strip Words Card", "callback_data": "act_stripwords"},
+                    {"text": "⚡ Pacing Settings", "callback_data": "act_pacing"}
+                ],
+                [
+                    {"text": "🖼️ Cover Thumbnail", "callback_data": "act_cloner_thumb"},
+                    {"text": "🚀 Clone Guide", "callback_data": "act_cloner_help"}
                 ]
             ]
         }
-        return "\n".join(lines), keyboard
+        return full_text, keyboard
+
+    def _build_strip_words_card_data(self, admin_id: int, page: int = 1, search_query: str = "") -> Tuple[str, dict]:
+        """Constructs interactive Strip & Clean Rules card with pagination and action buttons."""
+        import math
+        is_master = admin_id in self.master_admin_ids
+        all_rules = get_all_raw_rules()
+        
+        if search_query:
+            filtered_rules = search_strip_rule(search_query)
+            title_extra = f" (Search: '{html.escape(search_query)}')"
+        else:
+            filtered_rules = all_rules
+            title_extra = ""
+
+        total_rules = len(filtered_rules)
+        per_page = 12
+        total_pages = max(1, math.ceil(total_rules / per_page))
+        page = max(1, min(page, total_pages))
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        page_rules = filtered_rules[start_idx:end_idx]
+
+        rules_list_str = "\n".join(f"• <code>{html.escape(r)}</code>" for r in page_rules) if page_rules else "<i>(No rules found)</i>"
+        
+        text = (
+            f"🛡️ <b>Universal Strip & Clean Rules Card</b>{title_extra}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <b>Active Cleaning Rules:</b> <code>{len(all_rules)}</code> (Showing {len(filtered_rules)} matched)\n"
+            f"📄 <b>Page:</b> <code>{page} / {total_pages}</code>\n\n"
+            f"<b>Current Rules:</b>\n"
+            f"{rules_list_str}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔒 <i>Deletions & Cleans are restricted to Master Admins with automatic safety backups.</i>"
+        )
+
+        nav_row = []
+        if page > 1:
+            nav_row.append({"text": "⬅️ Prev", "callback_data": f"act_strip_page_{page - 1}"})
+        nav_row.append({"text": f"📑 {page}/{total_pages}", "callback_data": "act_strip_refresh"})
+        if page < total_pages:
+            nav_row.append({"text": "Next ➡️", "callback_data": f"act_strip_page_{page + 1}"})
+
+        keyboard_rows = [nav_row]
+        
+        if is_master:
+            keyboard_rows.append([
+                {"text": "➕ Add Rule", "callback_data": "act_strip_add"},
+                {"text": "🔍 Search", "callback_data": "act_strip_search"},
+            ])
+            keyboard_rows.append([
+                {"text": "🗑️ Delete Rule", "callback_data": "act_strip_del"},
+                {"text": "🧹 Clean & Dedup", "callback_data": "act_strip_dedup"},
+            ])
+        else:
+            keyboard_rows.append([
+                {"text": "➕ Add Rule", "callback_data": "act_strip_add"},
+                {"text": "🔍 Search", "callback_data": "act_strip_search"},
+            ])
+
+        keyboard_rows.append([
+            {"text": "🔄 Refresh", "callback_data": "act_strip_refresh"},
+            {"text": "❌ Close", "callback_data": "act_strip_close"},
+        ])
+
+        return text, {"inline_keyboard": keyboard_rows}
+
+    def _build_pacing_card_data(self, admin_id: int) -> Tuple[str, dict]:
+        """Constructs interactive speed & flood pacing card with 1-click preset buttons."""
+        is_master = admin_id in self.master_admin_ids
+        load_dotenv(ENV_PATH, override=True)
+        cur_delay_str = os.getenv("MESSAGE_DELAY", "0.0").strip()
+        try:
+            cur_delay = float(cur_delay_str) if cur_delay_str else 0.0
+        except ValueError:
+            cur_delay = 0.0
+
+        if cur_delay == 0.0:
+            speed_badge = "⚡ Supersonic (0.0s — 100% Uncapped Wire Speed)"
+        elif cur_delay <= 0.05:
+            speed_badge = f"🚀 Ultra-Fast ({cur_delay}s — Micro Pacing)"
+        elif cur_delay <= 0.2:
+            speed_badge = f"🛡️ Balanced ({cur_delay}s — Safe Flood Guard)"
+        elif cur_delay <= 1.0:
+            speed_badge = f"🐢 High Caution ({cur_delay}s — Strict Anti-Spam)"
+        else:
+            speed_badge = f"🔒 Maximum Stealth ({cur_delay}s — Conservative)"
+
+        text = (
+            f"⚡ <b>Engine Transmission Velocity & Pacing Card</b> 🩺\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🏎️ <b>Active Delay Preset:</b> <code>{speed_badge}</code>\n"
+            f"⏱️ <b>Configured Delay:</b> <code>{cur_delay}s</code> between messages\n\n"
+            f"💡 <b>Pacing Profiles:</b>\n"
+            f"• <b>0.0s</b> — Maximum bandwidth for private channels & large videos\n"
+            f"• <b>0.05s</b> — High-speed transmission for mixed lectures & documents\n"
+            f"• <b>0.2s</b> — Safe micro-delay recommended for public study groups\n"
+            f"• <b>1.0s / 2.0s</b> — Extra safe pacing for fresh/untrusted target channels\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎮 <b>1-Click Pacing Presets:</b>"
+        )
+
+        buttons = [
+            [
+                {"text": "⚡ 0.0s (Supersonic)", "callback_data": "act_pace_0.0"},
+                {"text": "🚀 0.05s (Ultra)", "callback_data": "act_pace_0.05"},
+            ],
+            [
+                {"text": "🛡️ 0.2s (Safe Micro)", "callback_data": "act_pace_0.2"},
+                {"text": "🐢 1.0s (Flood Guard)", "callback_data": "act_pace_1.0"},
+            ],
+            [
+                {"text": "🔒 2.0s (Stealth)", "callback_data": "act_pace_2.0"},
+                {"text": "🔄 Refresh", "callback_data": "act_pace_refresh"},
+            ]
+        ]
+
+        return text, {"inline_keyboard": buttons}
 
     def _build_interactive_help_card(self, category: str = "main", is_admin: bool = False) -> Tuple[str, dict]:
         """Builds interactive nested help card with in-place category switching."""
@@ -2937,6 +3095,165 @@ class DeviTelegramBot:
             elif action == "cloner_thumb":
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Loading thumbnail preview..."})
                 await self._handle_admin_command(session, chat_id, admin_id, "/viewthumb", message=msg_obj)
+                return
+
+            # --- STRIP WORDS INTERACTIVE CARD ACTIONS ---
+            elif action == "stripwords":
+                card_text, kb = self._build_strip_words_card_data(admin_id, page=1)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Strip Rules Loaded 🛡️"})
+                return
+
+            elif action.startswith("strip_page_"):
+                p_str = action.replace("strip_page_", "")
+                p = int(p_str) if p_str.isdigit() else 1
+                card_text, kb = self._build_strip_words_card_data(admin_id, page=p)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Page {p}"})
+                return
+
+            elif action == "strip_refresh":
+                card_text, kb = self._build_strip_words_card_data(admin_id, page=1)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Refreshed 🔄"})
+                return
+
+            elif action == "strip_close":
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._delete_message(session, chat_id, msg_id)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Closed ✖️"})
+                return
+
+            elif action == "strip_add":
+                self.pending_strip_input[admin_id] = {
+                    "action": "add",
+                    "chat_id": chat_id,
+                    "msg_id": msg_obj.get("message_id"),
+                    "thread_id": thread_id
+                }
+                prompt_text = (
+                    "➕ <b>Add Strip Word or Replacement Rule</b> 🛡️\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Ab agle message me apna word ya rule send karein:\n\n"
+                    "• <b>Direct Removal:</b> <code>@SomeOldChannel</code>\n"
+                    "• <b>Replacement Rule:</b> <code>OldBrand =&gt; NewBrand</code>\n"
+                    "• <b>Multiple Rules:</b> Ek saath multiple lines bhi bhej sakte hain!\n\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "<i>Cancel karne ke liye neeche button dabayein:</i>"
+                )
+                cancel_kb = {"inline_keyboard": [[{"text": "❌ Cancel Input", "callback_data": "act_strip_cancel"}]]}
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Awaiting your strip rule..."})
+                await self._send_message(session, chat_id, prompt_text, reply_markup=cancel_kb, message_thread_id=thread_id)
+                return
+
+            elif action == "strip_search":
+                self.pending_strip_input[admin_id] = {
+                    "action": "search",
+                    "chat_id": chat_id,
+                    "msg_id": msg_obj.get("message_id"),
+                    "thread_id": thread_id
+                }
+                prompt_text = (
+                    "🔍 <b>Search Active Strip Rules</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Search query send karein (e.g. <code>telegram</code>, <code>join</code>, <code>http</code>):\n\n"
+                    "<i>Cancel karne ke liye neeche button dabayein:</i>"
+                )
+                cancel_kb = {"inline_keyboard": [[{"text": "❌ Cancel Search", "callback_data": "act_strip_cancel"}]]}
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Type query to search..."})
+                await self._send_message(session, chat_id, prompt_text, reply_markup=cancel_kb, message_thread_id=thread_id)
+                return
+
+            elif action == "strip_del":
+                if admin_id not in self.master_admin_ids:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⛔ Strictly Restricted to Master Admins!", "show_alert": True})
+                    return
+                self.pending_strip_input[admin_id] = {
+                    "action": "delete",
+                    "chat_id": chat_id,
+                    "msg_id": msg_obj.get("message_id"),
+                    "thread_id": thread_id
+                }
+                prompt_text = (
+                    "🗑️ <b>Delete Strip Rule (Master Admin Lock)</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Jo word ya rule delete karna hai, wo exact text bhejein.\n\n"
+                    "🔒 <i>Safety Lock: Deletion se pehle timestamped safety backup automatic archive hoga.</i>\n\n"
+                    "<i>Cancel karne ke liye neeche button dabayein:</i>"
+                )
+                cancel_kb = {"inline_keyboard": [[{"text": "❌ Cancel Deletion", "callback_data": "act_strip_cancel"}]]}
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Awaiting deletion target..."})
+                await self._send_message(session, chat_id, prompt_text, reply_markup=cancel_kb, message_thread_id=thread_id)
+                return
+
+            elif action == "strip_dedup":
+                if admin_id not in self.master_admin_ids:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⛔ Strictly Restricted to Master Admins!", "show_alert": True})
+                    return
+                rem = deduplicate_and_clean()
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Cleaned! {rem} duplicates removed. ✨", "show_alert": True})
+                card_text, kb = self._build_strip_words_card_data(admin_id, page=1)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                return
+
+            elif action == "strip_cancel":
+                self.pending_strip_input.pop(admin_id, None)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Input cancelled."})
+                card_text, kb = self._build_strip_words_card_data(admin_id, page=1)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                return
+
+            # --- PACING & SPEED ACTIONS ---
+            elif action == "pacing":
+                card_text, kb = self._build_pacing_card_data(admin_id)
+                msg_id = msg_obj.get("message_id")
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Pacing Menu Loaded ⚡"})
+                return
+
+            elif action.startswith("pace_"):
+                val_str = action.replace("pace_", "").strip()
+                if val_str == "refresh":
+                    card_text, kb = self._build_pacing_card_data(admin_id)
+                    msg_id = msg_obj.get("message_id")
+                    if msg_id:
+                        await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Pacing Refreshed 🔄"})
+                    return
+                
+                # Changing pacing is Master Admin only
+                if admin_id not in self.master_admin_ids:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⛔ Pacing adjustment is restricted to Master Admins!", "show_alert": True})
+                    return
+
+                try:
+                    delay_val = float(val_str)
+                    os.environ["MESSAGE_DELAY"] = str(delay_val)
+                    with suppress(Exception):
+                        set_key(str(ENV_PATH), "MESSAGE_DELAY", str(delay_val))
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Pacing set to {delay_val}s ⚡", "show_alert": False})
+                    card_text, kb = self._build_pacing_card_data(admin_id)
+                    msg_id = msg_obj.get("message_id")
+                    if msg_id:
+                        await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                except Exception as ex_p:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error setting pacing: {ex_p}", "show_alert": True})
                 return
 
             if action == "mainindex":
@@ -3615,6 +3932,70 @@ class DeviTelegramBot:
 
         return False
 
+    async def _handle_strip_input_step(self, session: aiohttp.ClientSession, message: dict) -> bool:
+        """Processes user input during interactive strip words operations."""
+        sender_id = message.get("from", {}).get("id")
+        chat_id = message.get("chat", {}).get("id")
+        text = message.get("text", "").strip()
+        state = self.pending_strip_input.get(sender_id)
+        if not state:
+            return False
+
+        action = state.get("action")
+        thread_id = state.get("thread_id")
+
+        if text.lower() in ("/cancel", "cancel", "abort"):
+            self.pending_strip_input.pop(sender_id, None)
+            await self._send_message(session, chat_id, "❌ Strip word operation cancelled.", message_thread_id=thread_id)
+            card_text, kb = self._build_strip_words_card_data(sender_id, page=1)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+            return True
+
+        if action == "add":
+            self.pending_strip_input.pop(sender_id, None)
+            lines = [l.strip() for l in text.splitlines() if l.strip()]
+            added_cnt = add_strip_rules(lines, added_by=sender_id)
+            resp = (
+                f"✅ <b>Strip Rule(s) Added Successfully!</b> 🛡️\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• <b>Added Count:</b> <code>{added_cnt}</code> new rule(s)\n"
+                f"• <b>Synchronized:</b> <code>strip_words.txt</code>, <code>Friend_Edition/strip_words.txt</code>, &amp; SQLite\n\n"
+                f"<i>Future forwards aur cloning jobs me yeh words clean ho jayenge.</i>"
+            )
+            card_text, kb = self._build_strip_words_card_data(sender_id, page=1)
+            await self._send_message(session, chat_id, resp, message_thread_id=thread_id)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+            return True
+
+        elif action == "search":
+            self.pending_strip_input.pop(sender_id, None)
+            card_text, kb = self._build_strip_words_card_data(sender_id, page=1, search_query=text)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+            return True
+
+        elif action == "delete":
+            self.pending_strip_input.pop(sender_id, None)
+            if sender_id not in self.master_admin_ids:
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return True
+            ok = delete_strip_rule(text, deleted_by=sender_id)
+            if ok:
+                resp = (
+                    f"🗑️ <b>Strip Rule Deleted Successfully!</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• <b>Deleted:</b> <code>{html.escape(text)}</code>\n"
+                    f"• <b>Safety Snapshot:</b> Saved to <code>archives/strip_words_backups/</code>\n"
+                    f"• <b>Synced:</b> Both files &amp; database updated."
+                )
+            else:
+                resp = f"⚠️ Rule <code>{html.escape(text)}</code> active list me nahi mila."
+            card_text, kb = self._build_strip_words_card_data(sender_id, page=1)
+            await self._send_message(session, chat_id, resp, message_thread_id=thread_id)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+            return True
+
+        return False
+
     async def _handle_incoming_message(self, session: aiohttp.ClientSession, message: dict):
         chat = message.get("chat", {})
         chat_type = chat.get("type", "private")
@@ -3640,6 +4021,12 @@ class DeviTelegramBot:
         # Auto-Forward Channel Config Interceptor in Private DM
         if not is_group and sender_id in self.pending_fwd_setup:
             handled = await self._handle_fwd_setup_step(session, chat_id, sender_id, text, message)
+            if handled:
+                return
+
+        # Interactive Strip Words Interceptor
+        if sender_id in self.pending_strip_input:
+            handled = await self._handle_strip_input_step(session, message)
             if handled:
                 return
 
@@ -6985,49 +7372,92 @@ class DeviTelegramBot:
 
         elif cmd in ("/pauseclone", "/pausejob"):
             target_chat_id = self._resolve_study_group_id(chat_id)
-            is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
+            is_master = admin_id in self.master_admin_ids
+            is_caller_admin = is_master or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
             if not is_caller_admin:
                 await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
                 return
             from devi.operator.deep_cloner import _job_pause_flags
             target_job_id = int(parts[1]) if len(parts) >= 2 and parts[1].isdigit() else -1
-            _job_pause_flags[target_job_id] = True
-            with suppress(Exception):
-                with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                    if target_job_id == -1:
-                        conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE status = 'running'")
-                    else:
+
+            if target_job_id != -1:
+                if not is_master:
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                        row = conn.execute("SELECT user_id FROM telegram_clone_jobs WHERE id = ?", (target_job_id,)).fetchone()
+                        if not row or row[0] != admin_id:
+                            await self._send_message(session, chat_id, f"⚠️ Access Denied: Aap sirf apni clone jobs (Job #{target_job_id} belongs to another user) control kar sakte hain.", message_thread_id=thread_id)
+                            return
+                _job_pause_flags[target_job_id] = True
+                with suppress(Exception):
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
                         conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE id = ?", (target_job_id,))
-                    conn.commit()
-            if target_job_id == -1:
-                await self._send_message(session, chat_id, "⏸️ <b>All active clone jobs PAUSED!</b>\n\n• Type <code>/resumeclone</code> anytime to continue.", message_thread_id=thread_id)
-            else:
+                        conn.commit()
                 await self._send_message(session, chat_id, f"⏸️ <b>Clone Job #{target_job_id} PAUSED!</b>\n\n• Type <code>/resumeclone {target_job_id}</code> to continue.", message_thread_id=thread_id)
+            else:
+                if is_master:
+                    _job_pause_flags[-1] = True
+                    with suppress(Exception):
+                        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE status = 'running'")
+                            conn.commit()
+                    await self._send_message(session, chat_id, "⏸️ <b>All active clone jobs PAUSED!</b>\n\n• Type <code>/resumeclone</code> anytime to continue.", message_thread_id=thread_id)
+                else:
+                    with suppress(Exception):
+                        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                            cur = conn.execute("SELECT id FROM telegram_clone_jobs WHERE user_id = ? AND status = 'running'", (admin_id,))
+                            for r in cur.fetchall():
+                                _job_pause_flags[r[0]] = True
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'paused' WHERE user_id = ? AND status = 'running'", (admin_id,))
+                            conn.commit()
+                    await self._send_message(session, chat_id, "⏸️ <b>Aapki sabhi active clone jobs PAUSE ho gayi hain!</b>\n\n• Type <code>/resumeclone</code> to continue.", message_thread_id=thread_id)
 
         elif cmd in ("/resumeclone", "/resumejob"):
             target_chat_id = self._resolve_study_group_id(chat_id)
-            is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
+            is_master = admin_id in self.master_admin_ids
+            is_caller_admin = is_master or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
             if not is_caller_admin:
                 await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
                 return
             from devi.operator.deep_cloner import _job_pause_flags
             target_job_id = int(parts[1]) if len(parts) >= 2 and parts[1].isdigit() else -1
-            _job_pause_flags[target_job_id] = False
-            with suppress(Exception):
-                with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
-                    if target_job_id == -1:
-                        conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE status = 'paused'")
-                    else:
+
+            if target_job_id != -1:
+                if not is_master:
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                        row = conn.execute("SELECT user_id FROM telegram_clone_jobs WHERE id = ?", (target_job_id,)).fetchone()
+                        if not row or row[0] != admin_id:
+                            await self._send_message(session, chat_id, f"⚠️ Access Denied: Aap sirf apni clone jobs control kar sakte hain.", message_thread_id=thread_id)
+                            return
+                _job_pause_flags[target_job_id] = False
+                with suppress(Exception):
+                    with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
                         conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE id = ?", (target_job_id,))
-                    conn.commit()
-            if target_job_id == -1:
-                await self._send_message(session, chat_id, "▶️ <b>All clone jobs RESUMED!</b> 🚀", message_thread_id=thread_id)
-            else:
+                        conn.commit()
                 await self._send_message(session, chat_id, f"▶️ <b>Clone Job #{target_job_id} RESUMED!</b> 🚀", message_thread_id=thread_id)
+            else:
+                if is_master:
+                    _job_pause_flags[-1] = False
+                    for k in list(_job_pause_flags.keys()):
+                        _job_pause_flags[k] = False
+                    with suppress(Exception):
+                        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE status = 'paused'")
+                            conn.commit()
+                    await self._send_message(session, chat_id, "▶️ <b>All clone jobs RESUMED!</b> 🚀", message_thread_id=thread_id)
+                else:
+                    with suppress(Exception):
+                        with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                            cur = conn.execute("SELECT id FROM telegram_clone_jobs WHERE user_id = ? AND status = 'paused'", (admin_id,))
+                            for r in cur.fetchall():
+                                _job_pause_flags[r[0]] = False
+                            conn.execute("UPDATE telegram_clone_jobs SET status = 'running' WHERE user_id = ? AND status = 'paused'", (admin_id,))
+                            conn.commit()
+                    await self._send_message(session, chat_id, "▶️ <b>Aapki sabhi clone jobs RESUME ho gayi hain!</b> 🚀", message_thread_id=thread_id)
 
         elif cmd in ("/stopclone", "/cancelclone"):
             target_chat_id = self._resolve_study_group_id(chat_id)
-            is_caller_admin = (admin_id in (1553619403, 759038032)) or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
+            is_master = admin_id in self.master_admin_ids
+            is_caller_admin = is_master or (await self.is_admin_for_chat(session, target_chat_id, admin_id, message))
             if not is_caller_admin:
                 await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
                 return
@@ -7043,6 +7473,13 @@ class DeviTelegramBot:
                 return
 
             target_job_id = int(parts[1])
+            if not is_master:
+                with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
+                    row = conn.execute("SELECT user_id FROM telegram_clone_jobs WHERE id = ?", (target_job_id,)).fetchone()
+                    if not row or row[0] != admin_id:
+                        await self._send_message(session, chat_id, f"⚠️ Access Denied: Aap sirf apni clone jobs control kar sakte hain.", message_thread_id=thread_id)
+                        return
+
             from devi.operator.deep_cloner import _job_cancel_flags, update_clone_job_progress
             from devi.operator.session_vault import _running_user_jobs
             _job_cancel_flags[target_job_id] = True
@@ -8918,81 +9355,50 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
                 return
             if len(parts) < 2:
-                await self._send_message(
-                    session, chat_id,
-                    "Usage: `/addstrip <word/tag/channel to remove>`\n\n"
-                    "• **Direct Word Removal:** `/addstrip @MyOldChannel`\n"
-                    "• **Word Replacement:** `/addstrip OldBrand => NewBrand`",
-                    message_thread_id=thread_id
-                )
+                card_text, kb = self._build_strip_words_card_data(admin_id, page=1)
+                await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True, message_thread_id=thread_id)
                 return
             word_to_add = " ".join(parts[1:]).strip()
-            strip_file = BASE_PROJECT_DIR / "strip_words.txt"
-            try:
-                existing_lines = strip_file.read_text(encoding="utf-8").splitlines() if strip_file.exists() else []
-                if word_to_add in [l.strip() for l in existing_lines]:
-                    await self._send_message(session, chat_id, f"ℹ️ `{word_to_add}` already `strip_words.txt` me present hai.", message_thread_id=thread_id)
-                    return
-                with open(strip_file, "a", encoding="utf-8") as f:
-                    f.write(f"\n{word_to_add}")
+            added_cnt = add_strip_rules([word_to_add], added_by=admin_id)
+            if added_cnt > 0:
                 await self._send_message(
                     session, chat_id,
                     f"✅ **Strip Word Added Successfully!** 🛡️\n\n"
-                    f"• **New Rule:** `{word_to_add}`\n"
-                    f"• **Saved To:** `strip_words.txt`\n"
-                    f"• **Effect:** Future cloned & forwarded captions/filenames se yeh word automatically remove ho jayega.",
+                    f"• **New Rule:** <code>{html.escape(word_to_add)}</code>\n"
+                    f"• **Synchronized:** <code>strip_words.txt</code>, <code>Friend_Edition/strip_words.txt</code> &amp; SQLite\n"
+                    f"• **Effect:** Future cloned &amp; forwarded captions/filenames se yeh word automatically remove ho jayega.",
                     message_thread_id=thread_id
                 )
-            except Exception as e:
-                await self._send_message(session, chat_id, f"❌ Error adding strip word: {e}", message_thread_id=thread_id)
+            else:
+                await self._send_message(session, chat_id, f"ℹ️ <code>{html.escape(word_to_add)}</code> already active list me present hai.", message_thread_id=thread_id)
 
         elif cmd in ("/delstrip", "/stripdel"):
-            if not self.is_admin(admin_id):
-                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+            if admin_id not in self.master_admin_ids:
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins (@Kinddoctor4u / @Ammitrajput1).", message_thread_id=thread_id)
                 return
             if len(parts) < 2:
                 await self._send_message(session, chat_id, "Usage: `/delstrip <word to remove from strip list>`", message_thread_id=thread_id)
                 return
             target_word = " ".join(parts[1:]).strip()
-            strip_file = BASE_PROJECT_DIR / "strip_words.txt"
-            try:
-                if not strip_file.exists():
-                    await self._send_message(session, chat_id, "⚠️ `strip_words.txt` not found.", message_thread_id=thread_id)
-                    return
-                lines = strip_file.read_text(encoding="utf-8").splitlines()
-                new_lines = [l for l in lines if l.strip().lower() != target_word.lower()]
-                if len(new_lines) == len(lines):
-                    await self._send_message(session, chat_id, f"⚠️ Word `{target_word}` strip list me nahi mila.", message_thread_id=thread_id)
-                    return
-                strip_file.write_text("\n".join(new_lines), encoding="utf-8")
-                await self._send_message(session, chat_id, f"🗑️ Word `{target_word}` successfully removed from `strip_words.txt`.", message_thread_id=thread_id)
-            except Exception as e:
-                await self._send_message(session, chat_id, f"❌ Error deleting strip word: {e}", message_thread_id=thread_id)
-
-        elif cmd in ("/stripwords", "/striplist"):
-            strip_file = BASE_PROJECT_DIR / "strip_words.txt"
-            try:
-                if not strip_file.exists():
-                    await self._send_message(session, chat_id, "⚠️ `strip_words.txt` not found.", message_thread_id=thread_id)
-                    return
-                raw_lines = [l.strip() for l in strip_file.read_text(encoding="utf-8").splitlines() if l.strip() and not l.strip().startswith("#")]
-                total_cnt = len(raw_lines)
-                sample = raw_lines[-15:]
-                sample_list = "\n".join(f"• `{w}`" for w in sample)
-                msg = (
-                    f"🛡️ **Permanent Strip & Clean Words List**\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"📊 **Total Active Cleaning Rules:** `{total_cnt}`\n\n"
-                    f"**Recent Rules Preview (Last 15):**\n"
-                    f"{sample_list}\n\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"➕ Add Word: `/addstrip <word>`\n"
-                    f"❌ Delete Word: `/delstrip <word>`\n"
-                    f"📁 File Location: `strip_words.txt`"
+            ok = delete_strip_rule(target_word, deleted_by=admin_id)
+            if ok:
+                await self._send_message(
+                    session, chat_id,
+                    f"🗑️ Word <code>{html.escape(target_word)}</code> successfully removed.\n\n"
+                    f"• <b>Safety Snapshot:</b> Saved to <code>archives/strip_words_backups/</code>\n"
+                    f"• <b>Synced:</b> Both files &amp; database updated.",
+                    message_thread_id=thread_id
                 )
-                await self._send_message(session, chat_id, msg, message_thread_id=thread_id)
-            except Exception as e:
-                await self._send_message(session, chat_id, f"❌ Error reading strip words: {e}", message_thread_id=thread_id)
+            else:
+                await self._send_message(session, chat_id, f"⚠️ Word <code>{html.escape(target_word)}</code> strip list me nahi mila.", message_thread_id=thread_id)
+
+        elif cmd in ("/stripwords", "/striplist", "/stripcard"):
+            card_text, kb = self._build_strip_words_card_data(admin_id, page=1)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True, message_thread_id=thread_id)
+
+        elif cmd in ("/pacing", "/speed", "/delay"):
+            card_text, kb = self._build_pacing_card_data(admin_id)
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True, message_thread_id=thread_id)
 
         elif cmd in ("/engine", "/status"):
             if not self.is_admin(admin_id):

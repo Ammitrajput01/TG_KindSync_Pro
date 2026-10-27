@@ -186,3 +186,7 @@ data/session_string.txt
 *.session_string
 scratch/
 
+# Strip Words Backups
+archives/strip_words_backups/*.txt
+!archives/strip_words_backups/.gitkeep
+

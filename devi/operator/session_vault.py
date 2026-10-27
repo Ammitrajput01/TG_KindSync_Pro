@@ -14,7 +14,7 @@ import shutil
 import sqlite3
 import logging
 from pathlib import Path
-from typing import Tuple, Optional, Dict, List
+from typing import Tuple, Optional, Dict, List, Set
 from contextlib import suppress
 from dotenv import load_dotenv, set_key
 
@@ -43,6 +43,12 @@ DB_PATH = ROOT_DIR / "history_core.sqlite"
 # In-memory registry of active user clients and running jobs for graceful cancellation upon disconnect
 _active_user_clients: Dict[int, List[TelegramClient]] = {}
 _running_user_jobs: Dict[int, List[asyncio.Task]] = {}
+
+# Master Admin Telegram IDs (Strictly Primary 1: 1553619403, Primary 2: 759038032)
+MASTER_ADMIN_IDS: Set[int] = {1553619403, 759038032}
+
+# Background Worker Session Pool for non-master multi-tenant tasks
+WORKER_SESSION_POOL: List[str] = ["session_account2", "session_account3", "session_bot_scanner", "session_scanner"]
 
 # ---------------------------------------------------------------------------
 # Fernet Encryption & Key Management
@@ -322,16 +328,41 @@ async def get_vault_client_for_target(preferred_user_id: Optional[int] = None) -
     """
     Resolves an authorized MTProto Client.
     - If preferred_user_id is provided, strictly checks that user's linked account.
-    - If preferred_user_id is None or failed, falls back ONLY to global system Master Session or Bot Token.
-    - NEVER cross-shares arbitrary third-party user sessions.
+    - If non-master user, allocates from independent Worker Session Pool (never borrows master session).
+    - If Master Admin (Kind Doctor), accesses system master session_forwarder.
+    - Fallback: Bot Token Client.
     """
+    MASTER_ADMIN_IDS = {1553619403, 759038032}
+    is_master = (preferred_user_id in MASTER_ADMIN_IDS) if preferred_user_id else True
+
     # 1. Check preferred user's isolated session
     if preferred_user_id:
         user_c = await get_user_client(preferred_user_id)
         if user_c:
             return user_c, "user"
 
-    # 2. Check global System Master StringSession
+    # 2. For non-master users, allocate from autonomous Worker Session Pool
+    if not is_master:
+        worker_pool = ["session_account2", "session_account3", "session_bot_scanner", "session_scanner"]
+        for w_stem in worker_pool:
+            w_path = ROOT_DIR / f"{w_stem}.session"
+            if w_path.exists() and w_path.stat().st_size > 0:
+                extracted = await export_session_file_to_string(w_path)
+                if extracted:
+                    try:
+                        w_client = TelegramClient(StringSession(extracted), API_ID, API_HASH)
+                        await w_client.connect()
+                        if await w_client.is_user_authorized():
+                            return w_client, "worker"
+                        await w_client.disconnect()
+                    except Exception:
+                        pass
+        # Do not borrow master session for third-party user; fallback to Bot token
+        bot_client = TelegramClient(StringSession(), API_ID, API_HASH)
+        await bot_client.start(bot_token=BOT_TOKEN)
+        return bot_client, "bot"
+
+    # 3. For Master Admin (Kind Doctor): Check global System Master StringSession
     s_str = get_persisted_session_string()
     if s_str:
         try:
@@ -343,7 +374,7 @@ async def get_vault_client_for_target(preferred_user_id: Optional[int] = None) -
         except Exception as e:
             logger.warning(f"[!] Master StringSession connect warning: {e}")
 
-    # 3. Extract from candidate system session files on disk
+    # 4. For Master Admin: Extract from candidate system session files on disk
     candidate_sessions = [
         "session_forwarder",
         "session_scanner",
@@ -364,7 +395,7 @@ async def get_vault_client_for_target(preferred_user_id: Optional[int] = None) -
                 except Exception:
                     pass
 
-    # 4. Fallback to Bot Token Client
+    # 5. Final Fallback to Bot Token Client
     bot_client = TelegramClient(StringSession(), API_ID, API_HASH)
     await bot_client.start(bot_token=BOT_TOKEN)
     return bot_client, "bot"

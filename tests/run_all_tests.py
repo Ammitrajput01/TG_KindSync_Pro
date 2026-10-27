@@ -10,6 +10,8 @@ from pathlib import Path
 # Add project root to sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 # Import test runners
 from tests.test_devi_phase1 import run_verification as run_phase1
@@ -20,6 +22,7 @@ from tests.test_devi_phase5 import run_phase5_verification as run_phase5
 from tests.test_devi_sentinel_merge import main as run_sentinel_merge
 from tests.test_multi_login import run_multi_login_suite
 from tests.test_pause_resume_watermark_hashtags import main as run_pause_resume_suite
+from tests.test_unified_strip_and_isolation import run_suite as run_strip_and_isolation_suite
 from tests.test_kind_doctor_upgrades import (
     test_telegram_bot_name_sync,
     test_unified_branding_toggle_logic,
@@ -50,6 +53,7 @@ async def run_all():
         ("Multi-Login: Dual RBAC & Telegram Multi-Session", run_multi_login_suite),
         ("Kind Doctor Upgrades: Bot Name, Unified Branding & Pacing", run_kind_doctor_suite),
         ("Pause/Resume, Watermark Persistence & Hashtag Stripping", run_pause_resume_suite),
+        ("Unified Strip Rules, Session Isolation & Dual Radar", run_strip_and_isolation_suite),
     ]
 
     passed = 0

@@ -244,6 +244,22 @@ class AdminTelemetry:
             pass
 
     @staticmethod
+    def _perform_sqlite_online_backup(src_path: str, dst_path: str) -> None:
+        """Safe SQLite online WAL backup executed in background worker thread to prevent event loop freeze."""
+        src = None
+        dst = None
+        try:
+            src = sqlite3.connect(f"file:{Path(src_path).resolve()}?mode=ro", uri=True, timeout=30.0) if Path(src_path).exists() else sqlite3.connect(src_path, timeout=30.0)
+            dst = sqlite3.connect(str(dst_path), timeout=30.0)
+            src.backup(dst)
+            dst.commit()
+        finally:
+            with suppress(Exception):
+                if dst: dst.close()
+            with suppress(Exception):
+                if src: src.close()
+
+    @staticmethod
     async def send_cloud_backup(client):
         """Creates an atomic SQLite WAL snapshot and exports it to admin channels with strict timestamp metadata."""
         if not client: return
@@ -257,12 +273,8 @@ class AdminTelemetry:
             backup_dir.mkdir(exist_ok=True)
             out_path = backup_dir / filename
 
-            # Safe SQLite online backup
-            src = sqlite3.connect(DB_FILE, timeout=30.0)
-            dst = sqlite3.connect(str(out_path), timeout=30.0)
-            src.backup(dst)
-            dst.close()
-            src.close()
+            # Safe non-blocking SQLite online backup via worker thread
+            await asyncio.to_thread(AdminTelemetry._perform_sqlite_online_backup, str(DB_FILE), str(out_path))
 
             display_time = now.strftime("%A, %d %B %Y | %I:%M %p")
             size_mb = os.path.getsize(out_path) / MB if os.path.exists(out_path) else 0.0
