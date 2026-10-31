@@ -61,6 +61,7 @@ if exist "!SESS_PATH!" (
 scp -q -o StrictHostKeyChecking=no -i "!KEY_PATH!" .env tg_kindsync_pro.py web_dashboard.py main.py requirements.txt strip_words.txt ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/ 2>nul
 if exist "tools" scp -q -r -o StrictHostKeyChecking=no -i "!KEY_PATH!" tools ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/ 2>nul
 if exist "devi" scp -q -r -o StrictHostKeyChecking=no -i "!KEY_PATH!" devi ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/ 2>nul
+if exist "web" scp -q -r -o StrictHostKeyChecking=no -i "!KEY_PATH!" web ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/ 2>nul
 echo [OK] Files uploaded successfully!
 
 echo.

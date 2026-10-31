@@ -40,6 +40,7 @@ if not exist "%ORACLE_KEY%" (
 :: Transfer code files
 scp -o StrictHostKeyChecking=no -i "%ORACLE_KEY%" tg_kindsync_pro.py web_dashboard.py %ORACLE_USER%@%ORACLE_IP%:~/TG_KindSync_Pro/
 scp -o StrictHostKeyChecking=no -i "%ORACLE_KEY%" -r devi %ORACLE_USER%@%ORACLE_IP%:~/TG_KindSync_Pro/
+scp -o StrictHostKeyChecking=no -i "%ORACLE_KEY%" -r web %ORACLE_USER%@%ORACLE_IP%:~/TG_KindSync_Pro/
 
 echo.
 :: 3. RESTART SERVICES ON VPS
