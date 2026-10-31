@@ -2,6 +2,46 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Sunday, 1 November 2026 | 04:35 AM IST
+
+### 47. Web Cockpit UI/UX Master Polish, Single Chevron Sidebar Toggle, Anti-Cache Direct Inlines & Kind Doctor Bot Profile Pictures Suite
+* **User Directive & Context (Voice Audio 5 & 6, Browser Screenshot)**:
+  - *"Bhai main aapko ek baat batana chahunga ki aapko website banane ke liye skills seekhne ki zaroorat hai... Dekho abhi maine aapko screenshot share kiya hai. Jo aapne left side me arrow lagaya hai, usko minimize karne ke liye, jo side pe bar hai, wo minimize nahi ho raha. Phir aapne saath me hi 3 lines bhi laga di hain, wo bhi kaam nahi kar rahi hain, toggle collapse side sidebar... Aur toggle sidebar dono nahi kaam kar rahe. Phir upar se dekho, jo aapke, ye Dashboard / Overview ke saath me jo Engine Online (synced) likha hai aur jo uske neeche mera naam likha aa raha hai, Kind Doctor (Dr. Amit Singh), wo uska format hi alag hai pura. Color hi alag ho ja raha hai wo toh. Phir uske baad, System Tools & Utilities wo bhi frame se bahar ja rahe hain. Mobile Wi-Fi Phone Access URL, Picture-in-Picture Mini-HUD ye toh kaam nahi kar raha isme Firefox me... Aur options alag hi rang me aa rahi hain... Professionally banao yaar thoda sa."*
+  - *"And ek cheez aur poochhna tha, aapko Kind Doctor bot ke baare me toh pata hi hai na? Toh yaar uska na koi professional si profile picture hi bata do yaar bana ke... 2-3 pictures bana ke de do, toh main choose kar loonga."*
+  - *Permanent Admin Accounts*: Strictly `@Kinddoctor4u` (`1553619403`) & `@Ammitrajput1` (`759038032`).
+* **Root Cause Analysis (Screenshot Forensics)**:
+  1. **Browser Cache Contamination of CSS**: When `index.html` was loaded without query-string version tags (`?v=...`), the user's Firefox browser served a cached older version of `dashboard.css`. Consequently, new classes (`.header-tools-dropdown-menu`, `.header-doctor-pill`, `.sidebar-collapsed`) were missing in the stylesheet.
+  2. **Native Button Styling Default**: In absence of the cached class, `<button class="header-doctor-pill">` defaulted to the OS native button skin (white rectangle with black text).
+  3. **Unstyled Dropdown Element Spill**: `<div class="header-tools-dropdown-menu">` had default `display: block` in absence of CSS rules, spilling onto the screen at the top-right as plain text with square SVGs appearing as empty checkboxes.
+  4. **Redundant & Competing Toggle Buttons**: The UI featured both an arrow inside the sidebar brand AND a hamburger button in the breadcrumbs bar right next to it. Furthermore, `.sidebar.sidebar-collapsed` lacked `overflow: hidden !important` and `max-width: 70px !important`, which prevented shrinking in certain flexbox layouts.
+  5. **Firefox Document PiP Incompatibility**: Firefox does not implement `window.documentPictureInPicture.requestWindow`, which caused Mini-HUD activation to fail.
+* **Applied Engineering Upgrades**:
+  1. **Single Seamless Sidebar Toggle (`#sidebar-toggle-btn`)**:
+     - Removed redundant hamburger button `[ ≡ ]` from the header bar.
+     - Upgraded the sidebar brand button into a single master control with an animated rotating chevron (`<` when expanded, `>` when collapsed).
+     - Enhanced `toggleSidebarCollapse()` in `dashboard.js` with direct inline DOM width enforcement (`sidebar.style.setProperty('width', '70px', 'important')` / `'255px'`), guaranteeing instant, glitch-free collapse across all rendering engines.
+  2. **Bulletproof Inline Styles & Anti-Cache Query Strings**:
+     - Embedded critical structural and color CSS directly in `<style>` inside `web/templates/index.html`.
+     - Added explicit inline styles to `header-telemetry-capsule` and `header-doctor-pill` (`color: #34D399 !important; background: rgba(16, 185, 129, 0.12) !important`), making it physically impossible for buttons to ever render white.
+     - Added `style="display: none;"` directly to `.header-tools-dropdown-menu` and upgraded items with crisp emoji icons (`📱`, `🪟`, `🔊`, `⏯️`, `👨‍⚕️`).
+     - Added cache-busting queries: `dashboard.css?v=20261101_v17_0_1` and `dashboard.js?v=20261101_v17_0_1`.
+  3. **Universal In-Page Floating Mini-HUD (Cross-Browser Firefox Support)**:
+     - Added in-page draggable floating Mini-HUD widget (`#universal-mini-hud`) for browsers that do not support Document PiP (Firefox, Safari, Mobile).
+     - Synchronized telemetry streaming across both native PiP and universal in-page widget with live speed readout, progress bar, and pause/resume button.
+  4. **Generated Kind Doctor Bot Profile Pictures (3 Distinct Options)**:
+     - Option 1 (`kinddoc_bot_avatar_1.jpg`): Futuristic Cyber-Medical Asclepius & Stethoscope Hologram with glowing ECG pulse on obsidian circuitry.
+     - Option 2 (`kinddoc_bot_avatar_2.jpg`): Intelligent AI Doctor Specialist Mascot with AR HUD monocle and smart stethoscope.
+     - Option 3 (`kinddoc_bot_avatar_3.jpg`): Royal Titanium & Gold Kind Doctor Sovereign Medical Shield & Crest with emerald inlay.
+     - Deployed to both `docs/assets/` and `web/static/img/`.
+  5. **Verification**: Full master test suite passed with 14/14 tests 100% HEALTHY (`python tests/run_all_tests.py`).
+* **Affected Files**:
+  - `web/templates/index.html`
+  - `web/static/css/dashboard.css`
+  - `web/static/js/dashboard.js`
+  - `docs/assets/kinddoc_bot_avatar_1.jpg`, `docs/assets/kinddoc_bot_avatar_2.jpg`, `docs/assets/kinddoc_bot_avatar_3.jpg`
+  - `web/static/img/kinddoc_bot_avatar_1.jpg`, `web/static/img/kinddoc_bot_avatar_2.jpg`, `web/static/img/kinddoc_bot_avatar_3.jpg`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Sunday, 1 November 2026 | 04:15 AM IST
 
 ### 46. GitHub Documentation & Visual Telemetry Upgrade with Generated High-Craft Architecture, Cockpit HUD & Clinical CDSS Assets

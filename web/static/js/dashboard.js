@@ -158,10 +158,13 @@
             showToast(soundEnabled ? "Audio Synthesizer: ON" : "Audio Synthesizer: MUTED");
         }
 
-        // --- DOCUMENT PICTURE-IN-PICTURE (PiP) FLOATING TELEMETRY MINI-HUD ---
+        // --- DOCUMENT PICTURE-IN-PICTURE (PiP) & UNIVERSAL FLOATING TELEMETRY MINI-HUD ---
         window.pipWindow = null;
         async function toggleFloatingMiniHUD() {
             playAudioFeedback('tab');
+            const inpageHud = document.getElementById('universal-mini-hud');
+
+            // 1. If native Document Picture-in-Picture is supported (Chrome/Edge 116+)
             if ('documentPictureInPicture' in window) {
                 try {
                     if (window.pipWindow) {
@@ -194,25 +197,47 @@
                     `;
                     pipWin.addEventListener('pagehide', () => { window.pipWindow = null; });
                     showToast("Always-on-Top Mini-HUD Activated", "success");
+                    return;
                 } catch (e) {
-                    console.warn("Document PiP failed, opening popup:", e);
-                    window.open('/static/manifest.json', 'KindSyncMiniHUD', 'width=350,height=200');
+                    console.warn("Document PiP error, falling back to in-page HUD:", e);
                 }
-            } else {
-                showToast("Document Picture-in-Picture not supported in this browser (Use Chrome/Edge 116+)", "warning");
+            }
+
+            // 2. Universal In-Page Floating Mini-HUD (Firefox, Safari & All Browsers)
+            if (inpageHud) {
+                const isHidden = inpageHud.style.display === 'none' || !inpageHud.style.display;
+                if (isHidden) {
+                    inpageHud.style.display = 'block';
+                    showToast("Floating Mini-HUD Activated (Universal Mode)", "success");
+                } else {
+                    inpageHud.style.display = 'none';
+                    showToast("Floating Mini-HUD Closed");
+                }
             }
         }
 
         function updateMiniHUDTelemetry(speedText, fileName, percent) {
-            if (!window.pipWindow) return;
-            try {
-                const sEl = window.pipWindow.document.getElementById('pip-speed-val');
-                const fEl = window.pipWindow.document.getElementById('pip-file-name');
-                const pEl = window.pipWindow.document.getElementById('pip-progress-fill');
+            // Update native PiP window if active
+            if (window.pipWindow) {
+                try {
+                    const sEl = window.pipWindow.document.getElementById('pip-speed-val');
+                    const fEl = window.pipWindow.document.getElementById('pip-file-name');
+                    const pEl = window.pipWindow.document.getElementById('pip-progress-fill');
+                    if (sEl && speedText) sEl.textContent = speedText;
+                    if (fEl && fileName) fEl.textContent = fileName;
+                    if (pEl && percent !== undefined) pEl.style.width = Math.min(100, Math.max(0, percent)) + '%';
+                } catch(e) {}
+            }
+            // Also update universal in-page widget if active
+            const inpageHud = document.getElementById('universal-mini-hud');
+            if (inpageHud && inpageHud.style.display !== 'none') {
+                const sEl = document.getElementById('inpage-hud-speed');
+                const fEl = document.getElementById('inpage-hud-file');
+                const pEl = document.getElementById('inpage-hud-progress');
                 if (sEl && speedText) sEl.textContent = speedText;
                 if (fEl && fileName) fEl.textContent = fileName;
                 if (pEl && percent !== undefined) pEl.style.width = Math.min(100, Math.max(0, percent)) + '%';
-            } catch(e) {}
+            }
         }
 
         // Web Speech API Voice Briefing
@@ -2251,6 +2276,23 @@
             if (!sidebar) return;
             sidebar.classList.toggle('sidebar-collapsed');
             const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+            
+            // Explicit inline width sync guarantees instantaneous, glitch-free collapse in all browsers
+            if (isCollapsed) {
+                sidebar.style.setProperty('width', '70px', 'important');
+                sidebar.style.setProperty('min-width', '70px', 'important');
+                sidebar.style.setProperty('max-width', '70px', 'important');
+            } else {
+                sidebar.style.setProperty('width', '255px', 'important');
+                sidebar.style.setProperty('min-width', '255px', 'important');
+                sidebar.style.setProperty('max-width', '255px', 'important');
+            }
+
+            const brandToggle = document.getElementById('sidebar-toggle-btn');
+            if (brandToggle) {
+                brandToggle.title = isCollapsed ? 'Expand Sidebar (Ctrl+B)' : 'Collapse Sidebar (Ctrl+B)';
+            }
+
             try {
                 localStorage.setItem('sidebar_collapsed', isCollapsed ? 'true' : 'false');
             } catch(e) {}
@@ -2268,8 +2310,18 @@
             try {
                 const isCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
                 const sidebar = document.getElementById('app-sidebar');
-                if (sidebar && isCollapsed) {
-                    sidebar.classList.add('sidebar-collapsed');
+                if (sidebar) {
+                    if (isCollapsed) {
+                        sidebar.classList.add('sidebar-collapsed');
+                        sidebar.style.setProperty('width', '70px', 'important');
+                        sidebar.style.setProperty('min-width', '70px', 'important');
+                        sidebar.style.setProperty('max-width', '70px', 'important');
+                    } else {
+                        sidebar.classList.remove('sidebar-collapsed');
+                        sidebar.style.setProperty('width', '255px', 'important');
+                        sidebar.style.setProperty('min-width', '255px', 'important');
+                        sidebar.style.setProperty('max-width', '255px', 'important');
+                    }
                 }
             } catch(e) {}
         }
@@ -2278,13 +2330,21 @@
             if (e) e.stopPropagation();
             const menu = document.getElementById('header-tools-menu');
             if (!menu) return;
-            menu.classList.toggle('open');
+            const isOpen = menu.style.display === 'flex' || menu.classList.contains('open');
+            if (isOpen) {
+                menu.style.display = 'none';
+                menu.classList.remove('open');
+            } else {
+                menu.style.display = 'flex';
+                menu.classList.add('open');
+            }
             playAudioFeedback('click');
         }
 
         function closeHeaderToolsDropdown() {
             const menu = document.getElementById('header-tools-menu');
-            if (menu && menu.classList.contains('open')) {
+            if (menu) {
+                menu.style.display = 'none';
                 menu.classList.remove('open');
             }
         }

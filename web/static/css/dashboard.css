@@ -669,13 +669,20 @@
 
         /* Collapsed Sidebar Rail Mode */
         .sidebar.sidebar-collapsed {
-            width: 70px;
-            min-width: 70px;
+            width: 70px !important;
+            min-width: 70px !important;
+            max-width: 70px !important;
+            overflow: hidden !important;
         }
 
         .sidebar.sidebar-collapsed .sidebar-brand {
-            padding: 0 12px;
+            padding: 12px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             justify-content: center;
+            gap: 8px;
+            height: auto;
         }
 
         .sidebar.sidebar-collapsed .brand-title {
@@ -683,7 +690,14 @@
         }
 
         .sidebar.sidebar-collapsed .sidebar-collapse-trigger {
-            display: none !important;
+            display: flex !important;
+            margin: 0 auto;
+            width: 28px;
+            height: 28px;
+        }
+
+        .sidebar.sidebar-collapsed .collapse-chevron {
+            transform: rotate(180deg);
         }
 
         .sidebar.sidebar-collapsed .nav-group-title {

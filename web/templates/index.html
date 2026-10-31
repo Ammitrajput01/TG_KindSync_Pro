@@ -14,8 +14,105 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Telegram Mini App WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=20261101_v17_0_1">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        /* Bulletproof Critical Inlines for Zero-Glitch Layouts across all browsers */
+        .sidebar.sidebar-collapsed {
+            width: 70px !important;
+            min-width: 70px !important;
+            max-width: 70px !important;
+            overflow: hidden !important;
+        }
+        .sidebar.sidebar-collapsed .brand-title,
+        .sidebar.sidebar-collapsed .nav-label,
+        .sidebar.sidebar-collapsed .nav-badge,
+        .sidebar.sidebar-collapsed .nav-group-title,
+        .sidebar.sidebar-collapsed .doctor-sidebar-full,
+        .sidebar.sidebar-collapsed .user-details {
+            display: none !important;
+        }
+        .sidebar.sidebar-collapsed .sidebar-brand {
+            justify-content: space-between !important;
+            padding: 0 12px !important;
+        }
+        .sidebar.sidebar-collapsed .collapse-chevron {
+            transform: rotate(180deg) !important;
+        }
+        .sidebar.sidebar-collapsed .nav-link {
+            justify-content: center !important;
+            padding: 10px 0 !important;
+        }
+        .sidebar.sidebar-collapsed .nav-icon {
+            margin: 0 !important;
+        }
+        .header-tools-dropdown-menu {
+            display: none;
+        }
+        .header-tools-dropdown-menu.open {
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        .header-doctor-pill {
+            background: rgba(16, 185, 129, 0.12) !important;
+            border: 1px solid rgba(16, 185, 129, 0.4) !important;
+            color: #34D399 !important;
+        }
+        .header-doctor-pill:hover {
+            background: rgba(16, 185, 129, 0.22) !important;
+            box-shadow: 0 0 14px rgba(16, 185, 129, 0.3) !important;
+        }
+        /* Universal In-Page Mini-HUD Widget */
+        .universal-mini-hud {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 320px;
+            background: #0B101D;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 14px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.8), 0 0 20px rgba(56, 189, 248, 0.15);
+            z-index: 9999;
+            backdrop-filter: blur(20px);
+            overflow: hidden;
+            animation: mini-hud-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes mini-hud-pop {
+            from { opacity: 0; transform: translateY(16px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .mini-hud-header {
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 700;
+            color: #38BDF8;
+            letter-spacing: 0.5px;
+        }
+        .mini-hud-close-btn {
+            background: transparent;
+            border: none;
+            color: #94A3B8;
+            font-size: 18px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0 4px;
+        }
+        .mini-hud-close-btn:hover { color: #fff; }
+        .mini-hud-body { padding: 14px; }
+        .mini-hud-speed { font-size: 26px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: #10B981; margin-bottom: 2px; }
+        .mini-hud-file { font-size: 11px; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 10px; }
+        .mini-hud-track { width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+        .mini-hud-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #38BDF8, #6366F1); transition: width 0.3s; }
+        .mini-hud-footer { display: flex; align-items: center; justify-content: space-between; }
+        .mini-hud-btn { font-size: 11px; padding: 5px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); color: #fff; border-radius: 6px; cursor: pointer; font-weight: 700; transition: all 0.15s ease; }
+        .mini-hud-btn:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.3); }
+        .mini-hud-uptime { font-size: 10px; color: #64748B; font-family: 'JetBrains Mono', monospace; }
+    </style>
 </head>
 <body>
     <!-- Top 10 Website Benchmark Ambient Lighting Glow Orbs -->
@@ -59,13 +156,15 @@
         <!-- Modernized Professional Sidebar Navigation -->
         <aside class="sidebar" id="app-sidebar">
             <div class="sidebar-brand">
-                <div class="brand-logo" title="KindSync Pro Enterprise Suite">KS</div>
-                <div class="brand-title">
-                    <span>KindSync Pro</span>
-                    <span class="brand-subtitle">Version X &bull; Enterprise Cockpit</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="brand-logo" title="KindSync Pro Enterprise Suite">KS</div>
+                    <div class="brand-title">
+                        <span>KindSync Pro</span>
+                        <span class="brand-subtitle">Version X &bull; Enterprise Cockpit</span>
+                    </div>
                 </div>
-                <button class="sidebar-collapse-trigger" onclick="toggleSidebarCollapse()" title="Toggle Sidebar (Ctrl+B)">
-                    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                <button type="button" class="sidebar-collapse-trigger" id="sidebar-toggle-btn" onclick="toggleSidebarCollapse()" title="Toggle Sidebar (Ctrl+B)">
+                    <svg class="collapse-chevron" id="sidebar-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
             </div>
 
@@ -203,17 +302,10 @@
 
         <!-- Main Viewport -->
         <main class="main-viewport">
-            <!-- Top Application Header with Collapsible Toggle & Responsive Action Clustering -->
+            <!-- Top Application Header with Single Clean Architecture & Zero-Glitch Telemetry -->
             <header class="app-header">
-                <!-- Left: Hamburger Toggle + Breadcrumbs -->
+                <!-- Left: Clean Breadcrumbs (Sidebar toggle is handled natively via the brand chevron) -->
                 <div class="header-left-cluster">
-                    <button id="sidebar-toggle-btn" class="header-icon-btn sidebar-hamburger-btn" onclick="toggleSidebarCollapse()" title="Toggle Collapsible Sidebar (Ctrl+B)">
-                        <svg class="hamburger-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-                            <line x1="3" y1="6" x2="21" y2="6"/>
-                            <line x1="3" y1="12" x2="21" y2="12"/>
-                            <line x1="3" y1="18" x2="21" y2="18"/>
-                        </svg>
-                    </button>
                     <div class="header-breadcrumbs">
                         <span class="breadcrumb-root">Dashboard</span>
                         <span class="breadcrumb-sep">/</span>
@@ -221,15 +313,15 @@
                     </div>
                 </div>
 
-                <!-- Center: High-Tech Telemetry Capsule & Verified Doctor Badge -->
-                <div class="header-center-cluster">
-                    <div class="header-telemetry-capsule" onclick="checkServerPing()" title="Live Telemetry Round-Trip Latency (Click to Ping Server)">
+                <!-- Center: High-Tech Telemetry Capsule & Verified Doctor Badge (Always Dark Glass, Never White) -->
+                <div class="header-center-cluster" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
+                    <div class="header-telemetry-capsule" onclick="checkServerPing()" style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; background: #0E1626; border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 9999px; font-size: 12px; font-weight: 600; color: #E2E8F0; cursor: pointer; white-space: nowrap;" title="Live Telemetry Round-Trip Latency (Click to Ping Server)">
                         <span class="status-dot"></span>
                         <span class="telemetry-label" id="header-engine-status">Engine Online (Synced)</span>
-                        <span class="telemetry-divider">•</span>
-                        <span class="telemetry-ping" id="ping-text">⚡ 2ms</span>
+                        <span class="telemetry-divider" style="color: rgba(255,255,255,0.2);">•</span>
+                        <span class="telemetry-ping" id="ping-text" style="color: #38BDF8; font-family: 'JetBrains Mono', monospace; font-weight: 700;">⚡ 2ms</span>
                     </div>
-                    <button class="header-doctor-pill" onclick="openDoctorContactModal()" title="Kind Doctor 🩺❤️ (Dr. Amit Singh) Verified System Architect">
+                    <button type="button" class="header-doctor-pill" onclick="openDoctorContactModal()" style="display: inline-flex; align-items: center; gap: 7px; padding: 5px 14px; border-radius: 9999px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4); color: #34D399; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;" title="Kind Doctor 🩺❤️ (Dr. Amit Singh) Verified System Architect">
                         <span class="doctor-badge-dot">👨‍⚕️</span>
                         <span class="doctor-name-text">Kind Doctor 🩺❤️ (Dr. Amit Singh)</span>
                         <span class="doctor-verified-check">✓</span>
@@ -238,61 +330,61 @@
 
                 <!-- Right: Action Toolbar with Guaranteed No-Clip & More Tools Dropdown -->
                 <div class="header-actions">
-                    <button class="btn btn-ghost btn-sm header-action-btn" onclick="openCommandPalette()" title="Open Command Palette (Ctrl + K)">
+                    <button type="button" class="btn btn-ghost btn-sm header-action-btn" onclick="openCommandPalette()" title="Open Command Palette (Ctrl + K)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <span class="action-btn-text">Command</span>
                         <kbd class="hud-kbd">Ctrl+K</kbd>
                     </button>
                     
-                    <button class="btn btn-secondary btn-sm header-action-btn btn-refresh-accent" id="btn-smart-refresh" onclick="handleSmartRefresh()" title="Instant Smart Resync from Database (Alt + R)">
+                    <button type="button" class="btn btn-secondary btn-sm header-action-btn btn-refresh-accent" id="btn-smart-refresh" onclick="handleSmartRefresh()" title="Instant Smart Resync from Database (Alt + R)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="refresh-spin-icon"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
                         <span class="action-btn-text">Refresh</span>
                         <kbd class="hud-kbd" style="font-size: 9px; padding: 1px 4px;">Alt+R</kbd>
                     </button>
 
-                    <button class="btn btn-secondary btn-sm header-action-btn btn-diag-accent" id="btn-diag-analyzer" onclick="openDiagnosticModal()" title="Non-Blocking Live Diagnostic Analyzer (Alt + D)">
+                    <button type="button" class="btn btn-secondary btn-sm header-action-btn btn-diag-accent" id="btn-diag-analyzer" onclick="openDiagnosticModal()" title="Non-Blocking Live Diagnostic Analyzer (Alt + D)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                         <span class="action-btn-text">Diagnostic</span>
                         <kbd class="hud-kbd" style="font-size: 9px; padding: 1px 4px;">Alt+D</kbd>
                     </button>
 
-                    <button class="btn btn-secondary btn-sm header-action-btn" onclick="openRouteMatrixModal()" title="Visual Forwarding Route Matrix (Alt + M)">
+                    <button type="button" class="btn btn-secondary btn-sm header-action-btn" onclick="openRouteMatrixModal()" title="Visual Forwarding Route Matrix (Alt + M)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="2" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
                         <span class="action-btn-text">Route Matrix</span>
                     </button>
 
                     <!-- Snapshot: Prominently styled with rich gradient, 100% visible, never cut off -->
-                    <button class="btn btn-primary btn-sm header-action-btn btn-snapshot-glow" id="btn-header-snapshot" onclick="triggerCloudBackup()" title="Backup SQLite Database Snapshot (Alt + S)">
+                    <button type="button" class="btn btn-primary btn-sm header-action-btn btn-snapshot-glow" id="btn-header-snapshot" onclick="triggerCloudBackup()" title="Backup SQLite Database Snapshot (Alt + S)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
                         <span class="action-btn-text">Snapshot</span>
                     </button>
 
-                    <!-- More Tools & Settings Dropdown Menu -->
+                    <!-- More Tools & Settings Dropdown Menu (Guaranteed display: none by default) -->
                     <div class="header-tools-dropdown-wrapper" id="header-tools-wrapper">
-                        <button class="btn btn-ghost btn-sm header-icon-btn" onclick="toggleHeaderToolsDropdown(event)" id="btn-header-more-tools" title="More Tools & Integrations">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
+                        <button type="button" class="btn btn-ghost btn-sm header-icon-btn" onclick="toggleHeaderToolsDropdown(event)" id="btn-header-more-tools" title="More Tools & Integrations">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
                         </button>
-                        <div class="header-tools-dropdown-menu" id="header-tools-menu">
+                        <div class="header-tools-dropdown-menu" id="header-tools-menu" style="display: none;">
                             <div class="dropdown-header-title">System Tools & Utilities</div>
-                            <button class="dropdown-tool-item" onclick="openRemoteModal(); closeHeaderToolsDropdown();">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+                            <button type="button" class="dropdown-tool-item" onclick="openRemoteModal(); closeHeaderToolsDropdown();">
+                                <span style="font-size: 15px;">📱</span>
                                 <span>Mobile Wi-Fi Phone Access URL</span>
                             </button>
-                            <button class="dropdown-tool-item" onclick="toggleFloatingMiniHUD(); closeHeaderToolsDropdown();">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg>
+                            <button type="button" class="dropdown-tool-item" onclick="toggleFloatingMiniHUD(); closeHeaderToolsDropdown();">
+                                <span style="font-size: 15px;">🪟</span>
                                 <span>Picture-in-Picture Mini-HUD</span>
                             </button>
-                            <button class="dropdown-tool-item" onclick="toggleSoundFX(); closeHeaderToolsDropdown();">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            <button type="button" class="dropdown-tool-item" onclick="toggleSoundFX(); closeHeaderToolsDropdown();">
+                                <span style="font-size: 15px;">🔊</span>
                                 <span id="header-sound-label">Audio Synth FX</span>
                             </button>
-                            <button class="dropdown-tool-item" onclick="togglePauseEngine(); closeHeaderToolsDropdown();">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
+                            <button type="button" class="dropdown-tool-item" onclick="togglePauseEngine(); closeHeaderToolsDropdown();">
+                                <span style="font-size: 15px;">⏯️</span>
                                 <span id="dropdown-pause-label">Pause / Resume Engine (Space)</span>
                             </button>
                             <div class="dropdown-divider"></div>
-                            <button class="dropdown-tool-item" onclick="openDoctorContactModal(); closeHeaderToolsDropdown();" style="color: #34D399;">
-                                <span>👨‍⚕️</span>
+                            <button type="button" class="dropdown-tool-item" onclick="openDoctorContactModal(); closeHeaderToolsDropdown();" style="color: #34D399; font-weight: 700;">
+                                <span style="font-size: 15px;">👨‍⚕️</span>
                                 <span>Kind Doctor Official Profile & Relays</span>
                             </button>
                         </div>
@@ -2292,8 +2384,30 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- JavaScript Application Logic -->
-    <script src="/static/js/dashboard.js"></script>
+    <!-- JavaScript Application Logic with Anti-Cache Version Stamp -->
+    <script src="/static/js/dashboard.js?v=20261101_v17_0_1"></script>
+
+    <!-- Universal Cross-Browser Draggable Floating Mini-HUD (Firefox, Chrome, Edge, Safari) -->
+    <div id="universal-mini-hud" class="universal-mini-hud" style="display: none;">
+        <div class="mini-hud-header" id="mini-hud-drag-handle">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="status-dot"></span>
+                <span>⚡ KindSync Turbo Mini-HUD</span>
+            </div>
+            <button type="button" class="mini-hud-close-btn" onclick="toggleFloatingMiniHUD()" title="Close Mini-HUD">&times;</button>
+        </div>
+        <div class="mini-hud-body">
+            <div class="mini-hud-speed" id="inpage-hud-speed">0.0 KB/s</div>
+            <div class="mini-hud-file" id="inpage-hud-file">Monitoring Telegram Stream...</div>
+            <div class="mini-hud-track">
+                <div class="mini-hud-fill" id="inpage-hud-progress"></div>
+            </div>
+            <div class="mini-hud-footer">
+                <button type="button" class="mini-hud-btn" onclick="togglePauseEngine()">⏯️ Pause / Resume</button>
+                <span class="mini-hud-uptime" id="inpage-hud-uptime">UP: 0h 00m</span>
+            </div>
+        </div>
+    </div>
 
     <!-- Command Palette Floating Modal (Spotlight Style) -->
     <div class="cmd-palette-backdrop" id="modal-command-palette" onclick="if (event.target === this) closeCommandPalette()">
