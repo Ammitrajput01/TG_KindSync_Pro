@@ -230,6 +230,11 @@ An enterprise Telegram management bot providing complete operational oversight d
 
 <div align="center">
 
+<img src="docs/assets/kind_doctor_bot_official_profile.jpg" alt="Kind Doctor Bot Official Avatar" width="160" height="160" style="border-radius: 50%; border: 3px solid #00F0FF; box-shadow: 0 0 25px rgba(0,240,255,0.4); margin-bottom: 12px;" />
+
+### **Kind Doctor Bot (`@KindDoc_bot`)**
+*Your All-in-One Study Assistant • Official Live Telegram Bot*
+
 ![Kind Doctor Bot Showcase](docs/assets/telegram_bot_preview.jpg)
 
 </div>

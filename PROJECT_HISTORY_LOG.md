@@ -2,6 +2,34 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Sunday, 1 November 2026 | 04:55 AM IST
+
+### 50. GitHub Repository Branding Sync, Workspace Clutter Pruning & Cloning State Preservation
+* **User Directive & Context (Voice Audio 9)**:
+  - *"Jo Kind Doctor ki picture aap Kind Doctor bot pe lagaoge na, wahi aap GitHub ki repo mein bhi update kar dena Kind Doctor bot ke upar. And ek cheez aur karna, jitni bhi faaltu ki extra files hain ya extra codes hain please unko delete kar dena, bahut zyada faaltu ho gaya na. Toh har jagah se faaltu ki cheezein delete kar dena, baaki apna code clean rakhna. And please history ki backup filein mat delete karna, kyunki abhi maine usko run karna hai, cloning ko resume karna hai abhi."*
+  - *Permanent Admin Accounts*: Strictly `@Kinddoctor4u` (`1553619403`) & `@Ammitrajput1` (`759038032`).
+* **Root Cause Analysis & Requirements**:
+  1. The user explicitly directed to update GitHub repo documentation (`README.md` and `docs/index.html`) with the newly active official Kind Doctor Bot avatar (`kind_doctor_bot_official_profile.jpg`).
+  2. The workspace had accumulated temporary scratch files, old one-off test scripts in `scratch/`, stale temporary session exports (`temp_vault_export_*.session`), and SQLite traffic caches (`mitm_mcp_traffic.db`).
+  3. **Strict Invariant**: Under no circumstances should `history_core.sqlite` or any history backup files (`db_backups/`, `archives/`, `export_backups/`) be deleted, as live cloning resumes immediately.
+* **Applied Engineering Upgrades**:
+  1. Updated `README.md` (Bot Showcase Section) and `docs/index.html` (Cyber-Glass Showcase) with glowing circular badge showcasing `kind_doctor_bot_official_profile.jpg`.
+  2. Pruned obsolete non-repo files:
+     - Removed `temp_vault_export_session_forwarder_*.session` (4 temp export artifacts).
+     - Removed `mitm_mcp_traffic.db` and old `tg_thumb_cached.jpg`.
+     - Cleared deprecated one-off scripts from `scratch/`.
+     - Cleaned `__pycache__` and `.pytest_cache`.
+  3. Preserved intact:
+     - `history_core.sqlite`, all history backup snapshots in `db_backups/` and `archives/`.
+     - Production sessions (`session_forwarder.session`, `session_account2.session`, etc.).
+     - `strip_words.txt`, `.env`, and `engine_control.json`.
+  4. Verified all 14/14 automated system tests pass (`python tests/run_all_tests.py`).
+  5. Pushed commits to GitHub remote (`origin/main`) per direct user authorization.
+* **Affected Files**:
+  - `README.md`
+  - `docs/index.html`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Sunday, 1 November 2026 | 04:48 AM IST
 
 ### 49. Kind Doctor Bot Official Profile Picture Live Application via Telegram Bot API
