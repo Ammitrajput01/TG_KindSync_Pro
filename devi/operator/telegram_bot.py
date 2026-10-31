@@ -123,7 +123,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/find", "/search", "/faq", "/faqs", 
     "/indexhelp", "/clonehelp", "/cloninghelp", "/clonerhelp", "/cloner", "/routehelp", "/forwardhelp", "/routinghelp",
     "/adminhelp", "/modhelp", "/securityhelp", "/calchelp", "/dosehelp", "/scorehelp",
-    "/stripwords", "/striplist", "/stripcard", "/pacing", "/speed", "/delay",
+    "/strip", "/addstrip", "/delstrip", "/stripadd", "/stripdel", "/stripwords", "/striplist", "/stripcard", "/pacing", "/speed", "/delay",
     "/setthumb", "/thumb", "/setcover", "/viewthumb", "/getthumb", "/showthumb", "/delthumb", "/resetthumb",
     "/topics", "/help",
     "/mainindex", "/topicindex", "/indexmaster", "/index",
@@ -2343,14 +2343,15 @@ class DeviTelegramBot:
                     {"text": "⏱️ Pacing Settings", "callback_data": "act_pacing"}
                 ],
                 [
-                    {"text": "🏷️ Strip Words Filter", "callback_data": "act_stripwords"},
-                    {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}
+                    {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                    {"text": "🏷️ Strip Words List", "callback_data": "act_stripwords"}
                 ],
                 [
-                    {"text": "🧹 Clean Welcomes Now", "callback_data": "act_cleanwelcome"},
-                    {"text": "🔄 Refresh Panel", "callback_data": f"act_pnl_refresh_{target_chat_id}"}
+                    {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"},
+                    {"text": "🧹 Clean Welcomes Now", "callback_data": "act_cleanwelcome"}
                 ],
                 [
+                    {"text": "🔄 Refresh Panel", "callback_data": f"act_pnl_refresh_{target_chat_id}"},
                     {"text": "🔙 Main Help Menu", "callback_data": "act_menu"}
                 ]
             ]
@@ -2547,6 +2548,10 @@ class DeviTelegramBot:
                         {"text": "❌ UNLINK TARGET", "callback_data": "act_fwd_del_tgt"}
                     ],
                     [
+                        {"text": "➕ ADD STRIP WORD", "callback_data": "act_strip_add"},
+                        {"text": "🏷️ STRIP RULES", "callback_data": "act_stripwords"}
+                    ],
+                    [
                         {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
                         {"text": "🚀 START AUTO-SYNC", "callback_data": "act_fwd_start"}
                     ]
@@ -2585,6 +2590,10 @@ class DeviTelegramBot:
                     [
                         {"text": "❌ UNLINK SOURCE", "callback_data": "act_fwd_del_src"},
                         {"text": "❌ UNLINK TARGET", "callback_data": "act_fwd_del_tgt"}
+                    ],
+                    [
+                        {"text": "➕ ADD STRIP WORD", "callback_data": "act_strip_add"},
+                        {"text": "🏷️ STRIP RULES", "callback_data": "act_stripwords"}
                     ],
                     [
                         {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
@@ -2676,11 +2685,14 @@ class DeviTelegramBot:
                     {"text": "🧹 Reset Cloner (#0)", "callback_data": "act_cloner_reset"}
                 ],
                 [
-                    {"text": "🛡️ Strip Words Card", "callback_data": "act_stripwords"},
-                    {"text": "⚡ Pacing Settings", "callback_data": "act_pacing"}
+                    {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                    {"text": "🛡️ Strip Words Card", "callback_data": "act_stripwords"}
                 ],
                 [
-                    {"text": "🖼️ Cover Thumbnail", "callback_data": "act_cloner_thumb"},
+                    {"text": "⚡ Pacing Settings", "callback_data": "act_pacing"},
+                    {"text": "🖼️ Cover Thumbnail", "callback_data": "act_cloner_thumb"}
+                ],
+                [
                     {"text": "🚀 Clone Guide", "callback_data": "act_cloner_help"}
                 ]
             ]
@@ -5591,6 +5603,10 @@ class DeviTelegramBot:
                 keyboard["inline_keyboard"].append([
                     {"text": direct_btn_txt, "callback_data": "act_toggle_direct"},
                     {"text": sig_btn_txt, "callback_data": "act_toggle_sig"}
+                ])
+                keyboard["inline_keyboard"].append([
+                    {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                    {"text": "🏷️ Strip Words Filter", "callback_data": "act_stripwords"}
                 ])
             sent_m = await self._send_message(session, chat_id, reply, reply_markup=keyboard, message_thread_id=thread_id)
             if sent_m and chat_id < 0:
@@ -10446,8 +10462,24 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
                 return
             if len(parts) < 2:
-                card_text, kb = self._build_strip_words_card_data(admin_id, page=1)
-                await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True, message_thread_id=thread_id)
+                self.pending_strip_input[admin_id] = {
+                    "action": "add",
+                    "chat_id": chat_id,
+                    "msg_id": msg_id,
+                    "thread_id": thread_id
+                }
+                prompt_text = (
+                    "➕ <b>Add Strip Word or Replacement Rule</b> 🛡️\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Ab agle message me apna word ya rule send karein:\n\n"
+                    "• <b>Direct Removal:</b> <code>@SomeOldChannel</code>\n"
+                    "• <b>Replacement Rule:</b> <code>OldBrand =&gt; NewBrand</code>\n"
+                    "• <b>Multiple Rules:</b> Ek saath multiple lines bhi bhej sakte hain!\n\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "<i>Cancel karne ke liye /cancel ya neeche button dabayein:</i>"
+                )
+                cancel_kb = {"inline_keyboard": [[{"text": "❌ Cancel Input", "callback_data": "act_strip_cancel"}]]}
+                await self._send_message(session, chat_id, prompt_text, reply_markup=cancel_kb, message_thread_id=thread_id)
                 return
             word_to_add = " ".join(parts[1:]).strip()
             added_cnt = add_strip_rules([word_to_add], added_by=admin_id)
@@ -10483,7 +10515,7 @@ class DeviTelegramBot:
             else:
                 await self._send_message(session, chat_id, f"⚠️ Word <code>{html.escape(target_word)}</code> strip list me nahi mila.", message_thread_id=thread_id)
 
-        elif cmd in ("/stripwords", "/striplist", "/stripcard"):
+        elif cmd in ("/strip", "/stripwords", "/striplist", "/stripcard"):
             card_text, kb = self._build_strip_words_card_data(admin_id, page=1)
             await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True, message_thread_id=thread_id)
 

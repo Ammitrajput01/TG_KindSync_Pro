@@ -219,4 +219,16 @@ def test_welcome_settings_and_panel_cards(bot_and_db):
     assert "OSINT Framework" in card
     assert "999888777" in card
 
+    # 3. Test Auto Forward Hub and Clone Status cards include Add Strip Word buttons
+    admin_id = 1553619403
+    _, fwd_kb = bot._build_autoforward_panel_data(admin_id)
+    all_fwd_cbs = [btn.get("callback_data") for row in fwd_kb["inline_keyboard"] for btn in row]
+    assert "act_strip_add" in all_fwd_cbs
+    assert "act_stripwords" in all_fwd_cbs
+
+    _, clone_kb = bot._build_clone_status_card_data(admin_id)
+    all_clone_cbs = [btn.get("callback_data") for row in clone_kb["inline_keyboard"] for btn in row]
+    assert "act_strip_add" in all_clone_cbs
+    assert "act_stripwords" in all_clone_cbs
+
 

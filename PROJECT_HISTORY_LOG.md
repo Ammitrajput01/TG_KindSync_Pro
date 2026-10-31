@@ -2,6 +2,37 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 31 October 2026 | 10:00 PM IST
+
+### 40. Interactive "Add Strip Word" Triggers Across All Bot Panels (Control Panel, Main Menu, Auto Forward Hub & Live Cloner Status)
+* **User Directive & Context**:
+  - The user requested: *"Listen Actually one more more option is not available there That was like add stripping word Ok that was the main function of thekinddoctor bot So add that feature also in the cards in settings or features of the kinddoctor bot"*.
+  - Stripping unwanted words, promotional links, handles, and watermarks is the core branding and cleanliness function of the Kind Doctor Bot and TG KindSync Pro engine.
+  - While the stripping backend (`add_strip_rules`, `strip_words.txt`, SQLite `strip_rules`) and interactive prompt state machine (`self.pending_strip_input`) existed, the interactive action button `[ ➕ Add Strip Word ]` was missing from several primary navigation panels, requiring users to either navigate deeply or remember specific slash commands.
+* **Root Cause & Scope Analysis**:
+  1. **Absence in Auto Forward Hub (`_build_autoforward_panel_data`)**: Forwarding channels often carry unwanted sponsor texts, usernames, and invite links. While the Forward Hub provided source, target, and sync controls, it lacked a direct button to add strip words or view active cleaning rules.
+  2. **Absence in Live Cloner Status Radar (`_build_clone_status_card_data`)**: The cloner card provided buttons for Pacing, Refresh, and Thumbnail, but lacked an immediate 1-tap `[ ➕ Add Strip Word ]` button.
+  3. **Absence in Main Admin Menu (`/menu`, `/help`, `/start`)**: The admin section of the main menu featured fast forward pause, cloner status, and toggle buttons, but omitted direct strip rules access.
+  4. **Bare Command Invocation UX (`/addstrip`)**: When invoked without arguments (`/addstrip`), the bot previously rendered the static list rather than prompting the admin interactively to input the new word or replacement rule.
+* **Applied Engineering Fixes**:
+  1. **Auto Forward Hub Buttons Expansion (`_build_autoforward_panel_data`)**:
+     - Added `[ {"text": "➕ ADD STRIP WORD", "callback_data": "act_strip_add"}, {"text": "🏷️ STRIP RULES", "callback_data": "act_stripwords"} ]` to both unauthenticated and authenticated view layouts.
+  2. **Live Cloner Status Radar Expansion (`_build_clone_status_card_data`)**:
+     - Paired `[ ➕ Add Strip Word ]` (`act_strip_add`) directly alongside `[ 🛡️ Strip Words Card ]` (`act_stripwords`).
+  3. **Main Menu Admin Action Row (`/menu`)**:
+     - Added `[ {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"}, {"text": "🏷️ Strip Words Filter", "callback_data": "act_stripwords"} ]` to the admin controls row.
+  4. **Interactive Bare `/addstrip` Handler**:
+     - When `/addstrip` is sent without arguments, the bot immediately sets `self.pending_strip_input[admin_id] = {"action": "add", ...}` and renders the interactive rule entry prompt with cancellation buttons.
+  5. **Direct `/strip` Command & Aliases**:
+     - Registered `/strip`, `/addstrip`, `/delstrip`, `/stripadd`, `/stripdel` in `PUBLIC_ALLOWED_COMMANDS` and routed `/strip` directly to `_build_strip_words_card_data`.
+  6. **Unit Tests & Full Verification**:
+     - Extended `tests/test_osint_and_rose.py` to assert that `act_strip_add` and `act_stripwords` callback actions are present on both Auto Forward Hub and Cloner Status cards.
+     - Ran full test suite (`tests/run_all_tests.py`), confirming all 12 test suites passed 100%.
+* **Affected Files**:
+  - `devi/operator/telegram_bot.py`
+  - `tests/test_osint_and_rose.py`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Saturday, 31 October 2026 | 09:48 PM IST
 
 ### 39. Bot Card Navigation Anti-Loop Engine, Dedicated Welcome & Greetings Settings Card, 18-Platform OSINT Reconnaissance & Member Join Deep Links
