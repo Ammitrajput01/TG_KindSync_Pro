@@ -28,6 +28,7 @@ import logging
 import sqlite3
 import csv
 import io
+import copy
 import random
 import base64
 import struct
@@ -1627,34 +1628,32 @@ class DeviTelegramBot:
             )
             # 1. Official Command Autocomplete List
             commands = [
-                {"command": "menu", "description": "Interactive 1-Click Control Panel"},
-                {"command": "forward", "description": "Forward & Route messages to Topics"},
+                {"command": "menu", "description": "Interactive 1-Click Master Control Panel"},
+                {"command": "manual", "description": "Official 3-Part Command Manual"},
+                {"command": "striphelp", "description": "Strip Words, Regex & Watermark Studio Guide"},
+                {"command": "clonehelp", "description": "1-Click & Batch Cloner Engine Guide"},
+                {"command": "routehelp", "description": "Auto-Forward Matrix & Topic Routing Guide"},
+                {"command": "indexhelp", "description": "Lecture Index, DAMS Topics & Search Guide"},
+                {"command": "mediahelp", "description": "YouTube, Drive & Direct Media Downloader"},
+                {"command": "calchelp", "description": "Parkland Resuscitation & GCS Clinical Guide"},
+                {"command": "osinthelp", "description": "SangMata & Rose User Dossier Intel Guide"},
+                {"command": "pacinghelp", "description": "Anti-Flood Pacing & Velocity Guide"},
+                {"command": "adminhelp", "description": "Admin Safeguards, Stealth Mode & Privacy"},
+                {"command": "webhelp", "description": "Web Cockpit (TMA 2.0) Browser Guide"},
+                {"command": "strip", "description": "View & configure strip word cleaning rules"},
+                {"command": "clonestatus", "description": "Live cloning progress, speed & controls"},
+                {"command": "forward", "description": "Auto-Forward Hub & Topic Route Matrix"},
                 {"command": "pause", "description": "Pause auto-forwarding & live sync"},
                 {"command": "resume", "description": "Resume auto-forwarding & live sync"},
-                {"command": "clonestatus", "description": "Live cloning progress, speed & controls"},
-                {"command": "ytdl", "description": "Download & upload video/reel to current topic"},
-                {"command": "upload", "description": "Universal web & direct link topic uploader"},
-                {"command": "playlist", "description": "Upload entire YouTube playlist to topic"},
-                {"command": "newtopic", "description": "Create a new Forum Topic (e.g. DAMS)"},
-                {"command": "setgroup", "description": "Select active target group for DM commands"},
-                {"command": "mediahelp", "description": "In-topic media downloading manual"},
                 {"command": "clone", "description": "1-Click Instant Message Cloner"},
                 {"command": "batchclone", "description": "Batch Clone continuous message ranges"},
-                {"command": "pauseclone", "description": "Pause active deep clone jobs"},
-                {"command": "resumeclone", "description": "Resume paused deep clone jobs"},
-                {"command": "stopclone", "description": "Cancel a running clone job"},
                 {"command": "index", "description": "Topic Table of Contents & Lecture Index"},
                 {"command": "mainindex", "description": "Master Topic Directory (#A to #Z)"},
                 {"command": "find", "description": "Search lectures, notes & topics"},
                 {"command": "userinfo", "description": "SangMata & Rose style user dossier"},
-                {"command": "cleanwelcome", "description": "Auto-purge welcome & service alerts"},
-                {"command": "cleandeleted", "description": "Purge deleted ghost accounts from group"},
                 {"command": "status", "description": "Live transmission speed & health telemetry"},
                 {"command": "backup", "description": "Instant SQLite database backup snapshot"},
-                {"command": "manual", "description": "Official 3-Part Command Manual"},
-                {"command": "rules", "description": "View group study guidelines"},
                 {"command": "support", "description": "Confidential Line to Kind Doctor Desk"},
-                {"command": "botinfo", "description": "Bot specifications & credentials"},
                 {"command": "id", "description": "View Telegram User ID safely"}
             ]
             # Register across all Telegram scopes (Default, Groups, Group Admins, Private)
@@ -1701,16 +1700,24 @@ class DeviTelegramBot:
             dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
             lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
             dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+            if dash_url.lower().startswith("https://"):
+                menu_btn_payload = {
+                    "menu_button": {
+                        "type": "web_app",
+                        "text": "⚡ Web Cockpit",
+                        "web_app": {"url": dash_url}
+                    }
+                }
+            else:
+                menu_btn_payload = {
+                    "menu_button": {
+                        "type": "default"
+                    }
+                }
             with suppress(Exception):
                 await session.post(
                     f"https://api.telegram.org/bot{self.token}/setChatMenuButton",
-                    json={
-                        "menu_button": {
-                            "type": "web_app",
-                            "text": "⚡ Web Cockpit",
-                            "web_app": {"url": dash_url}
-                        }
-                    },
+                    json=menu_btn_payload,
                     timeout=8
                 )
 
@@ -1811,6 +1818,31 @@ class DeviTelegramBot:
         text = re.sub(r'(?<![<\w/])_([^_]+)_(?![>\w])', r'<i>\1</i>', text)
         return text
 
+    def _sanitize_reply_markup(self, markup: Optional[dict]) -> Optional[dict]:
+        """Defensively sanitizes inline_keyboard buttons to prevent Telegram API 400 Bad Request:
+        Telegram Bot API strictly mandates that 'web_app' URLs must be HTTPS (no http://, no raw IP addresses).
+        If a web_app URL is not https://, this converts it safely to a standard browser 'url' or fallback callback.
+        """
+        if not markup or not isinstance(markup, dict):
+            return markup
+        try:
+            sanitized = copy.deepcopy(markup)
+            keyboard = sanitized.get("inline_keyboard", [])
+            for row in keyboard:
+                for btn in row:
+                    if "web_app" in btn and isinstance(btn["web_app"], dict):
+                        w_url = btn["web_app"].get("url", "")
+                        if not str(w_url).lower().startswith("https://"):
+                            # Non-HTTPS web_app is strictly forbidden by Telegram Bot API
+                            btn.pop("web_app", None)
+                            if str(w_url).lower().startswith("http://"):
+                                btn["url"] = str(w_url)
+                            else:
+                                btn["callback_data"] = "act_webhelp"
+            return sanitized
+        except Exception as e:
+            logger.warning(f"Error sanitizing reply_markup: {e}")
+            return markup
 
     async def _send_message(
         self, 
@@ -1829,7 +1861,7 @@ class DeviTelegramBot:
         if reply_to:
             payload["reply_to_message_id"] = reply_to
         if reply_markup:
-            payload["reply_markup"] = reply_markup
+            payload["reply_markup"] = self._sanitize_reply_markup(reply_markup)
         if message_thread_id:
             payload["message_thread_id"] = message_thread_id
         if disable_web_page_preview:
@@ -1922,7 +1954,7 @@ class DeviTelegramBot:
             "disable_web_page_preview": disable_web_page_preview
         }
         if reply_markup:
-            payload["reply_markup"] = reply_markup
+            payload["reply_markup"] = self._sanitize_reply_markup(reply_markup)
         try:
             async with session.post(url, json=payload, timeout=10) as resp:
                 if resp.status == 200:
@@ -1943,6 +1975,9 @@ class DeviTelegramBot:
         except Exception as e:
             logger.warning(f"Failed to edit message {message_id} in {chat_id}: {e}")
             return False
+
+    # In-place edit alias for backward compatibility across modules
+    _edit_message_text = _edit_message
 
     async def _send_document(
         self,
@@ -2853,203 +2888,36 @@ class DeviTelegramBot:
 
     def _build_interactive_help_card(self, category: str = "main", is_admin: bool = False) -> Tuple[str, dict]:
         """Builds interactive nested help card with in-place category switching."""
+        dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+        lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+        dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+
         cat = str(category).lower().strip()
-        
-        if cat in ("study", "lectures", "navigation"):
-            text = (
-                f"📚 <b>STUDY &amp; LECTURE NAVIGATION MANUAL</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"• <code>/mainindex</code> — Generate Alphabetical (A-Z) Master Topic Directory\n"
-                f"• <code>/topicindex</code> — Generate Table of Contents (TOC) inside current topic\n"
-                f"• <code>/find &lt;keyword&gt;</code> — Search indexed lectures, topics &amp; notes\n"
-                f"• <code>/rules</code> — View official community guidelines &amp; study etiquette\n"
-                f"• <code>/support &lt;msg&gt;</code> — Direct confidential message line to Kind Doctor\n"
-                f"• <code>/id</code> — View your Telegram User ID safely without exposing phone\n"
-                f"• <code>/pomodoro [mins]</code> — Start focused deep-study sprint (25m/50m)\n"
-                f"• <code>/stats</code> — View community study metrics &amp; engagement\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
-            )
-            kb = {
-                "inline_keyboard": [
-                    [
-                        {"text": "🕵️ OSINT & Radar", "callback_data": "act_help_osint"},
-                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"}
-                    ],
-                    [
-                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"},
-                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
-                    ],
-                    [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
-                    ]
-                ]
-            }
-            return text, kb
 
-        elif cat in ("osint", "forensics", "intelligence"):
+        # -------------------------------------------------------------
+        # CARD 1: STRIP WORDS & WATERMARK CLEANER STUDIO
+        # -------------------------------------------------------------
+        if cat in ("strip", "stripwords", "watermark", "branding", "striphelp", "addstrip", "delstrip"):
             text = (
-                f"🕵️ <b>OSINT &amp; FORENSIC INTELLIGENCE MANUAL</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"• <code>/userinfo &lt;id|@user|reply&gt;</code> — Full SangMata timeline, DC, age &amp; risk score\n"
-                f"• <code>/osint &lt;target&gt;</code> — Cross-platform probe (GitHub, GitLab, Docker, Dev.to) + TGStat\n"
-                f"• <code>/phone &lt;number&gt;</code> — Telecom circle, Truecaller, WhatsApp &amp; group cross-match\n"
-                f"• <code>/email &lt;address&gt;</code> — Disposable check, corporate provider &amp; Gravatar profile\n"
-                f"• <code>/members</code> — Audit member roster, join dates &amp; name changes\n"
-                f"• <code>/exportmembers</code> — Export full member list as Excel/CSV\n"
-                f"• <code>/jointrack [on/off]</code> — Toggle deep forensic join alerts to admin PM\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
-            )
-            kb = {
-                "inline_keyboard": [
-                    [
-                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
-                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"}
-                    ],
-                    [
-                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"},
-                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
-                    ],
-                    [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
-                    ]
-                ]
-            }
-            return text, kb
-
-        elif cat in ("cloner", "cloning", "deepclone", "media", "ytdl"):
-            text = (
-                f"🚀 <b>DEEP CLONER &amp; UNIVERSAL MEDIA UPLOADER MANUAL</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📥 <b>UNIVERSAL IN-TOPIC MEDIA DOWNLOADER:</b>\n"
-                f"• <code>/ytdl &lt;url&gt; [Topic]</code> — Download &amp; upload video/reel to topic\n"
-                f"• <code>/playlist &lt;url&gt; [Topic]</code> — Upload entire YouTube playlist sequentially\n"
-                f"• <code>/upload &lt;direct_url&gt;</code> — Direct web stream upload (.mp4/.pdf/.zip)\n"
-                f"• <code>/newtopic &lt;Name&gt;</code> — Create a new Forum Topic (e.g. DAMS)\n"
-                f"• <code>/setgroup</code> — Switch active target group when commanding from DM\n"
-                f"• <code>/mediahelp</code> — In-depth guide for downloading in forum topics\n\n"
-                f"🔄 <b>DEEP CLONING &amp; MIRRORING:</b>\n"
-                f"• <code>/clonegroup [Src] [Tgt]</code> — Entire supergroup clone (auto-creates topics)\n"
-                f"• <code>/clonetopic [Src] [Tgt]</code> — Clone single topic with thousands of lectures\n"
-                f"• <code>/batchclone [Start] [End]</code> — Sequence clone of specific message range\n"
-                f"• <code>/clone [Link | Reply]</code> — 1-Click single post clone\n"
-                f"• <code>/clonejobs</code> — Live dashboard of all active and running clone jobs\n"
-                f"• <code>/clonestatus</code> — Real-time cloning speed &amp; ETA radar\n"
-                f"• <code>/stripwords</code> — Interactive strip words card &amp; pagination\n"
-                f"• <code>/pacing</code> — Interactive 1-click speed presets (0.0s to 2.0s)\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
-            )
-            kb = {
-                "inline_keyboard": [
-                    [
-                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
-                        {"text": "🕵️ OSINT & Radar", "callback_data": "act_help_osint"}
-                    ],
-                    [
-                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"},
-                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
-                    ],
-                    [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
-                    ]
-                ]
-            }
-            return text, kb
-
-        elif cat in ("calc", "calculator", "clinical"):
-            text = (
-                f"🩺 <b>CLINICAL &amp; BEDSIDE CALCULATORS MANUAL</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"• <code>/bmi &lt;weight_kg&gt; &lt;height_cm&gt;</code> — BMI &amp; WHO nutritional category\n"
-                f"• <code>/bsa &lt;weight_kg&gt; &lt;height_cm&gt;</code> — Body Surface Area (Mosteller/DuBois)\n"
-                f"• <code>/map &lt;sbp&gt; &lt;dbp&gt;</code> — Mean Arterial Pressure &amp; perfusion status\n"
-                f"• <code>/dose &lt;mg/kg&gt; &lt;wt&gt; &lt;conc_mg/ml&gt;</code> — Pediatric &amp; emergency dosing\n"
-                f"• <code>/maintenance &lt;weight_kg&gt;</code> — Holliday-Segar 4-2-1 hourly fluid rate\n"
-                f"• <code>/gfr &lt;cr&gt; &lt;age&gt; &lt;sex&gt;</code> — CKD-EPI Glomerular Filtration Rate\n"
-                f"• <code>/gcs &lt;E&gt; &lt;V&gt; &lt;M&gt;</code> — Glasgow Coma Scale &amp; head injury triage\n"
-                f"• <code>/curb65 &lt;score 0-5&gt;</code> — Pneumonia mortality risk &amp; triage\n"
-                f"• <code>/parkland &lt;wt&gt; &lt;tbsa%&gt;</code> — Parkland 24-hour burn resuscitation fluid\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
-            )
-            kb = {
-                "inline_keyboard": [
-                    [
-                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
-                        {"text": "🕵️ OSINT & Radar", "callback_data": "act_help_osint"}
-                    ],
-                    [
-                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"},
-                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
-                    ],
-                    [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
-                    ]
-                ]
-            }
-            return text, kb
-
-        elif cat in ("admin", "security", "mod"):
-            text = (
-                f"🛡️ <b>GROUP ADMINISTRATION &amp; SECURITY MANUAL</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"• <code>/setgroup</code> — Select active target group for remote DM commands\n"
-                f"• <code>/newtopic &lt;Name&gt;</code> — Create Forum Topic (e.g. DAMS)\n"
-                f"• <code>/cleanwelcome</code> — 1-Click batch purge of all previous welcome cards\n"
-                f"• <code>/cleandeleted</code> — Scan and remove ghost &amp; 'Deleted Accounts'\n"
-                f"• <code>/purge [count]</code> — Mass-delete recent messages in emergencies\n"
-                f"• <code>/setwelcome &lt;text&gt;</code> — Set custom welcome message\n"
-                f"• <code>/welcometoggle [on/off]</code> — Enable or disable welcome greetings\n"
-                f"• <code>/jointrack [on/off]</code> — Toggle deep forensic join alerts to admin PM\n"
-                f"• <code>/setrules &lt;text&gt;</code> — Set official group rules &amp; guidelines\n"
-                f"• <code>/backup</code> — Zero-downtime full SQLite snapshot export\n"
-                f"• <code>/health</code> — Real-time telemetry, RAM &amp; database status\n"
-                f"• <code>/update</code> — 1-Click Code Sync &amp; Auto-Updater\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche diye buttons se doosri categories browse karein:</i>"
-            )
-            kb = {
-                "inline_keyboard": [
-                    [
-                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
-                        {"text": "🕵️ OSINT & Radar", "callback_data": "act_help_osint"}
-                    ],
-                    [
-                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"},
-                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"}
-                    ],
-                    [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
-                    ]
-                ]
-            }
-            return text, kb
-
-        elif cat in ("strip", "stripwords", "watermark", "branding", "striphelp"):
-            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
-            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
-            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
-            text = (
-                f"🛡️ <b>WATERMARK &amp; STRIP WORDS STUDIO MANUAL</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Kind Doctor Bot ka core engine cloned &amp; forwarded posts me se unwanted channels, usernames, sponsor tags aur links automatically strip kar deta hai:\n\n"
-                f"🎯 <b>RULES KAISE KAAM KARTE HAIN:</b>\n"
-                f"• <b>1. Direct Removal:</b> <code>@SpamChannel</code> ya <code>Join Now!</code>\n"
-                f"  <i>(Yeh words caption, media text aur filenames se gayab ho jayenge)</i>\n"
-                f"• <b>2. Replacement Mapping:</b> <code>OldBrand =&gt; Kind Doctor</code>\n"
-                f"  <i>(OldBrand ko remove karke aapka custom signature replace hoga)</i>\n"
-                f"• <b>3. Regex Support:</b> <code>#[a-zA-Z0-9_]+</code>\n"
-                f"  <i>(Har tarah ke hashtags aur promotional watermarks filter karta hai)</i>\n"
-                f"• <b>4. Case-Insensitive &amp; Auto-Dedup:</b> Capital/small ka farq nahi padta, duplicate rules auto-clean hote hain.\n\n"
-                f"⚡ <b>DIRECT COMMANDS:</b>\n"
-                f"• ➕ <code>/addstrip &lt;rule&gt;</code> — Naya strip word ya replacement rule add karein\n"
-                f"• 🏷️ <code>/stripwords</code> — Saare active rules ka interactive card (12 per page)\n"
-                f"• 🗑️ <code>/delstrip &lt;rule&gt;</code> — Rule delete karein (safety backup auto-created)\n"
-                f"• 🧹 <code>/dedupstrip</code> — Duplicate aur whitespace rules auto-clean karein\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche diye 1-Click Buttons se live manage karein:</i>"
+                "🏷️ <b>STRIP WORDS &amp; WATERMARK CLEANER STUDIO MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Kind Doctor Bot ka core engine cloned &amp; forwarded posts me se unwanted channels, usernames, sponsor tags aur links automatically strip kar deta hai:\n\n"
+                "🎯 <b>RULES KAISE KAAM KARTE HAIN:</b>\n"
+                "• <b>1. Direct Removal:</b> <code>@SpamChannel</code> ya <code>Join Now!</code>\n"
+                "  <i>(Yeh words caption, media text aur filenames se clean ho jayenge)</i>\n"
+                "• <b>2. Replacement Mapping:</b> <code>OldBrand =&gt; Kind Doctor</code>\n"
+                "  <i>(OldBrand ko remove karke aapka custom signature replace hoga)</i>\n"
+                "• <b>3. Regex Filtering:</b> <code>#[a-zA-Z0-9_]+</code>\n"
+                "  <i>(Har tarah ke hashtags aur promotional watermarks filter karta hai)</i>\n"
+                "• <b>4. Case-Insensitive &amp; Auto-Dedup:</b> Capital/small ka farq nahi padta, duplicate rules auto-clean hote hain.\n\n"
+                "⚡ <b>DIRECT COMMANDS:</b>\n"
+                "• ➕ <code>/addstrip &lt;rule&gt;</code> — Naya strip word ya replacement rule add karein\n"
+                "• 🏷️ <code>/stripwords</code> — Saare active rules ka interactive card (12 per page)\n"
+                "• 🗑️ <code>/delstrip &lt;rule&gt;</code> — Rule delete karein (safety backup auto-created)\n"
+                "• 🧹 <code>/dedupstrip</code> — Duplicate aur whitespace rules auto-clean karein\n"
+                "• 🔄 <code>/syncstrip</code> — Disk file aur SQLite database synchronization\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se live manage karein:</i>"
             )
             kb = {
                 "inline_keyboard": [
@@ -3062,35 +2930,84 @@ class DeviTelegramBot:
                         {"text": "🧹 Clean & Dedup", "callback_data": "act_strip_dedup"}
                     ],
                     [
-                        {"text": "🌐 Web Regex Sandbox", "web_app": {"url": f"{dash_url}#operations"}}
+                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_help_cloner"},
+                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"}
                     ],
                     [
-                        {"text": "📚 Study Guide", "callback_data": "act_help_study"},
-                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"}
-                    ],
-                    [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
                     ]
                 ]
             }
             return text, kb
 
-        elif cat in ("route", "routing", "forward", "autoforward", "routehelp"):
-            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
-            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
-            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+        # -------------------------------------------------------------
+        # CARD 2: DEEP FORUM CLONER & TOPIC MIRRORING
+        # -------------------------------------------------------------
+        elif cat in ("cloner", "cloning", "deepclone", "clonehelp", "clonestatus", "clonejobs"):
             text = (
-                f"🔄 <b>CLOUD ROUTING &amp; AUTO-FORWARDER MANUAL</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"24/7 Cloud Background Forwarding Engine bina kisi PC ke continuous real-time copy karta hai:\n\n"
-                f"⚡ <b>CORE ROUTING COMMANDS:</b>\n"
-                f"• ➕ <code>/addroute &lt;source_id&gt; &lt;target_id&gt; [clean/forward]</code> — Naya auto-mirror stream banayein\n"
-                f"• 📋 <code>/routes</code> — Saari active auto-mirror routing streams dekhein\n"
-                f"• ❌ <code>/delroute &lt;route_id&gt;</code> — Auto-mirroring stream deactivate karein\n"
-                f"• 🚀 <code>/autoforward</code> or <code>/hub</code> — Auto-Forward Hub Pro card open karein\n"
-                f"• 🧹 <code>/clean_history</code> — Forwarded ID cache aur duplicate tracker reset karein\n\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche diye 1-Click Buttons se control karein:</i>"
+                "🚀 <b>DEEP FORUM CLONER &amp; TOPIC MIRRORING MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Supergroups aur Forum channels ke complete data ko bina forward tag ke target group me clone karta hai:\n\n"
+                "🎯 <b>CLONING MODES &amp; SYNTAX:</b>\n"
+                "• <b>Full Supergroup Clone:</b>\n"
+                "  <code>/clonegroup &lt;source_id&gt; &lt;target_id&gt;</code>\n"
+                "  <i>(Saare 1 to 2000+ topics target group me auto-create honge aur pura data clone hoga)</i>\n"
+                "• <b>Single Topic-to-Topic Clone:</b>\n"
+                "  <code>/clonetopic &lt;source_id&gt; &lt;target_id&gt; [src_topic] [tgt_topic]</code>\n"
+                "• <b>Batch Range Clone (Single Chat/Topic):</b>\n"
+                "  <code>/batchclone &lt;from_msg_id&gt; &lt;to_msg_id&gt;</code>\n"
+                "• <b>Single Message Clone:</b>\n"
+                "  <code>/clone &lt;link | reply&gt;</code>\n\n"
+                "🎮 <b>JOB CONTROL &amp; RADAR:</b>\n"
+                "• 📊 <code>/clonestatus</code> — Live progress bar, msgs/sec, ETA radar\n"
+                "• 📋 <code>/clonejobs</code> — List of all running &amp; queued clone jobs\n"
+                "• ⏸️ <code>/pauseclone &lt;job_id&gt;</code> | ▶️ <code>/resumeclone &lt;job_id&gt;</code>\n"
+                "• 🛑 <code>/stopclone &lt;job_id&gt;</code> — Cancel a running clone job safely\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se live control karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"},
+                        {"text": "📋 View Active Jobs", "callback_data": "act_clonejobs"}
+                    ],
+                    [
+                        {"text": "⏸️ Pause All Jobs", "callback_data": "act_cloner_pause_all"},
+                        {"text": "▶️ Resume All Jobs", "callback_data": "act_cloner_resume_all"}
+                    ],
+                    [
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"},
+                        {"text": "⏱️ Velocity & Pacing", "callback_data": "act_help_pacing"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # CARD 3: CLOUD AUTO-FORWARDER & ROUTING MATRIX
+        # -------------------------------------------------------------
+        elif cat in ("route", "routing", "forward", "autoforward", "routehelp", "routes"):
+            text = (
+                "🔄 <b>CLOUD AUTO-FORWARDER &amp; ROUTE MATRIX MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "24/7 Cloud Background Forwarding Engine bina kisi PC ke continuous real-time copy karta hai:\n\n"
+                "⚡ <b>CORE ROUTING COMMANDS:</b>\n"
+                "• ➕ <b>Add Auto-Forward Route:</b>\n"
+                "  <code>/addroute &lt;source_id&gt; &lt;target_id&gt; [clean/forward]</code>\n"
+                "  <i>Example:</i> <code>/addroute -1001234567890 -1009876543210 clean</code>\n"
+                "  <i>Note:</i> <code>clean</code> mode removes forwarded headers completely.\n"
+                "• 📋 <code>/routes</code> — Saari active auto-mirror routing streams dekhein\n"
+                "• ❌ <code>/delroute &lt;route_id&gt;</code> — Auto-mirroring stream deactivate karein\n"
+                "• 🚀 <code>/autoforward</code> or <code>/hub</code> — Auto-Forward Hub Pro card open karein\n"
+                "• 🧹 <code>/clean_history</code> — Forwarded ID cache aur duplicate tracker reset karein\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se live control karein:</i>"
             )
             kb = {
                 "inline_keyboard": [
@@ -3099,37 +3016,193 @@ class DeviTelegramBot:
                         {"text": "📋 Active Routes", "callback_data": "act_routes"}
                     ],
                     [
-                        {"text": "🌐 Route Matrix (Web App)", "web_app": {"url": f"{dash_url}#operations"}}
+                        {"text": "🔑 Connect Account", "callback_data": "act_connect"},
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"}
                     ],
                     [
-                        {"text": "🏷️ Strip Words Guide", "callback_data": "act_help_strip"},
-                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"}
-                    ],
-                    [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
                     ]
                 ]
             }
             return text, kb
 
-        elif cat in ("pacing", "speed", "velocity", "pacinghelp"):
+        # -------------------------------------------------------------
+        # CARD 4: MASTER TOPIC DIRECTORY & LECTURE TOC
+        # -------------------------------------------------------------
+        elif cat in ("study", "lectures", "navigation", "index", "indexhelp", "topics"):
             text = (
-                f"⏱️ <b>TRANSMISSION VELOCITY &amp; PACING MANUAL</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Cloning aur Forwarding ki transmission speed aur Telegram rate-limit pacing controls:\n\n"
-                f"⚡ <b>FORWARDING PIPELINE MODES:</b>\n"
-                f"• <b>⚡ Fast Direct Mode:</b> 0.2s ultra-fast pointer forwarding (Telegram servers par instant re-send, 10x faster).\n"
-                f"• <b>🔄 Stream Mode:</b> Full stream re-upload with fresh content hash, 16:9 custom HD cover override, and watermark cleaning.\n\n"
-                f"⏱️ <b>DYNAMIC PACING SLIDER:</b>\n"
-                f"• <code>/pacing</code> — Interactive 1-click speed presets (0.0s to 5.0s per message).\n"
-                f"• Anti-Flood Backoff: Rate limits aane par bot crash hone ki jagah safe sleep backoff use karta hai.\n\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche diye 1-Click Buttons se live toggle karein:</i>"
+                "📑 <b>MASTER TOPIC DIRECTORY &amp; LECTURE TOC MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Groups me study materials ko neatly organize karne ke liye 2 powerful index systems:\n\n"
+                "🏛️ <b>1. MASTER DIRECTORY (#A to #Z Alphabetical Hub):</b>\n"
+                "• <code>/mainindex</code> — Pure group ke saare subjects ka clickable directory card banata hai aur top par auto-pin karta hai.\n"
+                "• <code>/settopic &lt;Name&gt;</code> — Kisi topic me custom name bind karein (e.g. <code>/settopic Cardiology</code>).\n"
+                "• <code>/topics</code> — Saare registered subjects ki list dekhein.\n\n"
+                "📚 <b>2. TOPIC TABLE OF CONTENTS (TOC):</b>\n"
+                "• <code>/topicindex</code> — Current topic ke andar ke saare lectures &amp; PDFs ka sequential index banakar topic me pin karta hai.\n"
+                "• <code>/additem &lt;Title&gt;</code> — Lecture video/PDF par reply karke TOC me add karein.\n"
+                "• <code>/find &lt;keyword&gt;</code> — Kisi bhi lecture ya subject ko instantly search karein.\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se live run karein:</i>"
             )
             kb = {
                 "inline_keyboard": [
                     [
-                        {"text": "⏱️ Pacing Settings", "callback_data": "act_pacing"},
+                        {"text": "📑 Master Directory (/mainindex)", "callback_data": "act_mainindex"},
+                        {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"}
+                    ],
+                    [
+                        {"text": "📚 View All Topics (/topics)", "callback_data": "act_topics"},
+                        {"text": "📥 Media Downloader", "callback_data": "act_help_media"}
+                    ],
+                    [
+                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"},
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # CARD 5: UNIVERSAL IN-TOPIC MEDIA DOWNLOADER
+        # -------------------------------------------------------------
+        elif cat in ("media", "ytdl", "mediahelp", "upload", "playlist", "topic", "newtopic"):
+            text = (
+                "📥 <b>UNIVERSAL MEDIA DOWNLOADER &amp; IN-TOPIC UPLOADER MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Lectures ko dedicated <b>Forum Topics (DAMS, Prepladder, Marrow)</b> me direct stream &amp; upload karne ka guide:\n\n"
+                "🎯 <b>HOW TO UPLOAD TO TOPICS:</b>\n"
+                "• <b>Inside Any Topic:</b> Seedhe video link ke sath type karein:\n"
+                "  <code>/ytdl https://youtu.be/...</code>\n"
+                "  <i>(Video download hokar usi topic me auto-upload ho jayegi)</i>\n"
+                "• <b>With Topic Name:</b>\n"
+                "  <code>/ytdl &lt;link&gt; DAMS</code>\n"
+                "  <i>(Bot DAMS topic me video upload karega; topic na hone par auto-create karega)</i>\n"
+                "• <b>Full YouTube Playlists:</b>\n"
+                "  <code>/playlist &lt;playlist_url&gt; DAMS</code>\n"
+                "  <i>(Poori playlist sequentially Lecture 01, 02... upload hogi)</i>\n"
+                "• <b>Direct Web Links (.mp4/.pdf/.zip):</b> <code>/upload &lt;direct_url&gt;</code>\n"
+                "• <b>Create New Topic:</b> <code>/newtopic &lt;TopicName&gt;</code>\n"
+                "• <b>DM Multi-Group Switcher:</b> <code>/setgroup</code>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se explore karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🏛️ Select Target Group", "callback_data": "act_setgroup"},
+                        {"text": "📁 Create Topic", "callback_data": "act_help_topic"}
+                    ],
+                    [
+                        {"text": "📑 Topic Index Guide", "callback_data": "act_help_study"},
+                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_help_cloner"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # CARD 6: CLINICAL DECISION & BEDSIDE CALCULATORS
+        # -------------------------------------------------------------
+        elif cat in ("calc", "calculator", "clinical", "calchelp", "dose", "gfr", "bmi"):
+            text = (
+                "🩺 <b>CLINICAL DECISION &amp; BEDSIDE CALCULATORS MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Instant evidence-based clinical calculation tools bedside practice aur medical exams ke liye:\n\n"
+                "⚖️ <b>ANTHROPOMETRY &amp; DOSING:</b>\n"
+                "• <code>/bmi &lt;weight_kg&gt; &lt;height_cm&gt;</code> — BMI &amp; WHO category\n"
+                "• <code>/bsa &lt;weight_kg&gt; &lt;height_cm&gt;</code> — Body Surface Area (Mosteller)\n"
+                "• <code>/dose &lt;wt_kg&gt; &lt;mg_per_kg&gt; [freq]</code> — Pediatric &amp; weight dosing\n"
+                "• <code>/maintenance &lt;weight_kg&gt;</code> — Holiday-Segar 4-2-1 hourly fluids\n\n"
+                "🏥 <b>ICU, EMERGENCY &amp; RENAL SCORES:</b>\n"
+                "• <code>/gfr &lt;cr&gt; &lt;age&gt; &lt;sex m/f&gt; [wt]</code> — CKD-EPI &amp; Cockcroft-Gault\n"
+                "• <code>/gcs &lt;E 1-4&gt; &lt;V 1-5&gt; &lt;M 1-6&gt;</code> — Glasgow Coma Scale\n"
+                "• <code>/curb65 &lt;confusion&gt; &lt;bun&gt; &lt;rr&gt; &lt;bp&gt; &lt;age&gt;</code> — Pneumonia risk\n"
+                "• <code>/map &lt;sbp&gt; &lt;dbp&gt;</code> — Mean Arterial Pressure\n"
+                "• <code>/parkland &lt;wt_kg&gt; &lt;tbsa%&gt;</code> — Parkland 24h burn resuscitation\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se browse karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "⚖️ BMI & Dosing Guide", "callback_data": "act_bmi_guide"},
+                        {"text": "🏥 GFR & Renal Guide", "callback_data": "act_gfr_guide"}
+                    ],
+                    [
+                        {"text": "📚 Study Navigation", "callback_data": "act_help_study"},
+                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # CARD 7: SANGMATA OSINT & USER FORENSICS RADAR
+        # -------------------------------------------------------------
+        elif cat in ("osint", "forensics", "intelligence", "osinthelp", "whois", "userinfo", "sangmata"):
+            text = (
+                "🕵️ <b>SANGMATA OSINT &amp; USER FORENSICS RADAR MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Community protection ke liye deep forensic user intelligence suite:\n\n"
+                "🔍 <b>FORENSIC INTELLIGENCE COMMANDS:</b>\n"
+                "• <code>/whois [reply/id/@user]</code> — SangMata multi-year name &amp; username change history\n"
+                "• <code>/userinfo [reply/id/@user]</code> — Account creation age estimate, safety score &amp; permissions\n"
+                "• <code>/sangmata [query]</code> — Deep biometric footprint search\n"
+                "• <code>/jointrack [pm/group/off]</code> — New member join alerts destination\n"
+                "• <code>/members</code> — Audit member roster &amp; recent join dates\n"
+                "• <code>/exportmembers</code> — Export member database to Excel/CSV\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se check karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🔍 Check User (/whois)", "callback_data": "act_help_whois"},
+                        {"text": "📊 Dossier (/userinfo)", "callback_data": "act_help_userinfo"}
+                    ],
+                    [
+                        {"text": "🛡️ Group Admin Guide", "callback_data": "act_help_admin"},
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # CARD 8: TRANSMISSION VELOCITY & SPEED PACING
+        # -------------------------------------------------------------
+        elif cat in ("pacing", "speed", "velocity", "pacinghelp"):
+            text = (
+                "⏱️ <b>TRANSMISSION VELOCITY &amp; PACING MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Cloning aur Forwarding transmission speed aur rate-limit controls:\n\n"
+                "⚡ <b>PIPELINE MODES:</b>\n"
+                "• <b>⚡ Fast Direct Mode:</b> 0.2s ultra-fast pointer forwarding (Telegram servers par instant re-send, 10x faster).\n"
+                "• <b>🔄 Stream Mode:</b> Full stream re-upload with fresh content hash, 16:9 custom HD cover override, and watermark cleaning.\n\n"
+                "⏱️ <b>DYNAMIC PACING SLIDER:</b>\n"
+                "• <code>/pacing</code> — Interactive 1-click speed presets (0.0s to 2.0s per message).\n"
+                "• Anti-Flood Backoff: Rate limits aane par bot crash hone ki jagah safe sleep backoff use karta hai.\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se live toggle karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "⏱️ Pacing Slider", "callback_data": "act_pacing"},
                         {"text": "⚡ Toggle Direct Mode", "callback_data": "act_toggle_direct"}
                     ],
                     [
@@ -3137,39 +3210,85 @@ class DeviTelegramBot:
                         {"text": "🖼️ Cover Override", "callback_data": "act_toggle_thumb"}
                     ],
                     [
-                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"},
-                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
+                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_help_cloner"},
+                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"}
                     ],
                     [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
                     ]
                 ]
             }
             return text, kb
 
-        elif cat in ("web", "cockpit", "tma", "webapp", "webhelp"):
-            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
-            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
-            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+        # -------------------------------------------------------------
+        # CARD 9: GROUP MODERATION, SECURITY & SANITATION
+        # -------------------------------------------------------------
+        elif cat in ("admin", "security", "mod", "adminhelp", "panel", "welcome"):
             text = (
-                f"🌐 <b>WEB COCKPIT &amp; TELEGRAM MINI APP (TMA 2.0) GUIDE</b> 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Kind Doctor Web Cockpit ab Telegram Mini App 2.0 ke zariye seedhe Telegram me bina password open hota hai:\n\n"
-                f"⚡ <b>TMA 2.0 ADVANTAGES:</b>\n"
-                f"• <b>Persistent Chat Button:</b> Chat bar ke left me <code>⚡ Web Cockpit</code> button 24/7 available hai.\n"
-                f"• <b>Biometric Auto-Auth:</b> @Kinddoctor4u aur @Ammitrajput1 ke liye 1-tap zero-login instant admin access.\n"
-                f"• <b>Full-Screen Luxury:</b> Native mobile UI, dynamic dark mode, aur tactile vibration feedback.\n\n"
-                f"🏛️ <b>8 INTEGRATED SOVEREIGN HUBS:</b>\n"
-                f"1. 🛰️ Mission Control &amp; Speedometer Velocity Dial\n"
-                f"2. ⚡ Transmission Engine: Visual Route Matrix &amp; Strip Words Studio\n"
-                f"3. 📚 Topic Intelligence: Curriculum Distribution &amp; Lecture TOC\n"
-                f"4. 🩺 Clinical Studio: Parkland SVG Body Map, GCS Wheel &amp; OpenFDA Drug KB\n"
-                f"5. 👤 Telegram Multi-Session Identity Vault\n"
-                f"6. 🧠 Devi AI Labs: Multi-Model Operations Copilot\n"
-                f"7. 🛡️ Sentinel Terminal &amp; DLQ Inspector\n"
-                f"8. 🔐 Sovereign Security &amp; Online SQLite Snapshots\n\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Neeche button tap karke instantly launch karein:</i>"
+                "🛡️ <b>GROUP MODERATION, SECURITY &amp; SANITATION MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Group ko spam, raids aur ghost accounts se 100% safe rakhne ke liye complete suite:\n\n"
+                "🎛️ <b>CONTROL CENTER &amp; AUTOMATION:</b>\n"
+                "• 🎛️ <code>/panel</code> — Master interactive 1-click control center\n"
+                "• 👋 <code>/welcome [on/off]</code> — Welcome greetings toggle &amp; menu\n"
+                "• ⏱️ <code>/welcometimeout &lt;sec&gt;</code> — Auto-delete welcome message TTL (e.g. 60s, or 0)\n"
+                "• 📜 <code>/setwelcome &lt;text&gt;</code> — Custom greeting template ({name}, {group})\n"
+                "• 📜 <code>/setrules &lt;rules&gt;</code> — Set group study guidelines\n\n"
+                "👮 <b>MODERATION &amp; SANITATION:</b>\n"
+                "• 🔇 <code>/mute &lt;user&gt; [min]</code> | 🔊 <code>/unmute &lt;user&gt;</code>\n"
+                "• 👢 <code>/kick &lt;user&gt;</code> | 🚫 <code>/ban &lt;user&gt;</code> | 🔓 <code>/unban &lt;user&gt;</code>\n"
+                "• 🗑️ <code>/cleanwelcome</code> — Saare purane welcome cards batch purge karein\n"
+                "• 👻 <code>/cleandeleted</code> — Group se Deleted Accounts scan karke remove karein\n"
+                "• 🧹 <code>/clean_history</code> — Routing maps aur temporary cache clear karein\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se live control karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🎛️ Master Control Panel", "callback_data": "act_panel"},
+                        {"text": "👻 Purge Ghost Accounts", "callback_data": "act_cleandeleted"}
+                    ],
+                    [
+                        {"text": "🧹 Clean Welcomes", "callback_data": "act_cleanwelcome"},
+                        {"text": "👋 Welcome Settings", "callback_data": "act_welcome_settings"}
+                    ],
+                    [
+                        {"text": "🕵️ OSINT Radar", "callback_data": "act_help_osint"},
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # CARD 10: WEB COCKPIT & TELEGRAM MINI APP (TMA 2.0)
+        # -------------------------------------------------------------
+        elif cat in ("web", "cockpit", "tma", "webapp", "webhelp", "dashboard"):
+            text = (
+                "🌐 <b>WEB COCKPIT &amp; TELEGRAM MINI APP (TMA 2.0) MANUAL</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Kind Doctor Web Cockpit ab browser aur Telegram Mini App me seamlessly available hai:\n\n"
+                "⚡ <b>TMA 2.0 ADVANTAGES:</b>\n"
+                "• <b>Persistent Chat Button:</b> Chat bar me <code>⚡ Web Cockpit</code> button 24/7 available hai.\n"
+                "• <b>Zero-Login Auto-Auth:</b> @Kinddoctor4u aur @Ammitrajput1 ke liye 1-tap instant admin access.\n"
+                "• <b>Full-Screen Luxury:</b> Native mobile UI, dynamic dark mode, fluid auto-adjusting responsive layout.\n\n"
+                "🏛️ <b>8 INTEGRATED SOVEREIGN HUBS:</b>\n"
+                "1. 🛰️ Mission Control &amp; Speedometer Velocity Dial\n"
+                "2. ⚡ Transmission Engine: Visual Route Matrix &amp; Strip Words Studio\n"
+                "3. 📚 Topic Intelligence: Curriculum Distribution &amp; Lecture TOC\n"
+                "4. 🩺 Clinical Studio: Parkland SVG Body Map, GCS Wheel &amp; OpenFDA Drug KB\n"
+                "5. 👤 Telegram Multi-Session Identity Vault\n"
+                "6. 🧠 Devi AI Labs: Multi-Model Operations Copilot\n"
+                "7. 🛡️ Sentinel Terminal &amp; Hardware/Daemon Telemetry\n"
+                "8. 🔐 Sovereign Security &amp; Online SQLite Snapshots\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye buttons se navigate karein:</i>"
             )
             kb = {
                 "inline_keyboard": [
@@ -3177,71 +3296,344 @@ class DeviTelegramBot:
                         {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}}
                     ],
                     [
-                        {"text": "🏷️ Strip Words Guide", "callback_data": "act_help_strip"},
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"},
                         {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"}
                     ],
                     [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
                     ]
                 ]
             }
             return text, kb
 
-        else: # Main Menu
-            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
-            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
-            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+        # -------------------------------------------------------------
+        # OFFICIAL MANUAL — PART 1: STUDY & STUDENT TOOLS
+        # -------------------------------------------------------------
+        elif cat in ("part1", "man_part1", "manual_1", "1"):
             text = (
-                f"👨‍⚕️ <b>Kind Doctor — Master Command &amp; Feature Encyclopedia</b> 📖\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Welcome! Bot ke saare features dedicated <b>Interactive Cards</b> me categorized hain.\n"
-                f"Neeche diye buttons par tap karke kisi bhi feature ka full step-by-step guide aur action controls open karein:\n\n"
-                f"• 🏷️ <b>Strip Words Studio</b>: Word &amp; link cleaner, regex sandbox, auto-dedup\n"
-                f"• 🚀 <b>Deep Cloner &amp; Mirror</b>: 200k+ cloner, topic mirror, live sync streams\n"
-                f"• 🔄 <b>Cloud Auto-Forward</b>: Real-time 0-tag live mirroring &amp; route matrix\n"
-                f"• 📑 <b>Master Topic Index</b>: Master Topic Directory, TOC &amp; lecture search\n"
-                f"• 📥 <b>Media Downloader</b>: YouTube playlists, Reels, and topic delivery\n"
-                f"• 🩺 <b>Clinical Calculators</b>: Bedside BMI, GFR, MAP, GCS, Parkland burn\n"
-                f"• 🕵️ <b>OSINT &amp; Forensics</b>: SangMata biometrics, username footprint, phone/email\n"
-                f"• ⏱️ <b>Velocity &amp; Pacing</b>: Fast Direct 0.2s mode, pacing sliders &amp; branding\n"
-                f"• 🛡️ <b>Admin &amp; Security</b>: Ghost account purge, welcome cleaner, security radar\n"
-                f"• 🌐 <b>Web Cockpit (TMA)</b>: Full 8-Hub dashboard right inside Telegram\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Direct Jump: Type <code>/help &lt;strip|cloner|route|study|media|calc|osint|pacing|admin|web&gt;</code></i>"
+                "📚 <b>KIND DOCTOR OFFICIAL MANUAL — PART 1: STUDY &amp; STUDENT TOOLS</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Part 1 covers all features for students, lectures, study materials, and clinical tools:\n\n"
+                "📑 <b>1. TOPIC DIRECTORY &amp; TABLE OF CONTENTS:</b>\n"
+                "• <code>/mainindex</code> — Generate Alphabetical (A-Z) clickable topic directory in group.\n"
+                "• <code>/topicindex</code> — Generate sequential lecture TOC inside current topic.\n"
+                "• <code>/find &lt;keyword&gt;</code> — Instant search for lectures, notes, or topics.\n"
+                "• <code>/topics</code> — List all registered subjects and topic IDs.\n\n"
+                "📥 <b>2. IN-TOPIC MEDIA DOWNLOADER:</b>\n"
+                "• <code>/ytdl &lt;url&gt; [Topic]</code> — Download &amp; stream video/reel into forum topic.\n"
+                "• <code>/playlist &lt;url&gt; [Topic]</code> — Sequential lecture batch upload of YouTube playlist.\n"
+                "• <code>/upload &lt;direct_url&gt;</code> — Upload direct web files (.mp4/.pdf/.zip).\n"
+                "• <code>/newtopic &lt;Name&gt;</code> — Create a new Forum Topic.\n\n"
+                "🩺 <b>3. BEDSIDE CLINICAL CALCULATORS:</b>\n"
+                "• <code>/bmi &lt;wt&gt; &lt;ht&gt;</code> | <code>/bsa &lt;wt&gt; &lt;ht&gt;</code> | <code>/dose &lt;wt&gt; &lt;mg/kg&gt;</code>\n"
+                "• <code>/gfr &lt;cr&gt; &lt;age&gt; &lt;sex&gt;</code> | <code>/gcs &lt;E&gt; &lt;V&gt; &lt;M&gt;</code> | <code>/parkland &lt;wt&gt; &lt;tbsa%&gt;</code>\n\n"
+                "💬 <b>4. LIVE SUPPORT &amp; USER SAFETY:</b>\n"
+                "• <code>/support &lt;msg&gt;</code> — Direct confidential message line to Kind Doctor.\n"
+                "• <code>/id</code> — Safely check your Telegram User ID without revealing phone number.\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye buttons se manual ke agle parts browse karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📑 Topic Index Guide", "callback_data": "act_help_study"},
+                        {"text": "📥 Media Downloader", "callback_data": "act_help_media"}
+                    ],
+                    [
+                        {"text": "🩺 Clinical Calcs", "callback_data": "act_help_calc"},
+                        {"text": "💬 Message Kind Doctor", "callback_data": "act_support"}
+                    ],
+                    [
+                        {"text": "🚀 Go to Part 2 (Cloner & Strip)", "callback_data": "act_man_part2"},
+                        {"text": "🛡️ Go to Part 3 (Admin & Web)", "callback_data": "act_man_part3"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Manual Index", "callback_data": "act_manual"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # OFFICIAL MANUAL — PART 2: CLONER, FORWARDING & STRIP STUDIO
+        # -------------------------------------------------------------
+        elif cat in ("part2", "man_part2", "manual_2", "2"):
+            text = (
+                "🚀 <b>KIND DOCTOR OFFICIAL MANUAL — PART 2: CLONER, FORWARDING &amp; STRIP STUDIO</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Part 2 covers deep content cloning, 24/7 cloud forwarding, and watermark removal:\n\n"
+                "🏷️ <b>1. STRIP WORDS &amp; WATERMARK CLEANER STUDIO:</b>\n"
+                "• <code>/stripwords</code> — Interactive card of all active stripping rules (12 per page).\n"
+                "• <code>/addstrip &lt;rule&gt;</code> — Add single word or replacement rule (<code>Old =&gt; New</code>).\n"
+                "• <code>/delstrip &lt;rule&gt;</code> — Remove strip rule with timestamped backup.\n"
+                "• <code>/dedupstrip</code> — Clean duplicate rules and whitespace entries.\n\n"
+                "🚀 <b>2. DEEP FORUM &amp; TOPIC CLONER:</b>\n"
+                "• <code>/clonegroup &lt;src&gt; &lt;tgt&gt;</code> — Full supergroup clone with all 2000+ topics.\n"
+                "• <code>/clonetopic &lt;src&gt; &lt;tgt&gt; [src_top] [tgt_top]</code> — Single topic clone.\n"
+                "• <code>/batchclone &lt;start&gt; &lt;end&gt;</code> — Range clone with sequential preservation.\n"
+                "• <code>/clonestatus</code> &amp; <code>/clonejobs</code> — Real-time progress and job management.\n\n"
+                "🔄 <b>3. 24/7 CLOUD BACKGROUND FORWARDER:</b>\n"
+                "• <code>/addroute &lt;src&gt; &lt;tgt&gt; [clean/forward]</code> — Persistent auto-mirror stream.\n"
+                "• <code>/routes</code> — List active streams | <code>/delroute &lt;id&gt;</code> — Deactivate stream.\n"
+                "• <code>/autoforward</code> — Auto-Forward Hub Pro dashboard.\n\n"
+                "⏱️ <b>4. TRANSMISSION VELOCITY &amp; PACING:</b>\n"
+                "• <code>/pacing</code> — Interactive 0.0s to 2.0s delay slider.\n"
+                "• Fast Direct (0.2s pointer) vs Stream Mode (re-upload + 16:9 custom thumbnail).\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye buttons se manual ke baaki parts browse karein:</i>"
             )
             kb = {
                 "inline_keyboard": [
                     [
                         {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"},
-                        {"text": "🚀 Deep Cloner & Mirror", "callback_data": "act_help_cloner"}
+                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_help_cloner"}
                     ],
                     [
-                        {"text": "🔄 Auto-Forward & Routes", "callback_data": "act_help_route"},
-                        {"text": "📑 Master Topic Directory", "callback_data": "act_help_study"}
+                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"},
+                        {"text": "⏱️ Velocity & Pacing", "callback_data": "act_help_pacing"}
+                    ],
+                    [
+                        {"text": "📚 Go to Part 1 (Study Tools)", "callback_data": "act_man_part1"},
+                        {"text": "🛡️ Go to Part 3 (Admin & Web)", "callback_data": "act_man_part3"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Manual Index", "callback_data": "act_manual"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # OFFICIAL MANUAL — PART 3: ADMINISTRATION, FORENSICS & WEB COCKPIT
+        # -------------------------------------------------------------
+        elif cat in ("part3", "man_part3", "manual_3", "3"):
+            text = (
+                "🛡️ <b>KIND DOCTOR OFFICIAL MANUAL — PART 3: ADMINISTRATION, FORENSICS &amp; WEB COCKPIT</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Part 3 covers community moderation, security shields, forensics, and the web cockpit:\n\n"
+                "🎛️ <b>1. MASTER CONTROL &amp; MODERATION:</b>\n"
+                "• <code>/panel</code> — Master interactive 1-click control center.\n"
+                "• <code>/mute &lt;user&gt; [min]</code> | <code>/kick &lt;user&gt;</code> | <code>/ban &lt;user&gt;</code>\n"
+                "• <code>/welcome [on/off]</code> &amp; <code>/welcometimeout &lt;sec&gt;</code>\n"
+                "• <code>/cleanwelcome</code> — Batch purge previous welcome greetings.\n"
+                "• <code>/cleandeleted</code> — Purge ghost/deleted accounts from group.\n\n"
+                "🕵️ <b>2. SANGMATA OSINT &amp; USER FORENSICS:</b>\n"
+                "• <code>/whois [reply/id]</code> — SangMata multi-year name &amp; username history.\n"
+                "• <code>/userinfo [reply/id]</code> — Account creation age estimate &amp; safety score.\n"
+                "• <code>/jointrack [pm/group/off]</code> — Route new member forensic alerts to Admin DM.\n\n"
+                "🌐 <b>3. WEB COCKPIT (TMA 2.0) &amp; SYSTEM HEALTH:</b>\n"
+                "• <code>/webhelp</code> — Telegram Mini App guide and 8 integrated sovereign hubs.\n"
+                "• <code>/status</code> — Real-time forwarder velocity and process health.\n"
+                "• <code>/backup</code> — Instant zero-downtime full SQLite snapshot export.\n"
+                "• <code>/setgroup</code> — Switch active target group when commanding bot from DM.\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye buttons se navigate karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🛡️ Group Admin Guide", "callback_data": "act_help_admin"},
+                        {"text": "🕵️ OSINT Radar", "callback_data": "act_help_osint"}
+                    ],
+                    [
+                        {"text": "🌐 Web Cockpit Guide", "callback_data": "act_help_web"},
+                        {"text": "🎛️ Master Panel", "callback_data": "act_panel"}
+                    ],
+                    [
+                        {"text": "📚 Go to Part 1 (Study Tools)", "callback_data": "act_man_part1"},
+                        {"text": "🚀 Go to Part 2 (Cloner & Strip)", "callback_data": "act_man_part2"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                        {"text": "📖 Manual Index", "callback_data": "act_manual"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        # -------------------------------------------------------------
+        # MASTER MANUAL & ENCYCLOPEDIA HUB (DEFAULT)
+        # -------------------------------------------------------------
+        else:
+            text = (
+                "📖 <b>KIND DOCTOR — MASTER COMMAND &amp; FEATURE ENCYCLOPEDIA</b> 🩺\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Welcome! Kind Doctor Bot documentation <b>Official 3-Part Command Manual</b> aur <b>10 Dedicated Feature Cards</b> me organized hai.\n\n"
+                "📑 <b>OFFICIAL 3-PART COMMAND MANUAL:</b>\n"
+                "• 📚 <b>Part 1: Study &amp; Student Tools</b> (`/manual 1`)\n"
+                "  <i>Topic Directory, TOC, Search, In-Topic Media Downloader, Clinical Calculators</i>\n"
+                "• 🚀 <b>Part 2: Cloner, Forwarding &amp; Strip Studio</b> (`/manual 2`)\n"
+                "  <i>Deep Forum Cloner, Cloud Forwarder, Strip Words Studio, Pacing &amp; Speed</i>\n"
+                "• 🛡️ <b>Part 3: Administration, Forensics &amp; Web Cockpit</b> (`/manual 3`)\n"
+                "  <i>Control Panel, Moderation, Cleaners, SangMata OSINT, TMA 2.0 Web Cockpit</i>\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🌟 <b>10 DEDICATED FEATURE GUIDES:</b>\n"
+                "1. 🏷️ Strip Words Studio (`/striphelp`) | 2. 🚀 Deep Cloner (`/clonehelp`)\n"
+                "3. 🔄 Auto-Forwarder (`/routehelp`)    | 4. 📑 Topic Index (`/indexhelp`)\n"
+                "5. 📥 Media Downloader (`/mediahelp`)  | 6. 🩺 Clinical Calcs (`/calchelp`)\n"
+                "7. 🕵️ OSINT Radar (`/osinthelp`)       | 8. ⏱️ Velocity &amp; Pacing (`/pacinghelp`)\n"
+                "9. 🛡️ Group Admin (`/adminhelp`)       | 10. 🌐 Web Cockpit (`/webhelp`)\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 <i>Neeche diye 1-Click Buttons se kisi bhi part ya guide par tap karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📚 Part 1: Study Tools", "callback_data": "act_man_part1"},
+                        {"text": "🚀 Part 2: Cloner & Strip", "callback_data": "act_man_part2"}
+                    ],
+                    [
+                        {"text": "🛡️ Part 3: Admin & Safety", "callback_data": "act_man_part3"},
+                        {"text": "🎛️ Master Control Menu", "callback_data": "act_menu"}
+                    ],
+                    [
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"},
+                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_help_cloner"}
+                    ],
+                    [
+                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"},
+                        {"text": "📑 Topic Index Guide", "callback_data": "act_help_study"}
                     ],
                     [
                         {"text": "📥 Media Downloader", "callback_data": "act_help_media"},
                         {"text": "🩺 Clinical Calculators", "callback_data": "act_help_calc"}
                     ],
                     [
-                        {"text": "🕵️ OSINT & Forensics", "callback_data": "act_help_osint"},
+                        {"text": "🕵️ OSINT Radar Guide", "callback_data": "act_help_osint"},
                         {"text": "⏱️ Velocity & Pacing", "callback_data": "act_help_pacing"}
                     ],
                     [
-                        {"text": "🛡️ Group Admin & Security", "callback_data": "act_help_admin"},
+                        {"text": "🛡️ Group Admin Guide", "callback_data": "act_help_admin"},
                         {"text": "🌐 Web Cockpit Guide", "callback_data": "act_help_web"}
                     ],
                     [
-                        {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
-                        {"text": "🏷️ Active Rules Card", "callback_data": "act_stripwords"}
-                    ],
-                    [
-                        {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
-                        {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
+                        {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"},
+                        {"text": "🔄 Refresh Manual", "callback_data": "act_manual"}
                     ]
                 ]
             }
             return text, kb
+    async def _render_main_menu(
+        self,
+        session: aiohttp.ClientSession,
+        chat_id: int,
+        admin_id: int,
+        thread_id: Optional[int] = None,
+        edit_message_id: Optional[int] = None
+    ) -> Optional[int]:
+        """Renders the comprehensive 10-Card Master Control Panel with in-place edit support."""
+        load_dotenv(override=True)
+        cur_direct = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
+        cur_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
+        cur_thumb = os.getenv("THUMB_MODE", "custom").strip().lower()
+
+        ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
+        is_fwd_paused = False
+        if ctrl_p.exists():
+            with suppress(Exception):
+                with open(ctrl_p, "r", encoding="utf-8") as cf:
+                    is_fwd_paused = json.load(cf).get("paused", False)
+
+        fwd_pause_btn_txt = "▶️ Resume Auto-Forward" if is_fwd_paused else "⏸️ Pause Auto-Forward"
+        fwd_pause_cb = "act_fwd_resume" if is_fwd_paused else "act_fwd_pause"
+
+        direct_btn_txt = "⚡ Fast Direct: ON" if cur_direct else "🔄 Stream: Default"
+        sig_btn_txt = "👑 Branding: ✅ ON" if cur_sig else "🏷️ Clean Mode: ❌ OFF"
+
+        admin_panel_text = ""
+        if self.is_admin(admin_id):
+            admin_panel_text = (
+                f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"⚙️ <b>Admin Pipeline Controls:</b>\n"
+                f"• Auto-Forward Sync: <code>{'PAUSED ⏸️' if is_fwd_paused else 'ACTIVE 🟢'}</code>\n"
+                f"• Forwarding Mode: <code>{'⚡ Fast Direct (0.2s Instant)' if cur_direct else '🔄 Stream Mode (Safe, Fresh Hashes)'}</code>\n"
+                f"• Branding & Media: <code>{'👑 ON (Kind Doctor Sig + 16:9 HD Cover)' if cur_sig else '🏷️ OFF (Clean Mode: No Sig & Original Media)'}</code>\n"
+                f"<i>(Neeche diye 1-click buttons se instant switch karein)</i>"
+            )
+
+        dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+        lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+        dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+
+        reply = (
+            f"👨‍⚕️ <b>Kind Doctor</b> 🤍 🩺\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Welcome! Aapka study & group assistant <b>100% Active</b> hai.\n"
+            f"Neeche diye <b>10 Feature Cards & Guides</b> aur <b>1-Click Action Controls</b> se sabhi tools explore karein:\n\n"
+            f"🌟 <b>MASTER CAPABILITIES:</b>\n"
+            f"• 🏷️ <b>Strip Words Studio</b>: Unwanted usernames, links & sponsor watermarks strip engine\n"
+            f"• 🚀 <b>Deep Cloner Suite</b>: 200k+ messages & 2k+ topics clone engine\n"
+            f"• 🔄 <b>Cloud Forwarder</b>: Real-time 0-tag live mirroring streams\n"
+            f"• 📑 <b>Master Topic Directory</b>: Saare subjects ka Alphabetical (A-Z) hub\n"
+            f"• 📥 <b>Media Downloader</b>: YouTube playlists, Reels, and topic delivery\n"
+            f"• 🩺 <b>Clinical Decision Studio</b>: Bedside BMI, GFR, GCS, Parkland 4-2-1 calcs\n"
+            f"• 🕵️ <b>SangMata OSINT Radar</b>: Username timeline, account age & security score\n"
+            f"• 🌐 <b>Web Cockpit (TMA 2.0)</b>: 1-Tap browser dashboard inside Telegram\n"
+            f"{admin_panel_text}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 <i>Tip: Kisi bhi feature ko samajhne ke liye uska Guide card open karein!</i>"
+        )
+
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "🏷️ Strip Words Studio", "callback_data": "act_striphelp"},
+                    {"text": "🚀 Deep Cloner Guide", "callback_data": "act_clonehelp"}
+                ],
+                [
+                    {"text": "🔄 Auto-Forward Guide", "callback_data": "act_routehelp"},
+                    {"text": "📑 Topic Index Guide", "callback_data": "act_indexhelp"}
+                ],
+                [
+                    {"text": "📥 Media Downloader Guide", "callback_data": "act_mediahelp"},
+                    {"text": "🩺 Clinical Calculators", "callback_data": "act_calchelp"}
+                ],
+                [
+                    {"text": "🕵️ OSINT & Radar Guide", "callback_data": "act_osinthelp"},
+                    {"text": "⏱️ Velocity & Pacing", "callback_data": "act_pacinghelp"}
+                ],
+                [
+                    {"text": "🛡️ Group Admin Guide", "callback_data": "act_adminhelp"},
+                    {"text": "🌐 Web Cockpit Guide", "callback_data": "act_webhelp"}
+                ],
+                [
+                    {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                    {"text": "🏷️ Active Strip Rules", "callback_data": "act_stripwords"}
+                ],
+                [
+                    {"text": "📑 Master Topic Directory", "callback_data": "act_mainindex"},
+                    {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"}
+                ],
+                [
+                    {"text": "🚀 Auto Forward Hub", "callback_data": "act_fwd_hub"},
+                    {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}
+                ],
+                [
+                    {"text": fwd_pause_btn_txt, "callback_data": fwd_pause_cb},
+                    {"text": "📖 Official 3-Part Manual", "callback_data": "act_manual"}
+                ],
+                [
+                    {"text": direct_btn_txt, "callback_data": "act_toggle_direct"},
+                    {"text": sig_btn_txt, "callback_data": "act_toggle_sig"}
+                ],
+                [
+                    {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
+                    {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
+                ]
+            ]
+        }
+
+        if edit_message_id:
+            ok = await self._edit_message(session, chat_id, edit_message_id, reply, reply_markup=keyboard, parse_mode="HTML")
+            if ok:
+                return edit_message_id
+        sent_m = await self._send_message(session, chat_id, reply, reply_markup=keyboard, message_thread_id=thread_id, parse_mode="HTML")
+        if sent_m and chat_id < 0:
+            self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_m, 120))
+        return sent_m
 
     async def _handle_callback_query(self, session: aiohttp.ClientSession, cb: dict):
         """Handle inline button clicks from Admins."""
@@ -3908,26 +4300,136 @@ class DeviTelegramBot:
             elif action in ("unlink_account", "disconnect", "logout"):
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Disconnecting Account..."})
                 await self._handle_admin_command(session, chat_id, admin_id, "/disconnect", message=msg_obj)
-            elif action in ("clonehelp", "cloninghelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/clonehelp", message=msg_obj)
-            elif action in ("indexhelp", "topicshelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/indexhelp", message=msg_obj)
-            elif action in ("striphelp", "stripwordshelp", "watermarkhelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/striphelp", message=msg_obj)
-            elif action in ("routehelp", "forwardhelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/routehelp", message=msg_obj)
-            elif action in ("adminhelp", "securityhelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/adminhelp", message=msg_obj)
-            elif action in ("calchelp", "scorehelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/calchelp", message=msg_obj)
-            elif action in ("mediahelp", "ytdlhelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/mediahelp", message=msg_obj)
-            elif action in ("pacinghelp", "speedhelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/pacinghelp", message=msg_obj)
-            elif action in ("osinthelp", "radarhelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/osinthelp", message=msg_obj)
-            elif action in ("webhelp", "cockpithelp"):
-                await self._handle_admin_command(session, chat_id, admin_id, "/webhelp", message=msg_obj)
+            # --- 10 FEATURE CARDS & HELP GUIDES (In-Place Edit) ---
+            elif action in ("striphelp", "help_strip", "stripwordshelp", "watermarkhelp"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("strip", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("clonehelp", "help_cloner", "clonerhelp", "cloninghelp"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("cloner", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("routehelp", "help_route", "forwardhelp", "routinghelp"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("route", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("indexhelp", "help_study", "topicshelp", "topichelp"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("study", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("mediahelp", "help_media", "ytdlhelp", "help_topic"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("media", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("calchelp", "help_calc", "scorehelp", "clinicalhelp"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("calc", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("osinthelp", "help_osint", "radarhelp", "forensichelp", "help_whois", "help_userinfo"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("osint", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("pacinghelp", "help_pacing", "speedhelp", "velocityhelp"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("pacing", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("adminhelp", "help_admin", "securityhelp", "modhelp"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("admin", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("webhelp", "help_web", "cockpithelp", "tmahelp"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card("web", is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("manual", "man_part1", "man_part2", "man_part3", "help_manual") or action.startswith("man_"):
+                m_part = "main"
+                if "part1" in action or action == "man_1":
+                    m_part = "part1"
+                elif "part2" in action or action == "man_2":
+                    m_part = "part2"
+                elif "part3" in action or action == "man_3":
+                    m_part = "part3"
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                card_text, kb = self._build_interactive_help_card(m_part, is_admin=self.is_admin(admin_id))
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+                return
+
+            elif action in ("menu", "help_main", "mainmenu"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                await self._render_main_menu(session, chat_id, admin_id, thread_id=thread_id, edit_message_id=msg_id)
+                return
+
+            elif action in ("clonestatus", "clonerstatus"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Cloner Status Radar 🚀"})
+                card_text, kb = self._build_clone_status_card_data(admin_id)
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id)
+                return
+
+            elif action in ("fwd_hub", "autoforward"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Auto Forward Hub 🚀"})
+                card_text, kb = self._build_autoforward_panel_data(admin_id)
+                if msg_id:
+                    await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
+                else:
+                    await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id, disable_web_page_preview=True)
+                return
+
             elif action == "cleandeleted":
                 await self._handle_admin_command(session, chat_id, admin_id, "/cleandeleted", message=msg_obj)
             elif action == "cleanwelcome":
@@ -3940,8 +4442,6 @@ class DeviTelegramBot:
                 await self._handle_admin_command(session, chat_id, admin_id, "/clonejobs", message=msg_obj)
             elif action == "routes":
                 await self._handle_admin_command(session, chat_id, admin_id, "/routes", message=msg_obj)
-            elif action == "menu":
-                await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
             elif action == "support":
                 await self._handle_admin_command(session, chat_id, admin_id, "/support", message=msg_obj)
             elif action == "toggle_direct":
@@ -5749,118 +6249,8 @@ class DeviTelegramBot:
             return
 
         if cmd in ("/help", "/start", "/menu", "/mode"):
-            load_dotenv(override=True)
-            cur_direct = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
-            cur_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
-            cur_thumb = os.getenv("THUMB_MODE", "custom").strip().lower()
-
-            ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
-            is_fwd_paused = False
-            if ctrl_p.exists():
-                with suppress(Exception):
-                    with open(ctrl_p, "r", encoding="utf-8") as cf:
-                        is_fwd_paused = json.load(cf).get("paused", False)
-
-            fwd_pause_btn_txt = "▶️ Resume Auto-Forward" if is_fwd_paused else "⏸️ Pause Auto-Forward"
-            fwd_pause_cb = "act_fwd_resume" if is_fwd_paused else "act_fwd_pause"
-
-            direct_btn_txt = "⚡ Fast Direct: ON" if cur_direct else "🔄 Stream: Default"
-            sig_btn_txt = "👑 Branding: ✅ ON" if cur_sig else "🏷️ Clean Mode: ❌ OFF"
-            thumb_btn_txt = "🖼️ Cover: 16:9 HD" if cur_thumb == "custom" else "🎞️ Cover: Original"
-
-            admin_panel_text = ""
-            if self.is_admin(admin_id):
-                admin_panel_text = (
-                    f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"⚙️ <b>Admin Pipeline Controls:</b>\n"
-                    f"• Auto-Forward Sync: <code>{'PAUSED ⏸️' if is_fwd_paused else 'ACTIVE 🟢'}</code>\n"
-                    f"• Forwarding Mode: <code>{'⚡ Fast Direct (0.2s Instant)' if cur_direct else '🔄 Stream Mode (Safe, Fresh Hashes)'}</code>\n"
-                    f"• Branding & Media: <code>{'👑 ON (Kind Doctor Sig + 16:9 HD Cover)' if cur_sig else '🏷️ OFF (Clean Mode: No Sig & Original Media)'}</code>\n"
-                    f"• Video Cover Override: <code>{'🖼️ 16:9 HD Custom Cover' if cur_thumb == 'custom' else '🎞️ Original Media'}</code>\n"
-                    f"<i>(Neeche diye 1-click buttons se instant switch karein)</i>"
-                )
-
-            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
-            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
-            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
-
-            reply = (
-                f"👨‍⚕️ <b>Kind Doctor</b> 🤍 🩺\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Welcome! Aapka study & group assistant <b>100% Active</b> hai.\n"
-                f"Neeche diye <b>10 Feature Cards & Guides</b> aur <b>1-Click Action Controls</b> se sabhi tools explore karein:\n\n"
-                f"🌟 <b>MASTER CAPABILITIES:</b>\n"
-                f"• 🏷️ <b>Strip Words Studio</b>: Unwanted usernames, links & sponsor watermarks strip engine\n"
-                f"• 🚀 <b>Deep Cloner Suite</b>: 200k+ messages & 2k+ topics clone engine\n"
-                f"• 🔄 <b>Cloud Forwarder</b>: Real-time 0-tag live mirroring streams\n"
-                f"• 📑 <b>Master Topic Directory</b>: Saare subjects ka Alphabetical (A-Z) hub\n"
-                f"• 📥 <b>Media Downloader</b>: YouTube playlists, Reels, and topic delivery\n"
-                f"• 🩺 <b>Clinical Decision Studio</b>: Bedside BMI, GFR, GCS, Parkland 4-2-1 calcs\n"
-                f"• 🕵️ <b>SangMata OSINT Radar</b>: Username timeline, account age & security score\n"
-                f"• 🌐 <b>Web Cockpit (TMA 2.0)</b>: 1-Tap browser dashboard inside Telegram\n"
-                f"{admin_panel_text}\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Tip: Kisi bhi feature ko samajhne ke liye uska Guide card open karein!</i>"
-            )
-
-            # --- Master 10-Card Sequenced Grid ---
-            keyboard = {
-                "inline_keyboard": [
-                    # Section 1: Feature Cards & Guides
-                    [
-                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_striphelp"},
-                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_clonehelp"}
-                    ],
-                    [
-                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_routehelp"},
-                        {"text": "📑 Topic Index Guide", "callback_data": "act_indexhelp"}
-                    ],
-                    [
-                        {"text": "📥 Media Downloader Guide", "callback_data": "act_mediahelp"},
-                        {"text": "🩺 Clinical Calculators", "callback_data": "act_calchelp"}
-                    ],
-                    [
-                        {"text": "🕵️ OSINT & Radar Guide", "callback_data": "act_osinthelp"},
-                        {"text": "⏱️ Velocity & Pacing", "callback_data": "act_pacinghelp"}
-                    ],
-                    [
-                        {"text": "🛡️ Group Admin Guide", "callback_data": "act_adminhelp"},
-                        {"text": "🌐 Web Cockpit Guide", "callback_data": "act_webhelp"}
-                    ],
-                    # Section 2: Direct Action Buttons (Always Available for Quick Execution)
-                    [
-                        {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
-                        {"text": "🏷️ Active Strip Rules", "callback_data": "act_stripwords"}
-                    ],
-                    [
-                        {"text": "📑 Master Topic Directory", "callback_data": "act_mainindex"},
-                        {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"}
-                    ],
-                    [
-                        {"text": "🚀 Auto Forward Hub", "callback_data": "act_fwd_hub"},
-                        {"text": "🔑 Connect Account", "callback_data": "act_connect"}
-                    ],
-                    [
-                        {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
-                        {"text": "🎛️ Master Panel", "callback_data": "act_panel"}
-                    ],
-                    [
-                        {"text": fwd_pause_btn_txt, "callback_data": fwd_pause_cb},
-                        {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}
-                    ],
-                    [
-                        {"text": direct_btn_txt, "callback_data": "act_toggle_direct"},
-                        {"text": sig_btn_txt, "callback_data": "act_toggle_sig"}
-                    ],
-                    [
-                        {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"},
-                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
-                    ]
-                ]
-            }
-            sent_m = await self._send_message(session, chat_id, reply, reply_markup=keyboard, message_thread_id=thread_id)
-            if sent_m and chat_id < 0:
-                self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_m, 120))
+            await self._render_main_menu(session, chat_id, admin_id, thread_id=thread_id)
+            return
 
         elif cmd in ("/support", "/contact"):
             support_card = (
@@ -5896,9 +6286,20 @@ class DeviTelegramBot:
             await self._send_message(session, chat_id, "\n".join(lines), message_thread_id=thread_id)
 
         elif cmd in ("/fullhelp", "/manual"):
-            subcat = parts[1].lower().strip() if len(parts) > 1 else "main"
+            subcat = "main"
+            if len(parts) > 1:
+                arg = parts[1].lower().strip()
+                if arg in ("1", "part1", "man1", "study"):
+                    subcat = "part1"
+                elif arg in ("2", "part2", "man2", "cloner", "forward", "strip"):
+                    subcat = "part2"
+                elif arg in ("3", "part3", "man3", "admin", "security", "web"):
+                    subcat = "part3"
+                else:
+                    subcat = arg
             card_text, kb = self._build_interactive_help_card(subcat, is_admin=self.is_admin(admin_id))
             await self._send_message(session, chat_id, card_text, reply_markup=kb, message_thread_id=thread_id, parse_mode="HTML")
+            return
 
         elif cmd in ("/botinfo", "/about"):
             bot_card = (
@@ -6345,15 +6746,39 @@ class DeviTelegramBot:
             card_text, kb = self._build_interactive_help_card("strip", is_admin=self.is_admin(admin_id))
             await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
 
-        elif cmd in ("/pacinghelp", "/speedhelp"):
-            card_text, kb = self._build_interactive_help_card("pacing", is_admin=self.is_admin(admin_id))
+        elif cmd in ("/clonehelp", "/clonerhelp", "/cloninghelp"):
+            card_text, kb = self._build_interactive_help_card("cloner", is_admin=self.is_admin(admin_id))
             await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
 
-        elif cmd in ("/osinthelp", "/radarhelp"):
+        elif cmd in ("/routehelp", "/forwardhelp", "/routinghelp"):
+            card_text, kb = self._build_interactive_help_card("route", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/indexhelp", "/topicshelp", "/topichelp"):
+            card_text, kb = self._build_interactive_help_card("study", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/mediahelp", "/ytdlhelp", "/downloadhelp"):
+            card_text, kb = self._build_interactive_help_card("media", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/calchelp", "/clinicalhelp", "/scorehelp"):
+            card_text, kb = self._build_interactive_help_card("calc", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/osinthelp", "/radarhelp", "/forensichelp"):
             card_text, kb = self._build_interactive_help_card("osint", is_admin=self.is_admin(admin_id))
             await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
 
-        elif cmd in ("/webhelp", "/cockpithelp"):
+        elif cmd in ("/pacinghelp", "/speedhelp", "/velocityhelp"):
+            card_text, kb = self._build_interactive_help_card("pacing", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/adminhelp", "/securityhelp", "/modhelp"):
+            card_text, kb = self._build_interactive_help_card("admin", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/webhelp", "/cockpithelp", "/tmahelp"):
             card_text, kb = self._build_interactive_help_card("web", is_admin=self.is_admin(admin_id))
             await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
 

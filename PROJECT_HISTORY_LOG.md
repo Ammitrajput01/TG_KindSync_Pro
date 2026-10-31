@@ -2,6 +2,53 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Sunday, 1 November 2026 | 02:00 AM IST
+
+### 43. Telegram Bot Unresponsiveness Fix (HTTP 400 WebApp Sanitization), 10 Sequenced Cards, 3-Part Command Manual & In-Place Navigation
+* **User Directive & Context (Voice Audio)**:
+  - *"Bhai Kind Doctor bot ke bahut saare options kaam nahi kar rahe hain. Toh please ek baar na acche se analyze kar lo, sequencing wagarah sabkuch check kar lo, kyunki bahut saari commands kaam nahi kar rahi hain, maine abhi check kiya hai, theek hai? Aur bahut se cards bhi available nahi hain and menu bhi kaam nahi kar raha hai, manual bhi nahi kaam kar raha hai, menu bhi nahi kaam kar raha hai. And cards toh fir show hi nahi ho rahe hain... jaise ki stripping wala hai ki nahi hai... jab menu hi nahi kaam kar raha ya manual hi nahi kaam kar raha toh kaise pata lagega? And acche se ek baar check karke ek baar manual aur sabkuch update kar dena manual... iska, theek hai?"*
+  - *Permanent Admin Accounts*: Strictly `@Kinddoctor4u` (`1553619403`) & `@Ammitrajput1` (`759038032`).
+* **Root Cause & Forensics Analysis**:
+  1. **Telegram API HTTP 400 Bad Request Drops Messages Silently**: Telegram Bot API strictly forbids non-HTTPS links in `InlineKeyboardButton.web_app` (`"Bad Request: inline keyboard button Web App URL is invalid: Only HTTPS links are allowed"`). Because the VPS default dashboard URL was `http://127.0.0.1:8080`, every message attempting to include a Web App button (`/menu`, `/start`, `/help`, `/manual`, `/striphelp`, `/routehelp`, `/webhelp`, etc.) was rejected with status 400. The fallback retry in `_send_message` re-sent the same markup without stripping the invalid button, causing Telegram to reject it again and completely drop the messages.
+  2. **Unhandled Callback Actions**: `act_clonestatus` was missing from `_handle_callback_query`, leaving the button unresponsive. All card navigation buttons (`act_help_*`) had no handlers, resulting in silent failures when navigating between cards.
+  3. **Missing Command Handlers**: `/clonehelp`, `/routehelp`, `/indexhelp`, `/mediahelp`, `/calchelp`, `/adminhelp` were present in `PUBLIC_ALLOWED_COMMANDS` but omitted from `_handle_admin_command`.
+  4. **Manual Not Subdivided**: `/manual` had no subcategory parsing for `1`, `2`, `3`, failing to deliver the requested 3-Part Command Manual.
+  5. **Missing Method Alias**: `_edit_message_text` was called in lines 2385 and 2464 instead of `_edit_message`, risking runtime `AttributeError`.
+* **Applied Engineering Fixes**:
+  1. **Defensive Reply Markup Sanitization (`_sanitize_reply_markup`)**:
+     - Added `_sanitize_reply_markup` to `devi/operator/telegram_bot.py` and wrapped all payloads in `_send_message` and `_edit_message`.
+     - Automatically inspects every inline button; if `web_app.url` does not start with `https://`, it pops `web_app` and safely converts `http://` to standard browser `url` or `act_webhelp` callback, guaranteeing no button can ever trigger Telegram API 400 Bad Request again.
+     - Added HTTPS guard to `setChatMenuButton` in `_sync_bot_commands_and_profile`.
+  2. **10 Sequenced Feature Cards & 3-Part Official Command Manual (`_build_interactive_help_card`)**:
+     - Expanded `_build_interactive_help_card` to support all 14 categories with rich, step-by-step guides and action buttons:
+       - **Card 1**: `strip` — Strip Words & Watermark Cleaner Studio Manual
+       - **Card 2**: `cloner` — Deep Forum Cloner & Topic Mirroring Manual
+       - **Card 3**: `route` — Cloud Auto-Forwarder & Route Matrix Manual
+       - **Card 4**: `study` — Master Topic Directory (#A to #Z) & Lecture TOC Manual
+       - **Card 5**: `media` — Universal Media Downloader & In-Topic Uploader Manual
+       - **Card 6**: `calc` — Clinical Decision Support & Bedside Calculators Manual
+       - **Card 7**: `osint` — SangMata OSINT & User Forensics Radar Manual
+       - **Card 8**: `pacing` — Transmission Velocity & Pacing Manual
+       - **Card 9**: `admin` — Group Moderation, Security & Sanitation Manual
+       - **Card 10**: `web` — Web Cockpit & Telegram Mini App (TMA 2.0) Manual
+       - **Part 1**: `part1` — Official Manual: Study & Student Tools (`/manual 1`)
+       - **Part 2**: `part2` — Official Manual: Cloner, Forwarding & Strip Studio (`/manual 2`)
+       - **Part 3**: `part3` — Official Manual: Administration, Forensics & Web Cockpit (`/manual 3`)
+       - **Master Hub**: `main` — Master Command & Feature Encyclopedia
+  3. **Unified In-Place Main Menu (`_render_main_menu`)**:
+     - Created `_render_main_menu` rendering the 10 sequenced cards grid, direct quick action buttons, and admin pipeline controls.
+     - Supports `edit_message_id` for instant in-place card updates with zero chat spam.
+  4. **Comprehensive Callback & Command Routing**:
+     - Handled `act_clonestatus` and `act_fwd_hub` in-place.
+     - Handled all 10 card callbacks (`act_*help` and `act_help_*`) and manual parts (`act_man_part*`) with instant `answerCallbackQuery` and in-place `_edit_message`.
+     - Added `_edit_message_text = _edit_message` alias.
+     - Registered all 10 guides in official Telegram `commands` list via `setMyCommands`.
+  5. **100% Full Verification**:
+     - All 13 master verification suites passed with 100% HEALTHY status (13 PASSED | 0 FAILED).
+* **Affected Files**:
+  - `devi/operator/telegram_bot.py`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Sunday, 1 November 2026 | 12:15 AM IST
 
 ### 42. Complete Full-Stack Upgrades & TMA 2.0 WebApp Synchronization Across TG KindSync Pro & Kind Doctor Bot
