@@ -8,6 +8,7 @@ Comprehensive Unit & Integration Test Suite for Part 2:
 
 import os
 import sys
+import asyncio
 import pytest
 import sqlite3
 from pathlib import Path
@@ -152,20 +153,24 @@ def test_osint_search_links():
     assert "telemetr.io/en/channels" in links["telemetr"]
     assert "cse.google.com" in links["telegago"]
     assert "lyzem.com" in links["lyzem"]
+    assert "osint4all" in links["osint4all"]
+    assert "whatsmyname.app" in links["whatsmyname"]
+    assert "osintframework.com" in links["osintframework"]
 
 
-@pytest.mark.asyncio
-async def test_probe_cross_platform_username():
+def test_probe_cross_platform_username():
     """Verify concurrent lightweight username footprint reconnaissance."""
-    resolver = GlobalOSINTResolver()
-    res = await resolver.probe_cross_platform_username("torvalds")
-    assert isinstance(res, dict)
-    assert res["username"] == "torvalds"
-    assert "findings" in res
-    assert "scanned_count" in res
-    assert res["scanned_count"] >= 5
-    card_md = resolver.format_cross_platform_card(res)
-    assert "Cross-Platform" in card_md
+    async def _run():
+        resolver = GlobalOSINTResolver()
+        res = await resolver.probe_cross_platform_username("torvalds")
+        assert isinstance(res, dict)
+        assert res["username"] == "torvalds"
+        assert "findings" in res
+        assert "scanned_count" in res
+        assert res["scanned_count"] >= 18
+        card_md = resolver.format_cross_platform_card(res)
+        assert "Cross-Platform" in card_md
+    asyncio.run(_run())
 
 
 def test_interactive_help_cards(bot_and_db):
@@ -180,4 +185,38 @@ def test_interactive_help_cards(bot_and_db):
         # Check that buttons have act_help_ callbacks
         flattened_cbs = [btn["callback_data"] for row in kb["inline_keyboard"] for btn in row if "callback_data" in btn]
         assert any("act_help_" in cb for cb in flattened_cbs)
+
+
+def test_welcome_settings_and_panel_cards(bot_and_db):
+    """Verify Welcome Settings and Master Control Panel cards and group settings CRUD."""
+    bot = bot_and_db
+    chat_id = -1001234567890
+    
+    # 1. Test group setting CRUD
+    bot._save_group_setting(chat_id, "welcome_enabled", 1)
+    bot._save_group_setting(chat_id, "welcome_timeout", 90)
+    bot._save_group_setting(chat_id, "join_track_dest", "pm")
+    bot._save_group_setting(chat_id, "welcome_text", "Namaste {name}!")
+
+    settings = bot._get_group_settings(chat_id)
+    assert settings["welcome_enabled"] == 1
+    assert settings["welcome_timeout"] == 90
+    assert settings["join_track_dest"] == "pm"
+    assert settings["welcome_text"] == "Namaste {name}!"
+
+    # 2. Test Welcome card formatting without username
+    anon_dossier = {
+        "user_id": 999888777,
+        "full_name": "Dr Anonymous",
+        "username": None,
+        "is_premium": False,
+        "changes_count": 0,
+        "name_history": [],
+        "username_history": []
+    }
+    card = bot._format_sangmata_dossier(anon_dossier)
+    assert "OSINT4All" in card
+    assert "OSINT Framework" in card
+    assert "999888777" in card
+
 

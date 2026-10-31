@@ -143,7 +143,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/filter", "/setfilter", "/stop", "/delfilter", "/filters",
     "/mcq", "/pearl", "/pomodoro", "/ask",
     "/panel", "/settings", "/control", "/botpanel",
-    "/welcome", "/welcomemenu", "/welcometimeout", "/welcomettl", "/timeoutwelcome", "/jointrack",
+    "/welcome", "/welcomemenu", "/welcometimeout", "/welcomettl", "/timeoutwelcome", "/jointrack", "/setwelcome", "/resetwelcome",
     "/ytdl", "/yt", "/upload", "/playlist", "/leech", "/mediahelp", "/dl",
     "/setgroup", "/selectgroup", "/mygroup", "/activegroup", "/newtopic", "/createtopic"
 )
@@ -1530,10 +1530,24 @@ class DeviTelegramBot:
         clean_u = uname.lstrip("@") if uname and uname != "No Username" else ""
         if clean_u and not clean_u.isdigit():
             links_str = (
-                f"\n🔍 **Deep OSINT Links (osint4all radar):**\n"
-                f"• [📊 TGStat Analytics](https://tgstat.com/user/@{clean_u}) | "
-                f"[🔎 Telegago Search](https://cse.google.com/cse?cx=006368593537057042503:efxu7xprihg&q={clean_u}) | "
-                f"[📈 Telemetr](https://telemetr.io/en/channels?query={clean_u})\n"
+                f"\n🔍 **Deep OSINT Radar (OSINT4All & Platforms):**\n"
+                f"• [🌐 OSINT4All Hub](https://start.me/p/L1rEYQ/osint4all) | "
+                f"[🔎 WhatsMyName](https://whatsmyname.app/?q={clean_u}) | "
+                f"[🧭 OSINT Framework](https://osintframework.com/)\n"
+                f"• [📊 TGStat](https://tgstat.com/user/@{clean_u}) | "
+                f"[📈 Telemetr](https://telemetr.io/en/channels?query={clean_u}) | "
+                f"[🔎 Telegago](https://cse.google.com/cse?cx=006368593537057042503:efxu7xprihg&q={clean_u})\n"
+                f"• [✈️ Telegram Dork](https://www.google.com/search?q=site:t.me+{clean_u}) | "
+                f"[🌐 Web Dork](https://www.google.com/search?q=%22{clean_u}%22+site:github.com+OR+site:reddit.com+OR+site:x.com)\n"
+            )
+        else:
+            import urllib.parse
+            safe_name_enc = urllib.parse.quote(fn) if fn else "Telegram"
+            links_str = (
+                f"\n🔍 **Deep OSINT Radar (Directories & ID):**\n"
+                f"• [🌐 OSINT4All Hub](https://start.me/p/L1rEYQ/osint4all) | "
+                f"[🧭 OSINT Framework](https://osintframework.com/) | "
+                f"[🔎 Name Search](https://www.google.com/search?q=%22{safe_name_enc}%22+site:t.me)\n"
             )
 
         card = (
@@ -2271,8 +2285,9 @@ class DeviTelegramBot:
         edit_message_id: Optional[int] = None
     ):
         """Renders the Master Interactive Control Center card with 1-click inline button toggles."""
-        target_chat_id = self._resolve_study_group_id(chat_id)
+        target_chat_id = self._resolve_study_group_id(chat_id, admin_id)
         g_settings = self._get_group_settings(target_chat_id)
+        grp_title = self._get_group_title(target_chat_id)
         w_enabled = bool(g_settings.get("welcome_enabled", 1))
         w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
         w_ttl_str = f"{w_timeout}s" if w_timeout > 0 else "Never (Permanent)"
@@ -2289,39 +2304,54 @@ class DeviTelegramBot:
         load_dotenv(override=True)
         cur_df = os.getenv("DIRECT_FORWARD", "false").strip().lower() in ("true", "1", "yes")
         cur_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
+        cur_thumb = os.getenv("THUMB_MODE", "custom").strip().lower()
 
         panel_card = (
             "🎛️ <b>KIND DOCTOR MASTER CONTROL PANEL</b> 🩺\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🏛️ <b>Active Target:</b> <code>{target_chat_id}</code>\n\n"
-            f"👋 <b>Welcome Greetings:</b> <b>{'✅ Active' if w_enabled else '❌ Inactive'}</b>\n"
-            f"⏱️ <b>Welcome Auto-Delete (TTL):</b> <code>{w_ttl_str}</code>\n"
+            f"🏛️ <b>Target Group:</b> <b>{html.escape(grp_title)}</b> (<code>{target_chat_id}</code>)\n\n"
+            f"👋 <b>Welcome Greetings:</b> <b>{'✅ Active' if w_enabled else '❌ Inactive'}</b> (TTL: <code>{w_ttl_str}</code>)\n"
             f"🕵️‍♂️ <b>SangMata Join Radar:</b> <b>{j_str}</b>\n"
             f"⚡ <b>Cloner Velocity:</b> <b>{'⚡ Fast Direct (0.2s Pointer)' if cur_df else '🔄 Stream (Re-Upload)'}</b>\n"
             f"👑 <b>Branding Signature:</b> <b>{'🏷️ Active' if cur_sig else '🚫 Clean'}</b>\n"
+            f"🖼️ <b>Video Cover Override:</b> <b>{'🖼️ 16:9 HD' if cur_thumb == 'custom' else '🎞️ Original'}</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "💡 <i>Tap any button below to toggle settings instantly without typing commands!</i>"
         )
 
-        next_ttl = 60 if w_timeout == 30 else (120 if w_timeout == 60 else (0 if w_timeout == 120 else 30))
+        next_ttl = 60 if w_timeout == 30 else (90 if w_timeout == 60 else (120 if w_timeout == 90 else (0 if w_timeout == 120 else 30)))
         ttl_btn_text = f"⏱️ TTL: {w_ttl_str} ➔ {next_ttl}s" if next_ttl > 0 else f"⏱️ TTL: {w_ttl_str} ➔ Never"
 
         markup = {
             "inline_keyboard": [
                 [
-                    {"text": f"👋 Welcome: {'✅ ON' if w_enabled else '❌ OFF'}", "callback_data": f"pnl_w_tog_{target_chat_id}"},
-                    {"text": ttl_btn_text, "callback_data": f"pnl_w_ttl_{target_chat_id}_{next_ttl}"}
+                    {"text": "👋 Welcome & Greetings Settings", "callback_data": f"act_welcome_settings_{target_chat_id}"}
                 ],
                 [
-                    {"text": f"🕵️‍♂️ SangMata: {j_str}", "callback_data": f"pnl_sm_tog_{target_chat_id}"}
+                    {"text": f"👋 Welcome: {'✅ ON' if w_enabled else '❌ OFF'}", "callback_data": f"act_w_tog_{target_chat_id}"},
+                    {"text": ttl_btn_text, "callback_data": f"act_w_ttl_{target_chat_id}_{next_ttl}"}
                 ],
                 [
-                    {"text": f"⚡ Fast Direct: {'ON' if cur_df else 'OFF'}", "callback_data": "toggle_direct"},
-                    {"text": f"👑 Signature: {'ON' if cur_sig else 'OFF'}", "callback_data": "toggle_sig"}
+                    {"text": f"🎯 Join Alert: {j_str}", "callback_data": f"act_w_dest_{target_chat_id}"}
                 ],
                 [
-                    {"text": "🧹 Clean Welcomes Now", "callback_data": "cleanwelcome"},
-                    {"text": "🔄 Refresh Panel", "callback_data": f"pnl_refresh_{target_chat_id}"}
+                    {"text": f"⚡ Fast Direct: {'ON' if cur_df else 'OFF'}", "callback_data": "act_toggle_direct"},
+                    {"text": f"👑 Signature: {'ON' if cur_sig else 'OFF'}", "callback_data": "act_toggle_sig"}
+                ],
+                [
+                    {"text": f"🖼️ Cover: {'16:9 HD' if cur_thumb == 'custom' else 'Orig'}", "callback_data": "act_toggle_thumb"},
+                    {"text": "⏱️ Pacing Settings", "callback_data": "act_pacing"}
+                ],
+                [
+                    {"text": "🏷️ Strip Words Filter", "callback_data": "act_stripwords"},
+                    {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}
+                ],
+                [
+                    {"text": "🧹 Clean Welcomes Now", "callback_data": "act_cleanwelcome"},
+                    {"text": "🔄 Refresh Panel", "callback_data": f"act_pnl_refresh_{target_chat_id}"}
+                ],
+                [
+                    {"text": "🔙 Main Help Menu", "callback_data": "act_menu"}
                 ]
             ]
         }
@@ -2330,6 +2360,85 @@ class DeviTelegramBot:
             await self._edit_message_text(session, chat_id, edit_message_id, panel_card, reply_markup=markup, parse_mode="HTML")
         else:
             await self._send_message(session, chat_id, panel_card, reply_markup=markup, parse_mode="HTML", message_thread_id=message_thread_id)
+
+    async def _render_welcome_settings_card(
+        self,
+        session: aiohttp.ClientSession,
+        chat_id: int,
+        admin_id: int,
+        message_thread_id: int = 0,
+        edit_message_id: Optional[int] = None
+    ):
+        """Renders the Dedicated Welcome & Greetings Interactive Configuration Card."""
+        target_chat_id = self._resolve_study_group_id(chat_id, admin_id)
+        g_settings = self._get_group_settings(target_chat_id)
+        grp_title = self._get_group_title(target_chat_id)
+
+        w_enabled = bool(g_settings.get("welcome_enabled", 1))
+        w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
+        w_ttl_str = f"{w_timeout}s" if w_timeout > 0 else "Never (Permanent)"
+
+        j_enabled = bool(g_settings.get("join_track_enabled", 1))
+        j_dest = str(g_settings.get("join_track_dest", "pm")).lower().strip()
+        if not j_enabled or j_dest in ("off", "disabled", "0"):
+            j_str = "❌ Disabled"
+        elif j_dest in ("pm", "admin_pm", "dm"):
+            j_str = "🛡️ Admin PM Only"
+        else:
+            j_str = "📢 Public Group"
+
+        custom_w = g_settings.get("welcome_text")
+        if custom_w:
+            w_preview = f"<i>Custom:</i> <code>{html.escape(custom_w[:120])}{'...' if len(custom_w) > 120 else ''}</code>"
+        else:
+            w_preview = "<i>Default:</i> <b>Namaste / Welcome + Random Medical Quote 🩺</b>"
+
+        welcome_card = (
+            "👋 <b>KIND DOCTOR WELCOME & GREETINGS CONTROL</b> 🩺\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🏛️ <b>Target Group:</b> <b>{html.escape(grp_title)}</b> (<code>{target_chat_id}</code>)\n\n"
+            f"• <b>Welcome Greetings:</b> <b>{'✅ Active (ON)' if w_enabled else '❌ Inactive (OFF)'}</b>\n"
+            f"• <b>Auto-Delete TTL:</b> <code>{w_ttl_str}</code>\n"
+            f"• <b>Join Radar Destination:</b> <b>{j_str}</b>\n"
+            f"• <b>Message Template:</b>\n{w_preview}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 <b>Available Text Placeholders:</b>\n"
+            "  <code>{name}</code> — New Member Clickable Tag\n"
+            "  <code>{group}</code> — Group Title\n"
+            "  <code>{rules}</code> — Group Rules Link\n\n"
+            "<i>Commands:</i> <code>/setwelcome &lt;text&gt;</code> | <code>/resetwelcome</code>"
+        )
+
+        next_ttl = 60 if w_timeout == 30 else (90 if w_timeout == 60 else (120 if w_timeout == 90 else (0 if w_timeout == 120 else 30)))
+        ttl_btn_text = f"⏱️ TTL: {w_ttl_str} ➔ {next_ttl}s" if next_ttl > 0 else f"⏱️ TTL: {w_ttl_str} ➔ Never"
+
+        markup = {
+            "inline_keyboard": [
+                [
+                    {"text": f"👋 Welcome: {'✅ ON' if w_enabled else '❌ OFF'}", "callback_data": f"act_w_tog_{target_chat_id}"},
+                    {"text": ttl_btn_text, "callback_data": f"act_w_ttl_{target_chat_id}_{next_ttl}"}
+                ],
+                [
+                    {"text": f"🎯 Join Alert: {j_str}", "callback_data": f"act_w_dest_{target_chat_id}"}
+                ],
+                [
+                    {"text": "✍️ Set Custom Text", "callback_data": f"act_w_prompt_{target_chat_id}"},
+                    {"text": "🔄 Reset to Default", "callback_data": f"act_w_reset_{target_chat_id}"}
+                ],
+                [
+                    {"text": "🧹 Clean Welcomes Now", "callback_data": "act_cleanwelcome"},
+                    {"text": "🔄 Refresh", "callback_data": f"act_w_refresh_{target_chat_id}"}
+                ],
+                [
+                    {"text": "🔙 Back to Control Panel", "callback_data": "act_panel"}
+                ]
+            ]
+        }
+
+        if edit_message_id:
+            await self._edit_message_text(session, chat_id, edit_message_id, welcome_card, reply_markup=markup, parse_mode="HTML")
+        else:
+            await self._send_message(session, chat_id, welcome_card, reply_markup=markup, parse_mode="HTML", message_thread_id=message_thread_id)
 
     async def _delete_message(self, session: aiohttp.ClientSession, chat_id: int, message_id: int):
         """Silently delete a message from a chat/group with 429 FloodWait handling."""
@@ -2963,10 +3072,17 @@ class DeviTelegramBot:
             return
 
         # Public Interactive Study & Dashboard Actions (Available to ALL members)
-        if data.startswith("act_"):
-            action = data.replace("act_", "")
+        is_card_action = (
+            data.startswith("act_") or 
+            data.startswith("pnl_") or 
+            data.startswith("w_") or 
+            data in ("toggle_direct", "toggle_sig", "toggle_thumb", "cleanwelcome", "panel", "welcome")
+        )
+        if is_card_action:
+            action = data.replace("act_", "") if data.startswith("act_") else data
             msg_obj = cb.get("message", {})
             thread_id = msg_obj.get("message_thread_id")
+            msg_id = msg_obj.get("message_id")
             
             # --- INTERACTIVE HELP ENCYCLOPEDIA ACTIONS ---
             if action.startswith("help_"):
@@ -3143,9 +3259,9 @@ class DeviTelegramBot:
                 if msg_id:
                     await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, disable_web_page_preview=True)
                 return
-            elif action == "fwd_settings":
-                await self._handle_admin_command(session, chat_id, admin_id, "/settings", message=msg_obj)
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Opening Forward Settings..."})
+            elif action in ("fwd_settings", "settings"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Opening Forward & Control Settings ✨"})
+                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
                 return
             elif action in ("fwd_start", "fwd_resume"):
                 ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
@@ -3597,8 +3713,14 @@ class DeviTelegramBot:
                 set_key(str(ENV_PATH), "DIRECT_FORWARD", new_df)
                 os.environ["DIRECT_FORWARD"] = new_df
                 ans_txt = "⚡ Fast Direct Mode: ON (0.2s Unrestricted Forwarding)" if new_df == "true" else "🔄 Stream Mode: ON (Safe Default, Fresh Hashes & 16:9 Cover)"
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": ans_txt, "show_alert": True})
-                await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": ans_txt, "show_alert": False})
+                if msg_id:
+                    msg_txt_cur = msg_obj.get("text", "")
+                    if "CONTROL PANEL" in msg_txt_cur:
+                        await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                    else:
+                        await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
+                return
             elif action == "toggle_sig":
                 if not self.is_admin(admin_id):
                     return
@@ -3613,7 +3735,13 @@ class DeviTelegramBot:
                 os.environ["THUMB_MODE"] = new_th
                 ans_txt = "👑 Branded Mode: ON (Sig + 16:9 Cover)" if new_sig == "true" else "🏷️ Clean Mode: ON (No Sig, Original Media)"
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": ans_txt, "show_alert": False})
-                await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
+                if msg_id:
+                    msg_txt_cur = msg_obj.get("text", "")
+                    if "CONTROL PANEL" in msg_txt_cur:
+                        await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                    else:
+                        await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
+                return
             elif action == "toggle_thumb":
                 if not self.is_admin(admin_id):
                     return
@@ -3624,30 +3752,51 @@ class DeviTelegramBot:
                 os.environ["THUMB_MODE"] = new_th
                 ans_txt = "🎞️ Cover: ORIGINAL Media Thumbnail" if new_th == "original" else "🖼️ Cover: 16:9 HD Custom Cover"
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": ans_txt, "show_alert": False})
-                await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
+                if msg_id:
+                    msg_txt_cur = msg_obj.get("text", "")
+                    if "CONTROL PANEL" in msg_txt_cur:
+                        await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                    else:
+                        await self._handle_admin_command(session, chat_id, admin_id, "/menu", message=msg_obj)
+                return
             elif action.startswith("exp_members_"):
                 g_id = int(action.replace("exp_members_", ""))
                 await self._export_members_csv_file(session, chat_id, g_id, message_thread_id=thread_id)
             elif action.startswith("view_members_"):
                 g_id = int(action.replace("view_members_", ""))
                 await self._handle_admin_command(session, chat_id, admin_id, f"/members {g_id}", message=msg_obj)
-            elif action.startswith("pnl_w_tog_"):
-                tgt_c = int(action.replace("pnl_w_tog_", ""))
+            elif action in ("welcome", "welcomemenu", "welcome_settings", "act_welcome_settings") or action.startswith("welcome_settings_") or action.startswith("w_settings_"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Welcome & Greetings Settings ✨"})
+                await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                return
+            elif action.startswith("w_tog_") or action.startswith("pnl_w_tog_"):
+                tgt_c = int(action.replace("w_tog_", "").replace("pnl_w_tog_", ""))
                 curr_s = self._get_group_settings(tgt_c)
                 new_w = 0 if curr_s.get("welcome_enabled", 1) else 1
                 self._save_group_setting(tgt_c, "welcome_enabled", new_w)
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Welcome: {'ENABLED' if new_w else 'DISABLED'}"})
-                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
-            elif action.startswith("pnl_w_ttl_"):
-                parts_ttl = action.split("_")
-                tgt_c = int(parts_ttl[3])
-                new_ttl = int(parts_ttl[4])
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Welcome: {'ENABLED ✅' if new_w else 'DISABLED ❌'}"})
+                msg_txt_cur = msg_obj.get("text", "")
+                if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:
+                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                else:
+                    await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                return
+            elif action.startswith("w_ttl_") or action.startswith("pnl_w_ttl_"):
+                clean_act = action.replace("pnl_w_ttl_", "w_ttl_")
+                parts_ttl = clean_act.split("_")
+                tgt_c = int(parts_ttl[2])
+                new_ttl = int(parts_ttl[3])
                 self._save_group_setting(tgt_c, "welcome_timeout", new_ttl)
                 ttl_disp = f"{new_ttl}s" if new_ttl > 0 else "Never (Permanent)"
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Auto-Delete TTL: {ttl_disp}"})
-                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
-            elif action.startswith("pnl_sm_tog_"):
-                tgt_c = int(action.replace("pnl_sm_tog_", ""))
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Auto-Delete TTL: {ttl_disp} ⏱️"})
+                msg_txt_cur = msg_obj.get("text", "")
+                if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:
+                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                else:
+                    await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                return
+            elif action.startswith("w_dest_") or action.startswith("pnl_sm_tog_"):
+                tgt_c = int(action.replace("w_dest_", "").replace("pnl_sm_tog_", ""))
                 curr_s = self._get_group_settings(tgt_c)
                 cur_dest = str(curr_s.get("join_track_dest", "pm")).lower().strip()
                 cur_en = curr_s.get("join_track_enabled", 1)
@@ -3655,25 +3804,60 @@ class DeviTelegramBot:
                 if not cur_en or cur_dest == "off":
                     new_dest = "pm"
                     new_en = 1
-                    msg_txt = "SangMata: Admin PM Only (Group Clean)"
+                    msg_txt = "SangMata: Admin PM Only (Group Clean) 🛡️"
                 elif cur_dest in ("pm", "admin_pm"):
                     new_dest = "group"
                     new_en = 1
-                    msg_txt = "SangMata: Public Group"
+                    msg_txt = "SangMata: Public Group 📢"
                 else:
                     new_dest = "off"
                     new_en = 0
-                    msg_txt = "SangMata: Disabled"
+                    msg_txt = "SangMata: Disabled ❌"
                 self._save_group_setting(tgt_c, "join_track_dest", new_dest)
                 self._save_group_setting(tgt_c, "join_track_enabled", new_en)
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": msg_txt})
-                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                msg_txt_cur = msg_obj.get("text", "")
+                if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:
+                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                else:
+                    await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                return
+            elif action.startswith("w_reset_"):
+                tgt_c = int(action.replace("w_reset_", ""))
+                self._save_group_setting(tgt_c, "welcome_text", None)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Reset to Default Inspirational Quotes 🩺"})
+                await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                return
+            elif action.startswith("w_prompt_"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "💡 Send /setwelcome <text> to customize template!", "show_alert": True})
+                return
+            elif action.startswith("w_refresh_"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Welcome Settings Refreshed ✨"})
+                await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                return
             elif action.startswith("pnl_refresh_"):
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Panel Refreshed"})
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Panel Refreshed ✨"})
                 await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
-            elif action == "act_panel":
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Opening Master Control Panel..."})
-                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id)
+                return
+            elif action in ("cleanwelcome", "act_cleanwelcome", "pnl_cleanwelcome"):
+                target_chat_id = self._resolve_study_group_id(chat_id, admin_id)
+                msg_ids = self._get_logged_welcome_messages(target_chat_id)
+                del_count = 0
+                for mid in msg_ids:
+                    if await self._delete_message(session, target_chat_id, mid):
+                        del_count += 1
+                self._clear_logged_welcome_messages(target_chat_id)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"🧹 Purged {del_count} Welcome Cards!", "show_alert": False})
+                msg_txt_cur = msg_obj.get("text", "")
+                if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:
+                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                else:
+                    await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                return
+            elif action in ("panel", "control", "settings", "botpanel", "act_panel"):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Master Control Panel ✨"})
+                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                return
             return
 
         if not self.is_admin(admin_id):
@@ -4502,7 +4686,7 @@ class DeviTelegramBot:
                         logger.debug(f"SangMata fetch on join: {ex}")
 
                     # Deep OSINT Cross-Platform Username Probe (osint4all integration)
-                    nm_uname = new_m.get("username")
+                    nm_uname = new_member.get("username", "")
                     if nm_uname:
                         try:
                             from devi.operator.osint_resolver import osint_resolver
@@ -6909,7 +7093,7 @@ class DeviTelegramBot:
                 status_str = "✅ **ENABLED**" if new_val else "❌ **DISABLED**"
                 await self._send_message(session, chat_id, f"🔔 **Welcome Greetings:** {status_str} for group `{target_chat_id}`", message_thread_id=thread_id)
             else:
-                await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id)
+                await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id)
 
         elif cmd in ("/welcometimeout", "/welcomettl", "/timeoutwelcome"):
             target_chat_id = self._resolve_study_group_id(chat_id)
@@ -6974,6 +7158,21 @@ class DeviTelegramBot:
                 session, 
                 chat_id, 
                 f"✅ **Custom Welcome Message Saved!**\n\nNaye members ko ye message receive hoga:\n\n{welcome_body}",
+                message_thread_id=thread_id
+            )
+
+        elif cmd in ("/resetwelcome", "/delwelcome_text"):
+            target_chat_id = self._resolve_study_group_id(chat_id, admin_id)
+            is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
+            if not is_caller_admin:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Group Admin rights required.", message_thread_id=thread_id)
+                return
+
+            self._save_group_setting(target_chat_id, "welcome_text", None)
+            await self._send_message(
+                session,
+                chat_id,
+                "✅ **Custom Welcome Message Reset!**\nReverted back to official inspirational medical quotes & tags. 🩺✨",
                 message_thread_id=thread_id
             )
 

@@ -2,6 +2,62 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 31 October 2026 | 09:48 PM IST
+
+### 39. Bot Card Navigation Anti-Loop Engine, Dedicated Welcome & Greetings Settings Card, 18-Platform OSINT Reconnaissance & Member Join Deep Links
+* **User Directive & Context**:
+  - Direct Instruction: *"Hello Bro Actually I was looking for some features in kind Doctor bot So as we suggested before that we are going to put some settings or everything on card section as a features or functions But the thing is happen now Many features are not available in card options and those options are also not available in the settings OK Like welcome messages settings And some settings are going back if we are going to click on that feature that is available on the card I am clicking on it I am clicking on clicking on it and its going back So just cheque it Thoroughly And I want one thing more The thing is you know we have placed some welcome message timings and And where to get messages welcome messages and research settings whatever People are whoever so adding in group and getting add in the group via link or any other ways and after adding them the group the boat is analysing them their user name also and gathering information from the other awesome tools So after checking some things I got to know The thing is when he the body searching for the information of the person who added or joined the group It's not using all those in platforms that we discussed before We discussed before like you are going to add more than 12 platforms or many websites are there That to find users information from those websites or those in tools I think we have discussed also about the ocean tools website is there Free ocean tools and many github directories also Ocean OSINT Note Ocean ok So just cheque it and also cheque for the all the features are available on card section or not in settings of the board..."*
+* **Root Cause & Technical Analysis**:
+  1. **Member Join OSINT NameError Bug**:
+     - In `_handle_incoming_message` (`devi/operator/telegram_bot.py:4614`), the loop variable was `new_member`, but line 4614 called `nm_uname = new_m.get("username")`.
+     - This raised an unhandled `NameError: name 'new_m' is not defined`, aborting the deep OSINT probe for joining group members.
+  2. **Missing Card Prefix Interception & "Going Back" Loop**:
+     - In `_render_control_panel_card`, inline buttons used mixed prefixes (`pnl_w_tog_*`, `pnl_w_ttl_*`, `pnl_sm_tog_*`, `toggle_direct`, `toggle_sig`, `cleanwelcome`).
+     - In `_handle_callback_query`, button clicks were routed strictly under `if data.startswith("act_"):`. Consequently, any click with a `pnl_` or bare prefix fell through silently without action.
+     - Furthermore, toggling `toggle_direct`, `toggle_sig`, or `toggle_thumb` previously executed `await self._handle_admin_command(..., "/menu")`, which sent a brand-new main menu message instead of editing the control panel in-place, making the UI appear to jump back repeatedly.
+  3. **Absence of a Dedicated Welcome Settings Card**:
+     - The `/welcome` and `/welcomemenu` commands defaulted to rendering the generic control panel without individual controls for welcome message templates, placeholder previews, TTL cycle presets, or reset capabilities.
+  4. **OSINT Platform Coverage Limitation**:
+     - Cross-platform scanning was limited to 12 endpoints. When users lacked a public `@username` (e.g., ID-only or display name only), no OSINT links were generated.
+* **Applied Engineering Fixes**:
+  1. **Universal Callback Action Normalizer (`devi/operator/telegram_bot.py`)**:
+     - Extended `is_card_action` to intercept `act_`, `pnl_`, `w_`, and standalone action identifiers (`toggle_direct`, `toggle_sig`, `toggle_thumb`, `cleanwelcome`, `panel`, `welcome`).
+     - Normalizes incoming callback data regardless of whether the prefix is `act_` or direct.
+     - Replaced `/menu` invocations on toggles with in-place `editMessageText` updates (`edit_message_id=msg_id`) and non-intrusive toast notifications.
+  2. **Dedicated Welcome & Greetings Configuration Card (`_render_welcome_settings_card`)**:
+     - Engineered a dedicated sub-card with interactive controls:
+       - Active Target Group indicator (`{grp_title}` & ID).
+       - Welcome Greetings: `[ ✅ ON / ❌ OFF ]` in-place toggle (`act_w_tog_{chat_id}`).
+       - Auto-Delete TTL Timer: `[ ⏱️ 30s ➔ 60s ➔ 90s ➔ 120s ➔ Never ]` cycle selector (`act_w_ttl_{chat_id}_{ttl}`).
+       - Join Radar Destination: `[ 🛡️ Admin PM / 📢 Public Group / ❌ Off ]` cycle toggle (`act_w_dest_{chat_id}`).
+       - Template Customization & Reset: `[ ✍️ Set Custom Text ]` & `[ 🔄 Reset to Default ]` (`act_w_reset_{chat_id}`).
+       - One-Click Purge: `[ 🧹 Clean Welcomes Now ]` (`act_cleanwelcome`) with instant toast reporting deleted count.
+       - Master Control Panel Link: `[ 🔙 Back to Control Panel ]` (`act_panel`).
+     - Added `/resetwelcome` command restoring official inspirational clinical quotes.
+  3. **Master Control Panel Expansion (`_render_control_panel_card`)**:
+     - Added dedicated shortcut buttons to Welcome Settings, Forward & Cloner Settings, Transmission Pacing, Strip Words Filter, Live Cloner Status, Clean Welcomes, and Refresh.
+     - Every button edit updates in-place smoothly without chat flickering or navigation reset.
+  4. **18-Platform OSINT Reconnaissance Engine (`devi/operator/osint_resolver.py`)**:
+     - Expanded `probe_cross_platform_username` to probe 18 concurrent platforms without API keys: GitHub, GitLab, DockerHub, Dev.to, HackerNews, Telegram Web, Codeforces, Reddit, Chess.com, PyPI, npm, Medium, Pastebin, Replit, Kaggle, Steam Community, Keybase, and Linktree.
+     - Enriched `get_osint_search_links` with direct links to:
+       - **OSINT4All Directory**: `https://start.me/p/L1rEYQ/osint4all`
+       - **WhatsMyName Project Web App**: `https://whatsmyname.app/?q={clean_u}`
+       - **OSINT Framework Hub**: `https://osintframework.com/`
+       - **TGStat Analytics & Telemetr Radar**: `tgstat.com` and `telemetr.io`
+       - **Telegago Google Custom Search Engine**: `cse.google.com`
+       - **Telegram & Global Dorks**: Targeted Google Dorks for Telegram handles and cross-platform footprints.
+  5. **Join Intelligence Fallback for Users Without Public Usernames (`_format_sangmata_dossier`)**:
+     - Fixed `new_member.get("username")` NameError bug in `_handle_incoming_message`.
+     - When a joining member has no public `@username`, the dossier automatically falls back to generating OSINT4All, OSINT Framework, and URL-encoded Name search dorks.
+  6. **Unit Tests & Full System Verification**:
+     - Updated `tests/test_osint_and_rose.py` covering the 18-platform scan, search links, and welcome settings CRUD.
+     - Verified all 12 system verification test suites pass (100% HEALTHY).
+* **Affected Files**:
+  - `devi/operator/osint_resolver.py`
+  - `devi/operator/telegram_bot.py`
+  - `tests/test_osint_and_rose.py`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Saturday, 31 October 2026 | 08:27 PM IST
 
 ### 38. Virtual Reorder Buffer (VROB), Monotonic Sequence Barrier, Sovereign Biometric Name Vault, Kind Doctor Clinical Decision Support (CDSS), Document PiP Mini-HUD & Oracle Linux Kernel Tuning

@@ -598,18 +598,22 @@ class GlobalOSINTResolver:
     @staticmethod
     def get_osint_search_links(target: str) -> Dict[str, str]:
         """
-        Generates curated OSINT investigation links (from osint4all directory):
-        TGStat analytics, Telemetr, Telegago Google CSE, Lyzem search, and Google Dorks.
+        Generates curated OSINT investigation links (from osint4all, WhatsMyName, and OSINT Framework):
+        TGStat analytics, Telemetr, Telegago Google CSE, Lyzem search, WhatsMyName, and Google Dorks.
         """
         clean = str(target).strip().lstrip("@")
         return {
             "query": clean,
+            "osint4all": "https://start.me/p/L1rEYQ/osint4all",
+            "whatsmyname": f"https://whatsmyname.app/?q={clean}",
+            "osintframework": "https://osintframework.com/",
             "tgstat_user": f"https://tgstat.com/user/@{clean}",
             "tgstat_channel": f"https://tgstat.com/channel/@{clean}",
             "telemetr": f"https://telemetr.io/en/channels?query={clean}",
             "telegago": f"https://cse.google.com/cse?cx=006368593537057042503:efxu7xprihg&q={clean}",
             "lyzem": f"https://lyzem.com/search?q={clean}",
             "google_dork": f"https://www.google.com/search?q=site:t.me+{clean}",
+            "social_dork": f"https://www.google.com/search?q=%22{clean}%22+site:github.com+OR+site:reddit.com+OR+site:x.com",
             "truecaller": f"https://www.truecaller.com/search/in/{clean}" if clean.isdigit() else ""
         }
 
@@ -825,6 +829,90 @@ class GlobalOSINTResolver:
                 except Exception:
                     pass
 
+            async def check_pastebin():
+                try:
+                    url = f"https://pastebin.com/u/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Pastebin",
+                                "icon": "📋",
+                                "url": f"https://pastebin.com/u/{clean_u}",
+                                "detail": "Public Paste Author"
+                            })
+                except Exception:
+                    pass
+
+            async def check_replit():
+                try:
+                    url = f"https://replit.com/@{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Replit",
+                                "icon": "💻",
+                                "url": f"https://replit.com/@{clean_u}",
+                                "detail": "Software Project Creator"
+                            })
+                except Exception:
+                    pass
+
+            async def check_kaggle():
+                try:
+                    url = f"https://www.kaggle.com/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Kaggle",
+                                "icon": "📊",
+                                "url": f"https://www.kaggle.com/{clean_u}",
+                                "detail": "Data Scientist / ML Engineer"
+                            })
+                except Exception:
+                    pass
+
+            async def check_steam():
+                try:
+                    url = f"https://steamcommunity.com/id/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Steam",
+                                "icon": "🎮",
+                                "url": f"https://steamcommunity.com/id/{clean_u}",
+                                "detail": "Active Gamer Profile"
+                            })
+                except Exception:
+                    pass
+
+            async def check_keybase():
+                try:
+                    url = f"https://keybase.io/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Keybase",
+                                "icon": "🔑",
+                                "url": f"https://keybase.io/{clean_u}",
+                                "detail": "Cryptographic Identity Verified"
+                            })
+                except Exception:
+                    pass
+
+            async def check_linktree():
+                try:
+                    url = f"https://linktr.ee/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Linktree",
+                                "icon": "🌲",
+                                "url": f"https://linktr.ee/{clean_u}",
+                                "detail": "Public Social Linktree Hub"
+                            })
+                except Exception:
+                    pass
+
             await asyncio.gather(
                 check_github(),
                 check_gitlab(),
@@ -838,6 +926,12 @@ class GlobalOSINTResolver:
                 check_pypi(),
                 check_npm(),
                 check_medium(),
+                check_pastebin(),
+                check_replit(),
+                check_kaggle(),
+                check_steam(),
+                check_keybase(),
+                check_linktree(),
                 return_exceptions=True
             )
 
@@ -845,7 +939,7 @@ class GlobalOSINTResolver:
             "username": clean_u,
             "found_count": len(findings),
             "findings": findings,
-            "scanned_count": 12,
+            "scanned_count": 18,
             "search_links": self.get_osint_search_links(clean_u)
         }
 
@@ -853,13 +947,14 @@ class GlobalOSINTResolver:
         """Formats cross-platform username findings into clean Markdown for Telegram."""
         findings = scan_result.get("findings", [])
         u = scan_result.get("username", "")
+        scanned = scan_result.get("scanned_count", 18)
         if not findings:
             return (
-                f"🌐 **Cross-Platform Footprint (`@{u}`):**\n"
-                f"• *Clean: No matching public developer/creator profiles detected.*\n"
+                f"🌐 **Cross-Platform Footprint (`@{u}` — 0/{scanned} Networks):**\n"
+                f"• *Clean: No matching public developer/creator profiles detected across {scanned} platforms.*\n"
             )
 
-        lines = [f"🌐 **Cross-Platform Footprint (`@{u}`):**"]
+        lines = [f"🌐 **Cross-Platform Footprint (`@{u}` — {len(findings)}/{scanned} Matches):**"]
         for f in findings:
             icon = f.get("icon", "•")
             plat = f.get("platform", "Platform")

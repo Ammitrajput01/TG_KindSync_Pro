@@ -31,3 +31,4 @@ jobs:
     - name: Run Master Test Suite (11 Verification Suites)
       run: |
         python tests/run_all_tests.py
+
