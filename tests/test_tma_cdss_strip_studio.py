@@ -31,32 +31,63 @@ async def test_tma_auth_and_cdss():
     mock_state = MagicMock()
     server = DashboardServer(state=mock_state, host="127.0.0.1", port=8080)
 
-    # 1. Test TMA Biometric Auto-Auth for Master Admins
+    import os
+    import hmac
+    import hashlib
+    import urllib.parse
+    import time
+    bot_token = os.getenv("DEVI_TELEGRAM_BOT_TOKEN", "").strip() or "mock_test_token_12345"
+    os.environ["DEVI_TELEGRAM_BOT_TOKEN"] = bot_token
+
+    def make_init_data(user_dict: dict, token: str, tamper_hash: bool = False) -> str:
+        raw = {
+            "auth_date": str(int(time.time())),
+            "query_id": "AAHdF6IQAAAAAN0XohD12345",
+            "user": json.dumps(user_dict, separators=(",", ":"))
+        }
+        data_check_str = "\n".join(f"{k}={v}" for k, v in sorted(raw.items()))
+        secret_key = hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
+        sig = hmac.new(secret_key, data_check_str.encode("utf-8"), hashlib.sha256).hexdigest()
+        raw["hash"] = "tampered_signature" if tamper_hash else sig
+        return urllib.parse.urlencode(raw)
+
+    # 1. Test TMA Biometric Auto-Auth for Master Admins with Cryptographic initData
+    init1 = make_init_data({"id": 1553619403, "username": "Kinddoctor4u"}, bot_token)
     req_mock_admin1 = MagicMock()
-    req_mock_admin1.json = AsyncMock(return_value={"user": {"id": 1553619403, "username": "Kinddoctor4u"}})
+    req_mock_admin1.json = AsyncMock(return_value={"initData": init1, "user": {"id": 1553619403, "username": "Kinddoctor4u"}})
     resp1 = await server.handle_api_auth_telegram_webapp(req_mock_admin1)
     body1 = json.loads(resp1.text)
     assert resp1.status == 200, f"Expected 200, got {resp1.status}"
     assert body1["success"] is True
     assert body1["admin"] is True
     assert "session" in body1
-    print("  [+] TMA Auto-Auth Primary 1 (@Kinddoctor4u, ID: 1553619403): PASSED")
+    print("  [+] TMA Auto-Auth Primary 1 (@Kinddoctor4u, ID: 1553619403, Cryptographic HMAC-SHA256): PASSED")
 
+    init2 = make_init_data({"id": 759038032, "username": "Ammitrajput1"}, bot_token)
     req_mock_admin2 = MagicMock()
-    req_mock_admin2.json = AsyncMock(return_value={"user": {"id": 759038032, "username": "Ammitrajput1"}})
+    req_mock_admin2.json = AsyncMock(return_value={"initData": init2, "user": {"id": 759038032, "username": "Ammitrajput1"}})
     resp2 = await server.handle_api_auth_telegram_webapp(req_mock_admin2)
     body2 = json.loads(resp2.text)
     assert resp2.status == 200
     assert body2["success"] is True
     assert body2["admin"] is True
-    print("  [+] TMA Auto-Auth Primary 2 (@Ammitrajput1, ID: 759038032): PASSED")
+    print("  [+] TMA Auto-Auth Primary 2 (@Ammitrajput1, ID: 759038032, Cryptographic HMAC-SHA256): PASSED")
 
     # 2. Test TMA Auto-Auth Rejection for Unauthorized accounts
+    init_intruder = make_init_data({"id": 999999999, "username": "unknown_intruder"}, bot_token)
     req_mock_intruder = MagicMock()
-    req_mock_intruder.json = AsyncMock(return_value={"user": {"id": 999999999, "username": "unknown_intruder"}})
+    req_mock_intruder.json = AsyncMock(return_value={"initData": init_intruder, "user": {"id": 999999999, "username": "unknown_intruder"}})
     resp_intruder = await server.handle_api_auth_telegram_webapp(req_mock_intruder)
     assert resp_intruder.status == 403
     print("  [+] TMA Auto-Auth Unauthorized Rejection (403 Forbidden): PASSED")
+
+    # 3. Test TMA Forged Signature Rejection
+    init_forged = make_init_data({"id": 1553619403, "username": "Kinddoctor4u"}, bot_token, tamper_hash=True)
+    req_mock_forged = MagicMock()
+    req_mock_forged.json = AsyncMock(return_value={"initData": init_forged})
+    resp_forged = await server.handle_api_auth_telegram_webapp(req_mock_forged)
+    assert resp_forged.status == 403
+    print("  [+] TMA Forged / Tampered Signature Rejection (403 Forbidden): PASSED")
 
     # 3. Test Parkland Resuscitation Calculator API
     req_mock_burn = MagicMock()

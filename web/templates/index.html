@@ -33,30 +33,19 @@
             </div>
 
             <form id="auth-gate-form" action="javascript:void(0);" onsubmit="handleGateLoginSubmit(event); return false;" style="margin-top: var(--space-4);">
-                <div style="margin-bottom: var(--space-3); font-size: 11px; color: #38BDF8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 7px 10px; text-align: center;">
-                    🔑 <b>Official Login:</b> <code>Amit</code> &middot; Password: <code>Amit@123</code>
-                </div>
                 <div class="form-group" style="margin-bottom: var(--space-3); text-align: left;">
                     <label class="form-label" style="font-size: 12px; font-weight: 600;">Username</label>
-                    <input type="text" class="text-input" id="gate-username" value="Amit" placeholder="Amit" required autocomplete="username" autofocus style="font-size: 14px; padding: 10px 14px; width: 100%;">
+                    <input type="text" class="text-input" id="gate-username" value="" placeholder="Operator Username" required autocomplete="username" autofocus style="font-size: 14px; padding: 10px 14px; width: 100%;">
                 </div>
                 <div class="form-group" style="margin-bottom: var(--space-4); text-align: left;">
                     <label class="form-label" style="font-size: 12px; font-weight: 600;">Password</label>
-                    <input type="password" class="text-input" id="gate-password" value="Amit@123" placeholder="Amit@123" required autocomplete="current-password" style="font-size: 14px; padding: 10px 14px; width: 100%;">
+                    <input type="password" class="text-input" id="gate-password" value="" placeholder="Enter Password" required autocomplete="current-password" style="font-size: 14px; padding: 10px 14px; width: 100%;">
                 </div>
 
                 <div id="gate-error-banner" style="display: none; font-size: 12px; color: var(--accent-danger); background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.25); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: var(--space-4); text-align: center;"></div>
 
                 <button type="button" id="gate-submit-btn" onclick="handleGateLoginSubmit(event)" class="btn btn-primary" style="width: 100%; height: 42px; font-size: 14px; font-weight: 700; justify-content: center; background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);">
                     Unlock Mission Control
-                </button>
-                <div style="display: flex; align-items: center; gap: 8px; margin: 12px 0 8px 0;">
-                    <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
-                    <span style="font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; font-weight: 700;">Localhost Direct</span>
-                    <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
-                </div>
-                <button type="button" id="gate-local-unlock-btn" onclick="handleInstantLocalUnlock()" class="btn btn-secondary" style="width: 100%; height: 38px; font-size: 12px; font-weight: 700; justify-content: center; border-color: rgba(56, 189, 248, 0.4); color: #38BDF8; background: rgba(56, 189, 248, 0.08);">
-                    ⚡ Instant Local PC Unlock (Bypass Password)
                 </button>
             </form>
 
@@ -75,6 +64,9 @@
                     <span>KindSync Pro</span>
                     <span class="brand-subtitle">Version X &bull; Enterprise Cockpit</span>
                 </div>
+                <button class="sidebar-collapse-trigger" onclick="toggleSidebarCollapse()" title="Toggle Sidebar (Ctrl+B)">
+                    <svg class="collapse-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
             </div>
 
             <nav class="sidebar-nav">
@@ -86,22 +78,22 @@
                     </div>
                     <ul class="nav-items">
                         <li>
-                            <a href="#overview" class="nav-link active" onclick="switchView('overview'); return false;" id="nav-overview" role="tab" aria-selected="true">
+                            <a href="#overview" class="nav-link active" onclick="switchView('overview'); return false;" id="nav-overview" role="tab" aria-selected="true" data-tooltip="1. Mission Control">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-                                <span>1. Mission Control</span>
+                                <span class="nav-label">1. Mission Control</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#operations" class="nav-link" onclick="switchView('operations'); return false;" id="nav-operations" role="tab" aria-selected="false">
+                            <a href="#operations" class="nav-link" onclick="switchView('operations'); return false;" id="nav-operations" role="tab" aria-selected="false" data-tooltip="2. Transmission Engine">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                                <span>2. Transmission Engine</span>
+                                <span class="nav-label">2. Transmission Engine</span>
                                 <span class="nav-badge success tabular" id="sidebar-speed-badge">VROB 8x</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#topics" class="nav-link" onclick="switchView('topics'); return false;" id="nav-topics" role="tab" aria-selected="false">
+                            <a href="#topics" class="nav-link" onclick="switchView('topics'); return false;" id="nav-topics" role="tab" aria-selected="false" data-tooltip="3. Topic Intelligence">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
-                                <span>3. Topic Intelligence</span>
+                                <span class="nav-label">3. Topic Intelligence</span>
                                 <span class="nav-badge info tabular" id="sidebar-topics-badge">90 Topics</span>
                             </a>
                         </li>
@@ -116,16 +108,16 @@
                     </div>
                     <ul class="nav-items">
                         <li>
-                            <a href="#clinical" class="nav-link" onclick="switchView('clinical'); return false;" id="nav-clinical" role="tab" aria-selected="false">
+                            <a href="#clinical" class="nav-link" onclick="switchView('clinical'); return false;" id="nav-clinical" role="tab" aria-selected="false" data-tooltip="4. Clinical Decision Support (CDSS)">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
-                                <span>4. Clinical Studio</span>
+                                <span class="nav-label">4. Clinical Studio</span>
                                 <span class="nav-badge tabular" style="background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.35);">CDSS</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#telegram" class="nav-link" onclick="switchView('telegram'); return false;" id="nav-telegram" role="tab" aria-selected="false">
+                            <a href="#telegram" class="nav-link" onclick="switchView('telegram'); return false;" id="nav-telegram" role="tab" aria-selected="false" data-tooltip="5. Telegram Identity">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                                <span>5. Telegram Identity</span>
+                                <span class="nav-label">5. Telegram Identity</span>
                                 <span class="nav-badge tabular" id="sidebar-tg-badge">3</span>
                             </a>
                         </li>
@@ -140,28 +132,23 @@
                     </div>
                     <ul class="nav-items">
                         <li>
-                            <a href="#devi" class="nav-link" onclick="switchView('devi'); return false;" id="nav-devi" role="tab" aria-selected="false">
+                            <a href="#devi" class="nav-link" onclick="switchView('devi'); return false;" id="nav-devi" role="tab" aria-selected="false" data-tooltip="6. Devi AI Sovereign Labs">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-                                <span>6. Devi AI Labs</span>
+                                <span class="nav-label">6. Devi AI Labs</span>
                                 <span class="nav-badge tabular" style="background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3);">LVL 10</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#terminal" class="nav-link" onclick="switchView('terminal'); return false;" id="nav-terminal" role="tab" aria-selected="false">
+                            <a href="#terminal" class="nav-link" onclick="switchView('terminal'); return false;" id="nav-terminal" role="tab" aria-selected="false" data-tooltip="7. Sentinel Terminal (LIVE)">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-                                <span>7. Sentinel Terminal</span>
+                                <span class="nav-label">7. Sentinel Terminal</span>
                                 <span class="nav-badge success tabular" id="sidebar-terminal-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);">LIVE</span>
                             </a>
                         </li>
-                        <li style="display: none;">
-                            <a href="#dlq" class="nav-link" onclick="switchView('dlq'); return false;" id="nav-dlq" role="tab" aria-selected="false">
-                                <span>DLQ</span>
-                            </a>
-                        </li>
                         <li>
-                            <a href="#security" class="nav-link" onclick="switchView('security'); return false;" id="nav-security" role="tab" aria-selected="false">
+                            <a href="#security" class="nav-link" onclick="switchView('security'); return false;" id="nav-security" role="tab" aria-selected="false" data-tooltip="8. Security & Access Control">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                <span>8. Security & Access</span>
+                                <span class="nav-label">8. Security & Access</span>
                                 <span class="nav-badge tabular" style="background: rgba(251, 146, 60, 0.15); color: #FB923C; border: 1px solid rgba(251, 146, 60, 0.3);">Amit</span>
                             </a>
                         </li>
@@ -170,102 +157,146 @@
             </nav>
 
             <!-- Verified Doctor & Admin Contact Card -->
-            <div class="doctor-contact-sidebar" style="margin: 0 12px 10px 12px; padding: 10px 12px; background: rgba(16, 185, 129, 0.07); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                    <div style="font-weight: 800; font-size: 11.5px; color: #FFFFFF; display: flex; align-items: center; gap: 5px;">
-                        <span>👨‍⚕️</span> Kind Doctor 🩺❤️ (Dr. Amit Singh)
+            <div class="doctor-contact-sidebar" id="doctor-sidebar-widget">
+                <div class="doctor-sidebar-full">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                        <div style="font-weight: 800; font-size: 11.5px; color: #FFFFFF; display: flex; align-items: center; gap: 5px;">
+                            <span>👨‍⚕️</span> Kind Doctor 🩺❤️ (Dr. Amit Singh)
+                        </div>
+                        <span class="pill pill-success" style="font-size: 8px; padding: 1px 5px;">OWNER</span>
                     </div>
-                    <span class="pill pill-success" style="font-size: 8px; padding: 1px 5px;">OWNER</span>
+                    <div style="font-size: 10px; color: var(--text-tertiary); margin-bottom: 6px;">Kind Doctor • System Architect</div>
+                    <div style="display: flex; gap: 4px; flex-direction: column;">
+                        <a href="https://t.me/Kinddoctor4u" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 3px 8px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 4px; color: #38BDF8; text-decoration: none; display: flex; justify-content: space-between;">
+                            <span>✈️ @Kinddoctor4u</span>
+                            <span style="opacity: 0.7;">Primary</span>
+                        </a>
+                        <a href="https://t.me/Ammitrajput1" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 3px 8px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 4px; color: #818CF8; text-decoration: none; display: flex; justify-content: space-between;">
+                            <span>✈️ @Ammitrajput1</span>
+                            <span style="opacity: 0.7;">Backup</span>
+                        </a>
+                    </div>
                 </div>
-                <div style="font-size: 10px; color: var(--text-tertiary); margin-bottom: 6px;">Kind Doctor • System Architect</div>
-                <div style="display: flex; gap: 4px; flex-direction: column;">
-                    <a href="https://t.me/Kinddoctor4u" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 3px 8px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 4px; color: #38BDF8; text-decoration: none; display: flex; justify-content: space-between;">
-                        <span>✈️ @Kinddoctor4u</span>
-                        <span style="opacity: 0.7;">Primary</span>
-                    </a>
-                    <a href="https://t.me/Ammitrajput1" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 3px 8px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 4px; color: #818CF8; text-decoration: none; display: flex; justify-content: space-between;">
-                        <span>✈️ @Ammitrajput1</span>
-                        <span style="opacity: 0.7;">Backup</span>
-                    </a>
+                <div class="doctor-sidebar-mini" onclick="openDoctorContactModal()" title="Kind Doctor 🩺❤️ (Dr. Amit Singh) - Verified System Architect" style="display: none;">
+                    <span style="font-size: 20px;">👨‍⚕️</span>
                 </div>
             </div>
 
             <div class="sidebar-footer">
-                <div class="user-profile-widget" onclick="openLoginModal()" style="flex: 1;" title="Manage Operator Session">
+                <div class="user-profile-widget" onclick="openLoginModal()" style="flex: 1;" title="Manage Operator Session: Kind Doctor 🩺❤️ (Dr. Amit Singh)">
                     <div class="user-avatar" id="footer-user-avatar">KD</div>
                     <div class="user-details">
                         <span class="user-name" id="footer-user-name">Kind Doctor 🩺❤️ (Dr. Amit Singh)</span>
                         <span class="user-role" id="footer-user-role">ADMINISTRATOR</span>
                     </div>
                 </div>
-                <button class="audio-ctrl-btn" onclick="handleLogout()" title="Lock Session / Log Out" style="color: var(--accent-danger);">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                </button>
-                <button class="audio-ctrl-btn" onclick="toggleSoundFX()" title="Toggle Web Audio Synthesizer Tones" id="audio-toggle-btn">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                </button>
+                <div class="sidebar-footer-actions">
+                    <button class="audio-ctrl-btn" onclick="handleLogout()" title="Lock Session / Log Out" style="color: var(--accent-danger);">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    </button>
+                    <button class="audio-ctrl-btn" onclick="toggleSoundFX()" title="Toggle Web Audio Synthesizer Tones" id="audio-toggle-btn">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    </button>
+                </div>
             </div>
         </aside>
 
         <!-- Main Viewport -->
         <main class="main-viewport">
-            <!-- Top Application Header -->
+            <!-- Top Application Header with Collapsible Toggle & Responsive Action Clustering -->
             <header class="app-header">
-                <div class="header-breadcrumbs">
-                    <span class="breadcrumb-root">Dashboard</span>
-                    <span class="breadcrumb-sep">/</span>
-                    <span class="breadcrumb-current" id="header-breadcrumb-view">Overview</span>
+                <!-- Left: Hamburger Toggle + Breadcrumbs -->
+                <div class="header-left-cluster">
+                    <button id="sidebar-toggle-btn" class="header-icon-btn sidebar-hamburger-btn" onclick="toggleSidebarCollapse()" title="Toggle Collapsible Sidebar (Ctrl+B)">
+                        <svg class="hamburger-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                            <line x1="3" y1="6" x2="21" y2="6"/>
+                            <line x1="3" y1="12" x2="21" y2="12"/>
+                            <line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
+                    <div class="header-breadcrumbs">
+                        <span class="breadcrumb-root">Dashboard</span>
+                        <span class="breadcrumb-sep">/</span>
+                        <span class="breadcrumb-current" id="header-breadcrumb-view">Overview</span>
+                    </div>
                 </div>
 
+                <!-- Center: High-Tech Telemetry Capsule & Verified Doctor Badge -->
+                <div class="header-center-cluster">
+                    <div class="header-telemetry-capsule" onclick="checkServerPing()" title="Live Telemetry Round-Trip Latency (Click to Ping Server)">
+                        <span class="status-dot"></span>
+                        <span class="telemetry-label" id="header-engine-status">Engine Online (Synced)</span>
+                        <span class="telemetry-divider">•</span>
+                        <span class="telemetry-ping" id="ping-text">⚡ 2ms</span>
+                    </div>
+                    <button class="header-doctor-pill" onclick="openDoctorContactModal()" title="Kind Doctor 🩺❤️ (Dr. Amit Singh) Verified System Architect">
+                        <span class="doctor-badge-dot">👨‍⚕️</span>
+                        <span class="doctor-name-text">Kind Doctor 🩺❤️ (Dr. Amit Singh)</span>
+                        <span class="doctor-verified-check">✓</span>
+                    </button>
+                </div>
+
+                <!-- Right: Action Toolbar with Guaranteed No-Clip & More Tools Dropdown -->
                 <div class="header-actions">
-                    <button class="btn btn-ghost btn-sm" onclick="openCommandPalette()" title="Open Command Palette (Ctrl + K)" style="border: 1px solid var(--border-medium); background: rgba(255,255,255,0.04); display: flex; align-items: center; gap: 6px;">
+                    <button class="btn btn-ghost btn-sm header-action-btn" onclick="openCommandPalette()" title="Open Command Palette (Ctrl + K)">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <span>Command</span>
+                        <span class="action-btn-text">Command</span>
                         <kbd class="hud-kbd">Ctrl+K</kbd>
                     </button>
-                    <button class="btn btn-ghost btn-sm" onclick="openRemoteModal()" title="Mobile Phone Access URL">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
-                        <span id="header-wifi-label">Wi-Fi Phone URL</span>
-                    </button>
-                    <div class="system-status-indicator">
-                        <span class="status-dot"></span>
-                        <span id="header-engine-status">Engine Online (Synced)</span>
-                    </div>
-                    <div class="header-ping-badge" id="header-ping-badge" style="display: flex; align-items: center; gap: 5px; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #34D399; font-weight: 700; cursor: pointer;" onclick="checkServerPing()" title="Live Telemetry Round-Trip Latency">
-                        <span style="width: 6px; height: 6px; border-radius: 50%; background: #34D399; display: inline-block; box-shadow: 0 0 6px #34D399;"></span>
-                        <span id="ping-text">⚡ 2ms</span>
-                    </div>
-                    <button class="btn btn-ghost btn-sm" onclick="openDoctorContactModal()" title="Kind Doctor 🩺❤️ (Dr. Amit Singh) Verified Contact & Profile" style="border: 1px solid rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.08); color: #34D399; display: flex; align-items: center; gap: 6px; font-weight: 700;">
-                        <span style="font-size: 13px;">👨‍⚕️</span>
-                        <span>Kind Doctor 🩺❤️ (Dr. Amit Singh)</span>
-                    </button>
-                    <button class="btn btn-secondary btn-sm" id="btn-smart-refresh" onclick="handleSmartRefresh()" title="Instant Smart Resync from Database (Alt + R)" style="background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.4); color: #38BDF8; font-weight: 700;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="refresh-spin-icon"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-                        <span>Refresh</span>
+                    
+                    <button class="btn btn-secondary btn-sm header-action-btn btn-refresh-accent" id="btn-smart-refresh" onclick="handleSmartRefresh()" title="Instant Smart Resync from Database (Alt + R)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="refresh-spin-icon"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                        <span class="action-btn-text">Refresh</span>
                         <kbd class="hud-kbd" style="font-size: 9px; padding: 1px 4px;">Alt+R</kbd>
                     </button>
-                    <button class="btn btn-secondary btn-sm" id="btn-diag-analyzer" onclick="openDiagnosticModal()" title="Non-Blocking Live Diagnostic Analyzer (Alt + D)" style="background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.4); color: #4ADE80; font-weight: 700;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                        <span>Diagnostic</span>
+
+                    <button class="btn btn-secondary btn-sm header-action-btn btn-diag-accent" id="btn-diag-analyzer" onclick="openDiagnosticModal()" title="Non-Blocking Live Diagnostic Analyzer (Alt + D)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        <span class="action-btn-text">Diagnostic</span>
                         <kbd class="hud-kbd" style="font-size: 9px; padding: 1px 4px;">Alt+D</kbd>
                     </button>
-                    <button class="btn btn-secondary btn-sm" onclick="openRouteMatrixModal()" title="Visual Forwarding Route Matrix">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="2" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
-                        <span>Route Matrix</span>
+
+                    <button class="btn btn-secondary btn-sm header-action-btn" onclick="openRouteMatrixModal()" title="Visual Forwarding Route Matrix (Alt + M)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="2" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+                        <span class="action-btn-text">Route Matrix</span>
                     </button>
-                    <button class="btn btn-secondary btn-sm" onclick="triggerCloudBackup()" title="Backup SQLite Database Snapshot">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                        <span>Snapshot</span>
+
+                    <!-- Snapshot: Prominently styled with rich gradient, 100% visible, never cut off -->
+                    <button class="btn btn-primary btn-sm header-action-btn btn-snapshot-glow" id="btn-header-snapshot" onclick="triggerCloudBackup()" title="Backup SQLite Database Snapshot (Alt + S)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                        <span class="action-btn-text">Snapshot</span>
                     </button>
-                    <button class="btn btn-secondary btn-sm" onclick="toggleFloatingMiniHUD()" title="Float Always-on-Top Mini-HUD (Picture-in-Picture)" style="border-color: rgba(99, 102, 241, 0.4); color: #818CF8; background: rgba(99, 102, 241, 0.1);">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><rect width="8" height="6" x="11" y="13" rx="1"/></svg>
-                        <span>Mini-HUD</span>
-                    </button>
-                    <button class="btn btn-primary btn-sm" id="btn-pause-engine" onclick="togglePauseEngine()" title="Pause/Resume Pipeline Engine (Space)">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
-                        <span id="pause-btn-text">Pause Engine</span>
-                        <kbd class="hud-kbd" style="font-size: 9px; padding: 1px 4px; background: rgba(0,0,0,0.3);">Space</kbd>
-                    </button>
+
+                    <!-- More Tools & Settings Dropdown Menu -->
+                    <div class="header-tools-dropdown-wrapper" id="header-tools-wrapper">
+                        <button class="btn btn-ghost btn-sm header-icon-btn" onclick="toggleHeaderToolsDropdown(event)" id="btn-header-more-tools" title="More Tools & Integrations">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
+                        </button>
+                        <div class="header-tools-dropdown-menu" id="header-tools-menu">
+                            <div class="dropdown-header-title">System Tools & Utilities</div>
+                            <button class="dropdown-tool-item" onclick="openRemoteModal(); closeHeaderToolsDropdown();">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+                                <span>Mobile Wi-Fi Phone Access URL</span>
+                            </button>
+                            <button class="dropdown-tool-item" onclick="toggleFloatingMiniHUD(); closeHeaderToolsDropdown();">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg>
+                                <span>Picture-in-Picture Mini-HUD</span>
+                            </button>
+                            <button class="dropdown-tool-item" onclick="toggleSoundFX(); closeHeaderToolsDropdown();">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                                <span id="header-sound-label">Audio Synth FX</span>
+                            </button>
+                            <button class="dropdown-tool-item" onclick="togglePauseEngine(); closeHeaderToolsDropdown();">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
+                                <span id="dropdown-pause-label">Pause / Resume Engine (Space)</span>
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-tool-item" onclick="openDoctorContactModal(); closeHeaderToolsDropdown();" style="color: #34D399;">
+                                <span>👨‍⚕️</span>
+                                <span>Kind Doctor Official Profile & Relays</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </header>
 

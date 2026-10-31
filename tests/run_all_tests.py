@@ -26,6 +26,7 @@ from tests.test_unified_strip_and_isolation import run_suite as run_strip_and_is
 from tests.test_media_downloader import run_media_downloader_suite
 from tests.test_master_vrob_and_cdss import main as run_vrob_and_cdss_suite
 from tests.test_tma_cdss_strip_studio import main as run_tma_cdss_strip_studio_suite
+from tests.test_collapsible_sidebar_and_responsive_header import test_collapsible_sidebar_and_header as run_sidebar_and_header_suite
 from tests.test_kind_doctor_upgrades import (
     test_telegram_bot_name_sync,
     test_unified_branding_toggle_logic,
@@ -60,6 +61,7 @@ async def run_all():
         ("Universal In-Topic Media Downloader Engine", run_media_downloader_suite),
         ("Virtual Reorder Buffer (VROB), Biometric Vault & CDSS", run_vrob_and_cdss_suite),
         ("TMA 2.0 WebApp, Clinical Studio & Strip Words Studio", run_tma_cdss_strip_studio_suite),
+        ("Collapsible Mini Sidebar & Responsive Header", run_sidebar_and_header_suite),
     ]
 
     passed = 0

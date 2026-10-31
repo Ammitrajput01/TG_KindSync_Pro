@@ -2245,11 +2245,70 @@
             }
         }
 
+        // --- COLLAPSIBLE SIDEBAR & RESPONSIVE HEADER CONTROLS ---
+        function toggleSidebarCollapse() {
+            const sidebar = document.getElementById('app-sidebar');
+            if (!sidebar) return;
+            sidebar.classList.toggle('sidebar-collapsed');
+            const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+            try {
+                localStorage.setItem('sidebar_collapsed', isCollapsed ? 'true' : 'false');
+            } catch(e) {}
+            playAudioFeedback('click');
+
+            // Smoothly resize active charts after layout transition completes
+            setTimeout(() => {
+                if (typeof speedChart !== 'undefined' && speedChart) speedChart.resize();
+                if (typeof specialtyChart !== 'undefined' && specialtyChart) specialtyChart.resize();
+                if (typeof dlqChart !== 'undefined' && dlqChart) dlqChart.resize();
+            }, 300);
+        }
+
+        function initSidebarState() {
+            try {
+                const isCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+                const sidebar = document.getElementById('app-sidebar');
+                if (sidebar && isCollapsed) {
+                    sidebar.classList.add('sidebar-collapsed');
+                }
+            } catch(e) {}
+        }
+
+        function toggleHeaderToolsDropdown(e) {
+            if (e) e.stopPropagation();
+            const menu = document.getElementById('header-tools-menu');
+            if (!menu) return;
+            menu.classList.toggle('open');
+            playAudioFeedback('click');
+        }
+
+        function closeHeaderToolsDropdown() {
+            const menu = document.getElementById('header-tools-menu');
+            if (menu && menu.classList.contains('open')) {
+                menu.classList.remove('open');
+            }
+        }
+
+        // Global click-away listener for header dropdowns
+        document.addEventListener('click', (e) => {
+            const toolsWrapper = document.getElementById('header-tools-wrapper');
+            if (toolsWrapper && !toolsWrapper.contains(e.target)) {
+                closeHeaderToolsDropdown();
+            }
+        });
+
         // Global Keyboard Shortcut Dispatcher
         window.addEventListener('keydown', (e) => {
             const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
             const cmdPalette = document.getElementById('modal-command-palette');
             const isCmdOpen = cmdPalette && cmdPalette.classList.contains('open');
+
+            // Toggle Collapsible Sidebar: Ctrl+B or Cmd+B
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                toggleSidebarCollapse();
+                return;
+            }
 
             // Open Command Palette: Ctrl+K or Cmd+K
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -2288,6 +2347,7 @@
             // Global Shortcuts when NOT typing in form inputs
             if (!isTyping) {
                 if (e.key === 'Escape') {
+                    closeHeaderToolsDropdown();
                     closeTopicDetailsModal();
                     closeDiagnosticModal();
                     closeRouteMatrixModal();
@@ -4259,6 +4319,7 @@
 
         // Initialize App
         window.addEventListener('DOMContentLoaded', () => {
+            initSidebarState();
             initTelegramWebApp();
             checkAuth();
             updateStatus();

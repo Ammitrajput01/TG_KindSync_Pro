@@ -10232,21 +10232,13 @@ class DashboardServer:
 
     async def handle_api_auth_local_unlock(self, request):
         try:
-            peer = request.remote or "127.0.0.1"
-            host = request.headers.get("Host", "")
-            is_local = (
-                peer in ("127.0.0.1", "::1", "localhost")
-                or peer.startswith("192.168.")
-                or peer.startswith("10.")
-                or peer.startswith("172.16.")
-                or "130.210.1.32" in host
-                or "localhost" in host
-            )
+            peer = request.remote or ""
+            is_local = peer in ("127.0.0.1", "::1")
             if is_local:
                 sess = self.auth_mgr.create_local_session("Amit", "admin")
                 return web.json_response({"success": True, **sess})
             return web.json_response(
-                {"success": False, "error": "Instant local unlock is restricted to localhost / LAN clients"},
+                {"success": False, "error": "Instant local unlock is strictly restricted to loopback localhost (127.0.0.1)"},
                 status=403
             )
         except Exception as e:
@@ -10791,8 +10783,34 @@ class DashboardServer:
 
     async def handle_api_auth_telegram_webapp(self, request):
         try:
+            import hmac
+            import urllib.parse
             data = await request.json()
-            user_info = data.get("user", {})
+            init_data = data.get("initData", "").strip()
+            bot_token = os.getenv("DEVI_TELEGRAM_BOT_TOKEN", "").strip()
+
+            user_info = None
+            if init_data and bot_token:
+                try:
+                    parsed = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+                    received_hash = parsed.pop("hash", None)
+                    if received_hash:
+                        data_check_str = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+                        secret_key = hmac.new(b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256).digest()
+                        computed_hash = hmac.new(secret_key, data_check_str.encode("utf-8"), hashlib.sha256).hexdigest()
+                        if hmac.compare_digest(computed_hash, received_hash):
+                            user_raw = parsed.get("user")
+                            if user_raw:
+                                user_info = json.loads(user_raw)
+                except Exception as ex:
+                    logger.warning(f"[TMA Auth] Cryptographic validation error: {ex}")
+
+            if not user_info:
+                return web.json_response({
+                    "success": False,
+                    "error": "Cryptographic signature validation failed. Untrusted or forged Telegram WebApp token."
+                }, status=403)
+
             tg_id = int(user_info.get("id", 0))
             tg_u = str(user_info.get("username", "")).lower()
             is_master = tg_id in (1553619403, 759038032) or tg_u in ("kinddoctor4u", "ammitrajput1")
@@ -10800,7 +10818,10 @@ class DashboardServer:
                 sess = self.auth_mgr.create_local_session(username=f"Dr. Amit (@{tg_u or 'MasterAdmin'})", role="admin")
                 return web.json_response({"success": True, "session": sess, "admin": True})
             else:
-                return web.json_response({"success": False, "error": "Unauthorized Telegram account. Only @Kinddoctor4u and @Ammitrajput1 permitted."}, status=403)
+                return web.json_response({
+                    "success": False,
+                    "error": "Unauthorized Telegram account. The Web Cockpit is strictly restricted to Master Admin Dr. Amit (@Kinddoctor4u & @Ammitrajput1)."
+                }, status=403)
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=400)
 

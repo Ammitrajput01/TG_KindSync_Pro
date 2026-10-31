@@ -1697,29 +1697,33 @@ class DeviTelegramBot:
             )
 
             # 4. Telegram Mini App (TMA 2.0) Persistent Chat Menu Button (API 6.0+)
+            # 1. Reset Global Menu Button to default for all general users/students (Zero Cockpit Exposure)
+            with suppress(Exception):
+                await session.post(
+                    f"https://api.telegram.org/bot{self.token}/setChatMenuButton",
+                    json={"menu_button": {"type": "default"}},
+                    timeout=8
+                )
+
+            # 2. Scope Web Cockpit menu button strictly for Master Admins (@Kinddoctor4u & @Ammitrajput1)
             dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
             lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
             dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
             if dash_url.lower().startswith("https://"):
-                menu_btn_payload = {
+                admin_menu_payload = {
                     "menu_button": {
                         "type": "web_app",
                         "text": "⚡ Web Cockpit",
                         "web_app": {"url": dash_url}
                     }
                 }
-            else:
-                menu_btn_payload = {
-                    "menu_button": {
-                        "type": "default"
-                    }
-                }
-            with suppress(Exception):
-                await session.post(
-                    f"https://api.telegram.org/bot{self.token}/setChatMenuButton",
-                    json=menu_btn_payload,
-                    timeout=8
-                )
+                for master_id in self.master_admin_ids:
+                    with suppress(Exception):
+                        await session.post(
+                            f"https://api.telegram.org/bot{self.token}/setChatMenuButton",
+                            json={"chat_id": master_id, **admin_menu_payload},
+                            timeout=8
+                        )
 
             logger.info("Bot commands and profile successfully synchronized with Telegram API.")
         except Exception as e:
@@ -2617,12 +2621,13 @@ class DeviTelegramBot:
                     [
                         {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
                         {"text": "🚀 START AUTO-SYNC", "callback_data": "act_fwd_start"}
-                    ],
-                    [
-                        {"text": "🌐 ROUTE MATRIX (WEB APP)", "web_app": {"url": f"{dash_url}#operations"}}
                     ]
                 ]
             }
+            if user_id in self.master_admin_ids:
+                keyboard["inline_keyboard"].append([
+                    {"text": "🌐 ROUTE MATRIX (WEB APP)", "web_app": {"url": f"{dash_url}#operations"}}
+                ])
         else:
             ctrl_p = BASE_PROJECT_DIR / "engine_control.json"
             is_fwd_paused = False
@@ -2664,12 +2669,13 @@ class DeviTelegramBot:
                     [
                         {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
                         fwd_pause_btn
-                    ],
-                    [
-                        {"text": "🌐 ROUTE MATRIX (WEB APP)", "web_app": {"url": f"{dash_url}#operations"}}
                     ]
                 ]
             }
+            if user_id in self.master_admin_ids:
+                keyboard["inline_keyboard"].append([
+                    {"text": "🌐 ROUTE MATRIX (WEB APP)", "web_app": {"url": f"{dash_url}#operations"}}
+                ])
         return card_text, keyboard
 
     def _build_clone_status_card_data(self, admin_id: int) -> Tuple[str, dict]:
@@ -2886,7 +2892,7 @@ class DeviTelegramBot:
 
         return text, {"inline_keyboard": buttons}
 
-    def _build_interactive_help_card(self, category: str = "main", is_admin: bool = False) -> Tuple[str, dict]:
+    def _build_interactive_help_card(self, category: str = "main", is_admin: bool = False, is_master: bool = False) -> Tuple[str, dict]:
         """Builds interactive nested help card with in-place category switching."""
         dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
         lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
@@ -3290,22 +3296,25 @@ class DeviTelegramBot:
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "💡 <i>Neeche diye buttons se navigate karein:</i>"
             )
-            kb = {
-                "inline_keyboard": [
-                    [
-                        {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}}
-                    ],
-                    [
-                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"},
-                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"}
-                    ],
-                    [
-                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
-                        {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
-                    ]
+            kb_rows = []
+            if is_master:
+                kb_rows.append([{"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}}])
+            else:
+                text += (
+                    "\n\n🔒 <b>RESTRICTED MASTER CONTROL:</b>\n"
+                    "<i>The Web Cockpit &amp; TMA interface are reserved exclusively for Bot Owners &amp; Master Admins (@Kinddoctor4u &amp; @Ammitrajput1). Unauthorized users cannot launch or access the system cockpit.</i>"
+                )
+            kb_rows.extend([
+                [
+                    {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"},
+                    {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"}
+                ],
+                [
+                    {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
+                    {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
                 ]
-            }
-            return text, kb
+            ])
+            return text, {"inline_keyboard": kb_rows}
 
         # -------------------------------------------------------------
         # OFFICIAL MANUAL — PART 1: STUDY & STUDENT TOOLS
@@ -3618,13 +3627,20 @@ class DeviTelegramBot:
                 [
                     {"text": direct_btn_txt, "callback_data": "act_toggle_direct"},
                     {"text": sig_btn_txt, "callback_data": "act_toggle_sig"}
-                ],
-                [
-                    {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
-                    {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
                 ]
             ]
         }
+
+        # Strict Security: Only Master Admins receive the TMA Web Cockpit launch button
+        if admin_id in self.master_admin_ids:
+            keyboard["inline_keyboard"].append([
+                {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
+                {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
+            ])
+        else:
+            keyboard["inline_keyboard"].append([
+                {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
+            ])
 
         if edit_message_id:
             ok = await self._edit_message(session, chat_id, edit_message_id, reply, reply_markup=keyboard, parse_mode="HTML")
@@ -4384,7 +4400,7 @@ class DeviTelegramBot:
 
             elif action in ("webhelp", "help_web", "cockpithelp", "tmahelp"):
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
-                card_text, kb = self._build_interactive_help_card("web", is_admin=self.is_admin(admin_id))
+                card_text, kb = self._build_interactive_help_card("web", is_admin=self.is_admin(admin_id), is_master=(admin_id in self.master_admin_ids))
                 if msg_id:
                     await self._edit_message(session, chat_id, msg_id, card_text, reply_markup=kb, parse_mode="HTML")
                 else:
@@ -6779,7 +6795,7 @@ class DeviTelegramBot:
             await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
 
         elif cmd in ("/webhelp", "/cockpithelp", "/tmahelp"):
-            card_text, kb = self._build_interactive_help_card("web", is_admin=self.is_admin(admin_id))
+            card_text, kb = self._build_interactive_help_card("web", is_admin=self.is_admin(admin_id), is_master=(admin_id in self.master_admin_ids))
             await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
 
         # -------------------------------------------------------------
@@ -7707,10 +7723,11 @@ class DeviTelegramBot:
                     [
                         {"text": "✈️ Chat with @Kinddoctor4u", "url": "https://t.me/Kinddoctor4u"},
                         {"text": "✈️ Chat with @Ammitrajput1", "url": "https://t.me/Ammitrajput1"}
-                    ],
-                    [{"text": "🌐 Open Web Cockpit", "url": f"http://{os.getenv('SERVER_IP', '127.0.0.1')}:8080"}]
+                    ]
                 ]
             }
+            if admin_id in self.master_admin_ids:
+                kb["inline_keyboard"].append([{"text": "🌐 Open Web Cockpit", "url": f"http://{os.getenv('SERVER_IP', '127.0.0.1')}:8080"}])
             await self._send_message(session, chat_id, contact_card, reply_markup=kb, message_thread_id=thread_id)
 
         elif cmd in ("/test_alert", "/notify_test", "/alerttest"):
