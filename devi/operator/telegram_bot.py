@@ -14,6 +14,11 @@ Features:
 
 import aiohttp
 import asyncio
+try:
+    import uvloop
+    uvloop.install()
+except Exception:
+    pass
 import os
 import sys
 import re

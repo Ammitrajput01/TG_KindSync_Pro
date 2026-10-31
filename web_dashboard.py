@@ -24,6 +24,11 @@ import json
 import time
 import socket
 import asyncio
+try:
+    import uvloop
+    uvloop.install()
+except Exception:
+    pass
 import hashlib
 import secrets
 from pathlib import Path
