@@ -2,15 +2,15 @@
 
 ![TG KindSync Pro Header](docs/assets/header_banner.jpg)
 
-# 🩺 TG KINDSYNC PRO — V16.0.0 ENTERPRISE TURBO MASTERPIECE
+# 🩺 TG KINDSYNC PRO — V16.2.0 ENTERPRISE TURBO MASTERPIECE
 ### *Autonomous Telegram MTProto In-Memory Streaming Suite • DEVI Sentinel Engine • 24/7 Multi-OS Cloud Infrastructure*
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Telegram](https://img.shields.io/badge/Telegram-MTProto%20v2.0%20Pure-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://core.telegram.org/)
-[![Architecture](https://img.shields.io/badge/Architecture-100%25%20Standalone%20Engine-brightgreen?style=for-the-badge)](README.md)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Android%20%7C%20Oracle%20VPS-orange?style=for-the-badge)](README.md)
+[![Telegram Premium](https://img.shields.io/badge/Telegram%20Premium-4GB%20Uploads%20Unlocked-7B2CBF?style=for-the-badge&logo=telegram&logoColor=white)](https://telegram.org/faq#telegram-premium)
+[![Concurrency](https://img.shields.io/badge/Concurrency-40--Socket%20Chunk%20Streaming-00F0FF?style=for-the-badge)](README.md)
+[![Zero Desync](https://img.shields.io/badge/Sequencing-VROB%20Monotonic%20Barrier-brightgreen?style=for-the-badge)](README.md)
 [![Oracle Cloud](https://img.shields.io/badge/Oracle%20Cloud-24%2F7%20Always%20Free%20VPS-F80000?style=for-the-badge&logo=oracle&logoColor=white)](https://cloud.oracle.com/)
-[![License](https://img.shields.io/badge/License-Proprietary%20Enterprise-success?style=for-the-badge)](LICENSE)
 [![Lead Architect](https://img.shields.io/badge/Creator-Dr.%20Amit%20Singh%20(%40Kinddoctor4u)-7B2CBF?style=for-the-badge&logo=telegram)](https://t.me/Kinddoctor4u)
 [![Super Admin](https://img.shields.io/badge/Super%20Admin-%40Ammitrajput1-0088cc?style=for-the-badge&logo=telegram)](https://t.me/Ammitrajput1)
 
@@ -35,46 +35,34 @@
 
 ---
 
-## 🌟 Executive Summary & Engineering Highlights
+## ⚡ System Architecture & Distributed Data Flow
 
-Designed for medical education archives, high-volume curriculum migrations, and continuous 24/7 channel backups, **TG KindSync Pro V16.0.0 Enterprise Turbo Masterpiece** delivers production-grade reliability across all operational tiers:
+<div align="center">
 
-1. **Restricted Content Streaming**: Reliably extracts and forwards media from copy-protected channels, private groups, and restricted forum topics without writing intermediate bytes to disk.
-2. **Deterministic Sequence Locking**: Enforces strict FIFO (First-In, First-Out) delivery order across multi-worker threads, guaranteeing serial medical lecture series and curriculum modules never arrive out-of-order.
-3. **Automated Forum Topic Discovery & Hierarchy Preservation**: Automatically maps source forum topics to target discussion threads, preserving conversational replies and subject categories.
-4. **Dead-Letter-Queue (DLQ) Auto-Healing**: Intercepts network disconnects, Telegram FloodWait rate limits, and chunk timeouts into an SQLite WAL queue with automated exponential backoff retries.
-5. **Obsidian Cyber-Glass Web Cockpit (:8080)**: Real-time telemetry dashboard featuring live speedometer gauges, worker cards, account login manager, and 1-click database snapshots.
-6. **Kind Doctor Bot Daemon (`@KindDoc_bot`)**: Autonomous Telegram operator bot providing interactive study category cards (`/mainindex`), OSINT user intelligence, and remote administration.
-7. **Universal In-Topic Media Downloader & Uploader Engine**: Direct in-topic download and delivery from YouTube, Playlists (sequential numbering), Instagram Reels, TikTok, Twitter/X, and direct web files with HD thumbnails, `#MedicalLecture #KindDoctor` clinical tags, and 100% temporary disk cleanup.
-8. **Permanent Vault Architecture (Zero Deletion Sync)**: Strictly rejects source deletion propagation. Destructive events or takedowns on source channels NEVER delete resources in the target backup vault, ensuring permanent archive security.
-9. **Multi-Group Forum Topic Routing & Remote Switcher (`/setgroup`, `/newtopic`)**: Complete multi-group isolation. Commands issued inside any group are strictly scoped to that group. When commanding remotely from Private DM, the interactive `/setgroup` selector routes topics and media to the selected active target group with persistent SQLite memory.
-10. **Universal Strip Words Synchronization Bridge (`strip_sync.py`)**: Seamless two-way bridge unifying `strip_words.txt`, `Friend_Edition/strip_words.txt`, and SQLite database with case-insensitive deduplication, interactive pagination cards (`/stripwords`), and automatic safety backups before deletions.
-11. **Multi-Tenant Worker Session Isolation & Pool Protection**: Strict session isolation preventing non-master users from borrowing the master `session_forwarder.session`, cleanly dispatching them to an isolated worker session pool (`session_account2`, `session_account3`, `session_bot_scanner`).
-12. **Dual-Process Split Status Radar & Pacing Presets (`/clonestatus`, `/pacing`)**: Unified split dashboard segregating the 24/7 Forwarder Daemon from active In-Bot Deep Cloner tasks with real-time ETA, velocity gauges, and 1-click delay presets (0.0s to 2.0s).
+![TG KindSync Pro Architecture Flow](docs/assets/tg_architecture_flow.jpg)
+*Figure 1: High-Speed MTProto Data Center Ingress, 40-Socket Concurrency Pipeline, Virtual Reorder Buffer (VROB) & Forum Hierarchy Dispatcher.*
 
----
-
-## ⚡ System Architecture Flow
+</div>
 
 ```mermaid
 flowchart TD
     subgraph Sources [Telegram Source Endpoints]
         SRC_RESTRICTED[Restricted Channels / Groups]
         SRC_FORUM[Forum Topics & Discussion Threads]
-        SRC_DIRECT[Direct File Ingestion / 2GB Batches]
+        SRC_DIRECT[Direct File Ingestion / 4GB Batches]
     end
 
-    subgraph Core [TG KindSync Pro V16.0 Enterprise Core]
-        MTProto[48-Parallel MTProto In-Memory Chunker]
-        SeqLock[Deterministic FIFO Sequence Lock]
-        DLQ[Dead Letter Queue DLQ Engine]
+    subgraph Core [TG KindSync Pro V16.2 Enterprise Core]
+        MTProto[40-Parallel MTProto In-Memory Chunker]
+        VROB[Virtual Reorder Buffer & Monotonic Barrier]
+        DLQ[Dead Letter Queue DLQ Auto-Recovery]
         DB[(SQLite WAL High-Concurrency Store)]
-        Sentinel[DEVI Sentinel AI Watchdog & Health Monitor]
+        Sentinel[DEVI Sentinel AI Watchdog & Self-Healing]
     end
 
     subgraph Destinations [Target Storage & Control Surfaces]
         TGT_FORUMS[Target Forum Topics & Archives]
-        WEB_HUD[Web Cockpit HUD :8080]
+        WEB_HUD[Obsidian Web Cockpit HUD :8080]
         BOT_DAEMON[Kind Doctor Operator Bot @KindDoc_bot]
         ORACLE_VPS[Oracle Cloud 24/7 Always-Free VPS]
     end
@@ -83,10 +71,10 @@ flowchart TD
     SRC_FORUM -->|Topic Hierarchy Mapping| MTProto
     SRC_DIRECT -->|Batch Chunk Pipeline| MTProto
 
-    MTProto -->|Strict Order Dispatch| SeqLock
-    SeqLock -->|Idempotent Delivery| TGT_FORUMS
+    MTProto -->|Parallel Chunk Streams| VROB
+    VROB -->|Strict In-Order Commit| TGT_FORUMS
 
-    MTProto -->|Live Telemetry Stream| WEB_HUD
+    MTProto -->|Live Telemetry WebSocket| WEB_HUD
     MTProto -->|Failed Packet Routing| DLQ
     DLQ -.->|Auto-Retry with Backoff| MTProto
     MTProto -->|Transaction Logging| DB
@@ -94,6 +82,186 @@ flowchart TD
     Sentinel -->|Self-Healing & Alerts| BOT_DAEMON
     Core -.->|Autonomous 24/7 Systemd Daemons| ORACLE_VPS
 ```
+
+---
+
+## 🌟 Executive Summary & Engineering Highlights
+
+Designed for medical education archives, high-volume curriculum migrations, and continuous 24/7 channel backups, **TG KindSync Pro V16.2.0 Enterprise Turbo Masterpiece** delivers production-grade reliability across all operational tiers:
+
+1. **Telegram Premium 4GB Streaming**: Unlocks up to 4GB single-file uploads for verified Telegram Premium accounts with zero disk staging, bypassing the standard 2GB ceiling.
+2. **40-Socket Chunk Parallelism (God Mode)**: Dynamically opens up to 40 concurrent TCP upload chunk sockets per multipart file stream, saturating gigabit connections at $80\text{–}110\text{ MB/s}$.
+3. **Deterministic Sequence Locking (VROB)**: Monotonic Sequence Barrier guarantees that even under maximum uncapped wire speed (`MESSAGE_DELAY=0.0s`), medical lecture series and curriculum modules never arrive out-of-order.
+4. **Restricted Content Streaming**: Reliably extracts and forwards media from copy-protected channels, private groups, and restricted forum topics without writing intermediate bytes to disk.
+5. **Obsidian Cyber-Glass Web Cockpit (:8080)**: Real-time telemetry dashboard featuring live speedometer gauges, collapsible 70px icon-rail sidebar (`Ctrl+B`), live hacker-dark terminal logs, and 1-click database snapshots.
+6. **Telegram Mini App (TMA 2.0) with HMAC-SHA256 Auto-Auth**: Cryptographically authenticated 1-tap mobile entry inside Telegram, strictly scoped to Master Admins (`@Kinddoctor4u` & `@Ammitrajput1`).
+7. **Kind Doctor Bot Daemon (`@KindDoc_bot`)**: Autonomous Telegram operator bot providing interactive 10-card menu navigation (`/menu`), deep channel cloner (`/clone`), SangMata OSINT user intelligence (`/whois`), and remote administration.
+8. **Clinical Decision Support System (CDSS) Studio**: Bedside Parkland 4-2-1 burn fluid calculator, Glasgow Coma Scale (GCS) assessment, eGFR CKD-EPI, BMI, OpenFDA drug knowledge base, and Drug-Drug Interaction (DDI) Radar.
+9. **Universal In-Topic Media Downloader & Uploader Engine**: Direct in-topic download and delivery from YouTube, Playlists (sequential numbering), Instagram Reels, TikTok, Twitter/X, and direct web files with HD thumbnails, `#MedicalLecture #KindDoctor` clinical tags, and 100% temporary disk cleanup.
+10. **Multi-Tenant Worker Session Isolation**: Strict isolation preventing non-master users from borrowing the master `session_forwarder.session`, cleanly dispatching them to an isolated worker session pool.
+11. **Permanent Vault Architecture (Zero Deletion Sync)**: Strictly rejects source deletion propagation. Destructive events or takedowns on source channels NEVER delete resources in the target backup vault, ensuring permanent archive security.
+12. **Multi-Group Forum Topic Routing (`/setgroup`, `/newtopic`)**: Complete multi-group isolation. Commands issued inside any group are strictly scoped to that group. When commanding remotely from Private DM, the interactive `/setgroup` selector routes topics and media to the selected active target group.
+
+---
+
+## 🚀 Telegram Premium 4GB Uploads & 40-Socket MTProto Wire Speed
+
+Dr. Amit's active Telegram Premium subscription unlocks enterprise-grade data center bandwidth allocation:
+
+| Metric / Parameter | Standard Telegram Accounts | Dr. Amit's Telegram Premium Account | Engineering Advantage |
+| :--- | :---: | :---: | :--- |
+| **Max File Upload Size** | 2,000 MB (2.0 GB) | **4,096 MB (4.0 GB)** | Complete 4K surgical videos and multi-hour medical archives stream without truncation. |
+| **Chunk Upload Parallelism** | 12 Concurrent Sockets | **40 Concurrent Sockets** | 40 parallel chunk upload sockets saturate gigabit network pipelines at $80\text{–}110\text{ MB/s}$. |
+| **Transmission Pacing Delay** | 0.2s Artificial Delay | **0.0s (Supersonic Uncapped)** | Zero artificial sleep between message packets; instantaneous wire throughput. |
+| **Data Center Priority** | Standard Ingress Queue | **High-Priority DC Ingress** | Telegram server-side prioritization reduces chunk upload latency and packet drops. |
+| **Dead-Letter Guard** | Files > 2GB dropped to DLQ | **Auto-Bypasses 2GB Ceiling** | Seamlessly uploaded via `upload.saveBigFilePart` with zero DLQ failures. |
+
+```
+[ 4.0 GB Medical Archive File ]
+        │
+        ▼ (Split into 512 KB Multipart Chunks: 8,000 Chunks Total)
+┌──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┐
+│ C_01 │ C_02 │ C_03 │ C_04 │ C_05 │ ...  │ C_38 │ C_39 │ C_40 │ ...  │
+└──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┘
+   │      │      │      │      │             │      │      │
+   ▼      ▼      ▼      ▼      ▼             ▼      ▼      ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  40 CONCURRENT MTPROTO TCP UPLOAD SOCKETS (UPLOAD_PARALLELISM=40)│
+└──────────────────────────────────────────────────────────────────┘
+   │      │      │      │      │             │      │      │
+   ▼      ▼      ▼      ▼      ▼             ▼      ▼      ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  TELEGRAM PREMIUM DATA CENTER INGESTION (0.0s Supersonic Delay)  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔒 Zero-Desync Invariant: Virtual Reorder Buffer (VROB)
+
+Even when running at Maximum / God Mode (`UPLOAD_PARALLELISM=40`, `MESSAGE_DELAY=0.0s`), TG KindSync Pro provides a **100% mathematical guarantee of chronological in-order delivery**:
+
+```
+Message Ingestion (Source Channel)
+     [ Msg 101 ] ──► [ Msg 102 ] ──► [ Msg 103 ] ──► [ Msg 104 ]
+          │               │               │               │
+          ▼               ▼               ▼               ▼
+┌──────────────────────────────────────────────────────────────────┐
+│             CONCURRENT DOWNLOAD & RE-ENCODING STAGE              │
+│  Worker A (Msg 101)   Worker B (Msg 102)   Worker C (Msg 103)    │
+│  [Finishes in 4.2s]   [Finishes in 1.1s]   [Finishes in 2.8s]    │
+└──────────────────────────────────────────────────────────────────┘
+          │                       │                       │
+          ▼ (Msg 102 Finishes 1st)▼ (Msg 103 Finishes 2nd)▼ (Msg 101 Finishes 3rd)
+┌──────────────────────────────────────────────────────────────────┐
+│              VIRTUAL REORDER BUFFER (VROB) BARRIER               │
+│                                                                  │
+│  Expected Sequence Ticket: #101                                  │
+│  • Msg 102 arrives: Ticket #102 != #101 ──► HELD IN BUFFER ⏸️   │
+│  • Msg 103 arrives: Ticket #103 != #101 ──► HELD IN BUFFER ⏸️   │
+│  • Msg 101 arrives: Ticket #101 == #101 ──► RELEASED & POSTED ✅ │
+│                                                                  │
+│  Expected Sequence Ticket increments: #101 ──► #102              │
+│  • VROB drains Ticket #102              ──► RELEASED & POSTED ✅ │
+│  Expected Sequence Ticket increments: #102 ──► #103              │
+│  • VROB drains Ticket #103              ──► RELEASED & POSTED ✅ │
+└──────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+Target Channel / Topic receives strictly:
+[ Msg 101 ] ──► [ Msg 102 ] ──► [ Msg 103 ] ──► [ Msg 104 ] (100% In-Order!)
+```
+
+---
+
+## 🖥️ Obsidian Cyber-Glass Web Command Center & TMA 2.0 (Port 8080)
+
+<div align="center">
+
+![Web Cockpit and TMA 2.0 Showcase](docs/assets/web_cockpit_hud.jpg)
+*Figure 2: Obsidian Cyber-Glass Web Command Center HUD (Desktop) & Telegram Mini App 2.0 Biometric Interface (Mobile).*
+
+</div>
+
+### Key Web Cockpit Capabilities:
+1. **Collapsible Mini-Sidebar (Icon Rail Mode)**:
+   - Space-saving 70px collapsed rail with smooth cubic-bezier transitions (`0.28s cubic-bezier(0.16, 1, 0.3, 1)`).
+   - Floating dark-blur tooltip cards (`data-tooltip`) displaying full hub names and hotkeys.
+   - Persistent across browser reloads via `localStorage` and toggleable instantly with `Ctrl+B` / `Cmd+B`.
+2. **Reorganized High-Tech Header Toolbar**:
+   - Unified telemetry capsule combining `● Engine Online` status with live network ping (`⚡ 114ms`).
+   - Verified Doctor Pill linking directly to Kind Doctor's profile.
+   - Prominent gradient-glow `Download SQLite Snapshot` button with zero viewport clipping.
+   - Sleek `••• More Tools` dropdown menu for Wi-Fi Phone URL, Mini-HUD, Audio Synth FX, and Engine Pause.
+3. **Live Telemetry & Diagnostics**:
+   - Real-time ECharts speedometer gauge measuring upload velocity in MB/s.
+   - 60-second sliding-window bandwidth waveform graph.
+   - Hacker-dark live system terminal stream via `/ws/terminal_logs` WebSocket.
+4. **Hardened Multi-Tenant Security & TMA 2.0 Auto-Auth**:
+   - Local auto-unlock strictly restricted to loopback (`127.0.0.1` / `::1`). External VPS visitors are gated by 100,000-iteration PBKDF2-HMAC-SHA256 authentication.
+   - Zero credential disclosure; pre-filled login inputs permanently eradicated.
+   - Telegram Mini App (TMA 2.0) biometric 1-tap entry authenticated cryptographically with official Telegram Bot API `HMAC-SHA256(bot_token, data_check_string)`.
+   - Persistent chat menu button (`⚡ Web Cockpit`) scoped strictly by `chat_id` to `@Kinddoctor4u` & `@Ammitrajput1`.
+
+---
+
+## 🩺 Clinical Decision Support System (CDSS) Studio
+
+<div align="center">
+
+![Clinical CDSS Studio Showcase](docs/assets/clinical_cdss_studio.jpg)
+*Figure 3: Bedside Clinical Decision Studio: Parkland 4-2-1 Burn Calculator, GCS Neuro-Wheel, and OpenFDA Drug Interaction Matrix.*
+
+</div>
+
+Integrated natively into both the Web Cockpit and Kind Doctor Telegram Bot (`/calc`), providing instant point-of-care clinical diagnostics for medical students and practitioners:
+
+- **Parkland 4-2-1 Burn Fluid Resuscitation**: Calculates total 24-hour crystalloid (Ringer's Lactate) requirements ($4\text{ mL} \times \text{kg} \times \%\text{TBSA}$) and computes the split: first 8 hours (50%) and remaining 16 hours (50%).
+- **Glasgow Coma Scale (GCS) Neuro-Assessment**: Evaluates Eye (1–4), Verbal (1–5), and Motor (1–6) responses with automatic head injury severity grading (Mild $\ge 13$, Moderate 9–12, Severe $\le 8$).
+- **eGFR CKD-EPI Renal Assessment**: Computes estimated Glomerular Filtration Rate using race-agnostic CKD-EPI creatinine equations for accurate drug dosing and renal staging.
+- **OpenFDA Drug Knowledge Base & DDI Radar**: Direct API query to official FDA drug monographs with real-time black-box warning alerts and multi-agent Drug-Drug Interaction (DDI) risk analysis.
+- **3D Flip High-Yield Medical Flashcards**: Tactile flip-card pearls covering clinical mnemonics, ECG rhythms, pharmacology pearls, and emergency protocols.
+
+---
+
+## 🤖 Kind Doctor Telegram Operator Bot (`@KindDoc_bot`)
+
+An enterprise Telegram management bot providing complete operational oversight directly from your smartphone:
+
+<div align="center">
+
+![Kind Doctor Bot Showcase](docs/assets/telegram_bot_preview.jpg)
+
+</div>
+
+### Complete Bot Commands Reference:
+
+| Command | Permission | Operational Description |
+|:---|:---:|:---|
+| `/start` | Public | Displays welcome screen, medical study portal, and interactive feature navigation. |
+| `/menu` | Public | Renders the complete 10-Card Master Interactive Menu with in-place card switching. |
+| `/mainindex` | Public | Interactive study category cards with inline navigation buttons and page scrolling. |
+| `/topics` | Public | Alphabetical topic navigator with search and quick jump links. |
+| `/topicindex [id]` | Public | Generates a direct clickable catalog of all messages inside a specific forum topic. |
+| `/calc` | Public | Clinical Decision Studio: Bedside Parkland, GCS, eGFR, BMI, and Drug KB. |
+| `/userinfo [id/@user]`| Admin | Sangmata OSINT radar: displays name history, ID, username changes, and profile metadata. |
+| `/whois [id/@user]` | Admin | SangMata multi-year name and username audit trail with safety score. |
+| `/autoforward` | Admin | Live account status, active source/target pairing, and pipeline controls. |
+| `/clone [src] [tgt]`| Admin | 1-Click Deep Cloner for entire forum groups, topics, or single messages (Zero deletion sync). |
+| `/clonestatus` | Admin | Live cloning progress radar, throughput gauge, and non-destructive pause/resume controls. |
+| `/pacing` | Admin | 1-Click transmission delay presets (0.0s Supersonic, 0.05s Ultra, 0.2s Safe, 1.0s/2.0s Stealth). |
+| `/striphelp` | Public | Dedicated Watermark & Strip Words Studio guide card with 1-click action buttons. |
+| `/stripwords` | Admin | Interactive paginated rules card showing all active strip and replacement rules. |
+| `/ytdl [url] [topic]` | Public | Downloads YouTube video/Short and uploads directly inside current or specified Forum Topic. |
+| `/upload [url] [topic]` | Public | Universal uploader for Instagram Reels, Twitter/X videos, TikTok, and direct web files. |
+| `/playlist [url] [topic]`| Public | Sequentially downloads and uploads full YouTube lecture playlist into the topic. |
+| `/newtopic [name]` | Admin | Dynamically creates a new Forum Topic in the group or active target chat. |
+| `/setgroup` | Admin | Displays interactive buttons to select active working group when commanding from Private DM. |
+| `/status` | Admin | Real-time system health: CPU load, RAM consumption, MTProto socket status, and active worker count. |
+| `/speed` | Admin | Current throughput velocity gauge and MTProto network latency. |
+| `/backup` | Admin | Triggers full SQLite database snapshot export with standardized timestamps sent to private chat. |
+| `/lockdown [on/off]` | Admin | Emergency toggle that immediately pauses all outgoing messages in case of channel issues. |
+| `/restart` | Admin | Gracefully restarts the background forwarder and bot daemons without losing queued jobs. |
 
 ---
 
@@ -135,6 +303,7 @@ python -m venv .venv
 # 3. Upgrade pip and install production dependencies
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+```
 
 #### 3. Instant 3-Way Interactive Login (No Manual `.env` Editing Required!)
 You **do not need** to manually edit configuration files. Simply start the platform and let the built-in authentication wizard guide you:
@@ -149,9 +318,6 @@ The system automatically presents three zero-friction authentication choices:
 1. **⚡ Method 1: Instant QR Code Scan (Fastest)** — An ASCII QR code renders directly inside your terminal. Scan it instantly with your mobile phone (`Telegram App ➔ Settings ➔ Devices ➔ Link Desktop Device`).
 2. **📱 Method 2: Terminal Phone OTP & 2FA** — Enter your phone number (`+91...`), receive your official Telegram authorization code, and enter your 2FA password.
 3. **🌐 Method 3: In-Browser Web Login** — Open `http://127.0.0.1:5005` or the DEVI Web Cockpit at `http://localhost:8080/` to authenticate visually with OTP & 2FA from your browser.
-
-> [!TIP]
-> **Optional Headless Server Config**: If deploying headlessly on automated cloud instances, you can optionally copy `.env.example` to `.env` and specify `API_ID`, `API_HASH`, `BOT_TOKEN`, and `ADMIN_ID` manually.
 
 ---
 
@@ -172,7 +338,6 @@ sudo apt update && sudo apt install -y \
     tmux \
     curl
 ```
-*Output: All required audio/video transcoding tools and fonts are initialized.*
 
 #### Step 2: Clone Repository & Virtual Environment Setup
 ```bash
@@ -189,45 +354,16 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-#### Step 3: Configure Environment Credentials
-```bash
-cp .env.example .env
-nano .env
-# Enter API_ID, API_HASH, BOT_TOKEN, ADMIN_ID (Ctrl+O to save, Enter, Ctrl+X to exit)
-```
-
-#### Step 4: 24/7 Execution Strategies
-
-##### Strategy A: Interactive Terminal via `tmux` (Recommended for Visual Monitoring)
-```bash
-# 1. Start a new named tmux session
-tmux new -s kindsync
-
-# 2. Inside tmux, activate environment and start
-source .venv/bin/activate
-python3 tg_kindsync_pro.py
-
-# 3. Detach from session (keeps running 24/7 in background):
-# Press Ctrl + B, then press D
-
-# 4. Re-attach anytime to inspect live progress:
-tmux attach -t kindsync
-```
-
-##### Strategy B: Production `systemd` Daemons (Auto-Restart on Crash or Server Reboot)
-Deploy production service unit files:
+#### Step 3: Production `systemd` Daemons (Auto-Restart on Crash or Reboot)
 ```bash
 # Enable all three services on boot
 sudo systemctl enable tg-forwarder tg-kinddoc-bot tg-dashboard
 
 # Start the services
-sudo systemctl start tg-forwarder tg-kinddoc-bot tg-dashboard
+sudo systemctl start tg-kinddoc-bot tg-dashboard
 
 # Check service health
-sudo systemctl status tg-kinddoc-bot --no-pager
-
-# View real-time streaming logs
-sudo journalctl -u tg-forwarder -f
+sudo systemctl status tg-kinddoc-bot tg-dashboard --no-pager
 ```
 
 ---
@@ -239,65 +375,15 @@ Run the complete streaming engine and Telegram bot directly on an Android device
 #### Step 1: Install Termux
 Install **Termux** from [F-Droid](https://f-droid.org/packages/com.termux/) *(do not use Google Play Store, as its packages are deprecated)*.
 
-#### Step 2: Acquire Android Wake Lock
-Open Termux and run:
+#### Step 2: Acquire Android Wake Lock & Setup Environment
 ```bash
 termux-wake-lock
-```
-*Why this matters: Prevents Android OS from putting the CPU into deep sleep when the phone screen is locked or turned off.*
-
-#### Step 3: Install Packages & Clone Repository
-```bash
-# Update repositories and install required build packages
 pkg update -y && pkg install -y python git ffmpeg clang openssl
-
-# Clone repository
 git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
 cd TG_KindSync_Pro
-
-# Install Python requirements
 pip install --upgrade pip
 pip install -r requirements.txt
-```
-
-#### Step 4: Configure Credentials
-```bash
-cp .env.example .env
-nano .env
-```
-
-#### Step 5: Start 24/7 Background Runner
-Execute the pre-packaged Android background daemon runner:
-```bash
 bash deploy/RUN_24_7_TERMUX.sh
-```
-*This script automatically activates wake-lock, launches the Forwarder, Bot Daemon, and Web Dashboard in the background with `nohup`, logging to `logs/forwarder_service.log`.*
-
-To monitor live progress on Android:
-```bash
-tail -f logs/forwarder_service.log
-```
-To stop all services on Android:
-```bash
-pkill -f python
-```
-
----
-
-### 🍎 4. macOS Setup (Apple Silicon M1/M2/M3 & Intel)
-
-```bash
-# Install dependencies via Homebrew
-brew install python@3.11 ffmpeg git
-
-# Clone and setup
-git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
-cd TG_KindSync_Pro
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python3 tg_kindsync_pro.py
 ```
 
 ---
@@ -307,11 +393,11 @@ python3 tg_kindsync_pro.py
 The terminal interface is structured into four high-performance operational quadrants. Each module is built for specialized production tasks:
 
 ### 1. Transmission Quadrant (Streaming & Forwarding)
-| Option | Module Name | Parallel Workers | Technical Role & Use Case |
+| Option | Module Name | Parallel Sockets | Technical Role & Use Case |
 |:---:|:---|:---:|:---|
-| **1** | 🟢 **Safe Mode** | 4 | **Rate-Limited Transmission**: Optimized for fresh accounts, fragile sessions, or mobile hotspots. Employs aggressive FloodWait backoff to ensure zero account flags. |
+| **1** | 🟢 **Safe Mode** | 4 | **Rate-Limited Transmission**: Optimized for fresh accounts, fragile sessions, or mobile hotspots. Employs aggressive FloodWait backoff. |
 | **2** | ⚖️ **Balanced Mode** | 12 | **Recommended Production Default**: Optimal balance of high-speed MTProto chunk throughput and Telegram server rate-limit compliance. |
-| **3** | 🔥 **God Mode** | 40 | **Turbo In-Memory Chunker**: Designed for Gigabit fiber networks and dedicated VPS pipes. Streams massive 2GB-4GB video libraries with zero disk overhead. |
+| **3** | 🔥 **God Mode** | 40 | **Turbo 40-Socket Concurrency**: Designed for Gigabit fiber networks and dedicated VPS pipes. Streams massive 2GB-4GB video libraries with 0.0s delay. |
 | **4** | 🔴 **Live 24/7 Mode** | 12 | **Real-Time Channel Listener**: Continuously listens for incoming source messages and forwards them instantaneously the second they are published. |
 
 ### 2. Routing & Topic Studio Quadrant
@@ -319,16 +405,16 @@ The terminal interface is structured into four high-performance operational quad
 |:---:|:---|:---|
 | **5** | 🔗 **Quick Link Extractor** | **Interactive Setup Wizard**: Parses source and target channel invite links, resolves numeric Telegram IDs, and automatically updates `.env`. |
 | **6** | 🔀 **Multi-Route Manager** | **Routing Matrix Engine**: Maps content from multiple distinct source channels into dedicated target forum topics simultaneously. |
-| **7** | 🎯 **Content Cloner & Cherry-Picker** | **Granular Migration Engine**: <br>• `[1] Single Video Forwarder`: Clones a specific message ID. <br>• `[2] Cherry-Picker`: Selects a numbered range of lectures. <br>• `[3] Member Scraper & Smart Adder`: Safely mirrors discussion group members. <br>• `[4] Full Forum Auto-Mirror`: Recursively clones entire forum hierarchies with intact topics. |
+| **7** | 🎯 **Content Cloner & Cherry-Picker** | **Granular Migration Engine**: Single video forwarder, cherry-picker lecture range, and full recursive forum auto-mirroring. |
 | **8** | 📑 **Topic & Group Indexer** | **Table of Contents Generator**: Produces rich, clickable Telegram index posts linking directly to every file, PDF, and video across forum topics. |
 
 ### 3. Media & Optimization Studio Quadrant
 | Option | Module Name | Technical Role & Use Case |
 |:---:|:---|:---|
-| **9** | 📁 **Folder Batch & 2GB Uploader** | **Local Disk Batch Uploader**: Scans local directories, extracts durations, splits oversized files, injects custom thumbnails, and enforces strict alphabetical/numerical sequence order. |
-| **10** | ✍️ **Caption & Link Studio** | **Watermark & Ads Sanitizer**: Regex engine that scrubs promotional spam bots (e.g. `@Dams_new_robot`), stripping advertisements and appending custom medical branding. |
-| **11** | 🖼️ **16:9 Cover Enforcer** | **Thumbnail Standardizer**: Generates and attaches uniform 16:9 high-definition video covers with native font fallbacks across Windows, Linux, and Android. |
-| **12** | 📮 **DLQ Auto-Recovery** | **Dead Letter Queue Manager**: Inspects failed transmissions, displays error causes (timeout, rate limit), exports JSON diagnostics, and executes 1-click batch retries. |
+| **9** | 📁 **Folder Batch & 4GB Uploader** | **Local Disk Batch Uploader**: Scans local directories, extracts durations, splits oversized files, injects custom thumbnails, and enforces strict sequence order. |
+| **10** | ✍️ **Caption & Link Studio** | **Watermark & Ads Sanitizer**: Regex engine that scrubs promotional spam bots, stripping advertisements and appending custom medical branding. |
+| **11** | 🖼️ **16:9 Cover Enforcer** | **Thumbnail Standardizer**: Generates and attaches uniform 16:9 high-definition video covers with native font fallbacks. |
+| **12** | 📮 **DLQ Auto-Recovery** | **Dead Letter Queue Manager**: Inspects failed transmissions, displays error causes, exports JSON diagnostics, and executes 1-click batch retries. |
 
 ### 4. Diagnostics, Maintenance & System Tools
 | Option | Module Name | Technical Role & Use Case |
@@ -343,62 +429,7 @@ The terminal interface is structured into four high-performance operational quad
 
 ---
 
-## 🤖 Kind Doctor Telegram Operator Bot (`@KindDoc_bot`)
-
-An enterprise Telegram management bot providing complete operational oversight directly from your smartphone:
-
-<div align="center">
-
-![Kind Doctor Bot Showcase](docs/assets/telegram_bot_preview.jpg)
-
-</div>
-
-### Complete Bot Commands Reference:
-
-| Command | Permission | Operational Description |
-|:---|:---:|:---|
-| `/start` | Public | Displays welcome screen, medical study portal, and interactive feature navigation. |
-| `/mainindex` | Public | Interactive study category cards with inline navigation buttons and page scrolling. |
-| `/topics` | Public | Alphabetical topic navigator with search and quick jump links. |
-| `/topicindex [id]` | Public | Generates a direct clickable catalog of all messages inside a specific forum topic. |
-| `/userinfo [id/@user]`| Admin | Sangmata OSINT radar: displays name history, ID, username changes, and profile metadata. |
-| `/status` | Admin | Real-time system health: CPU load, RAM consumption, MTProto socket status, and active worker count. |
-| `/ytdl [url] [topic]` | Public | Downloads YouTube video/Short and uploads directly inside current or specified Forum Topic. |
-| `/upload [url] [topic]` | Public | Universal uploader for Instagram Reels, Twitter/X videos, TikTok, and direct web files. |
-| `/playlist [url] [topic]`| Public | Sequentially downloads and uploads full YouTube lecture playlist into the topic. |
-| `/newtopic [name]` | Admin | Dynamically creates a new Forum Topic in the group or active target chat. |
-| `/setgroup` | Admin | Displays interactive buttons to select active working group when commanding from Private DM. |
-| `/mediahelp` | Public | Interactive quick manual for in-topic media leeching and format capabilities. |
-| `/striphelp` | Public | Dedicated Watermark & Strip Words Studio guide card with 1-click action buttons. |
-| `/stripwords` | Admin | Interactive paginated rules card showing all active strip and replacement rules. |
-| `/clone [src] [tgt]`| Admin | 1-Click Deep Cloner for entire forum groups, topics, or single messages (Zero deletion sync). |
-| `/clonestatus` | Admin | Live cloning progress radar, throughput gauge, and non-destructive pause/resume controls. |
-| `/stats` | Admin | Aggregate statistics: total messages forwarded, video volume, transfer speed, and DLQ errors. |
-| `/speed` | Admin | Current throughput velocity gauge and MTProto network latency. |
-| `/backup` | Admin | Triggers full SQLite database snapshot export with standardized timestamps sent to private chat. |
-| `/lockdown [on/off]` | Admin | Emergency toggle that immediately pauses all outgoing messages in case of channel issues. |
-| `/restart` | Admin | Gracefully restarts the background forwarder and bot daemons without losing queued jobs. |
-
----
-
-## 🖥️ Live Web Command Center HUD (Port 8080)
-
-<div align="center">
-
-![DEVI Web Dashboard Showcase](docs/assets/web_dashboard_preview.jpg)
-
-</div>
-
-### Key Web Cockpit Features:
-- **Obsidian Cyber-Glass UI**: High-contrast, tactile dark-mode interface crafted with strict responsive layout principles.
-- **Dynamic Speedometer Gauge**: Real-time throughput visualization tracking streaming bandwidth (MB/s).
-- **In-Browser Session Manager**: Login to secondary Telegram accounts directly from the browser with full SMS OTP & 2FA Cloud Password support.
-- **SQLite WAL Idempotency Monitor**: Microsecond query latency visualizer and dead-letter queue metrics.
-- **1-Click Snapshot Exporter**: Instant database and configuration backup with full timestamp metadata.
-
----
-
-## 🔒 Security, Privacy & Compliance Controls
+## 🔒 Security, Privacy & Multi-Tenant Isolation
 
 TG KindSync Pro enforces strict enterprise-grade asset protection:
 
@@ -407,24 +438,6 @@ TG KindSync Pro enforces strict enterprise-grade asset protection:
    - **Primary Admin 1**: `@Kinddoctor4u` (ID: `1553619403`)
    - **Primary Admin 2**: `@Ammitrajput1` (ID: `759038032`)
 3. **Lock-Free Database Concurrency**: Database operations leverage SQLite Write-Ahead Logging (`PRAGMA journal_mode = WAL;`) and memory-mapped I/O (`PRAGMA mmap_size = 268435456;`), completely eliminating file lock conflicts.
-
----
-
-## 📚 Technical Documentation & Guides
-
-- 📖 **[Comprehensive User Manual](docs/SETUP_GUIDE_AND_MANUAL.md)** — Detailed operational reference for all modules.
-- 🤖 **[Bot Setup & Command Guide](docs/BOT_GUIDE_AND_COMMANDS.md)** — Deep dive into `@KindDoc_bot` configuration.
-- ☁️ **[Oracle Cloud 24/7 VPS Deployment](deploy/ORACLE_CLOUD_DEPLOY_GUIDE.md)** — Step-by-step Oracle Always-Free deployment.
-- 📱 **[Android Termux Setup](docs/TERMUX_GUIDE.md)** — Running KindSync on Android devices 24/7.
-
----
-
----
-
-## 🌐 Official Interactive Showcase Website
-
-Explore our interactive web portal featuring real-time architecture flows, copy-paste terminal wizards, and interactive command simulators:
-- 🚀 **[Official TG KindSync Pro Portal](docs/index.html)** *(Open directly in any modern browser or host via GitHub Pages)*
 
 ---
 

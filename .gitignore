@@ -156,6 +156,7 @@ data/dashboard_users.json
 *.jpeg
 *.png
 !docs/assets/**
+!web/static/img/**
 
 
 # IDE files
