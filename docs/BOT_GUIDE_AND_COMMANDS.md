@@ -266,6 +266,26 @@ In Forum Topics, group members can simply mention the bot or send a message star
 
 ---
 
+### Module 17: Watermark & Strip Words Studio 🛡️
+*Problem Solved:* Cloned and forwarded medical lectures are often cluttered with competitor watermarks, sponsor channels, promotional hashtags, and unwanted URLs.  
+*Capabilities:*
+- **Direct Removal:** Words, URLs, or channel tags are completely eliminated from captions and filenames.
+- **Replacement Mapping:** `OldBrand => NewBrand` syntax replaces competitor branding with custom signatures.
+- **Regex Pattern Matching:** Strips dynamic tags and complex patterns without breaking caption formatting.
+- **Case-Insensitive Deduplication:** Auto-deduplicates active strip rule sets across `strip_words.txt`, `Friend_Edition/strip_words.txt`, and SQLite.
+
+| Command | Permission | Syntax & Example | Description |
+| :--- | :--- | :--- | :--- |
+| `/striphelp` | All Members | `/striphelp` | Interactive Watermark & Strip Words Studio guide card with 1-click action buttons. |
+| `/stripwords` | Admin | `/stripwords` | Interactive paginated card showing all active strip and replacement rules. |
+| `/addstrip <rule>` | Admin | `/addstrip @SpamChannel` or `/addstrip OldBrand => Kind Doctor` | Adds a direct removal word or replacement mapping rule. |
+| `/delstrip <rule>` | Admin | `/delstrip @SpamChannel` | Deletes a rule with automatic safety snapshot creation. |
+| `/dedupstrip` | Admin | `/dedupstrip` | Cleans empty lines and deduplicates active rules across storage. |
+| `/syncstrip` | Admin | `/syncstrip` | Synchronizes rules between text files and the SQLite database. |
+| `/pacing` | Admin | `/pacing` | Opens interactive transmission speed slider and rate-limit delay presets. |
+
+---
+
 ## 🚀 4. How ANY Group Admin Can Setup `@KindDoc_bot`
 
 1. Open Telegram and search for [@KindDoc_bot](https://t.me/KindDoc_bot).

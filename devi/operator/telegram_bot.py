@@ -122,8 +122,9 @@ DANGEROUS_EXT_REGEX = re.compile(r'(?i)\.(apk|exe|bat|cmd|vbs|scr|msi)$')
 PUBLIC_ALLOWED_COMMANDS = (
     "/find", "/search", "/faq", "/faqs", 
     "/indexhelp", "/clonehelp", "/cloninghelp", "/clonerhelp", "/cloner", "/routehelp", "/forwardhelp", "/routinghelp",
+    "/striphelp", "/watermarkhelp", "/stripwordshelp", "/pacinghelp", "/speedhelp", "/osinthelp", "/radarhelp", "/webhelp", "/cockpithelp",
     "/adminhelp", "/modhelp", "/securityhelp", "/calchelp", "/dosehelp", "/scorehelp",
-    "/strip", "/addstrip", "/delstrip", "/stripadd", "/stripdel", "/stripwords", "/striplist", "/stripcard", "/pacing", "/speed", "/delay",
+    "/strip", "/addstrip", "/delstrip", "/stripadd", "/stripdel", "/stripwords", "/striplist", "/stripcard", "/dedupstrip", "/syncstrip", "/pacing", "/speed", "/delay",
     "/setthumb", "/thumb", "/setcover", "/viewthumb", "/getthumb", "/showthumb", "/delthumb", "/resetthumb",
     "/topics", "/help",
     "/mainindex", "/topicindex", "/indexmaster", "/index",
@@ -3021,32 +3022,216 @@ class DeviTelegramBot:
             }
             return text, kb
 
-        else: # Main Menu
+        elif cat in ("strip", "stripwords", "watermark", "branding", "striphelp"):
+            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
             text = (
-                f"👨‍⚕️ <b>Kind Doctor — Interactive Command Encyclopedia</b> 📖\n"
+                f"🛡️ <b>WATERMARK &amp; STRIP WORDS STUDIO MANUAL</b> 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Welcome! Bot ke saare 40+ features categorized hain.\n"
-                f"Neeche diye <b>Interactive Buttons</b> par click karke kisi bhi section ka complete guide dekhein:\n\n"
-                f"• 📚 <b>Study &amp; Navigation</b>: Master Topic Directory, TOC, search &amp; study tools\n"
-                f"• 🕵️ <b>OSINT &amp; Forensics</b>: SangMata biometrics, username footprint, phone/email lookup\n"
-                f"• 🚀 <b>Deep Cloner &amp; Routing</b>: 200k+ cloner, topic mirror, live sync streams\n"
-                f"• 🩺 <b>Clinical Calculators</b>: Bedside BMI, GFR, MAP, GCS, fluid maintenance\n"
-                f"• 🛡️ <b>Admin &amp; Security</b>: Ghost purge, welcome cleaner, automated forensic alerts\n"
+                f"Kind Doctor Bot ka core engine cloned &amp; forwarded posts me se unwanted channels, usernames, sponsor tags aur links automatically strip kar deta hai:\n\n"
+                f"🎯 <b>RULES KAISE KAAM KARTE HAIN:</b>\n"
+                f"• <b>1. Direct Removal:</b> <code>@SpamChannel</code> ya <code>Join Now!</code>\n"
+                f"  <i>(Yeh words caption, media text aur filenames se gayab ho jayenge)</i>\n"
+                f"• <b>2. Replacement Mapping:</b> <code>OldBrand =&gt; Kind Doctor</code>\n"
+                f"  <i>(OldBrand ko remove karke aapka custom signature replace hoga)</i>\n"
+                f"• <b>3. Regex Support:</b> <code>#[a-zA-Z0-9_]+</code>\n"
+                f"  <i>(Har tarah ke hashtags aur promotional watermarks filter karta hai)</i>\n"
+                f"• <b>4. Case-Insensitive &amp; Auto-Dedup:</b> Capital/small ka farq nahi padta, duplicate rules auto-clean hote hain.\n\n"
+                f"⚡ <b>DIRECT COMMANDS:</b>\n"
+                f"• ➕ <code>/addstrip &lt;rule&gt;</code> — Naya strip word ya replacement rule add karein\n"
+                f"• 🏷️ <code>/stripwords</code> — Saare active rules ka interactive card (12 per page)\n"
+                f"• 🗑️ <code>/delstrip &lt;rule&gt;</code> — Rule delete karein (safety backup auto-created)\n"
+                f"• 🧹 <code>/dedupstrip</code> — Duplicate aur whitespace rules auto-clean karein\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Direct Jump: Type <code>/help &lt;study|osint|cloner|calc|admin&gt;</code></i>"
+                f"💡 <i>Neeche diye 1-Click Buttons se live manage karein:</i>"
             )
             kb = {
                 "inline_keyboard": [
                     [
-                        {"text": "📚 Study & Navigation", "callback_data": "act_help_study"},
-                        {"text": "🕵️ OSINT & Forensics", "callback_data": "act_help_osint"}
+                        {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                        {"text": "🏷️ Active Rules Card", "callback_data": "act_stripwords"}
                     ],
                     [
-                        {"text": "🚀 Deep Cloner & Routing", "callback_data": "act_help_cloner"},
+                        {"text": "🔍 Search Rules", "callback_data": "act_strip_search"},
+                        {"text": "🧹 Clean & Dedup", "callback_data": "act_strip_dedup"}
+                    ],
+                    [
+                        {"text": "🌐 Web Regex Sandbox", "web_app": {"url": f"{dash_url}#operations"}}
+                    ],
+                    [
+                        {"text": "📚 Study Guide", "callback_data": "act_help_study"},
+                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        elif cat in ("route", "routing", "forward", "autoforward", "routehelp"):
+            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+            text = (
+                f"🔄 <b>CLOUD ROUTING &amp; AUTO-FORWARDER MANUAL</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"24/7 Cloud Background Forwarding Engine bina kisi PC ke continuous real-time copy karta hai:\n\n"
+                f"⚡ <b>CORE ROUTING COMMANDS:</b>\n"
+                f"• ➕ <code>/addroute &lt;source_id&gt; &lt;target_id&gt; [clean/forward]</code> — Naya auto-mirror stream banayein\n"
+                f"• 📋 <code>/routes</code> — Saari active auto-mirror routing streams dekhein\n"
+                f"• ❌ <code>/delroute &lt;route_id&gt;</code> — Auto-mirroring stream deactivate karein\n"
+                f"• 🚀 <code>/autoforward</code> or <code>/hub</code> — Auto-Forward Hub Pro card open karein\n"
+                f"• 🧹 <code>/clean_history</code> — Forwarded ID cache aur duplicate tracker reset karein\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Neeche diye 1-Click Buttons se control karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🚀 Auto Forward Hub", "callback_data": "act_fwd_hub"},
+                        {"text": "📋 Active Routes", "callback_data": "act_routes"}
+                    ],
+                    [
+                        {"text": "🌐 Route Matrix (Web App)", "web_app": {"url": f"{dash_url}#operations"}}
+                    ],
+                    [
+                        {"text": "🏷️ Strip Words Guide", "callback_data": "act_help_strip"},
+                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        elif cat in ("pacing", "speed", "velocity", "pacinghelp"):
+            text = (
+                f"⏱️ <b>TRANSMISSION VELOCITY &amp; PACING MANUAL</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Cloning aur Forwarding ki transmission speed aur Telegram rate-limit pacing controls:\n\n"
+                f"⚡ <b>FORWARDING PIPELINE MODES:</b>\n"
+                f"• <b>⚡ Fast Direct Mode:</b> 0.2s ultra-fast pointer forwarding (Telegram servers par instant re-send, 10x faster).\n"
+                f"• <b>🔄 Stream Mode:</b> Full stream re-upload with fresh content hash, 16:9 custom HD cover override, and watermark cleaning.\n\n"
+                f"⏱️ <b>DYNAMIC PACING SLIDER:</b>\n"
+                f"• <code>/pacing</code> — Interactive 1-click speed presets (0.0s to 5.0s per message).\n"
+                f"• Anti-Flood Backoff: Rate limits aane par bot crash hone ki jagah safe sleep backoff use karta hai.\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Neeche diye 1-Click Buttons se live toggle karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "⏱️ Pacing Settings", "callback_data": "act_pacing"},
+                        {"text": "⚡ Toggle Direct Mode", "callback_data": "act_toggle_direct"}
+                    ],
+                    [
+                        {"text": "👑 Toggle Branding", "callback_data": "act_toggle_sig"},
+                        {"text": "🖼️ Cover Override", "callback_data": "act_toggle_thumb"}
+                    ],
+                    [
+                        {"text": "🚀 Deep Cloner", "callback_data": "act_help_cloner"},
+                        {"text": "🛡️ Group Admin", "callback_data": "act_help_admin"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        elif cat in ("web", "cockpit", "tma", "webapp", "webhelp"):
+            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+            text = (
+                f"🌐 <b>WEB COCKPIT &amp; TELEGRAM MINI APP (TMA 2.0) GUIDE</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Kind Doctor Web Cockpit ab Telegram Mini App 2.0 ke zariye seedhe Telegram me bina password open hota hai:\n\n"
+                f"⚡ <b>TMA 2.0 ADVANTAGES:</b>\n"
+                f"• <b>Persistent Chat Button:</b> Chat bar ke left me <code>⚡ Web Cockpit</code> button 24/7 available hai.\n"
+                f"• <b>Biometric Auto-Auth:</b> @Kinddoctor4u aur @Ammitrajput1 ke liye 1-tap zero-login instant admin access.\n"
+                f"• <b>Full-Screen Luxury:</b> Native mobile UI, dynamic dark mode, aur tactile vibration feedback.\n\n"
+                f"🏛️ <b>8 INTEGRATED SOVEREIGN HUBS:</b>\n"
+                f"1. 🛰️ Mission Control &amp; Speedometer Velocity Dial\n"
+                f"2. ⚡ Transmission Engine: Visual Route Matrix &amp; Strip Words Studio\n"
+                f"3. 📚 Topic Intelligence: Curriculum Distribution &amp; Lecture TOC\n"
+                f"4. 🩺 Clinical Studio: Parkland SVG Body Map, GCS Wheel &amp; OpenFDA Drug KB\n"
+                f"5. 👤 Telegram Multi-Session Identity Vault\n"
+                f"6. 🧠 Devi AI Labs: Multi-Model Operations Copilot\n"
+                f"7. 🛡️ Sentinel Terminal &amp; DLQ Inspector\n"
+                f"8. 🔐 Sovereign Security &amp; Online SQLite Snapshots\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Neeche button tap karke instantly launch karein:</i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}}
+                    ],
+                    [
+                        {"text": "🏷️ Strip Words Guide", "callback_data": "act_help_strip"},
+                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"}
+                    ],
+                    [
+                        {"text": "⬅️ Back to Main Menu", "callback_data": "act_help_main"}
+                    ]
+                ]
+            }
+            return text, kb
+
+        else: # Main Menu
+            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+            text = (
+                f"👨‍⚕️ <b>Kind Doctor — Master Command &amp; Feature Encyclopedia</b> 📖\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Welcome! Bot ke saare features dedicated <b>Interactive Cards</b> me categorized hain.\n"
+                f"Neeche diye buttons par tap karke kisi bhi feature ka full step-by-step guide aur action controls open karein:\n\n"
+                f"• 🏷️ <b>Strip Words Studio</b>: Word &amp; link cleaner, regex sandbox, auto-dedup\n"
+                f"• 🚀 <b>Deep Cloner &amp; Mirror</b>: 200k+ cloner, topic mirror, live sync streams\n"
+                f"• 🔄 <b>Cloud Auto-Forward</b>: Real-time 0-tag live mirroring &amp; route matrix\n"
+                f"• 📑 <b>Master Topic Index</b>: Master Topic Directory, TOC &amp; lecture search\n"
+                f"• 📥 <b>Media Downloader</b>: YouTube playlists, Reels, and topic delivery\n"
+                f"• 🩺 <b>Clinical Calculators</b>: Bedside BMI, GFR, MAP, GCS, Parkland burn\n"
+                f"• 🕵️ <b>OSINT &amp; Forensics</b>: SangMata biometrics, username footprint, phone/email\n"
+                f"• ⏱️ <b>Velocity &amp; Pacing</b>: Fast Direct 0.2s mode, pacing sliders &amp; branding\n"
+                f"• 🛡️ <b>Admin &amp; Security</b>: Ghost account purge, welcome cleaner, security radar\n"
+                f"• 🌐 <b>Web Cockpit (TMA)</b>: Full 8-Hub dashboard right inside Telegram\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Direct Jump: Type <code>/help &lt;strip|cloner|route|study|media|calc|osint|pacing|admin|web&gt;</code></i>"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"},
+                        {"text": "🚀 Deep Cloner & Mirror", "callback_data": "act_help_cloner"}
+                    ],
+                    [
+                        {"text": "🔄 Auto-Forward & Routes", "callback_data": "act_help_route"},
+                        {"text": "📑 Master Topic Directory", "callback_data": "act_help_study"}
+                    ],
+                    [
+                        {"text": "📥 Media Downloader", "callback_data": "act_help_media"},
                         {"text": "🩺 Clinical Calculators", "callback_data": "act_help_calc"}
                     ],
                     [
+                        {"text": "🕵️ OSINT & Forensics", "callback_data": "act_help_osint"},
+                        {"text": "⏱️ Velocity & Pacing", "callback_data": "act_help_pacing"}
+                    ],
+                    [
                         {"text": "🛡️ Group Admin & Security", "callback_data": "act_help_admin"},
+                        {"text": "🌐 Web Cockpit Guide", "callback_data": "act_help_web"}
+                    ],
+                    [
+                        {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                        {"text": "🏷️ Active Rules Card", "callback_data": "act_stripwords"}
+                    ],
+                    [
+                        {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
                         {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
                     ]
                 ]
@@ -3722,12 +3907,22 @@ class DeviTelegramBot:
                 await self._handle_admin_command(session, chat_id, admin_id, "/clonehelp", message=msg_obj)
             elif action in ("indexhelp", "topicshelp"):
                 await self._handle_admin_command(session, chat_id, admin_id, "/indexhelp", message=msg_obj)
+            elif action in ("striphelp", "stripwordshelp", "watermarkhelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/striphelp", message=msg_obj)
             elif action in ("routehelp", "forwardhelp"):
                 await self._handle_admin_command(session, chat_id, admin_id, "/routehelp", message=msg_obj)
             elif action in ("adminhelp", "securityhelp"):
                 await self._handle_admin_command(session, chat_id, admin_id, "/adminhelp", message=msg_obj)
             elif action in ("calchelp", "scorehelp"):
                 await self._handle_admin_command(session, chat_id, admin_id, "/calchelp", message=msg_obj)
+            elif action in ("mediahelp", "ytdlhelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/mediahelp", message=msg_obj)
+            elif action in ("pacinghelp", "speedhelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/pacinghelp", message=msg_obj)
+            elif action in ("osinthelp", "radarhelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/osinthelp", message=msg_obj)
+            elif action in ("webhelp", "cockpithelp"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/webhelp", message=msg_obj)
             elif action == "cleandeleted":
                 await self._handle_admin_command(session, chat_id, admin_id, "/cleandeleted", message=msg_obj)
             elif action == "cleanwelcome":
@@ -5224,8 +5419,8 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, custom_output)
                 return
 
-            # Allow /help, /start, /index, and all study commands in private DM for EVERYONE!
-            if custom_cmd_key in STUDENT_ALLOWED_COMMANDS:
+            # Allow all admin commands for admins, and student commands for everyone in private DM
+            if self.is_admin(sender_id) or custom_cmd_key in STUDENT_ALLOWED_COMMANDS:
                 await self._handle_admin_command(session, chat_id, sender_id, clean_prompt, message=message)
                 return
 
@@ -5580,24 +5775,58 @@ class DeviTelegramBot:
                     f"<i>(Neeche diye 1-click buttons se instant switch karein)</i>"
                 )
 
+            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+
             reply = (
                 f"👨‍⚕️ <b>Kind Doctor</b> 🤍 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"Welcome! Aapka study & group assistant <b>100% Active</b> hai.\n"
-                f"Neeche diye <b>1-Click Buttons</b> se direct features aur dedicated guides open karein:\n\n"
-                f"⚡ <b>Core Tools:</b>\n"
-                f"• 📑 <b>Master Topic Directory</b>: Saare subjects ka Alphabetical (A-Z) hub\n"
-                f"• ⚡ <b>1-Click Auto-Scan</b>: Poora group scan karke directory auto-fill\n"
+                f"Neeche diye <b>10 Feature Cards & Guides</b> aur <b>1-Click Action Controls</b> se sabhi tools explore karein:\n\n"
+                f"🌟 <b>MASTER CAPABILITIES:</b>\n"
+                f"• 🏷️ <b>Strip Words Studio</b>: Unwanted usernames, links & sponsor watermarks strip engine\n"
                 f"• 🚀 <b>Deep Cloner Suite</b>: 200k+ messages & 2k+ topics clone engine\n"
                 f"• 🔄 <b>Cloud Forwarder</b>: Real-time 0-tag live mirroring streams\n"
-                f"• 💬 <b>Message Kind Doctor</b>: Direct personal live support desk\n"
-                f"• 🔍 <b>Search Engine</b>: <code>/find &lt;topic/lecture&gt;</code> instantly dhoondein\n"
+                f"• 📑 <b>Master Topic Directory</b>: Saare subjects ka Alphabetical (A-Z) hub\n"
+                f"• 📥 <b>Media Downloader</b>: YouTube playlists, Reels, and topic delivery\n"
+                f"• 🩺 <b>Clinical Decision Studio</b>: Bedside BMI, GFR, GCS, Parkland 4-2-1 calcs\n"
+                f"• 🕵️ <b>SangMata OSINT Radar</b>: Username timeline, account age & security score\n"
+                f"• 🌐 <b>Web Cockpit (TMA 2.0)</b>: 1-Tap browser dashboard inside Telegram\n"
                 f"{admin_panel_text}\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 <i>Tip: Har feature ki alag help file dekhne ke liye neeche buttons tap karein!</i>"
+                f"💡 <i>Tip: Kisi bhi feature ko samajhne ke liye uska Guide card open karein!</i>"
             )
+
+            # --- Master 10-Card Sequenced Grid ---
             keyboard = {
                 "inline_keyboard": [
+                    # Section 1: Feature Cards & Guides
+                    [
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_striphelp"},
+                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_clonehelp"}
+                    ],
+                    [
+                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_routehelp"},
+                        {"text": "📑 Topic Index Guide", "callback_data": "act_indexhelp"}
+                    ],
+                    [
+                        {"text": "📥 Media Downloader Guide", "callback_data": "act_mediahelp"},
+                        {"text": "🩺 Clinical Calculators", "callback_data": "act_calchelp"}
+                    ],
+                    [
+                        {"text": "🕵️ OSINT & Radar Guide", "callback_data": "act_osinthelp"},
+                        {"text": "⏱️ Velocity & Pacing", "callback_data": "act_pacinghelp"}
+                    ],
+                    [
+                        {"text": "🛡️ Group Admin Guide", "callback_data": "act_adminhelp"},
+                        {"text": "🌐 Web Cockpit Guide", "callback_data": "act_webhelp"}
+                    ],
+                    # Section 2: Direct Action Buttons (Always Available for Quick Execution)
+                    [
+                        {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                        {"text": "🏷️ Active Strip Rules", "callback_data": "act_stripwords"}
+                    ],
                     [
                         {"text": "📑 Master Topic Directory", "callback_data": "act_mainindex"},
                         {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"}
@@ -5607,42 +5836,23 @@ class DeviTelegramBot:
                         {"text": "🔑 Connect Account", "callback_data": "act_connect"}
                     ],
                     [
-                        {"text": "🚀 Deep Cloner Guide", "callback_data": "act_clonehelp"},
-                        {"text": "📑 Topic Index Guide", "callback_data": "act_indexhelp"}
+                        {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
+                        {"text": "🎛️ Master Panel", "callback_data": "act_panel"}
                     ],
                     [
-                        {"text": "🔄 Cloud Routing Guide", "callback_data": "act_routehelp"},
-                        {"text": "🛡️ Admin & Security Guide", "callback_data": "act_adminhelp"}
+                        {"text": fwd_pause_btn_txt, "callback_data": fwd_pause_cb},
+                        {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}
                     ],
                     [
-                        {"text": "🩺 Clinical Calculators", "callback_data": "act_calchelp"},
-                        {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"}
+                        {"text": direct_btn_txt, "callback_data": "act_toggle_direct"},
+                        {"text": sig_btn_txt, "callback_data": "act_toggle_sig"}
                     ],
                     [
+                        {"text": "💬 Message Kind Doctor 🩺", "callback_data": "act_support"},
                         {"text": "📖 Full 3-Part Manual", "callback_data": "act_manual"}
                     ]
                 ]
             }
-            if self.is_admin(admin_id):
-                dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
-                lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
-                dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
-                keyboard["inline_keyboard"].append([
-                    {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
-                    {"text": "🎛️ Master Panel", "callback_data": "act_panel"}
-                ])
-                keyboard["inline_keyboard"].append([
-                    {"text": fwd_pause_btn_txt, "callback_data": fwd_pause_cb},
-                    {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}
-                ])
-                keyboard["inline_keyboard"].append([
-                    {"text": direct_btn_txt, "callback_data": "act_toggle_direct"},
-                    {"text": sig_btn_txt, "callback_data": "act_toggle_sig"}
-                ])
-                keyboard["inline_keyboard"].append([
-                    {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
-                    {"text": "🏷️ Strip Words Filter", "callback_data": "act_stripwords"}
-                ])
             sent_m = await self._send_message(session, chat_id, reply, reply_markup=keyboard, message_thread_id=thread_id)
             if sent_m and chat_id < 0:
                 self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_m, 120))
@@ -6125,6 +6335,22 @@ class DeviTelegramBot:
             sent_m = await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
             if sent_m and chat_id < 0:
                 self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_m, 120))
+
+        elif cmd in ("/striphelp", "/watermarkhelp", "/stripwordshelp"):
+            card_text, kb = self._build_interactive_help_card("strip", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/pacinghelp", "/speedhelp"):
+            card_text, kb = self._build_interactive_help_card("pacing", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/osinthelp", "/radarhelp"):
+            card_text, kb = self._build_interactive_help_card("osint", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
+
+        elif cmd in ("/webhelp", "/cockpithelp"):
+            card_text, kb = self._build_interactive_help_card("web", is_admin=self.is_admin(admin_id))
+            await self._send_message(session, chat_id, card_text, reply_markup=kb, parse_mode="HTML", message_thread_id=thread_id)
 
         # -------------------------------------------------------------
         # NATIVE AUTO-FORWARD HUB & LOGIN PANEL (Screenshot Mode)
@@ -10557,6 +10783,33 @@ class DeviTelegramBot:
         elif cmd in ("/pacing", "/speed", "/delay"):
             card_text, kb = self._build_pacing_card_data(admin_id)
             await self._send_message(session, chat_id, card_text, reply_markup=kb, disable_web_page_preview=True, message_thread_id=thread_id)
+
+        elif cmd in ("/dedupstrip", "/cleanstrip", "/stripclean"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+            rem = deduplicate_and_clean()
+            await self._send_message(
+                session, chat_id,
+                f"🧹 <b>Strip Rules Clean &amp; Dedup Completed!</b> 🛡️\n\n"
+                f"• Cleaned: <b>{rem}</b> duplicate/empty rules removed.\n"
+                f"• Active Rules: <code>strip_words.txt</code> &amp; SQLite fully synchronized.",
+                message_thread_id=thread_id
+            )
+
+        elif cmd in ("/syncstrip",):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+            from devi.operator.strip_sync import sync_from_file_to_db
+            synced_cnt = sync_from_file_to_db()
+            await self._send_message(
+                session, chat_id,
+                f"🔄 <b>Strip Rules Synchronized!</b> 🛡️\n\n"
+                f"• Rules Synced: <b>{synced_cnt}</b>\n"
+                f"• Primary &amp; Friend Edition matched.",
+                message_thread_id=thread_id
+            )
 
         elif cmd in ("/engine", "/status"):
             if not self.is_admin(admin_id):

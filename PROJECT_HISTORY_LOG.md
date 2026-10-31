@@ -2132,6 +2132,42 @@ This log permanently documents root causes, architectural patterns, historical b
   - Master system verification `tests/run_all_tests.py` executed: 11 / 11 test suites passed 100% (0 errors).
   - Strict local verification enforced; zero git push or VPS deploy.
 
+---
 
+## 📅 Log Entry: Sunday, 01 November 2026
 
-
+### 43. Strip Words Studio Card, 10-Card Master Architecture & Private DM Admin Command Gate
+* **User Directive & Feedback**:
+  - Voice Note Query: *"Bhai ek problem hai. Actually jo ad stripping wala hai na, wo isme available nahi hai... Kind Doctor Bot me wo option available nahi hai. Please ek baar research karo, ya to us card ko add kar do ya mujhe bata do kahan pe hai to main ek baar check kar loon. Wo card add nahi hai. Aur mere khayal se bahut se cards usme available nahi hai to saare cards, saare options, all possible options saare ke saare cards ki tarah available aur acche se sequencing me kar do yaar please, aur unki help bhi ho jaye na ki haan kaise use karna hai... sabkuch check kar lo sabkuch available hai ki nahi hai, kyunki bahut saare options mere khayal se available nahi hai usme ya mentioned nahi hai."*
+  - Follow-up Instruction: *"bhaai har jgh update kr diya hai na aapne"*
+* **Root Cause Analysis**:
+  1. **Missing Dedicated Strip Help Card & Command**:
+     - Kind Doctor Bot had `/clonehelp`, `/indexhelp`, `/routehelp`, `/adminhelp`, `/calchelp`, and `/mediahelp`, but zero dedicated help card or command for `/striphelp` or `/watermarkhelp`.
+     - In `/menu`, `act_strip_add` and `act_stripwords` were previously relegated to the bottom conditional block, and absent from the main card grid.
+  2. **Private DM Admin Command Blocking**:
+     - In private DM, non-student commands sent by an admin fell through to the student contact desk relay because line 5422 strictly checked `if custom_cmd_key in STUDENT_ALLOWED_COMMANDS:`, without verifying `self.is_admin(sender_id)`.
+* **Permanent Fix Applied**:
+  1. **New Strip Words Studio Card (`devi/operator/telegram_bot.py`)**:
+     - Added dedicated category `strip` / `stripwords` / `watermark` / `branding` to `_build_interactive_help_card`.
+     - Details exact usage rules: Direct removal (`@SpamChannel`), replacement mapping (`OldBrand => NewBrand`), regex pattern filtering, and case-insensitive deduplication.
+     - Interactive inline buttons: `➕ Add Strip Word`, `🏷️ Active Rules Card`, `🔍 Search Rules`, `🧹 Clean & Dedup`, and `🌐 Web Regex Sandbox` (linking directly to TMA WebApp).
+  2. **10-Card Master Architecture**:
+     - 1. 🏷️ Strip Words Studio (`/striphelp`)
+     - 2. 🚀 Deep Cloner Guide (`/clonehelp`)
+     - 3. 🔄 Auto-Forward Guide (`/routehelp`)
+     - 4. 📑 Topic Index Guide (`/indexhelp`)
+     - 5. 📥 Media Downloader Guide (`/mediahelp`)
+     - 6. 🩺 Clinical Calculators (`/calchelp`)
+     - 7. 🕵️ OSINT & Radar Guide (`/osinthelp`)
+     - 8. ⏱️ Velocity & Pacing (`/pacinghelp`)
+     - 9. 🛡️ Group Admin Guide (`/adminhelp`)
+     - 10. 🌐 Web Cockpit Guide (`/webhelp`)
+  3. **Main Menu Re-Sequencing (`/menu`, `/start`, `/help`)**:
+     - Re-sequenced into **Section 1: 10 Feature Cards & Guides** (balanced 2-column inline grid) and **Section 2: Direct 1-Click Action Controls** (with `➕ Add Strip Word` and `🏷️ Active Strip Rules` right at the top of Section 2).
+  4. **Private DM Admin Command Gate**:
+     - Updated line 5422 to `if self.is_admin(sender_id) or custom_cmd_key in STUDENT_ALLOWED_COMMANDS:`, ensuring admins (@Kinddoctor4u and @Ammitrajput1) can run any admin command in private DM without ticket interception.
+  5. **Added Command Handlers in `_handle_admin_command`**:
+     - Handlers for `/striphelp`, `/watermarkhelp`, `/stripwordshelp`, `/pacinghelp`, `/speedhelp`, `/osinthelp`, `/radarhelp`, `/webhelp`, `/cockpithelp`, `/dedupstrip`, and `/syncstrip`.
+* **Verification & Results**:
+  - Python compile check: `python -m py_compile devi/operator/telegram_bot.py` (Exit code 0).
+  - Master test suite `tests/run_all_tests.py`: 13 / 13 test suites passed 100% (0 errors).

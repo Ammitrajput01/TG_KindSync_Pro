@@ -369,6 +369,8 @@ An enterprise Telegram management bot providing complete operational oversight d
 | `/newtopic [name]` | Admin | Dynamically creates a new Forum Topic in the group or active target chat. |
 | `/setgroup` | Admin | Displays interactive buttons to select active working group when commanding from Private DM. |
 | `/mediahelp` | Public | Interactive quick manual for in-topic media leeching and format capabilities. |
+| `/striphelp` | Public | Dedicated Watermark & Strip Words Studio guide card with 1-click action buttons. |
+| `/stripwords` | Admin | Interactive paginated rules card showing all active strip and replacement rules. |
 | `/clone [src] [tgt]`| Admin | 1-Click Deep Cloner for entire forum groups, topics, or single messages (Zero deletion sync). |
 | `/clonestatus` | Admin | Live cloning progress radar, throughput gauge, and non-destructive pause/resume controls. |
 | `/stats` | Admin | Aggregate statistics: total messages forwarded, video volume, transfer speed, and DLQ errors. |
