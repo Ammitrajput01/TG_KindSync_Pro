@@ -104,11 +104,11 @@ def format_bytes(size_bytes: Optional[int]) -> str:
 
 
 def is_supported_url(url: str) -> bool:
-    """Quick validation for YouTube, Instagram, Twitter, or direct media URLs."""
+    """Quick validation for YouTube, Instagram, TikTok, Snapchat, Twitter/X, and direct media URLs."""
     if not url:
         return False
     u = url.strip().lower()
-    if re.search(r'(?:youtube\.com|youtu\.be|instagram\.com|twitter\.com|x\.com|tiktok\.com|facebook\.com|fb\.watch|vimeo\.com|reddit\.com)', u):
+    if re.search(r'(?:youtube\.com|youtu\.be|instagram\.com|twitter\.com|x\.com|tiktok\.com|snapchat\.com|facebook\.com|fb\.watch|vimeo\.com|reddit\.com|pinterest\.com|pin\.it|threads\.net|soundcloud\.com|spotify\.com|dailymotion\.com|bilibili\.com)', u):
         return True
     if re.search(r'\.(mp4|mkv|mov|avi|flv|webm|mp3|m4a|pdf|zip|rar)(?:\?.*)?$', u):
         return True
@@ -151,6 +151,25 @@ class MediaDownloaderEngine:
         }
         if self.ffmpeg_exe:
             opts["ffmpeg_location"] = self.ffmpeg_exe
+
+        # Automatic Cookie Resolution for Datacenter / VPS Anti-Bot Bypass
+        cookie_candidates = [
+            BASE_PROJECT_DIR / "cookies.txt",
+            Path("/home/ubuntu/TG_KindSync_Pro/cookies.txt"),
+            Path("c:/TG_KindSync_Pro/cookies.txt"),
+            Path("cookies.txt"),
+        ]
+        for c in cookie_candidates:
+            if c.is_file() and c.stat().st_size > 0:
+                opts["cookiefile"] = str(c)
+                break
+
+        # Anti-Bot JS Challenge Execution (Deno / Node.js)
+        opts["remote_components"] = ["ejs:github"]
+        deno_bin = shutil.which("deno") or (Path("/home/ubuntu/.deno/bin/deno") if Path("/home/ubuntu/.deno/bin/deno").is_file() else None)
+        if deno_bin:
+            opts["js_runtimes"] = {"deno": {"path": str(deno_bin)}}
+
         return opts
 
     async def extract_info(self, url: str, max_playlist_items: int = 50) -> Dict[str, Any]:
@@ -226,10 +245,11 @@ class MediaDownloaderEngine:
     async def download_single_media(
         self,
         url: str,
+        quality: Optional[str] = "best",
         progress_callback=None
     ) -> Dict[str, Any]:
         """
-        Downloads a single video/audio track with best compatibility (1080p/720p MP4).
+        Downloads a single video/audio track with requested quality (1080p, 720p, 480p, 360p, or MP3).
         Returns metadata dict with local file paths.
         """
         if not YT_DLP_AVAILABLE and not ensure_yt_dlp():
@@ -237,11 +257,33 @@ class MediaDownloaderEngine:
 
         def _download():
             opts = self._get_base_ydl_opts()
-            # Choose best mp4 video under 2GB, or best video+audio merged to mp4
-            opts["format"] = "bestvideo[ext=mp4][filesize<1900M]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-            opts["merge_output_format"] = "mp4"
             opts["writethumbnail"] = True
             opts["noplaylist"] = True
+
+            q = (quality or "best").strip().lower()
+            if q in ("audio", "mp3", "m4a", "music"):
+                opts["format"] = "bestaudio/best"
+                opts["postprocessors"] = [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }]
+            elif q in ("1080p", "1080", "fhd"):
+                opts["format"] = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]/best"
+                opts["merge_output_format"] = "mp4"
+            elif q in ("720p", "720", "hd"):
+                opts["format"] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best"
+                opts["merge_output_format"] = "mp4"
+            elif q in ("480p", "480", "sd"):
+                opts["format"] = "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]/best"
+                opts["merge_output_format"] = "mp4"
+            elif q in ("360p", "360"):
+                opts["format"] = "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]/best"
+                opts["merge_output_format"] = "mp4"
+            else:
+                # Default: Best MP4 under 2GB (Telegram compatible)
+                opts["format"] = "bestvideo[ext=mp4][filesize<1900M]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+                opts["merge_output_format"] = "mp4"
 
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
@@ -256,11 +298,21 @@ class MediaDownloaderEngine:
                     self.download_dir / f"{base_stem}.mp4",
                     self.download_dir / f"{base_stem}.mkv",
                     self.download_dir / f"{base_stem}.webm",
+                    self.download_dir / f"{base_stem}.mp3",
+                    self.download_dir / f"{base_stem}.m4a",
+                    self.download_dir / f"{base_stem}.aac",
+                    self.download_dir / f"{base_stem}.opus",
                 ]
                 for cand in candidates:
                     if cand.is_file() and cand.stat().st_size > 0:
                         final_video_path = cand
                         break
+
+                if not final_video_path:
+                    for f in self.download_dir.glob(f"{base_stem}.*"):
+                        if f.suffix.lower() not in (".jpg", ".jpeg", ".png", ".webp", ".part", ".ytdl") and f.stat().st_size > 0:
+                            final_video_path = f
+                            break
 
                 # Probe thumbnail
                 thumb_candidates = [

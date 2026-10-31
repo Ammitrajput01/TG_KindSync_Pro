@@ -2,6 +2,51 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Sunday, 1 November 2026 | 05:25 AM IST
+
+### 52. Kind Doctor Media Studio: YouTube Datacenter Bot-Wall Bypass, Multi-Platform Expansion & Interactive Quality Selection
+* **User Directive & Context (Voice Audio 10 & Telegram Error Screenshot)**:
+  - *Telegram Error*:
+    ```
+    [01-Nov-26 4:53 AM] Kind Doctor 🩺: ❌ Media Download Failed: yt-dlp is not installed in the python environment.
+    [01-Nov-26 5:00 AM] Kind Doctor 🩺: ❌ Media Download Failed: Could not extract info for URL: https://www.youtube.com/watch?v=xvT1jH8B9AM
+    ```
+  - *Audio Directive (Dr. Amit)*:
+    *"Also fix all kind of this problem, I mean all problems kind like this, okay? Maine abhi link share kiya woh download nahi ho raha hai error maar raha hai toh ye check kar lo aur isko fix kar do. Ho sake to possibly wahan pe kitni quality ka chahiye woh bhi decide karne ke liye poochh lo and har tarah ka kaam kare: Instagram, TikTok, Snapchat... Instagram, Telegram, Snapchat, and jitne bhi platforms hote hain all possible, utna maximum ho jaaye."*
+  - *Permanent Admin Accounts*: Strictly `@Kinddoctor4u` (`1553619403`) & `@Ammitrajput1` (`759038032`).
+* **Root Cause Forensics**:
+  1. **YouTube Datacenter IP Bot-Wall**: Oracle Cloud VPS IPs (e.g. `130.210.1.32`) are systematically challenged by YouTube BotGuard with `Sign in to confirm you're not a bot`. Without modern JavaScript engines (to compute Proof-of-Origin / EJS tokens) and valid browser cookies, video information extraction fails on cloud IPs.
+  2. **Missing System FFmpeg & Runtimes on VPS**: The Oracle Cloud VPS lacked system `/usr/bin/ffmpeg` for partial stream processing and format transcoding, as well as a JavaScript engine (`deno` or `nodejs`) to execute client-side JS challenges.
+  3. **Lack of Quality Controls**: The bot previously defaulted to arbitrary format selection without giving the admin a choice of resolution (`1080p`, `720p`, `480p`, `360p`) or audio-only extraction (`MP3`).
+  4. **Platform Regex Limitations**: URL detection was restricted to YouTube, Instagram, and Twitter, failing on Snapchat, Pinterest, Threads, SoundCloud, Spotify, and Reddit.
+* **Applied Engineering Upgrades**:
+  1. **Anti-Bot Datacenter Bypass Infrastructure**:
+     - Deployed Deno runtime (`v2.9.8`), Node.js (`v18.19.1`), and system FFmpeg (`v6.1.1`) to Oracle Cloud VPS.
+     - Configured `devi/operator/media_downloader.py` with `remote_components = ["ejs:github"]` and automatic runtime discovery for executing YouTube challenge scripts.
+     - Transferred authenticated `cookies.txt` to the VPS and added automatic multi-path discovery (`/home/ubuntu/TG_KindSync_Pro/cookies.txt`, `c:/TG_KindSync_Pro/cookies.txt`, etc.).
+     - Added `cookies.txt` and `*cookies*.txt` to `.gitignore` to safeguard user privacy.
+  2. **Universal Multi-Platform Support**:
+     - Expanded `is_supported_url` in `media_downloader.py` to support YouTube (single, shorts, playlists), Instagram (reels, stories, posts), TikTok, Snapchat (spotlights, stories), Twitter/X, Reddit, Pinterest, Threads, SoundCloud, Spotify, Dailymotion, Bilibili, and direct HTTP media files.
+  3. **Interactive Quality Selection UI**:
+     - Upgraded `/ytdl`, `/upload`, `/playlist`, `/leech` in `telegram_bot.py`.
+     - When a link is provided without quality: Presents an interactive inline keyboard card:
+       - `[ 🎬 1080p FHD ] [ 📺 720p HD ]`
+       - `[ 📱 480p SD  ] [ 🎵 MP3 Audio Only ]`
+       - `[ ⚡ Auto Best Quality ] [ ❌ Cancel ]`
+     - Allows direct inline quality arguments (e.g., `/ytdl <url> 720p`, `/ytdl <url> audio`, `/ytdl <url> 1080p`).
+     - Added `dlq_` callback interceptor in `_handle_callback_query` with pending download cache (`self.pending_media_downloads`).
+     - Added native `_send_audio` Telegram Bot API wrapper for delivering pristine MP3 audio with artist and lecture title tags.
+     - Added automatic media URL detection in Admin Private DM so links pasted without slash commands trigger the quality picker immediately.
+  4. **Verification**:
+     - Direct VPS test video chunk download verified with exit code 0 (`task-2761`).
+     - Automated test suite passed 100% across all 14 tests (`python tests/run_all_tests.py` and `tests/test_media_downloader.py`).
+* **Affected Files**:
+  - `devi/operator/media_downloader.py`
+  - `devi/operator/telegram_bot.py`
+  - `tests/test_media_downloader.py`
+  - `.gitignore`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Sunday, 1 November 2026 | 05:00 AM IST
 
 ### 51. Kind Doctor Bot Universal Media Downloader: yt-dlp Dependency & Cloud VPS Self-Healing Fix

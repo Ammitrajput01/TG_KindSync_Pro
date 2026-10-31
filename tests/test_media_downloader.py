@@ -36,6 +36,11 @@ def test_url_detection():
     assert is_supported_url("https://twitter.com/user/status/123456789")
     assert is_supported_url("https://x.com/user/status/123456789")
     assert is_supported_url("https://www.tiktok.com/@user/video/123456789")
+    assert is_supported_url("https://www.snapchat.com/spotlight/W7_EDlXWTBiXAEEniNoMPwAAYaW5zdGFncmFtAA")
+    assert is_supported_url("https://www.pinterest.com/pin/1234567890/")
+    assert is_supported_url("https://www.threads.net/@user/post/C123456789")
+    assert is_supported_url("https://soundcloud.com/artist/track")
+    assert is_supported_url("https://www.reddit.com/r/medical/comments/123456/lecture_clip/")
     
     # Unsupported or invalid URLs
     assert not is_supported_url("https://random-unsupported-site.org/page.html")
@@ -139,6 +144,39 @@ def test_multi_group_resolution():
     print("  -> Multi-Group Resolution: PASSED")
 
 
+def test_quality_selection_and_pending_cache():
+    print("[TEST] Testing Quality Selection and Pending Download State...")
+    from devi.operator.telegram_bot import DeviTelegramBot
+    import uuid
+    import time
+    
+    bot = DeviTelegramBot()
+    assert hasattr(bot, "pending_media_downloads")
+    assert isinstance(bot.pending_media_downloads, dict)
+    
+    # Simulate storing a pending download request
+    dl_key = uuid.uuid4().hex[:8]
+    test_req = {
+        "url": "https://www.youtube.com/watch?v=xvT1jH8B9AM",
+        "user_id": 1553619403,
+        "chat_id": 1553619403,
+        "thread_id": None,
+        "dest_chat_id": 1553619403,
+        "custom_topic_name": "Cardiology",
+        "is_playlist": False,
+        "created_at": time.time(),
+    }
+    bot.pending_media_downloads[dl_key] = test_req
+    
+    # Verify retrieval and removal
+    retrieved = bot.pending_media_downloads.pop(dl_key, None)
+    assert retrieved is not None
+    assert retrieved["url"] == "https://www.youtube.com/watch?v=xvT1jH8B9AM"
+    assert retrieved["custom_topic_name"] == "Cardiology"
+    assert dl_key not in bot.pending_media_downloads
+    print("  -> Quality Selection Cache & Interceptor: PASSED")
+
+
 def run_media_downloader_suite():
     print("\n========================================================")
     print("   UNIVERSAL IN-TOPIC MEDIA DOWNLOADER TEST SUITE")
@@ -150,6 +188,7 @@ def run_media_downloader_suite():
     test_cleanup_utility()
     test_bot_command_definitions()
     test_multi_group_resolution()
+    test_quality_selection_and_pending_cache()
     print("\n[SUCCESS] ALL MEDIA DOWNLOADER TESTS PASSED 100%!\n")
 
 

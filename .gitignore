@@ -186,6 +186,8 @@ devi/memory/*.sqlite-shm
 data/session_string.txt
 *.session_string
 scratch/
+cookies.txt
+*cookies*.txt
 
 # Strip Words Backups
 archives/strip_words_backups/*.txt

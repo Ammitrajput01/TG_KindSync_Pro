@@ -33,6 +33,8 @@ import random
 import base64
 import struct
 import hashlib
+import uuid
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Set, Dict, Any, Optional, Tuple, List
@@ -188,6 +190,8 @@ class DeviTelegramBot:
         self.connect_rate_limits: Dict[int, list] = {}
         # Active Target Group cache: admin_id -> target_chat_id
         self.admin_active_group: Dict[int, int] = {}
+        # Pending Media Downloads for Quality Selection: dl_key -> dict(...)
+        self.pending_media_downloads: Dict[str, Dict[str, Any]] = {}
         
         self.memory = MemoryStore()
         self.evaluator = Evaluator(self.memory)
@@ -2096,6 +2100,63 @@ class DeviTelegramBot:
             if t_handle:
                 t_handle.close()
 
+    async def _send_audio(
+        self,
+        session: aiohttp.ClientSession,
+        chat_id: int,
+        audio_bytes_or_path: Any,
+        filename: str = "audio.mp3",
+        caption: str = "",
+        duration: Optional[int] = None,
+        performer: Optional[str] = None,
+        title: Optional[str] = None,
+        thumb_bytes_or_path: Optional[Any] = None,
+        message_thread_id: Optional[int] = None,
+    ) -> bool:
+        """Sends an audio file (MP3/M4A) via Telegram Bot API with audio player tags and forum topic support."""
+        url = f"https://api.telegram.org/bot{self.token}/sendAudio"
+        data = aiohttp.FormData()
+        data.add_field("chat_id", str(chat_id))
+        if message_thread_id:
+            data.add_field("message_thread_id", str(message_thread_id))
+        if caption:
+            data.add_field("caption", caption)
+            data.add_field("parse_mode", "HTML")
+        if duration and duration > 0:
+            data.add_field("duration", str(int(duration)))
+        if performer:
+            data.add_field("performer", str(performer)[:64])
+        if title:
+            data.add_field("title", str(title)[:64])
+
+        f_handle = None
+        t_handle = None
+        try:
+            if isinstance(audio_bytes_or_path, (str, Path)):
+                f_path = Path(audio_bytes_or_path)
+                f_handle = open(f_path, "rb")
+                data.add_field("audio", f_handle, filename=f_path.name, content_type="audio/mpeg")
+            else:
+                data.add_field("audio", audio_bytes_or_path, filename=filename, content_type="audio/mpeg")
+
+            if thumb_bytes_or_path:
+                if isinstance(thumb_bytes_or_path, (str, Path)) and os.path.isfile(thumb_bytes_or_path):
+                    t_handle = open(thumb_bytes_or_path, "rb")
+                    data.add_field("thumb", t_handle, filename="thumb.jpg", content_type="image/jpeg")
+                elif isinstance(thumb_bytes_or_path, bytes):
+                    data.add_field("thumb", thumb_bytes_or_path, filename="thumb.jpg", content_type="image/jpeg")
+
+            async with session.post(url, data=data, timeout=300) as resp:
+                return resp.status == 200
+        except Exception as e:
+            logger.warning(f"Failed to send audio to {chat_id}: {e}")
+            return False
+        finally:
+            if f_handle:
+                f_handle.close()
+            if t_handle:
+                t_handle.close()
+
     async def _export_members_csv_file(self, session: aiohttp.ClientSession, send_to_chat: int, group_id: int, message_thread_id: Optional[int] = None):
         """Generates and sends an audit CSV with member details and join timestamps."""
         try:
@@ -3704,9 +3765,75 @@ class DeviTelegramBot:
             is_adm = (admin_id in self.master_admin_ids) or (await self.is_admin_for_chat(session, chat_id, admin_id, message=msg_obj))
             if is_adm and msg_id:
                 await self._delete_message(session, chat_id, msg_id)
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Card Purged Successfully 🗑️"})
             else:
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⚠️ Strictly Group Admins Only!", "show_alert": True})
+            return
+
+        # Media Download Quality Selection Interceptor
+        if data.startswith("dlq_"):
+            parts = data.split("_")
+            if len(parts) >= 3:
+                chosen_q = parts[1]
+                dl_key = parts[2]
+                dl_info = self.pending_media_downloads.pop(dl_key, None)
+                msg_obj = cb.get("message", {})
+                msg_id = msg_obj.get("message_id")
+
+                if not dl_info:
+                    await session.post(
+                        f"https://api.telegram.org/bot{self.token}/answerCallbackQuery",
+                        json={"callback_query_id": cb_id, "text": "⚠️ Download request expired or already processed.", "show_alert": True}
+                    )
+                    if msg_id:
+                        await self._delete_message(session, chat_id, msg_id)
+                    return
+
+                if chosen_q == "cancel":
+                    await session.post(
+                        f"https://api.telegram.org/bot{self.token}/answerCallbackQuery",
+                        json={"callback_query_id": cb_id, "text": "Download cancelled ❌"}
+                    )
+                    if msg_id:
+                        await self._delete_message(session, chat_id, msg_id)
+                    return
+
+                quality_labels = {
+                    "1080p": "🎬 1080p FHD",
+                    "720p": "📺 720p HD",
+                    "480p": "📱 480p SD",
+                    "360p": "📱 360p Low",
+                    "audio": "🎵 MP3 Audio",
+                    "best": "⚡ Auto Best"
+                }
+                q_label = quality_labels.get(chosen_q, chosen_q)
+
+                await session.post(
+                    f"https://api.telegram.org/bot{self.token}/answerCallbackQuery",
+                    json={"callback_query_id": cb_id, "text": f"Starting {q_label} download..."}
+                )
+
+                if msg_id:
+                    await self._edit_message(
+                        session, chat_id, msg_id,
+                        f"⏳ <b>Quality Selected:</b> <b>{q_label}</b>\n"
+                        f"🚀 <i>Initializing Kind Doctor Media Engine...</i>"
+                    )
+
+                self.create_tracked_task(
+                    self._process_media_upload_task(
+                        session=session,
+                        chat_id=dl_info["chat_id"],
+                        dest_chat_id=dl_info["dest_chat_id"],
+                        thread_id=dl_info["thread_id"],
+                        user_id=dl_info["user_id"],
+                        url=dl_info["url"],
+                        is_playlist_cmd=dl_info.get("is_playlist", False),
+                        custom_topic_name=dl_info.get("custom_topic_name"),
+                        quality=chosen_q,
+                        prompt_msg_id=msg_id
+                    ),
+                    name=f"media_dl_{dl_info['chat_id']}_{int(asyncio.get_event_loop().time())}"
+                )
             return
 
         # Public Interactive Study & Dashboard Actions (Available to ALL members)
@@ -5833,6 +5960,12 @@ class DeviTelegramBot:
                 await self._handle_admin_command(session, chat_id, sender_id, text, message=message)
                 return
 
+            # Admin Media Link Detection in DM (Auto-detect YouTube, Insta, TikTok, Snapchat, etc.)
+            m_media_url = re.search(r'https?://\S+', text)
+            if m_media_url and (is_supported_url(m_media_url.group(0)) or is_direct_file_url(m_media_url.group(0))):
+                await self._handle_admin_command(session, chat_id, sender_id, f"/ytdl {text.strip()}", message=message)
+                return
+
             # Admin natural chat with DEVI AI (ONLY IN PRIVATE DM)
             if text:
                 await self._handle_devi_ai_chat(session, chat_id, text, sender.get("first_name", "Admin"))
@@ -6021,7 +6154,9 @@ class DeviTelegramBot:
         url: str,
         is_playlist_cmd: bool = False,
         custom_topic_name: Optional[str] = None,
-        dest_chat_id: Optional[int] = None
+        dest_chat_id: Optional[int] = None,
+        quality: Optional[str] = "best",
+        prompt_msg_id: Optional[int] = None
     ):
         """Asynchronous worker for downloading and uploading media into target chat & forum topic."""
         target_upload_chat = dest_chat_id or chat_id
@@ -6042,12 +6177,22 @@ class DeviTelegramBot:
         else:
             topic_label = f" into <b>{html.escape(custom_topic_name)}</b>" if custom_topic_name else ""
 
-        status_msg_id = await self._send_message(
-            session,
-            chat_id,
-            f"⚡ <b>Kind Doctor Media Engine:</b> Analyzing link{topic_label}...\n⏳ <i>Extracting stream metadata & formats...</i>",
-            message_thread_id=thread_id
-        )
+        q_disp = (quality or "Best").upper()
+        if prompt_msg_id:
+            status_msg_id = prompt_msg_id
+            await self._edit_message(
+                session,
+                chat_id,
+                status_msg_id,
+                f"⚡ <b>Kind Doctor Media Engine:</b> Analyzing link{topic_label}...\n⏳ <i>Extracting stream metadata ({q_disp})...</i>"
+            )
+        else:
+            status_msg_id = await self._send_message(
+                session,
+                chat_id,
+                f"⚡ <b>Kind Doctor Media Engine:</b> Analyzing link{topic_label}...\n⏳ <i>Extracting stream metadata ({q_disp})...</i>",
+                message_thread_id=thread_id
+            )
 
         try:
             # 1. Direct Web File Link Detection (.mp4, .pdf, .zip, etc.)
@@ -6121,7 +6266,7 @@ class DeviTelegramBot:
                     item_title = item.get("title", f"Lecture {item_idx}")
 
                     try:
-                        dl_res = await media_engine.download_single_media(item_url)
+                        dl_res = await media_engine.download_single_media(item_url, quality=quality)
                         v_path = dl_res["file_path"]
                         t_path = dl_res.get("thumb_path")
                         v_dur = dl_res.get("duration_sec")
@@ -6131,20 +6276,29 @@ class DeviTelegramBot:
                             index=item_idx, total=total_items
                         )
                         v_size = dl_res.get("filesize", 0)
+                        is_audio = Path(v_path).suffix.lower() in (".mp3", ".m4a", ".aac", ".wav", ".opus", ".ogg")
 
                         if v_size <= 48 * 1024 * 1024:
-                            await self._send_video(
-                                session, target_upload_chat, v_path, filename=Path(v_path).name,
-                                caption=cap, duration=v_dur, thumb_bytes_or_path=t_path,
-                                message_thread_id=active_topic_id
-                            )
+                            if is_audio:
+                                await self._send_audio(
+                                    session, target_upload_chat, v_path, filename=Path(v_path).name,
+                                    caption=cap, duration=v_dur, performer=dl_res.get("uploader"),
+                                    title=item_title, thumb_bytes_or_path=t_path,
+                                    message_thread_id=active_topic_id
+                                )
+                            else:
+                                await self._send_video(
+                                    session, target_upload_chat, v_path, filename=Path(v_path).name,
+                                    caption=cap, duration=v_dur, thumb_bytes_or_path=t_path,
+                                    message_thread_id=active_topic_id
+                                )
                         else:
                             from devi.operator.session_vault import get_vault_client_for_target
                             user_cli, _ = await get_vault_client_for_target(user_id)
                             if user_cli:
                                 await user_cli.send_file(
                                     target_upload_chat, v_path, caption=cap, thumb=t_path,
-                                    reply_to=active_topic_id, supports_streaming=True,
+                                    reply_to=active_topic_id, supports_streaming=not is_audio,
                                     parse_mode="html"
                                 )
                         cleanup_files(v_path, t_path)
@@ -6168,7 +6322,7 @@ class DeviTelegramBot:
                         )
                 return
 
-            # 4. Handle Single Video / Reel / Short
+            # 4. Handle Single Video / Reel / Short / Audio
             v_title = info.get("title", "Media")
             v_dur_str = info.get("duration_str", "N/A")
             v_author = info.get("uploader", "Unknown Channel")
@@ -6177,15 +6331,16 @@ class DeviTelegramBot:
                 await self._edit_message(
                     session, chat_id, status_msg_id,
                     f"⬇️ <b>Downloading:</b> <b>{v_title[:60]}</b>\n"
-                    f"⏱️ <b>Duration:</b> <code>{v_dur_str}</code> | 👤 <code>{v_author}</code>\n"
-                    f"⏳ <i>Streaming to local cache...</i>"
+                    f"⏱️ <b>Duration:</b> <code>{v_dur_str}</code> | 🎯 <b>Quality:</b> <code>{(quality or 'Best').upper()}</code>\n"
+                    f"⏳ <i>Streaming to local cache via Kind Doctor Media Engine...</i>"
                 )
 
-            dl_res = await media_engine.download_single_media(url)
+            dl_res = await media_engine.download_single_media(url, quality=quality)
             v_path = dl_res["file_path"]
             t_path = dl_res.get("thumb_path")
             v_dur = dl_res.get("duration_sec")
             v_size = dl_res.get("filesize", 0)
+            is_audio = Path(v_path).suffix.lower() in (".mp3", ".m4a", ".aac", ".wav", ".opus", ".ogg")
 
             cap = format_media_caption(
                 dl_res.get("title", v_title),
@@ -6197,23 +6352,31 @@ class DeviTelegramBot:
                 await self._edit_message(
                     session, chat_id, status_msg_id,
                     f"⬆️ <b>Uploading to Topic...</b>\n"
-                    f"📦 <b>Size:</b> <code>{dl_res.get('filesize_str')}</code> | ⚡ <b>HD MP4</b>"
+                    f"📦 <b>Size:</b> <code>{dl_res.get('filesize_str')}</code> | ⚡ <b>{'Audio (MP3)' if is_audio else 'HD Video'}</b>"
                 )
 
             sent = False
             if v_size <= 48 * 1024 * 1024:
-                sent = await self._send_video(
-                    session, target_upload_chat, v_path, filename=Path(v_path).name,
-                    caption=cap, duration=v_dur, thumb_bytes_or_path=t_path,
-                    message_thread_id=active_topic_id
-                )
+                if is_audio:
+                    sent = await self._send_audio(
+                        session, target_upload_chat, v_path, filename=Path(v_path).name,
+                        caption=cap, duration=v_dur, performer=dl_res.get("uploader", v_author),
+                        title=dl_res.get("title", v_title), thumb_bytes_or_path=t_path,
+                        message_thread_id=active_topic_id
+                    )
+                else:
+                    sent = await self._send_video(
+                        session, target_upload_chat, v_path, filename=Path(v_path).name,
+                        caption=cap, duration=v_dur, thumb_bytes_or_path=t_path,
+                        message_thread_id=active_topic_id
+                    )
             else:
                 from devi.operator.session_vault import get_vault_client_for_target
                 user_cli, _ = await get_vault_client_for_target(user_id)
                 if user_cli:
                     await user_cli.send_file(
                         target_upload_chat, v_path, caption=cap, thumb=t_path,
-                        reply_to=active_topic_id, supports_streaming=True,
+                        reply_to=active_topic_id, supports_streaming=not is_audio,
                         parse_mode="html"
                     )
                     sent = True
@@ -6622,6 +6785,16 @@ class DeviTelegramBot:
             target_url = None
             custom_topic_name = None
             explicit_chat_id = None
+            detected_quality = None
+
+            valid_qualities = {
+                "1080p": "1080p", "1080": "1080p", "fhd": "1080p",
+                "720p": "720p", "720": "720p", "hd": "720p",
+                "480p": "480p", "480": "480p", "sd": "480p",
+                "360p": "360p", "360": "360p",
+                "mp3": "audio", "audio": "audio", "music": "audio", "m4a": "audio",
+                "best": "best"
+            }
 
             if len(parts) > 1:
                 target_url = parts[1].strip()
@@ -6630,8 +6803,15 @@ class DeviTelegramBot:
                     if rem_parts[-1].startswith("-100") and rem_parts[-1].lstrip("-").isdigit():
                         explicit_chat_id = int(rem_parts[-1])
                         rem_parts = rem_parts[:-1]
-                    if rem_parts:
-                        custom_topic_name = " ".join(rem_parts).strip()
+                    filtered_rem = []
+                    for rp in rem_parts:
+                        low_rp = rp.lower().strip()
+                        if low_rp in valid_qualities and not detected_quality:
+                            detected_quality = valid_qualities[low_rp]
+                        else:
+                            filtered_rem.append(rp)
+                    if filtered_rem:
+                        custom_topic_name = " ".join(filtered_rem).strip()
             elif reply_to:
                 rep_text = reply_to.get("text", "") or reply_to.get("caption", "")
                 m_url = re.search(r'https?://\S+', rep_text)
@@ -6641,29 +6821,105 @@ class DeviTelegramBot:
             if not target_url or not (target_url.startswith("http://") or target_url.startswith("https://")):
                 err_msg = (
                     "⚠️ <b>Usage Error:</b> Please provide a valid media link.\n\n"
-                    "• <b>Single Video:</b> <code>/ytdl https://youtu.be/...</code>\n"
+                    "• <b>Single Video:</b> <code>/ytdl https://youtu.be/... [quality]</code>\n"
                     "• <b>Full Playlist:</b> <code>/playlist https://youtube.com/playlist?list=...</code>\n"
-                    "• <b>Direct File / Insta:</b> <code>/upload https://...</code>\n\n"
-                    "💡 <i>Tip: Run this command inside any Forum Topic to upload directly into that topic!</i>"
+                    "• <b>Direct File / Insta / TikTok / Snapchat:</b> <code>/upload https://...</code>\n\n"
+                    "💡 <i>Tip: Quality options: <code>1080p</code>, <code>720p</code>, <code>480p</code>, <code>360p</code>, <code>mp3</code> (or click buttons below)!</i>"
                 )
                 await self._send_message(session, chat_id, err_msg, message_thread_id=thread_id)
                 return
 
             dest_chat_id = explicit_chat_id or (chat_id if chat_id < 0 else (self._resolve_study_group_id(chat_id, admin_id) if custom_topic_name else chat_id))
 
-            self.create_tracked_task(
-                self._process_media_upload_task(
-                    session=session,
-                    chat_id=chat_id,
-                    dest_chat_id=dest_chat_id,
-                    thread_id=thread_id,
-                    user_id=admin_id,
-                    url=target_url,
-                    is_playlist_cmd=(cmd == "/playlist"),
-                    custom_topic_name=custom_topic_name
-                ),
-                name=f"media_dl_{chat_id}_{thread_id}_{int(asyncio.get_event_loop().time())}"
+            # Direct file or explicit quality given -> start download directly
+            if detected_quality or is_direct_file_url(target_url):
+                self.create_tracked_task(
+                    self._process_media_upload_task(
+                        session=session,
+                        chat_id=chat_id,
+                        dest_chat_id=dest_chat_id,
+                        thread_id=thread_id,
+                        user_id=admin_id,
+                        url=target_url,
+                        is_playlist_cmd=(cmd == "/playlist"),
+                        custom_topic_name=custom_topic_name,
+                        quality=detected_quality or "best"
+                    ),
+                    name=f"media_dl_{chat_id}_{thread_id}_{int(asyncio.get_event_loop().time())}"
+                )
+                return
+
+            # Interactive Quality Selection Prompt
+            dl_key = uuid.uuid4().hex[:8]
+            self.pending_media_downloads[dl_key] = {
+                "url": target_url,
+                "user_id": admin_id,
+                "chat_id": chat_id,
+                "thread_id": thread_id,
+                "dest_chat_id": dest_chat_id,
+                "custom_topic_name": custom_topic_name,
+                "is_playlist": (cmd == "/playlist"),
+                "created_at": time.time(),
+            }
+
+            platform_icon = "🎬"
+            platform_name = "Online Media"
+            t_low = target_url.lower()
+            if "youtube.com" in t_low or "youtu.be" in t_low:
+                platform_icon = "▶️"
+                platform_name = "YouTube"
+            elif "instagram.com" in t_low:
+                platform_icon = "📸"
+                platform_name = "Instagram"
+            elif "tiktok.com" in t_low:
+                platform_icon = "🎵"
+                platform_name = "TikTok"
+            elif "snapchat.com" in t_low:
+                platform_icon = "👻"
+                platform_name = "Snapchat"
+            elif "twitter.com" in t_low or "x.com" in t_low:
+                platform_icon = "🐦"
+                platform_name = "Twitter / X"
+            elif "pinterest.com" in t_low or "pin.it" in t_low:
+                platform_icon = "📌"
+                platform_name = "Pinterest"
+            elif "reddit.com" in t_low:
+                platform_icon = "🤖"
+                platform_name = "Reddit"
+            elif "facebook.com" in t_low or "fb.watch" in t_low:
+                platform_icon = "📘"
+                platform_name = "Facebook"
+
+            dest_display = f"\n📁 <b>Topic:</b> <code>{custom_topic_name}</code>" if custom_topic_name else ""
+            if dest_chat_id != chat_id:
+                dest_display += f" (in <code>{self._get_group_title(dest_chat_id)}</code>)"
+
+            prompt_card = (
+                f"{platform_icon} <b>Kind Doctor Media Studio</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🌐 <b>Platform:</b> <b>{platform_name}</b>\n"
+                f"🔗 <b>Link:</b> <code>{html.escape(target_url[:75])}</code>{dest_display}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✨ <b>Download quality choose karein:</b>\n"
+                f"<i>Neeche diye gaye option par tap karein:</i>"
             )
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🎬 1080p FHD", "callback_data": f"dlq_1080p_{dl_key}"},
+                        {"text": "📺 720p HD", "callback_data": f"dlq_720p_{dl_key}"}
+                    ],
+                    [
+                        {"text": "📱 480p SD", "callback_data": f"dlq_480p_{dl_key}"},
+                        {"text": "🎵 MP3 Audio Only", "callback_data": f"dlq_audio_{dl_key}"}
+                    ],
+                    [
+                        {"text": "⚡ Auto Best Quality", "callback_data": f"dlq_best_{dl_key}"},
+                        {"text": "❌ Cancel", "callback_data": f"dlq_cancel_{dl_key}"}
+                    ]
+                ]
+            }
+            await self._send_message(session, chat_id, prompt_card, reply_markup=kb, message_thread_id=thread_id)
             return
 
         elif cmd in ("/routehelp", "/forwardhelp", "/routinghelp"):
