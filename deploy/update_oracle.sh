@@ -29,10 +29,15 @@ if [ -d ".venv" ]; then
     pip install -r requirements.txt --quiet
 fi
 
-# 3. Gracefully restart all 3 background services
+# 3. Gracefully restart active background systemd services
 echo "[*] Restarting background systemd services..."
 sudo systemctl daemon-reload
-sudo systemctl restart tg-forwarder 2>/dev/null || true
+if systemctl is-active --quiet tg-forwarder; then
+    echo "[*] Forwarder was running; restarting..."
+    sudo systemctl restart tg-forwarder 2>/dev/null || true
+else
+    echo "[*] Forwarder is currently paused by operator; keeping in standby."
+fi
 sudo systemctl restart tg-kinddoc-bot 2>/dev/null || true
 sudo systemctl restart tg-dashboard 2>/dev/null || true
 

@@ -2912,17 +2912,19 @@ class MemoryStreamer:
                     buffer.extend(chunk)
                     self.metrics["bytes_downloaded"] += len(chunk)
 
-                    ctrl_p = Path("engine_control.json")
-                    if ctrl_p.exists():
-                        with suppress(Exception):
-                            with open(ctrl_p, "r", encoding="utf-8") as cf:
-                                if json.load(cf).get("paused", False):
-                                    while not stop_event.is_set():
-                                        await asyncio.sleep(1.0)
-                                        with suppress(Exception):
-                                            with open(ctrl_p, "r", encoding="utf-8") as cf2:
-                                                if not json.load(cf2).get("paused", False):
-                                                    break
+                    if not hasattr(self, "_last_pause_chk") or time.monotonic() - getattr(self, "_last_pause_chk", 0.0) >= 1.5:
+                        self._last_pause_chk = time.monotonic()
+                        ctrl_p = Path("engine_control.json")
+                        if ctrl_p.exists():
+                            with suppress(Exception):
+                                with open(ctrl_p, "r", encoding="utf-8") as cf:
+                                    if json.load(cf).get("paused", False):
+                                        while not stop_event.is_set():
+                                            await asyncio.sleep(1.0)
+                                            with suppress(Exception):
+                                                with open(ctrl_p, "r", encoding="utf-8") as cf2:
+                                                    if not json.load(cf2).get("paused", False):
+                                                        break
 
                     while len(buffer) >= UP_CHUNK_SIZE:
                         payload = bytes(buffer[:UP_CHUNK_SIZE])

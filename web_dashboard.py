@@ -8359,72 +8359,86 @@ class DashboardServer:
         mins, secs = divmod(rem, 60)
         uptime_str = f"{hours:02d}:{mins:02d}:{secs:02d}"
 
-        # Real-time SQLite Database Queries & Maps
+        # Real-time SQLite Database Queries & Maps (3-Second Micro-Cached to protect Event Loop)
         real_db_count = 0
         total_db_items = 0
         topic_map = {}
         recent_dispatched_files = []
-        try:
-            db_file = BASE_DIR / "history_core.sqlite"
-            if db_file.exists():
-                with sqlite3.connect(db_file, timeout=2.5) as conn:
-                    # 1. Forwarded Count
-                    cur = conn.execute("SELECT COUNT(*) FROM forwarded")
-                    row = cur.fetchone()
-                    if row:
-                        real_db_count = int(row[0])
+        now_mono = time.monotonic()
+        if not hasattr(self, "_status_db_cache_time"):
+            self._status_db_cache_time = 0.0
+            self._status_db_cache = (0, 0, {}, [])
 
-                    # 2. Total Discovered Items Count
-                    cur = conn.execute("SELECT COUNT(*) FROM telegram_topic_items")
-                    row = cur.fetchone()
-                    if row:
-                        total_db_items = int(row[0])
+        if now_mono - self._status_db_cache_time < 3.0:
+            real_db_count, total_db_items, topic_map, recent_dispatched_files = self._status_db_cache
+        else:
+            try:
+                db_file = BASE_DIR / "history_core.sqlite"
+                if db_file.exists():
+                    with sqlite3.connect(db_file, timeout=2.5) as conn:
+                        # 1. Forwarded Count
+                        cur = conn.execute("SELECT COUNT(*) FROM forwarded")
+                        row = cur.fetchone()
+                        if row:
+                            real_db_count = int(row[0])
 
-                    # 3. Topic Map for Human Names
-                    cur = conn.execute("SELECT topic_id, topic_title FROM telegram_group_topics WHERE topic_title NOT LIKE 'Topic #%'")
-                    for tid, ttitle in cur.fetchall():
-                        if ttitle:
-                            clean_t = str(ttitle).strip()
-                            # Clean emojis if needed for robust display
-                            topic_map[int(tid)] = clean_t
+                        # 2. Total Discovered Items Count
+                        cur = conn.execute("SELECT COUNT(*) FROM telegram_topic_items")
+                        row = cur.fetchone()
+                        if row:
+                            total_db_items = int(row[0])
 
-                    # 4. Recent Dispatched Files Ledger (last 12 records)
-                    cur = conn.execute("SELECT title, item_type, topic_id, created_at FROM telegram_topic_items ORDER BY id DESC LIMIT 12")
-                    for row in cur.fetchall():
-                        f_title = row[0] or "Lecture Media Item"
-                        f_type = (row[1] or "video").lower()
-                        t_id = row[2]
-                        t_name = topic_map.get(int(t_id), f"Topic #{t_id}") if t_id else "Medical Lectures"
-                        c_time = str(row[3])[:19].replace("T", " ") if row[3] else "Recently Synced"
-                        
-                        # Estimated individual media size
-                        if f_type == "video":
-                            f_size = 184.2
-                        elif f_type in ("document", "pdf"):
-                            f_size = 14.8
-                        elif f_type in ("photo", "image"):
-                            f_size = 3.6
-                        elif f_type in ("audio", "voice"):
-                            f_size = 22.4
-                        else:
-                            f_size = 120.0
+                        # 3. Topic Map for Human Names
+                        cur = conn.execute("SELECT topic_id, topic_title FROM telegram_group_topics WHERE topic_title NOT LIKE 'Topic #%'")
+                        for tid, ttitle in cur.fetchall():
+                            if ttitle:
+                                clean_t = str(ttitle).strip()
+                                topic_map[int(tid)] = clean_t
 
-                        recent_dispatched_files.append({
-                            "title": f_title,
-                            "item_type": f_type,
-                            "size_mb": f_size,
-                            "target_topic": t_name,
-                            "completed_at": c_time,
-                            "status": "Delivered"
-                        })
-        except Exception:
-            pass
+                        # 4. Recent Dispatched Files Ledger (last 12 records)
+                        cur = conn.execute("SELECT title, item_type, topic_id, created_at FROM telegram_topic_items ORDER BY id DESC LIMIT 12")
+                        for row in cur.fetchall():
+                            f_title = row[0] or "Lecture Media Item"
+                            f_type = (row[1] or "video").lower()
+                            t_id = row[2]
+                            t_name = topic_map.get(int(t_id), f"Topic #{t_id}") if t_id else "Medical Lectures"
+                            c_time = str(row[3])[:19].replace("T", " ") if row[3] else "Recently Synced"
+                            
+                            if f_type == "video":
+                                f_size = 184.2
+                            elif f_type in ("document", "pdf"):
+                                f_size = 14.8
+                            elif f_type in ("photo", "image"):
+                                f_size = 3.6
+                            elif f_type in ("audio", "voice"):
+                                f_size = 22.4
+                            else:
+                                f_size = 120.0
 
-        dlq_count = 0
+                            recent_dispatched_files.append({
+                                "title": f_title,
+                                "item_type": f_type,
+                                "size_mb": f_size,
+                                "target_topic": t_name,
+                                "completed_at": c_time,
+                                "status": "Delivered"
+                            })
+                    self._status_db_cache = (real_db_count, total_db_items, topic_map, recent_dispatched_files)
+                    self._status_db_cache_time = now_mono
+            except Exception:
+                pass
+
+        dlq_count = getattr(self, "_cached_dlq_count", 0)
         if DLQ_FILE.exists():
-            with suppress(Exception):
-                with open(DLQ_FILE, "r", encoding="utf-8") as f:
-                    dlq_count = sum(1 for line in f if line.strip())
+            try:
+                curr_mtime = DLQ_FILE.stat().st_mtime
+                if getattr(self, "_last_dlq_mtime", 0.0) != curr_mtime:
+                    with open(DLQ_FILE, "r", encoding="utf-8") as f:
+                        dlq_count = sum(1 for line in f if line.strip())
+                    self._cached_dlq_count = dlq_count
+                    self._last_dlq_mtime = curr_mtime
+            except Exception:
+                pass
 
         import re
         clean_events = [re.sub(r"\[.*?\]", "", e) for e in self.state.recent_events]

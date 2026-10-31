@@ -24,6 +24,7 @@ from tests.test_multi_login import run_multi_login_suite
 from tests.test_pause_resume_watermark_hashtags import main as run_pause_resume_suite
 from tests.test_unified_strip_and_isolation import run_suite as run_strip_and_isolation_suite
 from tests.test_media_downloader import run_media_downloader_suite
+from tests.test_master_vrob_and_cdss import main as run_vrob_and_cdss_suite
 from tests.test_kind_doctor_upgrades import (
     test_telegram_bot_name_sync,
     test_unified_branding_toggle_logic,
@@ -56,6 +57,7 @@ async def run_all():
         ("Pause/Resume, Watermark Persistence & Hashtag Stripping", run_pause_resume_suite),
         ("Unified Strip Rules, Session Isolation & Dual Radar", run_strip_and_isolation_suite),
         ("Universal In-Topic Media Downloader Engine", run_media_downloader_suite),
+        ("Virtual Reorder Buffer (VROB), Biometric Vault & CDSS", run_vrob_and_cdss_suite),
     ]
 
     passed = 0

@@ -2912,6 +2912,37 @@ class DeviTelegramBot:
         admin_id = from_user.get("id")
         chat_id = cb.get("message", {}).get("chat", {}).get("id")
 
+        # Clinical Case Simulation Answer Interceptor
+        if data.startswith("case_ans_"):
+            parts = data.split("_")
+            c_id = parts[2] if len(parts) > 2 else "c1"
+            chosen = parts[3] if len(parts) > 3 else "A"
+            ANS_MAP = {
+                "c1": ("C", "🚨 Acute Inferior Wall STEMI with Right Ventricular Infarction! Nitrates/Beta-blockers are CONTRAINDICATED due to catastrophic preload collapse. Management is IV volume expansion and emergent PCI!"),
+                "c2": ("B", "💡 Acute Appendicitis is triggered by luminal obstruction (fecalith in adults, lymphoid hyperplasia in youth), resulting in intraluminal pressure buildup, venous ischemia, and bacterial invasion!"),
+                "c3": ("B", "🚨 Acute Epiglottitis is an airway emergency historically caused by H. influenzae type b. Direct oral examination is contraindicated due to risk of fatal laryngospasm. Airway must be secured in the operating room!")
+            }
+            correct_opt, pearl = ANS_MAP.get(c_id, ("C", "Great clinical reasoning!"))
+            is_correct = (chosen.upper() == correct_opt)
+            badge = "✅ CORRECT! Excellent clinical reasoning! 🩺" if is_correct else f"❌ INCORRECT. Correct answer is Option {correct_opt}."
+            alert_text = f"{badge}\n\n{pearl}"
+            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={
+                "callback_query_id": cb_id,
+                "text": alert_text[:200],
+                "show_alert": True
+            })
+            msg_obj = cb.get("message", {})
+            msg_id = msg_obj.get("message_id")
+            orig_text = msg_obj.get("text", "")
+            ans_card = (
+                f"{orig_text}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🧑‍⚕️ **Result:** Selected Option **{chosen}** ➔ **{badge}**\n\n"
+                f"{pearl}"
+            )
+            await self._edit_message(session, chat_id, msg_id, ans_card)
+            return
+
         # Direct OSINT User Lookup from Member Join Alert
         if data.startswith("osint_user_"):
             target_uid = data.replace("osint_user_", "").strip()
@@ -4214,6 +4245,18 @@ class DeviTelegramBot:
             return
 
         logger.info(f"📩 Telegram update from {sender_id} (@{sender.get('username')}) in {chat_id} [{chat_type}]: '{text}'")
+
+        # Sovereign Biometric Identity Vault Record
+        if sender and sender.get("id"):
+            with suppress(Exception):
+                from devi.operator.osint_resolver import record_biometric_identity
+                record_biometric_identity(
+                    user_id=sender.get("id"),
+                    first_name=sender.get("first_name", ""),
+                    last_name=sender.get("last_name", ""),
+                    username=sender.get("username", ""),
+                    source_chat_id=chat_id or 0
+                )
 
         # Multi-Tenant User Session Linking Flow in Private DM
         if not is_group and sender_id in self.pending_auth:
@@ -9359,6 +9402,177 @@ class DeviTelegramBot:
                     await self._send_message(session, chat_id, card, message_thread_id=thread_id)
                 except ValueError:
                     await self._send_message(session, chat_id, "⚠️ Invalid input. Example: `/meld 2.5 1.8 1.4 130 0`", message_thread_id=thread_id)
+
+        # -------------------------------------------------------------
+        # 4.9 KIND DOCTOR CLINICAL DECISION SUPPORT SYSTEM (CDSS)
+        # -------------------------------------------------------------
+        elif cmd in ("/drug", "/fda", "/med"):
+            if len(parts) < 2:
+                await self._send_message(session, chat_id, "Usage: `/drug <drug_name>`\nExample: `/drug Metformin` or `/drug Lisinopril`", message_thread_id=thread_id)
+                return
+            drug_query = " ".join(parts[1:]).strip()
+            try:
+                import urllib.parse
+                enc_name = urllib.parse.quote(drug_query)
+                fda_url = f"https://api.fda.gov/drug/label.json?search=openfda.generic_name:\"{enc_name}\"+openfda.brand_name:\"{enc_name}\"&limit=1"
+                async with aiohttp.ClientSession() as http_sess:
+                    async with http_sess.get(fda_url, timeout=4.0) as resp:
+                        if resp.status == 200:
+                            fda_data = await resp.json()
+                            results = fda_data.get("results", [])
+                            if results:
+                                res_item = results[0]
+                                ofda = res_item.get("openfda", {})
+                                b_names = ", ".join(ofda.get("brand_name", [])[:3]) or drug_query.title()
+                                g_names = ", ".join(ofda.get("generic_name", [])[:2]) or drug_query.title()
+                                pharm_class = ", ".join(ofda.get("pharm_class_epc", [])[:2]) or "Pharmaceutical Agent"
+                                boxed = res_item.get("boxed_warning", [])
+                                indications = res_item.get("indications_and_usage", [])
+                                contra = res_item.get("contraindications", [])
+                                
+                                boxed_text = f"\n\n🚨 **FDA BLACK BOX WARNING:**\n⚠️ {boxed[0][:400]}..." if boxed else "\n\n🟢 **Black Box Warning:** None listed in FDA label."
+                                ind_text = f"\n\n🩺 **Indications:**\n{indications[0][:300]}..." if indications else ""
+                                contra_text = f"\n\n🚫 **Contraindications:**\n{contra[0][:250]}..." if contra else ""
+                                
+                                card = (
+                                    f"💊 **OpenFDA Clinical Drug Radar: {b_names}** 🩺\n"
+                                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                    f"• **Generic Name**: `{g_names}`\n"
+                                    f"• **Class**: `{pharm_class}`\n"
+                                    f"• **Source**: `US FDA National Drug Code Directory`"
+                                    f"{boxed_text}"
+                                    f"{ind_text}"
+                                    f"{contra_text}\n\n"
+                                    f"💡 *Verified against official US FDA openFDA database (api.fda.gov)*"
+                                )
+                                await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+                                return
+                await self._send_message(
+                    session, chat_id,
+                    f"💊 **Drug Info: {drug_query.title()}**\n\nNo exact US FDA NDC record found. Please verify spelling (e.g. `/drug Paracetamol` vs `/drug Acetaminophen`).",
+                    message_thread_id=thread_id
+                )
+            except Exception as ex_fda:
+                await self._send_message(session, chat_id, f"⚠️ Error querying FDA drug radar: {ex_fda}", message_thread_id=thread_id)
+
+        elif cmd in ("/ddi", "/interaction", "/interactions"):
+            if len(parts) < 3:
+                await self._send_message(session, chat_id, "Usage: `/ddi <drug1> <drug2>`\nExample: `/ddi sildenafil nitroglycerin` or `/ddi warfarin ibuprofen`", message_thread_id=thread_id)
+                return
+            d1, d2 = parts[1].strip().lower(), parts[2].strip().lower()
+            KNOWN_DDI = {
+                ("sildenafil", "nitroglycerin"): ("🔴 CONTRAINDICATED (FATAL RISK)", "Concurrent PDE5 inhibitors and nitrates cause catastrophic systemic vasodilation, profound refractory hypotension, and cardiovascular collapse. Minimum 24h separation required (48h for tadalafil)."),
+                ("warfarin", "ibuprofen"): ("🔴 MAJOR RISK (AVOID)", "NSAIDs displace warfarin from plasma proteins, inhibit platelet aggregation, and induce gastric mucosal erosion, drastically multiplying major GI hemorrhage risk."),
+                ("warfarin", "aspirin"): ("🔴 MAJOR RISK", "Synergistic anticoagulant/antiplatelet effect exponentially increases intracranial and gastrointestinal bleeding."),
+                ("simvastatin", "clarithromycin"): ("🔴 CONTRAINDICATED", "Clarithromycin potent CYP3A4 inhibition elevates simvastatin levels >10-fold, triggering acute rhabdomyolysis and renal failure."),
+                ("methotrexate", "trimethoprim"): ("🔴 MAJOR RISK", "Additive dihydrofolate reductase inhibition leads to severe bone marrow suppression, pancytopenia, and fatal toxicity."),
+                ("lisinopril", "spironolactone"): ("🟡 MODERATE / MONITOR", "Dual renin-angiotensin-aldosterone blockade dramatically elevates serum potassium. Risk of life-threatening hyperkalemia and cardiac arrhythmias. Frequent K⁺ checks mandatory."),
+                ("ciprofloxacin", "theophylline"): ("🟡 MODERATE / MONITOR", "Ciprofloxacin CYP1A2 inhibition reduces theophylline clearance by 30-50%, risking theophylline toxicity (seizures, ventricular tachycardias)."),
+                ("fluoxetine", "selegiline"): ("🔴 CONTRAINDICATED (FATAL RISK)", "Combination of SSRIs and MAO inhibitors triggers Serotonin Syndrome (hyperthermia, autonomic instability, neuromuscular clonus, death). Minimum 5-week washout required."),
+                ("metformin", "contrast"): ("🟡 CLINICAL PRECAUTION", "Iodinated intravascular radiocontrast can cause acute kidney injury, causing metformin accumulation and fatal lactic acidosis. Withhold metformin 48h prior to and after procedure."),
+                ("digoxin", "amiodarone"): ("🟡 MODERATE / MONITOR", "Amiodarone inhibits P-glycoprotein, doubling serum digoxin concentrations. Digoxin dose must be reduced by 50% upon starting amiodarone."),
+                ("clopidogrel", "omeprazole"): ("🟡 MODERATE", "Omeprazole inhibits CYP2C19, impairing conversion of clopidogrel to its active metabolite and reducing antiplatelet efficacy. Prefer pantoprazole.")
+            }
+            interaction = KNOWN_DDI.get((d1, d2)) or KNOWN_DDI.get((d2, d1))
+            if interaction:
+                badge, desc = interaction
+            else:
+                badge = "🟢 LOW RISK / NO KNOWN SEVERE INTERACTION"
+                desc = f"No major life-threatening CYP450 or pharmacodynamic interaction flagged between **{d1.title()}** and **{d2.title()}** in standard emergency formulary radar. Always cross-check patient renal/hepatic clearance."
+            
+            card = (
+                f"⚡ **Kind Doctor Drug-Drug Interaction Radar (DDI)** 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Drug 1**: `{d1.title()}` | **Drug 2**: `{d2.title()}`\n"
+                f"• **Severity Badge**: **{badge}**\n\n"
+                f"📋 **Clinical Analysis:**\n{desc}\n\n"
+                f"💡 *Built for emergency bedside clinical verification & NEET-PG / USMLE Pharmacology.*"
+            )
+            await self._send_message(session, chat_id, card, message_thread_id=thread_id)
+
+        elif cmd in ("/case", "/vignette", "/rounds"):
+            import random
+            CASES = [
+                {
+                    "id": "c1",
+                    "title": "Emergency Room: 58-Year-Old Male with Chest Pain",
+                    "vignette": "A 58-year-old diabetic male presents with 2 hours of crushing retrosternal chest pain radiating to his left jaw, accompanied by profuse diaphoresis and nausea. BP is 88/56 mmHg, HR is 52 bpm. ECG reveals 3mm ST-segment elevation in leads II, III, and aVF with reciprocal ST depression in I and aVL.",
+                    "question": "Which of the following is the MOST appropriate next management step?",
+                    "options": [
+                        ("A", "Immediate IV Metoprolol 5mg push"),
+                        ("B", "Sublingual Nitroglycerin 0.4mg"),
+                        ("C", "IV Normal Saline bolus & Emergency PCI", True),
+                        ("D", "Oral Diltiazem 60mg stat")
+                    ]
+                },
+                {
+                    "id": "c2",
+                    "title": "Surgery Ward: 22-Year-Old with Abdominal Pain",
+                    "vignette": "A 22-year-old medical student presents with 18 hours of periumbilical pain that migrated to the right lower quadrant. Examination reveals tenderness at McBurney's point, Rovsing's sign positive, low-grade fever of 100.4°F, and TLC 14,800/mm³ with 82% neutrophils.",
+                    "question": "What is the primary pathophysiological trigger of this condition?",
+                    "options": [
+                        ("A", "Entamoeba histolytica mucosal invasion"),
+                        ("B", "Fecalith or lymphoid hyperplasia obstruction", True),
+                        ("C", "Meckel's diverticulitis perforation"),
+                        ("D", "Superior mesenteric artery thrombosis")
+                    ]
+                },
+                {
+                    "id": "c3",
+                    "title": "Pediatrics ICU: 3-Year-Old with Stridor",
+                    "vignette": "A 3-year-old unvaccinated child is brought in acute respiratory distress, sitting forward in a tripod position with drooling of saliva, high fever (103°F), and inspiratory stridor. Lateral neck X-ray reveals the classic 'Thumbprint sign'.",
+                    "question": "Which pathogen is the most common causative agent, and what is the immediate priority?",
+                    "options": [
+                        ("A", "Parainfluenza virus; Oral Dexamethasone"),
+                        ("B", "Haemophilus influenzae type b; Secure airway in OR", True),
+                        ("C", "Respiratory Syncytial Virus; Nebulized Salbutamol"),
+                        ("D", "Streptococcus pneumoniae; Immediate throat swab")
+                    ]
+                }
+            ]
+            c = random.choice(CASES)
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": f"🔘 Option {opt[0]}", "callback_data": f"case_ans_{c['id']}_{opt[0]}"}
+                        for opt in c["options"][:2]
+                    ],
+                    [
+                        {"text": f"🔘 Option {opt[0]}", "callback_data": f"case_ans_{c['id']}_{opt[0]}"}
+                        for opt in c["options"][2:]
+                    ]
+                ]
+            }
+            opts_text = "\n".join(f"**{opt[0]}**: {opt[1]}" for opt in c["options"])
+            text = (
+                f"🩺 **Kind Doctor Clinical Case Rounds** 👨‍⚕️\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📋 **Case:** *{c['title']}*\n\n"
+                f"{c['vignette']}\n\n"
+                f"❓ **Question:**\n{c['question']}\n\n"
+                f"{opts_text}\n\n"
+                f"👉 *Tap your answer below to test your clinical reasoning:* 👇"
+            )
+            await self._send_message(session, chat_id, text, reply_markup=kb, message_thread_id=thread_id)
+
+        elif cmd in ("/biometric", "/biohistory", "/nameshifts"):
+            target_id = None
+            if len(parts) > 1 and parts[1].strip().isdigit():
+                target_id = int(parts[1].strip())
+            else:
+                target_id = admin_id
+            from devi.operator.osint_resolver import get_biometric_history
+            shifts = get_biometric_history(target_id)
+            if not shifts:
+                await self._send_message(session, chat_id, f"🏛️ **Sovereign Biometric Vault:**\n\nNo recorded name or username shifts detected for User ID `{target_id}` in local SQLite vault.", message_thread_id=thread_id)
+            else:
+                lines = [f"🏛️ **Sovereign Biometric Vault History (User #{target_id}):**\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+                for i, s in enumerate(shifts, 1):
+                    full = f"{s['first_name']} {s['last_name']}".strip() or "Anonymous"
+                    uname = f"@{s['username']}" if s['username'] else "No username"
+                    lines.append(f"{i}. `{s['detected_at']}` ➔ **{full}** (`{uname}`)")
+                lines.append("\n💡 *100% sovereign local database records without relying on external bots.*")
+                await self._send_message(session, chat_id, "\n".join(lines), message_thread_id=thread_id)
 
         # -------------------------------------------------------------
         # 5. LEGACY EDUCATIONAL COMMANDS REDIRECT

@@ -150,6 +150,63 @@
             showToast(soundEnabled ? "Audio Synthesizer: ON" : "Audio Synthesizer: MUTED");
         }
 
+        // --- DOCUMENT PICTURE-IN-PICTURE (PiP) FLOATING TELEMETRY MINI-HUD ---
+        window.pipWindow = null;
+        async function toggleFloatingMiniHUD() {
+            playAudioFeedback('tab');
+            if ('documentPictureInPicture' in window) {
+                try {
+                    if (window.pipWindow) {
+                        window.pipWindow.close();
+                        window.pipWindow = null;
+                        showToast("Mini-HUD Closed");
+                        return;
+                    }
+                    const pipWin = await window.documentPictureInPicture.requestWindow({
+                        width: 350,
+                        height: 200,
+                    });
+                    window.pipWindow = pipWin;
+                    pipWin.document.body.innerHTML = `
+                        <style>
+                            body { margin: 0; background: #0B0D13; color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 14px; box-sizing: border-box; text-align: center; }
+                            .pip-badge { font-size: 10px; font-weight: 800; color: #38BDF8; letter-spacing: 0.5px; text-transform: uppercase; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 4px; margin-bottom: 6px; }
+                            .pip-speed { font-size: 26px; font-weight: 800; font-family: monospace; color: #10B981; margin-bottom: 2px; }
+                            .pip-file { font-size: 11px; color: #94A3B8; max-width: 310px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 8px; }
+                            .pip-track { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+                            .pip-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #38BDF8, #6366F1); transition: width 0.3s; }
+                            .pip-btn { font-size: 11px; padding: 4px 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 4px; cursor: pointer; font-weight: 700; }
+                            .pip-btn:hover { background: rgba(255,255,255,0.15); }
+                        </style>
+                        <div class="pip-badge">⚡ KindSync Turbo Mini-HUD</div>
+                        <div class="pip-speed" id="pip-speed-val">0.0 MB/s</div>
+                        <div class="pip-file" id="pip-file-name">Monitoring Telegram Stream...</div>
+                        <div class="pip-track"><div class="pip-fill" id="pip-progress-fill"></div></div>
+                        <button class="pip-btn" onclick="window.opener && window.opener.togglePauseEngine && window.opener.togglePauseEngine()">⏯️ Pause / Resume</button>
+                    `;
+                    pipWin.addEventListener('pagehide', () => { window.pipWindow = null; });
+                    showToast("Always-on-Top Mini-HUD Activated", "success");
+                } catch (e) {
+                    console.warn("Document PiP failed, opening popup:", e);
+                    window.open('/static/manifest.json', 'KindSyncMiniHUD', 'width=350,height=200');
+                }
+            } else {
+                showToast("Document Picture-in-Picture not supported in this browser (Use Chrome/Edge 116+)", "warning");
+            }
+        }
+
+        function updateMiniHUDTelemetry(speedText, fileName, percent) {
+            if (!window.pipWindow) return;
+            try {
+                const sEl = window.pipWindow.document.getElementById('pip-speed-val');
+                const fEl = window.pipWindow.document.getElementById('pip-file-name');
+                const pEl = window.pipWindow.document.getElementById('pip-progress-fill');
+                if (sEl && speedText) sEl.textContent = speedText;
+                if (fEl && fileName) fEl.textContent = fileName;
+                if (pEl && percent !== undefined) pEl.style.width = Math.min(100, Math.max(0, percent)) + '%';
+            } catch(e) {}
+        }
+
         // Web Speech API Voice Briefing
         function speakDeviStatus() {
             if (!('speechSynthesis' in window)) {
@@ -3288,6 +3345,7 @@
 
             const echSpeedBadge = document.getElementById('echart-speed-badge');
             if (echSpeedBadge) echSpeedBadge.textContent = curSpeedObj.combined;
+            updateMiniHUDTelemetry(curSpeedObj.combined, d.active_file || d.current_file || "Monitoring Telegram Stream...", d.progress_pct || 0);
             const echPeakBadge = document.getElementById('echart-peak-badge');
             if (echPeakBadge) echPeakBadge.textContent = `Peak: ${peakSpeedObj.formatted}`;
 

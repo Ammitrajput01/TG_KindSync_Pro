@@ -47,8 +47,118 @@ def get_db_conn() -> sqlite3.Connection:
         );
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sangmata_uname ON sangmata_osint_cache(username);")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS biometric_name_vault (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            first_name TEXT,
+            last_name TEXT,
+            username TEXT,
+            detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            source_chat_id INTEGER,
+            change_type TEXT DEFAULT 'shift'
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_bnv_user_id ON biometric_name_vault(user_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_bnv_username ON biometric_name_vault(username);")
     conn.commit()
     return conn
+
+
+
+
+def record_biometric_identity(user_id: int, first_name: str, last_name: str, username: str, source_chat_id: int = 0) -> bool:
+    """
+    Sovereign Biometric Identity Vault:
+    Records changes in display name or username locally with zero third-party dependencies.
+    Returns True if a name/username shift was detected and recorded.
+    """
+    if not user_id or user_id <= 0:
+        return False
+    try:
+        with get_db_conn() as conn:
+            row = conn.execute("""
+                SELECT first_name, last_name, username FROM biometric_name_vault
+                WHERE user_id = ? ORDER BY id DESC LIMIT 1
+            """, (user_id,)).fetchone()
+            f_name = (first_name or "").strip()
+            l_name = (last_name or "").strip()
+            u_name = (username or "").strip().lstrip("@")
+            if row:
+                old_f, old_l, old_u = row[0] or "", row[1] or "", row[2] or ""
+                if old_f == f_name and old_l == l_name and old_u == u_name:
+                    return False
+            conn.execute("""
+                INSERT INTO biometric_name_vault (user_id, first_name, last_name, username, source_chat_id)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, f_name, l_name, u_name, source_chat_id))
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.warning(f"Failed recording biometric identity for #{user_id}: {e}")
+        return False
+
+
+def get_biometric_history(user_id: int) -> List[Dict[str, Any]]:
+    """Retrieves all tracked name/username shifts for a user from the local vault."""
+    try:
+        with get_db_conn() as conn:
+            rows = conn.execute("""
+                SELECT first_name, last_name, username, detected_at, source_chat_id
+                FROM biometric_name_vault
+                WHERE user_id = ? ORDER BY id DESC LIMIT 25
+            """, (user_id,)).fetchall()
+            return [
+                {
+                    "first_name": r[0] or "",
+                    "last_name": r[1] or "",
+                    "username": r[2] or "",
+                    "detected_at": str(r[3])[:19],
+                    "chat_id": r[4] or 0
+                }
+                for r in rows
+            ]
+    except Exception as e:
+        logger.warning(f"Failed retrieving biometric history for #{user_id}: {e}")
+        return []
+
+
+def compute_image_dhash(image_bytes_or_path, hash_size: int = 8) -> Optional[str]:
+    """Computes difference perceptual hash (dHash) for avatar impersonator detection."""
+    try:
+        from PIL import Image
+        import io
+        if isinstance(image_bytes_or_path, (bytes, bytearray)):
+            img = Image.open(io.BytesIO(image_bytes_or_path))
+        else:
+            img = Image.open(image_bytes_or_path)
+        img = img.convert('L').resize((hash_size + 1, hash_size), Image.Resampling.LANCZOS)
+        pixels = list(img.getdata())
+        diff = []
+        for row in range(hash_size):
+            for col in range(hash_size):
+                p_left = pixels[row * (hash_size + 1) + col]
+                p_right = pixels[row * (hash_size + 1) + col + 1]
+                diff.append(p_left > p_right)
+        decimal_val = 0
+        hex_str = []
+        for index, val in enumerate(diff):
+            if val:
+                decimal_val += 2 ** (index % 4)
+            if index % 4 == 3:
+                hex_str.append(hex(decimal_val)[2:])
+                decimal_val = 0
+        return "".join(hex_str)
+    except Exception:
+        return None
+
+
+def compare_dhash(hash1: str, hash2: str) -> int:
+    """Computes Hamming distance between two hex hashes (0-5 indicates identical/impersonator image)."""
+    try:
+        return bin(int(hash1, 16) ^ int(hash2, 16)).count("1")
+    except Exception:
+        return 999
 
 
 class GlobalOSINTResolver:
@@ -639,6 +749,82 @@ class GlobalOSINTResolver:
                 except Exception:
                     pass
 
+            async def check_reddit():
+                try:
+                    url = f"https://www.reddit.com/user/{clean_u}/about.json"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            if data.get("data", {}).get("name"):
+                                karma = data["data"].get("total_karma", 0)
+                                findings.append({
+                                    "platform": "Reddit",
+                                    "icon": "🤖",
+                                    "url": f"https://www.reddit.com/user/{clean_u}",
+                                    "detail": f"{karma} Total Karma"
+                                })
+                except Exception:
+                    pass
+
+            async def check_chess():
+                try:
+                    url = f"https://api.chess.com/pub/player/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            if data.get("username"):
+                                title = data.get("title") or "Player"
+                                findings.append({
+                                    "platform": "Chess.com",
+                                    "icon": "♟️",
+                                    "url": f"https://www.chess.com/member/{clean_u}",
+                                    "detail": f"Active {title}"
+                                })
+                except Exception:
+                    pass
+
+            async def check_pypi():
+                try:
+                    url = f"https://pypi.org/user/{clean_u}/"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "PyPI",
+                                "icon": "🐍",
+                                "url": f"https://pypi.org/user/{clean_u}/",
+                                "detail": "Python Package Author"
+                            })
+                except Exception:
+                    pass
+
+            async def check_npm():
+                try:
+                    url = f"https://www.npmjs.com/~{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "npm",
+                                "icon": "📦",
+                                "url": f"https://www.npmjs.com/~{clean_u}",
+                                "detail": "JavaScript Package Developer"
+                            })
+                except Exception:
+                    pass
+
+            async def check_medium():
+                try:
+                    url = f"https://medium.com/@{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Medium",
+                                "icon": "📝",
+                                "url": f"https://medium.com/@{clean_u}",
+                                "detail": "Verified Article Creator"
+                            })
+                except Exception:
+                    pass
+
             await asyncio.gather(
                 check_github(),
                 check_gitlab(),
@@ -647,6 +833,11 @@ class GlobalOSINTResolver:
                 check_hackernews(),
                 check_telegram_web(),
                 check_codeforces(),
+                check_reddit(),
+                check_chess(),
+                check_pypi(),
+                check_npm(),
+                check_medium(),
                 return_exceptions=True
             )
 
@@ -654,7 +845,7 @@ class GlobalOSINTResolver:
             "username": clean_u,
             "found_count": len(findings),
             "findings": findings,
-            "scanned_count": 7,
+            "scanned_count": 12,
             "search_links": self.get_osint_search_links(clean_u)
         }
 

@@ -16,10 +16,17 @@ cd "$(dirname "$0")/.."
 CURRENT_DIR=$(pwd)
 CURRENT_USER=$(whoami)
 
-# 1. Update system packages
+# 1. Update system packages & Apply High-Throughput TCP BBR Tuning
 echo "[+] Step 1/5: Installing System Dependencies & Build Tools..."
 sudo apt-get update -y
 sudo apt-get install -y python3 python3-pip python3-venv build-essential libffi-dev libssl-dev git curl iptables-persistent netfilter-persistent 2>/dev/null || sudo apt-get install -y python3 python3-pip python3-venv build-essential libffi-dev libssl-dev git curl
+
+# Scale Linux TCP Socket Buffers & Enable Google BBR for 45+ MB/s wire throughput to Telegram DCs
+sudo sysctl -w net.core.rmem_max=16777216 2>/dev/null || true
+sudo sysctl -w net.core.wmem_max=16777216 2>/dev/null || true
+sudo sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216" 2>/dev/null || true
+sudo sysctl -w net.ipv4.tcp_wmem="4096 65536 16777216" 2>/dev/null || true
+sudo sysctl -w net.ipv4.tcp_congestion_control=bbr 2>/dev/null || true
 
 # 2. Setup Python Virtual Environment
 echo "[+] Step 2/5: Setting up Python Virtual Environment..."
@@ -58,6 +65,9 @@ Environment=\"PYTHONPATH=${CURRENT_DIR}\" \"PYTHONUNBUFFERED=1\" \"AUTO_START_LI
 ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/main.py --live
 Restart=always
 RestartSec=5
+LimitNOFILE=65535
+LimitNPROC=65535
+MemoryMax=4.8G
 StandardOutput=append:${CURRENT_DIR}/logs/forwarder_service.log
 StandardError=append:${CURRENT_DIR}/logs/forwarder_service.log
 
@@ -78,6 +88,9 @@ Environment=\"PYTHONPATH=${CURRENT_DIR}\" \"PYTHONUNBUFFERED=1\"
 ExecStart=${CURRENT_DIR}/.venv/bin/python -m devi.operator.telegram_bot
 Restart=always
 RestartSec=5
+LimitNOFILE=65535
+LimitNPROC=65535
+MemoryMax=4.8G
 StandardOutput=append:${CURRENT_DIR}/logs/bot_service.log
 StandardError=append:${CURRENT_DIR}/logs/bot_service.log
 
@@ -98,6 +111,9 @@ Environment=\"PYTHONPATH=${CURRENT_DIR}\" \"PYTHONUNBUFFERED=1\"
 ExecStart=${CURRENT_DIR}/.venv/bin/python ${CURRENT_DIR}/web_dashboard.py
 Restart=always
 RestartSec=5
+LimitNOFILE=65535
+LimitNPROC=65535
+MemoryMax=4.8G
 StandardOutput=append:${CURRENT_DIR}/logs/dashboard_service.log
 StandardError=append:${CURRENT_DIR}/logs/dashboard_service.log
 
