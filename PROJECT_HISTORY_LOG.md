@@ -2192,3 +2192,47 @@ This log permanently documents root causes, architectural patterns, historical b
   - `python -m py_compile devi/operator/telegram_bot.py web_dashboard.py` (Exit code 0).
   - Live VPS test confirmed `uvloop` (0.23.0) active on Oracle Cloud VPS.
 
+---
+
+### 45. Responsive Auto-Adjustable Layout, Collapsible Card Chevrons, Professional SVG Icons & Deep System Telemetry Cockpit
+* **User Directive & Feedback**:
+  - Voice Note Feedback (Dr. Amit):
+    - *"Bhai jo humne dashboard banaya hai na, wo screen ke bahar jaa raha hai, screen ke andar poora nahi aa raha hai, thoda bada hai screen se. Toh usko auto adjustable banao, saara ka saara screen ke andar aaye."*
+    - *"Usme feature add karo, thoda transitions add karo, thode buttons add karo, thode toggles add karo, minimize maximize features ko thoda andar bahar karo..."*
+    - *"Icons add karo, icons toh usme bilkul bhi nahi hain. Professional icons add karo, professionally color karo."*
+    - *"Usme ek aur feature add kar do ki jo system pe program run ho raha ho, program system ke baare me poori information de."*
+* **Root Cause Analysis**:
+  1. **Screen Overflow & Rigid Viewport Layout**:
+     - `.app-shell` had hardcoded `width: 100vw;`, which in Windows browsers includes the vertical scrollbar width (17px), pushing content beyond the viewport edge and causing horizontal scrollbars.
+     - `.main-viewport` and `.view-content-area` lacked `min-width: 0;`, preventing nested flexbox children from shrinking when wide tables or fixed grids were present.
+     - Rigid grid column definitions (`repeat(5, 1fr)`, `repeat(3, 1fr)`) blew out on screens smaller than 1400px.
+  2. **Static Non-Collapsible Cards**:
+     - Dense informational cards (Batch Ledger, Topic Radar, Speedometer, Media Breakdown) took up extensive vertical space without minimize or collapse capabilities.
+  3. **Lack of Professional Vector Icons**:
+     - Legacy interface relied on unicode emojis (`📦`, `⚡`, `🎬`, etc.) which rendered inconsistently across mobile, desktop, and TMA webviews without visual accents.
+  4. **Missing System & Running Program Visibility**:
+     - The dashboard lacked host-level and process-level telemetry to report machine health (OS, CPU, RAM, disk, active sockets) and whether mission-critical background daemons were running or stalled.
+* **Permanent Implementation**:
+  1. **Fluid Auto-Adjustable Responsive CSS Engine**:
+     - Enforced `html, body { width: 100%; max-width: 100vw; overflow-x: hidden; }` and `.app-shell { width: 100%; max-width: 100vw; min-width: 0; overflow: hidden; }`.
+     - Added `min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden;` to `.main-viewport` and `.view-content-area`.
+     - Refactored rigid grids to fluid auto-fit grids (`repeat(auto-fit, minmax(min(100%, 180px), 1fr))`).
+     - Added `.table-responsive` with `-webkit-overflow-scrolling: touch;`.
+     - Integrated collapsible sidebar (`.sidebar.collapsed`, 68px icon-only) with desktop toggle button, mobile drawer overlay backdrop (`.sidebar-backdrop`), and `localStorage` persistence.
+  2. **Card Minimize/Maximize Collapsible Chevrons**:
+     - Added `.card-collapsible`, `.card-head-controls`, `.card-ctrl-btn`, `.card-collapsed` with smooth 90° rotating chevron animations.
+     - Injected minimize toggles across: Channel Clone Ledger, Speedometer, Media Category Breakdown, In-Flight Active Transfer, Forum Topic Delivery Radar, and Host Hardware panels.
+  3. **Professional Vectorized SVG Icon Set**:
+     - Replaced emojis with crisp Lucide/Feather vector SVG icons with curated ambient neon badges.
+  4. **Deep System & Running Program Telemetry Engine (Tab 9 - `#view-telemetry`)**:
+     - Added backend collector `get_deep_system_telemetry()` in `web_dashboard.py` with 2-second non-blocking cache via `psutil`.
+     - Captures: OS, kernel version, hostname, CPU model/cores/frequencies/load, RAM total/used/free/cached, root disk mount capacity, network I/O MB in/out, and active TCP sockets.
+     - Dynamically inspects 4 core daemons via `psutil.process_iter`: `tg_kindsync_pro.py`, `devi.operator.telegram_bot`, `web_dashboard.py`, and `sentinel_observer.py`, reporting status (`ONLINE 🟢` / `STANDBY 🟡`), PID, RSS memory MB, CPU%, threads, and uptime.
+     - Tracks accelerators: `uvloop`, `cryptg`, `sqlite_wal`, `psutil`.
+     - Registered REST endpoint `GET /api/system/telemetry` and raw socket dispatcher.
+     - Added Tab 9 ("Host & Telemetry") with 4 macro hardware cards, daemon inspector table, network I/O radar, and live refresh controls.
+* **Verification & Results**:
+  - Python compile check: `python -m py_compile web_dashboard.py` (Exit code 0).
+  - Master test suite: `python tests/run_all_tests.py` -> 13 PASSED | 0 FAILED (100% HEALTHY).
+
+

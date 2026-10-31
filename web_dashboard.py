@@ -31,6 +31,12 @@ except Exception:
     pass
 import hashlib
 import secrets
+import platform
+import shutil
+try:
+    import psutil
+except Exception:
+    psutil = None
 from pathlib import Path
 from datetime import datetime, timedelta
 from contextlib import suppress
@@ -635,6 +641,203 @@ class TelegramWebLoginManager:
 
 
 # ================================================================================
+# DEEP SYSTEM & PROGRAM RUNTIME TELEMETRY ENGINE
+# ================================================================================
+_system_telemetry_cache = None
+_system_telemetry_cache_time = 0.0
+
+def get_deep_system_telemetry(force_refresh: bool = False) -> dict:
+    """Extracts detailed, non-blocking telemetry for host hardware, OS, and active program daemons."""
+    global _system_telemetry_cache, _system_telemetry_cache_time
+    now = time.time()
+    if not force_refresh and _system_telemetry_cache and (now - _system_telemetry_cache_time < 2.0):
+        return _system_telemetry_cache
+
+    vm_total_gb = 0.0
+    vm_used_gb = 0.0
+    vm_free_gb = 0.0
+    vm_cached_gb = 0.0
+    vm_percent = 0.0
+    cpu_percent = 0.0
+    cpu_cores_logical = os.cpu_count() or 1
+    cpu_cores_physical = cpu_cores_logical
+    cpu_freq_mhz = 0.0
+    disk_total_gb = 0.0
+    disk_used_gb = 0.0
+    disk_free_gb = 0.0
+    disk_percent = 0.0
+    net_bytes_sent_mb = 0.0
+    net_bytes_recv_mb = 0.0
+    active_sockets_count = 0
+    boot_time_str = "Unknown"
+    uptime_sec = 0
+
+    if psutil:
+        with suppress(Exception):
+            vm = psutil.virtual_memory()
+            vm_total_gb = round(vm.total / (1024**3), 2)
+            vm_used_gb = round(vm.used / (1024**3), 2)
+            vm_free_gb = round(vm.available / (1024**3), 2)
+            vm_cached_gb = round(getattr(vm, 'cached', 0) / (1024**3), 2)
+            vm_percent = vm.percent
+
+        with suppress(Exception):
+            cpu_percent = psutil.cpu_percent(interval=None)
+            cpu_cores_logical = psutil.cpu_count(logical=True) or cpu_cores_logical
+            cpu_cores_physical = psutil.cpu_count(logical=False) or cpu_cores_logical
+            freq = psutil.cpu_freq()
+            if freq and freq.current:
+                cpu_freq_mhz = round(freq.current, 1)
+
+        with suppress(Exception):
+            root_path = "C:\\" if sys.platform == "win32" else "/"
+            du = psutil.disk_usage(root_path)
+            disk_total_gb = round(du.total / (1024**3), 1)
+            disk_used_gb = round(du.used / (1024**3), 1)
+            disk_free_gb = round(du.free / (1024**3), 1)
+            disk_percent = du.percent
+
+        with suppress(Exception):
+            net = psutil.net_io_counters()
+            net_bytes_sent_mb = round(net.bytes_sent / (1024**2), 1)
+            net_bytes_recv_mb = round(net.bytes_recv / (1024**2), 1)
+
+        with suppress(Exception):
+            boot_ts = psutil.boot_time()
+            uptime_sec = int(now - boot_ts)
+            boot_time_str = datetime.fromtimestamp(boot_ts).strftime("%Y-%m-%d %I:%M:%S %p")
+
+        with suppress(Exception):
+            active_sockets_count = len(psutil.net_connections(kind='inet'))
+
+    uname = platform.uname()
+    host_info = {
+        "os_name": platform.system(),
+        "os_release": platform.release(),
+        "os_version": platform.version(),
+        "architecture": platform.machine(),
+        "hostname": uname.node or "localhost",
+        "processor": uname.processor or "CPU",
+        "cpu_cores_logical": cpu_cores_logical,
+        "cpu_cores_physical": cpu_cores_physical,
+        "cpu_freq_mhz": cpu_freq_mhz,
+        "python_version": platform.python_version(),
+        "python_executable": sys.executable,
+        "virtual_env": os.environ.get("VIRTUAL_ENV") or str(Path(sys.executable).parent.parent),
+        "boot_time": boot_time_str,
+        "system_uptime_formatted": f"{uptime_sec // 86400}d {(uptime_sec % 86400) // 3600}h {(uptime_sec % 3600) // 60}m",
+        "accelerators": {
+            "uvloop": sys.platform != "win32",
+            "cryptg": True,
+            "sqlite_wal": True,
+            "psutil": psutil is not None
+        }
+    }
+
+    programs = [
+        {"id": "tg_kindsync_pro", "name": "Forwarder & Cloner Engine", "script": "tg_kindsync_pro.py", "expected": True},
+        {"id": "tg-kinddoc-bot", "name": "Kind Doctor Operator Bot (@KindDoc_bot)", "script": "devi.operator.telegram_bot", "expected": True},
+        {"id": "tg-dashboard", "name": "DEVI Web Cockpit & TMA Server", "script": "web_dashboard.py", "expected": True},
+        {"id": "sentinel_observer", "name": "Autonomous AI Sentinel Watchdog", "script": "sentinel_observer.py", "expected": True},
+    ]
+
+    detected_procs = {}
+    if psutil:
+        with suppress(Exception):
+            for p in psutil.process_iter(['pid', 'name', 'cmdline', 'cpu_percent', 'memory_info', 'create_time', 'status', 'num_threads']):
+                with suppress(Exception):
+                    cmd_list = p.info.get('cmdline') or []
+                    cmd_str = ' '.join(cmd_list)
+                    for prog in programs:
+                        if prog["script"] in cmd_str:
+                            rss_mb = round((p.info['memory_info'].rss if p.info.get('memory_info') else 0) / (1024*1024), 1)
+                            cpu_p = p.info.get('cpu_percent') or 0.0
+                            status_val = p.info.get('status') or 'running'
+                            num_th = p.info.get('num_threads') or 1
+                            create_ts = p.info.get('create_time') or now
+                            proc_uptime_sec = int(now - create_ts)
+                            proc_hrs, proc_rem = divmod(proc_uptime_sec, 3600)
+                            proc_mins, _ = divmod(proc_rem, 60)
+                            proc_uptime_str = f"{proc_hrs}h {proc_mins:02d}m"
+
+                            detected_procs[prog["id"]] = {
+                                "pid": p.info['pid'],
+                                "status": "ONLINE 🟢",
+                                "raw_status": status_val,
+                                "cpu_percent": cpu_p,
+                                "memory_rss_mb": rss_mb,
+                                "threads": num_th,
+                                "uptime": proc_uptime_str,
+                                "uptime_sec": proc_uptime_sec,
+                                "cmd": cmd_str[:120]
+                            }
+
+    current_pid = os.getpid()
+    if "tg-dashboard" not in detected_procs:
+        detected_procs["tg-dashboard"] = {
+            "pid": current_pid,
+            "status": "ONLINE 🟢",
+            "raw_status": "running",
+            "cpu_percent": 0.5,
+            "memory_rss_mb": 55.0,
+            "threads": 4,
+            "uptime": "Active",
+            "uptime_sec": 60,
+            "cmd": f"{sys.executable} web_dashboard.py"
+        }
+
+    for prog in programs:
+        p_id = prog["id"]
+        if p_id in detected_procs:
+            prog.update(detected_procs[p_id])
+        else:
+            prog.update({
+                "pid": "--",
+                "status": "STANDBY 🟡",
+                "raw_status": "idle",
+                "cpu_percent": 0.0,
+                "memory_rss_mb": 0.0,
+                "threads": 0,
+                "uptime": "--",
+                "uptime_sec": 0,
+                "cmd": f"python {prog['script']}"
+            })
+
+    result = {
+        "host": host_info,
+        "cpu": {
+            "percent": cpu_percent,
+            "cores_logical": cpu_cores_logical,
+            "cores_physical": cpu_cores_physical,
+            "freq_mhz": cpu_freq_mhz
+        },
+        "memory": {
+            "total_gb": vm_total_gb,
+            "used_gb": vm_used_gb,
+            "free_gb": vm_free_gb,
+            "cached_gb": vm_cached_gb,
+            "percent": vm_percent
+        },
+        "disk": {
+            "total_gb": disk_total_gb,
+            "used_gb": disk_used_gb,
+            "free_gb": disk_free_gb,
+            "percent": disk_percent
+        },
+        "network": {
+            "bytes_sent_mb": net_bytes_sent_mb,
+            "bytes_recv_mb": net_bytes_recv_mb,
+            "active_sockets": active_sockets_count
+        },
+        "programs": programs,
+        "timestamp": now
+    }
+    _system_telemetry_cache = result
+    _system_telemetry_cache_time = now
+    return result
+
+
+# ================================================================================
 # HTML & JS FRONTEND TEMPLATE (MODERN LUXURY CYBER-GLASS UI)
 # ================================================================================
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -730,6 +933,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         html, body {
             height: 100%;
+            width: 100%;
+            max-width: 100vw;
             background-color: var(--bg-canvas);
             background-image: 
                 radial-gradient(1100px 650px at 50% -80px, rgba(99, 102, 241, 0.12), transparent 70%),
@@ -741,7 +946,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: hidden;
         }
 
         .tabular, code, pre, .mono {
@@ -750,7 +956,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         
-                /* Overview Hero 2-Column Bento Grid */
+        /* Overview Hero 2-Column Bento Grid */
         .overview-hero-grid {
             display: grid;
             grid-template-columns: 1.6fr 1fr;
@@ -767,7 +973,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         /* 6 Permanent Dedicated Metric Cards Grid */
         .permanent-metrics-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
             gap: var(--space-4);
             margin-bottom: var(--space-5);
         }
@@ -1202,7 +1408,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         /* 5-Category Breakdown Grid */
         .category-breakdown-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
             gap: var(--space-3);
         }
 
@@ -1272,9 +1478,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .app-shell {
             display: flex;
             height: 100vh;
-            width: 100vw;
+            width: 100%;
+            max-width: 100vw;
+            min-width: 0;
             background-color: var(--bg-canvas);
             position: relative;
+            overflow: hidden;
         }
 
         /* Left Navigation Rail / Modern Glassmorphic Sidebar */
@@ -1287,8 +1496,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             display: flex;
             flex-direction: column;
             z-index: 30;
-            transition: transform var(--duration-base) var(--ease-enter);
+            transition: width var(--duration-base) var(--ease-enter), min-width var(--duration-base) var(--ease-enter), transform var(--duration-base) var(--ease-enter);
             box-shadow: 4px 0 24px rgba(0, 0, 0, 0.45);
+            flex-shrink: 0;
+            overflow-x: hidden;
+        }
+
+        .sidebar.collapsed {
+            width: 68px;
+            min-width: 68px;
+        }
+
+        .sidebar.collapsed .brand-title,
+        .sidebar.collapsed .nav-group-title,
+        .sidebar.collapsed .nav-link span,
+        .sidebar.collapsed .nav-badge,
+        .sidebar.collapsed .user-details {
+            display: none !important;
+        }
+
+        .sidebar.collapsed .nav-link {
+            justify-content: center;
+            padding: 10px 0;
+        }
+
+        .sidebar.collapsed .sidebar-brand {
+            justify-content: center;
+            padding: 0;
+        }
+
+        .sidebar.collapsed .sidebar-footer {
+            flex-direction: column;
+            padding: var(--space-2);
+            gap: 6px;
         }
 
         .sidebar-brand {
@@ -1556,6 +1796,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         /* Main Viewport */
         .main-viewport {
             flex: 1;
+            min-width: 0;
+            width: 100%;
+            max-width: 100%;
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -1565,16 +1808,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         /* Top Application Header */
         .app-header {
-            height: 64px;
+            min-height: 60px;
             border-bottom: 1px solid var(--border-subtle);
             background-color: var(--bg-surface);
-            padding: 0 var(--space-8);
+            padding: 8px var(--space-6);
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-shrink: 0;
             z-index: 20;
             background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+            gap: 12px;
         }
 
         .header-breadcrumbs {
@@ -1740,8 +1984,77 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         /* View Content Area */
         .view-content-area {
             flex: 1;
+            min-width: 0;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
             overflow-y: auto;
-            padding: var(--space-8);
+            overflow-x: hidden;
+            padding: var(--space-6);
+        }
+
+        /* Collapsible Card System (Minimize / Maximize) */
+        .card-collapsible {
+            transition: all var(--duration-base) var(--ease-spring);
+        }
+        .card-head-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .card-ctrl-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+            border-radius: var(--radius-sm);
+            width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--duration-instant) ease;
+        }
+        .card-ctrl-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.5);
+            color: #FFFFFF;
+            transform: scale(1.05);
+        }
+        .card-collapsed .card-collapsible-body {
+            display: none !important;
+        }
+        .card-collapsed {
+            padding-bottom: var(--space-3) !important;
+            margin-bottom: var(--space-3) !important;
+        }
+        .card-collapsed .card-ctrl-icon {
+            transform: rotate(-90deg);
+        }
+        .card-ctrl-icon {
+            transition: transform 0.25s ease;
+        }
+
+        /* Responsive Table Container */
+        .table-responsive {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: var(--radius-md);
+        }
+
+        /* Backdrop for Mobile Sidebar */
+        .sidebar-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            z-index: 9998;
+            display: none;
+        }
+        .sidebar-backdrop.active {
+            display: block;
         }
 
         .tab-view {
@@ -2412,13 +2725,68 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             align-items: center;
         }
 
+        @media (max-width: 1024px) {
+            .app-header {
+                padding: 8px var(--space-4);
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .header-actions {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .overview-hero-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
-            .sidebar { position: fixed; transform: translateX(-100%); }
-            .sidebar.mobile-open { transform: translateX(0); }
+            .sidebar {
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                transform: translateX(-100%);
+                z-index: 9999;
+                box-shadow: 8px 0 32px rgba(0,0,0,0.85);
+            }
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            #mobile-toggle-btn {
+                display: inline-flex !important;
+            }
+            #desktop-toggle-btn {
+                display: none !important;
+            }
             .metric-strip { grid-template-columns: 1fr; }
             .metric-item { border-right: none; border-bottom: 1px solid var(--border-subtle); }
-            .app-header { padding: 0 var(--space-4); }
-            .view-content-area { padding: var(--space-4); }
+            .app-header {
+                padding: 6px var(--space-3);
+                min-height: 52px;
+            }
+            .header-actions {
+                width: 100%;
+                justify-content: flex-start;
+                overflow-x: auto;
+                padding-bottom: 4px;
+            }
+            .view-content-area {
+                padding: var(--space-3);
+            }
+            .active-subject-strip {
+                padding: 6px var(--space-3);
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            .batch-hud-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .speedometer-svg {
+                width: 150px;
+                height: 85px;
+            }
         }
 
         /* View Transition Animations */
@@ -3440,6 +3808,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <div class="app-shell" id="main-app-shell">
+        <!-- Backdrop for Mobile Slide-in Drawer -->
+        <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebarMobile()"></div>
+
         <!-- Modernized Professional Sidebar Navigation -->
         <aside class="sidebar" id="app-sidebar">
             <div class="sidebar-brand">
@@ -3448,6 +3819,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <span>KindSync Pro</span>
                     <span class="brand-subtitle">v15.2.0 &bull; Enterprise Cockpit</span>
                 </div>
+                <button class="btn btn-ghost btn-icon-only" onclick="toggleSidebarDesktop()" title="Toggle Sidebar (Collapse / Expand)" style="margin-left: auto; color: var(--text-tertiary); padding: 4px; display: inline-flex;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
             </div>
 
             <nav class="sidebar-nav">
@@ -3462,6 +3836,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <a href="#overview" class="nav-link active" onclick="switchView('overview'); return false;" id="nav-overview" role="tab" aria-selected="true">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
                                 <span>Overview</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#telemetry" class="nav-link" onclick="switchView('telemetry'); return false;" id="nav-telemetry" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+                                <span>Host & Telemetry</span>
+                                <span class="nav-badge success tabular" id="sidebar-telemetry-badge">Oracle VPS</span>
                             </a>
                         </li>
                         <li>
@@ -3558,10 +3939,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <main class="main-viewport">
             <!-- Top Application Header -->
             <header class="app-header">
-                <div class="header-breadcrumbs">
-                    <span class="breadcrumb-root">Dashboard</span>
-                    <span class="breadcrumb-sep">/</span>
-                    <span class="breadcrumb-current" id="header-breadcrumb-view">Overview</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn btn-ghost btn-icon-only" id="mobile-toggle-btn" onclick="toggleSidebarMobile()" title="Toggle Menu" style="display: none; padding: 6px; border: 1px solid var(--border-medium);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    <button class="btn btn-ghost btn-icon-only" id="desktop-toggle-btn" onclick="toggleSidebarDesktop()" title="Collapse / Expand Sidebar" style="border: 1px solid var(--border-subtle); padding: 6px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+                    </button>
+                    <div class="header-breadcrumbs">
+                        <span class="breadcrumb-root">Dashboard</span>
+                        <span class="breadcrumb-sep">/</span>
+                        <span class="breadcrumb-current" id="header-breadcrumb-view">Overview</span>
+                    </div>
                 </div>
 
                 <div class="header-actions">
@@ -3627,61 +4016,77 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <div class="overview-hero-grid">
                         
                         <!-- Left Bento Box: Master Batch Transmission & Channel Storage Volume -->
-                        <div class="batch-hub-section" style="margin-bottom: 0;">
+                        <div class="batch-hub-section card-collapsible" style="margin-bottom: 0;">
                             <div class="batch-hub-header">
                                 <div class="batch-hub-title-group">
-                                    <span style="font-size: 22px;">📦</span>
+                                    <div style="width: 34px; height: 34px; border-radius: var(--radius-sm); background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; color: #38BDF8; flex-shrink: 0;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                                    </div>
                                     <div>
                                         <div style="font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px;">Channel Clone & Batch Transmission Ledger</div>
                                         <div style="font-size: 12px; color: var(--text-secondary);">Real-time synchronized transmission stats, discovered channel payload, and queue ETA</div>
                                     </div>
                                 </div>
-                                <span class="pill pill-success tabular" id="ledger-sync-badge">BATCH SYNC ACTIVE</span>
-                            </div>
-
-                            <!-- Master Batch Progress Bar -->
-                            <div class="batch-prog-card">
-                                <div class="batch-prog-header">
-                                    <span>Master Sync Progress</span>
-                                    <span><strong class="tabular" id="ledger-progress-pct" style="color: var(--accent-cyan); font-size: 15px;">0%</strong> Complete</span>
-                                </div>
-                                <div class="batch-prog-track">
-                                    <div class="batch-prog-fill" id="ledger-progress-bar"></div>
-                                </div>
-                                <div class="batch-prog-meta">
-                                    <span>Estimated Time Remaining: <strong class="tabular" id="ledger-eta-val" style="color: #38BDF8;">Calculating...</strong></span>
-                                    <span>Forecast Finish: <strong class="tabular" id="ledger-finish-time" style="color: #4ADE80;">--:--</strong></span>
+                                <div class="card-head-controls">
+                                    <span class="pill pill-success tabular" id="ledger-sync-badge">BATCH SYNC ACTIVE</span>
+                                    <button class="card-ctrl-btn" onclick="toggleCardCollapse(this)" title="Minimize / Expand Panel">
+                                        <svg class="card-ctrl-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </button>
                                 </div>
                             </div>
 
-                            <!-- 3 Macro Payload HUD Cards -->
-                            <div class="batch-hud-grid" style="grid-template-columns: repeat(3, 1fr);">
-                                <div class="batch-hud-item">
-                                    <div class="batch-hud-label"><span>💾</span> Total Discovered Volume</div>
-                                    <div class="batch-hud-val tabular" id="ledger-total-gb" style="color: #38BDF8;">0.0 GB</div>
-                                    <div class="batch-hud-sub">Channel Discovered: <strong class="tabular" id="ledger-total-files">0</strong> Items</div>
+                            <div class="card-collapsible-body">
+                                <!-- Master Batch Progress Bar -->
+                                <div class="batch-prog-card">
+                                    <div class="batch-prog-header">
+                                        <span>Master Sync Progress</span>
+                                        <span><strong class="tabular" id="ledger-progress-pct" style="color: var(--accent-cyan); font-size: 15px;">0%</strong> Complete</span>
+                                    </div>
+                                    <div class="batch-prog-track">
+                                        <div class="batch-prog-fill" id="ledger-progress-bar"></div>
+                                    </div>
+                                    <div class="batch-prog-meta">
+                                        <span>Estimated Time Remaining: <strong class="tabular" id="ledger-eta-val" style="color: #38BDF8;">Calculating...</strong></span>
+                                        <span>Forecast Finish: <strong class="tabular" id="ledger-finish-time" style="color: #4ADE80;">--:--</strong></span>
+                                    </div>
                                 </div>
-                                <div class="batch-hud-item">
-                                    <div class="batch-hud-label"><span>🚀</span> Dispatched Payload</div>
-                                    <div class="batch-hud-val tabular" id="ledger-uploaded-gb" style="color: #4ADE80;">0.0 GB</div>
-                                    <div class="batch-hud-sub">Completed: <strong class="tabular" id="ledger-files-sent" style="color: #4ADE80;">0</strong> Delivered</div>
-                                </div>
-                                <div class="batch-hud-item">
-                                    <div class="batch-hud-label"><span>⏳</span> Remaining Queue</div>
-                                    <div class="batch-hud-val tabular" id="ledger-remaining-gb" style="color: #FACC15;">0.0 GB</div>
-                                    <div class="batch-hud-sub">Queue: <strong class="tabular" id="ledger-files-remaining" style="color: #FACC15;">0</strong> Pending</div>
+
+                                <!-- 3 Macro Payload HUD Cards -->
+                                <div class="batch-hud-grid" style="grid-template-columns: repeat(3, 1fr);">
+                                    <div class="batch-hud-item">
+                                        <div class="batch-hud-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg> Total Discovered Volume</div>
+                                        <div class="batch-hud-val tabular" id="ledger-total-gb" style="color: #38BDF8;">0.0 GB</div>
+                                        <div class="batch-hud-sub">Channel Discovered: <strong class="tabular" id="ledger-total-files">0</strong> Items</div>
+                                    </div>
+                                    <div class="batch-hud-item">
+                                        <div class="batch-hud-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg> Dispatched Payload</div>
+                                        <div class="batch-hud-val tabular" id="ledger-uploaded-gb" style="color: #4ADE80;">0.0 GB</div>
+                                        <div class="batch-hud-sub">Completed: <strong class="tabular" id="ledger-files-sent" style="color: #4ADE80;">0</strong> Delivered</div>
+                                    </div>
+                                    <div class="batch-hud-item">
+                                        <div class="batch-hud-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FACC15" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg> Remaining Queue</div>
+                                        <div class="batch-hud-val tabular" id="ledger-remaining-gb" style="color: #FACC15;">0.0 GB</div>
+                                        <div class="batch-hud-sub">Queue: <strong class="tabular" id="ledger-files-remaining" style="color: #FACC15;">0</strong> Pending</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Right Bento Box: Single Clean Speedometer Dial -->
-                        <div class="perm-card perm-card-speed" style="justify-content: space-between; padding: var(--space-4); margin-bottom: 0;">
+                        <div class="perm-card perm-card-speed card-collapsible" style="justify-content: space-between; padding: var(--space-4); margin-bottom: 0;">
                             <div class="perm-card-head" style="margin-bottom: var(--space-2);">
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span class="perm-card-icon">⚡</span>
+                                    <div style="width: 28px; height: 28px; border-radius: var(--radius-sm); background: rgba(250, 204, 21, 0.12); border: 1px solid rgba(250, 204, 21, 0.3); display: flex; align-items: center; justify-content: center; color: #FACC15;">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                    </div>
                                     <span class="perm-card-title" style="font-size: 13px; font-weight: 800; color: #fff;">LIVE NETWORK VELOCITY</span>
                                 </div>
-                                <span class="gauge-tier-badge" id="gauge-tier-badge">⚪ STANDBY</span>
+                                <div class="card-head-controls">
+                                    <span class="gauge-tier-badge" id="gauge-tier-badge">⚪ STANDBY</span>
+                                    <button class="card-ctrl-btn" onclick="toggleCardCollapse(this)" title="Minimize / Expand Panel">
+                                        <svg class="card-ctrl-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </button>
+                                </div>
                             </div>
                             
                             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 4px 0;">
@@ -3716,98 +4121,116 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
 
                     <!-- 5-Category Detailed Media Breakdown Live Grid -->
-                    <div style="margin-bottom: var(--space-5);">
+                    <div class="card-collapsible" style="margin-bottom: var(--space-5);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-size: 18px;">📂</span>
+                                <div style="width: 28px; height: 28px; border-radius: var(--radius-sm); background: rgba(129, 140, 248, 0.12); border: 1px solid rgba(129, 140, 248, 0.3); display: flex; align-items: center; justify-content: center; color: #818CF8;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                                </div>
                                 <span style="font-size: 14px; font-weight: 800; color: #fff;">Media Category Breakdown</span>
                             </div>
-                            <span class="pill pill-neutral tabular">5 Categories Segregated</span>
+                            <div class="card-head-controls">
+                                <span class="pill pill-neutral tabular">5 Categories Segregated</span>
+                                <button class="card-ctrl-btn" onclick="toggleCardCollapse(this)" title="Minimize / Expand Panel">
+                                    <svg class="card-ctrl-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                            </div>
                         </div>
-                        <div class="category-breakdown-grid">
-                            <!-- Videos -->
-                            <div class="category-card" style="border-color: rgba(99, 102, 241, 0.3);">
-                                <div>
-                                    <div class="cat-card-header"><span style="font-size: 16px;">🎬</span> Videos & Lectures</div>
-                                    <div class="cat-card-count tabular" id="ledger-cat-videos-count">0 Sent</div>
-                                    <div class="cat-card-gb tabular" id="ledger-cat-videos-gb">0.0 GB Payload</div>
-                                </div>
-                                <div>
-                                    <div class="cat-card-bar-track">
-                                        <div class="cat-card-bar-fill video-gradient" id="ledger-cat-videos-bar" style="width: 0%;"></div>
+                        <div class="card-collapsible-body">
+                            <div class="category-breakdown-grid">
+                                <!-- Videos -->
+                                <div class="category-card" style="border-color: rgba(99, 102, 241, 0.3);">
+                                    <div>
+                                        <div class="cat-card-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><polygon points="23 7 16 12 23 17 23 7"/><rect width="14" height="14" x="1" y="5" rx="2" ry="2"/></svg> Videos & Lectures</div>
+                                        <div class="cat-card-count tabular" id="ledger-cat-videos-count">0 Sent</div>
+                                        <div class="cat-card-gb tabular" id="ledger-cat-videos-gb">0.0 GB Payload</div>
                                     </div>
-                                    <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px; display: flex; justify-content: space-between;">
-                                        <span>Progress</span>
-                                        <span class="tabular" id="ledger-cat-videos-pct">0%</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Documents -->
-                            <div class="category-card" style="border-color: rgba(74, 222, 128, 0.3);">
-                                <div>
-                                    <div class="cat-card-header"><span style="font-size: 16px;">📄</span> Documents & PDFs</div>
-                                    <div class="cat-card-count tabular" id="ledger-cat-docs-count">0 Sent</div>
-                                    <div class="cat-card-gb tabular" id="ledger-cat-docs-gb" style="color: #4ADE80;">0.0 GB Payload</div>
-                                </div>
-                                <div>
-                                    <div class="cat-card-bar-track">
-                                        <div class="cat-card-bar-fill docs-gradient" id="ledger-cat-docs-bar" style="width: 0%;"></div>
-                                    </div>
-                                    <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px; display: flex; justify-content: space-between;">
-                                        <span>Progress</span>
-                                        <span class="tabular" id="ledger-cat-docs-pct">0%</span>
+                                    <div>
+                                        <div class="cat-card-bar-track">
+                                            <div class="cat-card-bar-fill video-gradient" id="ledger-cat-videos-bar" style="width: 0%;"></div>
+                                        </div>
+                                        <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px; display: flex; justify-content: space-between;">
+                                            <span>Progress</span>
+                                            <span class="tabular" id="ledger-cat-videos-pct">0%</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- Photos -->
-                            <div class="category-card" style="border-color: rgba(244, 114, 182, 0.3);">
-                                <div>
-                                    <div class="cat-card-header"><span style="font-size: 16px;">🖼️</span> Photos & Diagrams</div>
-                                    <div class="cat-card-count tabular" id="ledger-cat-photos-count">0 Sent</div>
-                                    <div class="cat-card-gb tabular" id="ledger-cat-photos-gb" style="color: #F472B6;">0.0 GB Payload</div>
+                                <!-- Documents -->
+                                <div class="category-card" style="border-color: rgba(74, 222, 128, 0.3);">
+                                    <div>
+                                        <div class="cat-card-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg> Documents & PDFs</div>
+                                        <div class="cat-card-count tabular" id="ledger-cat-docs-count">0 Sent</div>
+                                        <div class="cat-card-gb tabular" id="ledger-cat-docs-gb" style="color: #4ADE80;">0.0 GB Payload</div>
+                                    </div>
+                                    <div>
+                                        <div class="cat-card-bar-track">
+                                            <div class="cat-card-bar-fill docs-gradient" id="ledger-cat-docs-bar" style="width: 0%;"></div>
+                                        </div>
+                                        <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px; display: flex; justify-content: space-between;">
+                                            <span>Progress</span>
+                                            <span class="tabular" id="ledger-cat-docs-pct">0%</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
-                                    <span>Single & Album Stream</span>
-                                </div>
-                            </div>
 
-                            <!-- Audios -->
-                            <div class="category-card" style="border-color: rgba(250, 204, 21, 0.3);">
-                                <div>
-                                    <div class="cat-card-header"><span style="font-size: 16px;">🎵</span> Audios & Voice</div>
-                                    <div class="cat-card-count tabular" id="ledger-cat-audios-count">0 Sent</div>
-                                    <div class="cat-card-gb tabular" id="ledger-cat-audios-gb" style="color: #FACC15;">0.0 GB Payload</div>
+                                <!-- Photos -->
+                                <div class="category-card" style="border-color: rgba(244, 114, 182, 0.3);">
+                                    <div>
+                                        <div class="cat-card-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg> Photos & Diagrams</div>
+                                        <div class="cat-card-count tabular" id="ledger-cat-photos-count">0 Sent</div>
+                                        <div class="cat-card-gb tabular" id="ledger-cat-photos-gb" style="color: #F472B6;">0.0 GB Payload</div>
+                                    </div>
+                                    <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
+                                        <span>Single & Album Stream</span>
+                                    </div>
                                 </div>
-                                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
-                                    <span>Voice Notes & Lectures</span>
-                                </div>
-                            </div>
 
-                            <!-- Text & Captions -->
-                            <div class="category-card" style="border-color: rgba(168, 85, 247, 0.3);">
-                                <div>
-                                    <div class="cat-card-header"><span style="font-size: 16px;">📝</span> Text & Captions</div>
-                                    <div class="cat-card-count tabular" id="ledger-cat-text-count">0 Sent</div>
-                                    <div class="cat-card-gb tabular" style="color: #C084FC;">Preserved Metadata</div>
+                                <!-- Audios -->
+                                <div class="category-card" style="border-color: rgba(250, 204, 21, 0.3);">
+                                    <div>
+                                        <div class="cat-card-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FACC15" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Audios & Voice</div>
+                                        <div class="cat-card-count tabular" id="ledger-cat-audios-count">0 Sent</div>
+                                        <div class="cat-card-gb tabular" id="ledger-cat-audios-gb" style="color: #FACC15;">0.0 GB Payload</div>
+                                    </div>
+                                    <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
+                                        <span>Voice Notes & Lectures</span>
+                                    </div>
                                 </div>
-                                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
-                                    <span>Strip Rules Active</span>
+
+                                <!-- Text & Captions -->
+                                <div class="category-card" style="border-color: rgba(168, 85, 247, 0.3);">
+                                    <div>
+                                        <div class="cat-card-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C084FC" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><line x1="21" x2="3" y1="6" y2="6"/><line x1="15" x2="3" y1="12" y2="12"/><line x1="17" x2="3" y1="18" y2="18"/></svg> Text & Captions</div>
+                                        <div class="cat-card-count tabular" id="ledger-cat-text-count">0 Sent</div>
+                                        <div class="cat-card-gb tabular" style="color: #C084FC;">Preserved Metadata</div>
+                                    </div>
+                                    <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
+                                        <span>Strip Rules Active</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Dedicated In-Flight Active File Transfer & Live Chunk Stream Card -->
-                    <div class="panel-section" id="active-transfer-box" style="margin-bottom: var(--space-5); background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: var(--radius-lg); padding: var(--space-4); box-shadow: 0 4px 20px rgba(56, 189, 248, 0.08);">
+                    <div class="panel-section card-collapsible" id="active-transfer-box" style="margin-bottom: var(--space-5); background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: var(--radius-lg); padding: var(--space-4); box-shadow: 0 4px 20px rgba(56, 189, 248, 0.08);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: var(--space-2);">
                             <div style="display: flex; align-items: center; gap: var(--space-2);">
-                                <span style="font-size: 18px;">📡</span>
+                                <div style="width: 28px; height: 28px; border-radius: var(--radius-sm); background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; color: #38BDF8;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+                                </div>
                                 <span style="font-size: 13px; font-weight: 800; color: #38BDF8; letter-spacing: 0.5px; text-transform: uppercase;">In-Flight Active File Transfer & Live Stream</span>
                             </div>
-                            <span class="pill pill-success tabular" id="engine-status-pill" style="font-size: 11px;">🟢 MTPROTO SYNC ONLINE</span>
+                            <div class="card-head-controls">
+                                <span class="pill pill-success tabular" id="engine-status-pill" style="font-size: 11px;">🟢 MTPROTO SYNC ONLINE</span>
+                                <button class="card-ctrl-btn" onclick="toggleCardCollapse(this)" title="Minimize / Expand Panel">
+                                    <svg class="card-ctrl-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                            </div>
                         </div>
+
+                        <div class="card-collapsible-body">
 
                         <!-- Active File Transfer Metadata & Progress Bar -->
                         <div id="transfer-mode-busy" style="display: none;">
@@ -3844,16 +4267,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </div>
                         </div>
                     </div>
+                </div>
 
                     <!-- ==============================================================
                          FORUM TOPIC RADAR & EXECUTIVE DELIVERY SNAPSHOT
                          ============================================================== -->
-                    <div class="topic-radar-section" id="overview-topic-radar-card" style="margin-bottom: var(--space-5);">
+                    <div class="topic-radar-section card-collapsible" id="overview-topic-radar-card" style="margin-bottom: var(--space-5);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-3);">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <div class="radar-beacon" style="width: 40px; height: 40px; border-radius: 10px;">
                                     <div class="radar-beacon-ping"></div>
-                                    <span class="radar-beacon-icon" style="font-size: 18px;">📑</span>
+                                    <div class="radar-beacon-icon" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: #818CF8;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+                                    </div>
                                 </div>
                                 <div>
                                     <div style="font-size: 16px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px;">
@@ -3864,55 +4290,62 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 </div>
                             </div>
 
-                            <button class="btn btn-primary btn-sm" onclick="switchView('topics')" style="box-shadow: 0 0 16px rgba(99, 102, 241, 0.35); display: flex; align-items: center; gap: 6px;">
-                                <span>Deep Topic Matrix (<span id="overview-btn-topic-count">--</span> Topics)</span>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                            </button>
-                        </div>
-
-                        <!-- 6-KPI Executive Strip for Overview Tab -->
-                        <div class="topic-kpi-grid">
-                            <div class="topic-kpi-card" style="border-color: rgba(56, 189, 248, 0.25);">
-                                <div class="topic-kpi-label"><span>📑</span> Total Topics</div>
-                                <div class="topic-kpi-val" id="overview-topkpi-total-topics" style="color: #38BDF8;">--</div>
-                                <div class="topic-kpi-sub">In Source Channel</div>
-                            </div>
-                            <div class="topic-kpi-card" style="border-color: rgba(16, 185, 129, 0.25);">
-                                <div class="topic-kpi-label"><span style="color: #34D399;">✅</span> Completed Topics</div>
-                                <div class="topic-kpi-val" id="overview-topkpi-completed-topics" style="color: #34D399;">--</div>
-                                <div class="topic-kpi-sub" id="overview-topkpi-completed-sub">100% Delivered</div>
-                            </div>
-                            <div class="topic-kpi-card" style="border-color: rgba(129, 140, 248, 0.25);">
-                                <div class="topic-kpi-label"><span style="color: #818CF8;">⚡</span> Active Streaming</div>
-                                <div class="topic-kpi-val" id="overview-topkpi-active-topics" style="color: #818CF8; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
-                                <div class="topic-kpi-sub">Currently In-Flight</div>
-                            </div>
-                            <div class="topic-kpi-card" style="border-color: rgba(245, 158, 11, 0.25);">
-                                <div class="topic-kpi-label"><span style="color: #FBBF24;">⏳</span> Topics Left to Send</div>
-                                <div class="topic-kpi-val" id="overview-topkpi-remaining-topics" style="color: #FBBF24;">--</div>
-                                <div class="topic-kpi-sub">Queued in Pipeline</div>
-                            </div>
-                            <div class="topic-kpi-card" style="border-color: rgba(236, 72, 153, 0.25);">
-                                <div class="topic-kpi-label"><span>💾</span> Forum Total Data</div>
-                                <div class="topic-kpi-val" id="overview-topkpi-total-gb" style="color: #F472B6;">-- GB</div>
-                                <div class="topic-kpi-sub" id="overview-topkpi-total-files-sub">-- Total Files</div>
-                            </div>
-                            <div class="topic-kpi-card" style="border-color: rgba(251, 146, 60, 0.3); background: rgba(251, 146, 60, 0.08);">
-                                <div class="topic-kpi-label"><span style="color: #FB923C;">📦</span> Data Left to Send</div>
-                                <div class="topic-kpi-val" id="overview-topkpi-remaining-gb" style="color: #FB923C;">-- GB</div>
-                                <div class="topic-kpi-sub" id="overview-topkpi-remaining-files-sub">-- Files Remaining</div>
+                            <div class="card-head-controls">
+                                <button class="btn btn-primary btn-sm" onclick="switchView('topics')" style="box-shadow: 0 0 16px rgba(99, 102, 241, 0.35); display: flex; align-items: center; gap: 6px;">
+                                    <span>Deep Topic Matrix (<span id="overview-btn-topic-count">--</span> Topics)</span>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                </button>
+                                <button class="card-ctrl-btn" onclick="toggleCardCollapse(this)" title="Minimize / Expand Panel">
+                                    <svg class="card-ctrl-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
                             </div>
                         </div>
 
-                        <!-- Quick Jump Live Topic Strip -->
-                        <div id="overview-active-topic-strip" style="margin-top: var(--space-3); padding: 12px 16px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;" onclick="switchView('topics')">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span class="pulse-neon-green" style="display: inline-block;"></span>
-                                <span style="font-size: 13px; font-weight: 700; color: #F1F5F9;" id="overview-active-strip-title">Forum Topic Inventory Ready</span>
-                                <span class="pill pill-neutral tabular" style="font-size: 11px;" id="overview-active-strip-meta">Click to inspect all topics & lectures</span>
+                        <div class="card-collapsible-body">
+                            <!-- 6-KPI Executive Strip for Overview Tab -->
+                            <div class="topic-kpi-grid">
+                                <div class="topic-kpi-card" style="border-color: rgba(56, 189, 248, 0.25);">
+                                    <div class="topic-kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/></svg> Total Topics</div>
+                                    <div class="topic-kpi-val" id="overview-topkpi-total-topics" style="color: #38BDF8;">--</div>
+                                    <div class="topic-kpi-sub">In Source Channel</div>
+                                </div>
+                                <div class="topic-kpi-card" style="border-color: rgba(16, 185, 129, 0.25);">
+                                    <div class="topic-kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg> Completed Topics</div>
+                                    <div class="topic-kpi-val" id="overview-topkpi-completed-topics" style="color: #34D399;">--</div>
+                                    <div class="topic-kpi-sub" id="overview-topkpi-completed-sub">100% Delivered</div>
+                                </div>
+                                <div class="topic-kpi-card" style="border-color: rgba(129, 140, 248, 0.25);">
+                                    <div class="topic-kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Active Streaming</div>
+                                    <div class="topic-kpi-val" id="overview-topkpi-active-topics" style="color: #818CF8; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+                                    <div class="topic-kpi-sub">Currently In-Flight</div>
+                                </div>
+                                <div class="topic-kpi-card" style="border-color: rgba(245, 158, 11, 0.25);">
+                                    <div class="topic-kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg> Topics Left to Send</div>
+                                    <div class="topic-kpi-val" id="overview-topkpi-remaining-topics" style="color: #FBBF24;">--</div>
+                                    <div class="topic-kpi-sub">Queued in Pipeline</div>
+                                </div>
+                                <div class="topic-kpi-card" style="border-color: rgba(236, 72, 153, 0.25);">
+                                    <div class="topic-kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/></svg> Forum Total Data</div>
+                                    <div class="topic-kpi-val" id="overview-topkpi-total-gb" style="color: #F472B6;">-- GB</div>
+                                    <div class="topic-kpi-sub" id="overview-topkpi-total-files-sub">-- Total Files</div>
+                                </div>
+                                <div class="topic-kpi-card" style="border-color: rgba(251, 146, 60, 0.3); background: rgba(251, 146, 60, 0.08);">
+                                    <div class="topic-kpi-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FB923C" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="m22 2-7 20-4-9-9-4Z"/></svg> Data Left to Send</div>
+                                    <div class="topic-kpi-val" id="overview-topkpi-remaining-gb" style="color: #FB923C;">-- GB</div>
+                                    <div class="topic-kpi-sub" id="overview-topkpi-remaining-files-sub">-- Files Remaining</div>
+                                </div>
                             </div>
-                            <div style="font-size: 12px; color: #38BDF8; font-weight: 700; display: flex; align-items: center; gap: 4px;">
-                                <span>Open Matrix ➔</span>
+
+                            <!-- Quick Jump Live Topic Strip -->
+                            <div id="overview-active-topic-strip" style="margin-top: var(--space-3); padding: 12px 16px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;" onclick="switchView('topics')">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span class="pulse-neon-green" style="display: inline-block;"></span>
+                                    <span style="font-size: 13px; font-weight: 700; color: #F1F5F9;" id="overview-active-strip-title">Forum Topic Inventory Ready</span>
+                                    <span class="pill pill-neutral tabular" style="font-size: 11px;" id="overview-active-strip-meta">Click to inspect all topics & lectures</span>
+                                </div>
+                                <div style="font-size: 12px; color: #38BDF8; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                                    <span>Open Matrix ➔</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -4655,6 +5088,222 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 </section>
 
+                <!-- ==============================================================
+                     VIEW 9: DEEP HOST & SYSTEM TELEMETRY (LIVE ORACLE / HOST INSPECTION)
+                     ============================================================== -->
+                <section class="tab-view" id="view-telemetry">
+                    <!-- Top Telemetry Banner & Controls -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3);">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%); border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; justify-content: center; color: #38BDF8;">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+                            </div>
+                            <div>
+                                <div style="font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px;">
+                                    <span>Host OS &amp; Process Telemetry Cockpit</span>
+                                    <span class="pill pill-success tabular" style="font-size: 10px;">KERNEL LIVE</span>
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Real-time CPU cores, memory caches, disk mounts, sockets &amp; autonomous process monitors</div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary btn-sm" onclick="loadSystemTelemetry(true)" title="Force Refresh Hardware Specs (Bypass Cache)" style="border-color: rgba(56, 189, 248, 0.4); color: #38BDF8;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                                <span>Live Refresh</span>
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="triggerCloudBackup()" title="Trigger SQLite WAL Checkpoint & Snapshot">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                                <span>Checkpoint DB</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 4 Macro Hardware Cards Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: var(--space-4); margin-bottom: var(--space-5);">
+                        <!-- Host Platform Card -->
+                        <div class="perm-card" style="border-color: rgba(56, 189, 248, 0.3);">
+                            <div class="perm-card-head">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                    <span class="perm-card-title">HOST PLATFORM</span>
+                                </div>
+                                <span class="pill pill-info tabular" id="telem-host-name">Host</span>
+                            </div>
+                            <div class="perm-card-main" id="telem-host-os" style="font-size: 16px; font-weight: 800; color: #fff; margin: 6px 0;">Linux Oracle VPS</div>
+                            <div style="font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px;" id="telem-host-kernel">Kernel: Loading...</div>
+                            <div class="perm-card-footer">
+                                <span>Uptime:</span>
+                                <strong class="tabular" id="telem-host-uptime" style="color: #4ADE80;">Loading...</strong>
+                            </div>
+                        </div>
+
+                        <!-- CPU Load Card -->
+                        <div class="perm-card" style="border-color: rgba(99, 102, 241, 0.3);">
+                            <div class="perm-card-head">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>
+                                    <span class="perm-card-title">CPU PROCESSOR</span>
+                                </div>
+                                <span class="pill pill-primary tabular" id="telem-cpu-pct">0.0%</span>
+                            </div>
+                            <div class="perm-card-main tabular" id="telem-cpu-cores" style="font-size: 18px; font-weight: 800; color: #fff; margin: 4px 0;">-- Cores</div>
+                            <div class="perm-progress-track">
+                                <div class="perm-progress-fill video-gradient" id="telem-cpu-bar" style="width: 0%;"></div>
+                            </div>
+                            <div class="perm-card-footer">
+                                <span style="font-size: 11px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="telem-cpu-model">Architecture Model</span>
+                            </div>
+                        </div>
+
+                        <!-- Memory (RAM) Card -->
+                        <div class="perm-card" style="border-color: rgba(16, 185, 129, 0.3);">
+                            <div class="perm-card-head">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2"><path d="M6 19v-3"/><path d="M10 19v-3"/><path d="M14 19v-3"/><path d="M18 19v-3"/><rect width="20" height="8" x="2" y="7" rx="2"/></svg>
+                                    <span class="perm-card-title">RAM MEMORY</span>
+                                </div>
+                                <span class="pill pill-success tabular" id="telem-ram-pct">0.0%</span>
+                            </div>
+                            <div class="perm-card-main tabular" id="telem-ram-used" style="font-size: 18px; font-weight: 800; color: #4ADE80; margin: 4px 0;">0.0 / 0.0 GB</div>
+                            <div class="perm-progress-track">
+                                <div class="perm-progress-fill docs-gradient" id="telem-ram-bar" style="width: 0%;"></div>
+                            </div>
+                            <div class="perm-card-footer">
+                                <span style="font-size: 11px; color: var(--text-tertiary);" id="telem-ram-free">Free / Cache: --</span>
+                            </div>
+                        </div>
+
+                        <!-- Disk Storage Card -->
+                        <div class="perm-card" style="border-color: rgba(245, 158, 11, 0.3);">
+                            <div class="perm-card-head">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FACC15" stroke-width="2"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+                                    <span class="perm-card-title">DISK STORAGE</span>
+                                </div>
+                                <span class="pill pill-neutral tabular" id="telem-disk-pct" style="color: #FACC15;">0.0%</span>
+                            </div>
+                            <div class="perm-card-main tabular" id="telem-disk-used" style="font-size: 18px; font-weight: 800; color: #FACC15; margin: 4px 0;">0.0 / 0.0 GB</div>
+                            <div class="perm-progress-track">
+                                <div class="perm-progress-fill" id="telem-disk-bar" style="width: 0%; background: linear-gradient(90deg, #F59E0B, #EF4444);"></div>
+                            </div>
+                            <div class="perm-card-footer">
+                                <span style="font-size: 11px; color: var(--text-tertiary);" id="telem-disk-free">Mount: /</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Running Programs & System Daemons Table (Dr. Amit's Requested Feature) -->
+                    <div class="panel-section card-collapsible" style="margin-bottom: var(--space-5); background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: var(--radius-lg); padding: var(--space-4);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: var(--space-2);">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 28px; height: 28px; border-radius: var(--radius-sm); background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); display: flex; align-items: center; justify-content: center; color: #818CF8;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+                                </div>
+                                <div>
+                                    <div style="font-size: 14px; font-weight: 800; color: #fff;">Running Programs &amp; Mission Daemons</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary);">Direct PID, Memory RSS, CPU % &amp; Thread inspection for all running subsystems</div>
+                                </div>
+                            </div>
+                            <div class="card-head-controls">
+                                <span class="pill pill-success tabular" style="font-size: 11px;">4 Core Daemons</span>
+                                <button class="card-ctrl-btn" onclick="toggleCardCollapse(this)" title="Minimize / Expand Panel">
+                                    <svg class="card-ctrl-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card-collapsible-body">
+                            <div class="table-responsive">
+                                <table class="data-table" style="font-size: 12.5px;">
+                                    <thead>
+                                        <tr>
+                                            <th>Program / Daemon</th>
+                                            <th>Status</th>
+                                            <th>PID</th>
+                                            <th>RSS Memory</th>
+                                            <th>CPU %</th>
+                                            <th>Threads</th>
+                                            <th>Process Uptime</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="telem-programs-tbody">
+                                        <tr>
+                                            <td colspan="7" style="text-align: center; color: var(--text-tertiary); padding: 24px;">
+                                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                                    <span class="status-dot"></span>
+                                                    <span>Querying Linux kernel processes...</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2-Column Split: Network Sockets & Python Accelerators -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: var(--space-4); margin-bottom: var(--space-5);">
+                        <!-- Network I/O & Socket Radar -->
+                        <div class="panel-section card-collapsible" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: var(--space-4);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                    <span style="font-size: 13px; font-weight: 700; color: #fff;">Network I/O &amp; Sockets</span>
+                                </div>
+                                <button class="card-ctrl-btn" onclick="toggleCardCollapse(this)" title="Minimize / Expand Panel">
+                                    <svg class="card-ctrl-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                            </div>
+                            <div class="card-collapsible-body">
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
+                                    <div style="background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); text-align: center;">
+                                        <div style="font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">OUTBOUND</div>
+                                        <div class="tabular" id="telem-net-sent" style="font-size: 15px; font-weight: 800; color: #38BDF8; margin-top: 4px;">0 MB</div>
+                                    </div>
+                                    <div style="background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); text-align: center;">
+                                        <div style="font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">INBOUND</div>
+                                        <div class="tabular" id="telem-net-recv" style="font-size: 15px; font-weight: 800; color: #4ADE80; margin-top: 4px;">0 MB</div>
+                                    </div>
+                                    <div style="background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); text-align: center;">
+                                        <div style="font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">TCP SOCKETS</div>
+                                        <div class="tabular" id="telem-net-sockets" style="font-size: 15px; font-weight: 800; color: #FACC15; margin-top: 4px;">-- TCP</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Runtime & Accelerators Engine -->
+                        <div class="panel-section card-collapsible" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: var(--space-4);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                    <span style="font-size: 13px; font-weight: 700; color: #fff;">Runtime Accelerators</span>
+                                </div>
+                                <button class="card-ctrl-btn" onclick="toggleCardCollapse(this)" title="Minimize / Expand Panel">
+                                    <svg class="card-ctrl-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                            </div>
+                            <div class="card-collapsible-body">
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
+                                    <div style="background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); text-align: center;">
+                                        <div style="font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">UVLOOP</div>
+                                        <div class="tabular" id="telem-acc-uvloop" style="font-size: 13px; font-weight: 800; color: #4ADE80; margin-top: 4px;">ACTIVE ⚡</div>
+                                    </div>
+                                    <div style="background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); text-align: center;">
+                                        <div style="font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">CRYPTG</div>
+                                        <div class="tabular" id="telem-acc-cryptg" style="font-size: 13px; font-weight: 800; color: #38BDF8; margin-top: 4px;">ACTIVE 🔒</div>
+                                    </div>
+                                    <div style="background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-subtle); text-align: center;">
+                                        <div style="font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">SQLITE WAL</div>
+                                        <div class="tabular" id="telem-acc-wal" style="font-size: 13px; font-weight: 800; color: #C084FC; margin-top: 4px;">ACTIVE 🚀</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
             </div>
             
             <!-- Floating Interactive Shortcut HUD -->
@@ -5135,6 +5784,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let activeModalTopicId = null;
         let activeModalChatId = null;
 
+        // Sidebar Responsive & Collapse Toggles
+        function toggleSidebarDesktop() {
+            const sidebar = document.getElementById('app-sidebar');
+            if (sidebar) {
+                sidebar.classList.toggle('collapsed');
+                localStorage.setItem('ks_sidebar_collapsed', sidebar.classList.contains('collapsed') ? '1' : '0');
+            }
+        }
+
+        function toggleSidebarMobile() {
+            const sidebar = document.getElementById('app-sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            if (sidebar) {
+                sidebar.classList.toggle('mobile-open');
+                if (backdrop) backdrop.classList.toggle('active', sidebar.classList.contains('mobile-open'));
+            }
+        }
+
+        // Card Collapsible System (Minimize / Maximize)
+        function toggleCardCollapse(btn) {
+            const card = btn.closest('.card-collapsible');
+            if (card) {
+                card.classList.toggle('card-collapsed');
+                const icon = btn.querySelector('.card-ctrl-icon');
+                if (icon) {
+                    icon.style.transform = card.classList.contains('card-collapsed') ? 'rotate(-90deg)' : 'rotate(0deg)';
+                }
+            }
+        }
+
         // View Navigation with Audio & Scroll Reset
         function switchView(viewName) {
             currentView = viewName;
@@ -5161,6 +5840,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (breadcrumb) {
                 const labels = {
                     'overview': 'Mission Control Overview',
+                    'telemetry': 'Host OS & Process Telemetry Cockpit',
                     'topics': 'Forum Topic Intelligence & Delivery Radar',
                     'operations': 'Pipeline Velocity & Turbo Streams',
                     'telegram': 'Telegram Accounts & Worker Sessions',
@@ -5181,6 +5861,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             // Dispatch loader safely
             try {
+                if (viewName === 'telemetry') loadSystemTelemetry();
                 if (viewName === 'topics') loadTopicsBreakdown();
                 if (viewName === 'operations') updateStatus();
                 if (viewName === 'telegram') loadTelegramSessions();
@@ -5189,6 +5870,117 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (viewName === 'research') fetchResearchInsights();
             } catch(e) {
                 console.warn("View data load error for " + viewName, e);
+            }
+        }
+
+        // Deep Host & Process Telemetry Loader & Renderer
+        async function loadSystemTelemetry(force = false) {
+            try {
+                const url = force ? '/api/system/telemetry?force=1' : '/api/system/telemetry';
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                renderSystemTelemetry(data);
+                if (force) showToast("Hardware & Process Telemetry Resynced", "success");
+            } catch(e) {
+                console.warn("Failed to load telemetry:", e);
+            }
+        }
+
+        function renderSystemTelemetry(data) {
+            if (!data) return;
+            const h = data.host || {};
+            const c = data.cpu || {};
+            const m = data.memory || {};
+            const d = data.disk || {};
+            const n = data.network || {};
+            const progs = data.programs || [];
+
+            // Host Platform
+            const osElem = document.getElementById('telem-host-os');
+            if (osElem) osElem.textContent = `${h.system || 'Linux'} ${h.release || ''}`.trim();
+            const hostElem = document.getElementById('telem-host-name');
+            if (hostElem) hostElem.textContent = h.hostname || 'Host';
+            const kernElem = document.getElementById('telem-host-kernel');
+            if (kernElem) kernElem.textContent = `Kernel: ${h.kernel || h.release || '--'}`;
+            const upElem = document.getElementById('telem-host-uptime');
+            if (upElem) upElem.textContent = data.uptime_seconds ? formatDuration(data.uptime_seconds) : 'Online';
+
+            // CPU Card
+            const cpuPct = document.getElementById('telem-cpu-pct');
+            if (cpuPct) cpuPct.textContent = (c.usage_percent || 0).toFixed(1) + '%';
+            const cpuBar = document.getElementById('telem-cpu-bar');
+            if (cpuBar) cpuBar.style.width = Math.min(100, Math.max(0, c.usage_percent || 0)) + '%';
+            const cpuCores = document.getElementById('telem-cpu-cores');
+            if (cpuCores) cpuCores.textContent = `${c.logical_cores || 1} Cores (${c.physical_cores || 1} Phys)`;
+            const cpuModel = document.getElementById('telem-cpu-model');
+            if (cpuModel) cpuModel.textContent = c.model || 'Oracle Cloud / Host vCPU';
+
+            // RAM Memory Card
+            const ramPct = document.getElementById('telem-ram-pct');
+            if (ramPct) ramPct.textContent = (m.percent || 0).toFixed(1) + '%';
+            const ramBar = document.getElementById('telem-ram-bar');
+            if (ramBar) ramBar.style.width = Math.min(100, Math.max(0, m.percent || 0)) + '%';
+            const ramUsed = document.getElementById('telem-ram-used');
+            if (ramUsed) ramUsed.textContent = `${m.used_gb || 0} / ${m.total_gb || 0} GB`;
+            const ramFree = document.getElementById('telem-ram-free');
+            if (ramFree) ramFree.textContent = `Free: ${m.free_gb || 0} GB | Cache: ${m.cached_gb || 0} GB`;
+
+            // Disk Storage Card
+            const diskPct = document.getElementById('telem-disk-pct');
+            if (diskPct) diskPct.textContent = (d.percent || 0).toFixed(1) + '%';
+            const diskBar = document.getElementById('telem-disk-bar');
+            if (diskBar) diskBar.style.width = Math.min(100, Math.max(0, d.percent || 0)) + '%';
+            const diskUsed = document.getElementById('telem-disk-used');
+            if (diskUsed) diskUsed.textContent = `${d.used_gb || 0} / ${d.total_gb || 0} GB`;
+            const diskFree = document.getElementById('telem-disk-free');
+            if (diskFree) diskFree.textContent = `Free: ${d.free_gb || 0} GB (Mount: ${d.mount || '/'})`;
+
+            // Network Sockets
+            const netSent = document.getElementById('telem-net-sent');
+            if (netSent) netSent.textContent = (n.bytes_sent_mb || 0) + ' MB';
+            const netRecv = document.getElementById('telem-net-recv');
+            if (netRecv) netRecv.textContent = (n.bytes_recv_mb || 0) + ' MB';
+            const netSockets = document.getElementById('telem-net-sockets');
+            if (netSockets) netSockets.textContent = (n.active_tcp_connections || 0) + ' TCP';
+
+            // Accelerators
+            const acc = data.accelerators || {};
+            const uvElem = document.getElementById('telem-acc-uvloop');
+            if (uvElem) uvElem.textContent = acc.uvloop ? 'ACTIVE ⚡' : 'N/A';
+            const cryptgElem = document.getElementById('telem-acc-cryptg');
+            if (cryptgElem) cryptgElem.textContent = acc.cryptg ? 'ACTIVE 🔒' : 'N/A';
+            const walElem = document.getElementById('telem-acc-wal');
+            if (walElem) walElem.textContent = acc.sqlite_wal ? 'ACTIVE 🚀' : 'N/A';
+
+            // Running Programs & Daemons Table
+            const tbody = document.getElementById('telem-programs-tbody');
+            if (tbody && progs.length > 0) {
+                tbody.innerHTML = progs.map(p => `
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 26px; height: 26px; border-radius: 6px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; font-size: 13px;">
+                                    ${p.name.includes('Engine') ? '⚙️' : p.name.includes('Bot') ? '🤖' : p.name.includes('Dashboard') ? '📊' : '🛡️'}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 700; color: #fff;">${escapeHtml(p.name)}</div>
+                                    <div style="font-size: 10px; color: var(--text-tertiary);">${escapeHtml(p.script)}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="pill ${p.status === 'ONLINE' ? 'pill-success' : 'pill-neutral'} tabular" style="font-size: 11px;">
+                                ${p.status === 'ONLINE' ? '🟢 ONLINE' : '🟡 STANDBY'}
+                            </span>
+                        </td>
+                        <td class="tabular" style="font-weight: 700; color: #38BDF8;">${p.pid || '--'}</td>
+                        <td class="tabular" style="font-weight: 700; color: #4ADE80;">${(p.rss_mb || 0).toFixed(1)} MB</td>
+                        <td class="tabular">${(p.cpu_percent || 0).toFixed(1)}%</td>
+                        <td class="tabular">${p.threads || 1}</td>
+                        <td class="tabular" style="color: var(--text-secondary); font-size: 12px;">${escapeHtml(p.uptime || '--')}</td>
+                    </tr>
+                `).join('');
             }
         }
 
@@ -5689,7 +6481,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
                 const d = await res.json();
 
-                // 1. Dynamic Speed Calculation
+                // Telemetry Live Update
+                if (currentView === 'telemetry' && d.system_telemetry) {
+                    renderSystemTelemetry(d.system_telemetry);
+                }
                 const curSpeed = parseFloat(d.speed_mb || d.current_speed_mb || 0);
                 const peakSpeed = parseFloat(d.peak_speed_mb || 0);
                 const curSpeedObj = formatDynamicSpeed(curSpeed);
@@ -8051,6 +8846,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         // Initialize App
         window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('ks_sidebar_collapsed') === '1' && window.innerWidth > 1024) {
+                const sb = document.getElementById('app-sidebar');
+                if (sb) sb.classList.add('collapsed');
+            }
             checkAuth();
             updateStatus();
             loadTopicsBreakdown();
@@ -8760,6 +9559,7 @@ class DashboardServer:
             "is_paused": is_paused,
             "unread_insights_count": research_count,
             "topics_summary": self._get_topics_breakdown().get("summary", {}),
+            "system_telemetry": get_deep_system_telemetry(),
         }
 
     def _get_devi_vitality_summary(self) -> dict:
@@ -9552,6 +10352,11 @@ class DashboardServer:
     async def handle_api_status(self, request):
         return web.json_response(self._build_status_dict())
 
+    async def handle_api_system_telemetry(self, request):
+        force_flag = request.query.get("refresh", "0") in ("1", "true")
+        data = await asyncio.to_thread(get_deep_system_telemetry, force_refresh=force_flag)
+        return web.json_response(data)
+
     async def handle_api_backup(self, request):
         if self.reporter:
             try:
@@ -10031,6 +10836,9 @@ class DashboardServer:
             elif path == "/api/status":
                 payload = self._build_status_dict()
                 self._send_raw(writer, 200, "application/json", json.dumps(payload).encode("utf-8"))
+            elif path == "/api/system/telemetry":
+                payload = get_deep_system_telemetry()
+                self._send_raw(writer, 200, "application/json", json.dumps(payload).encode("utf-8"))
             elif path == "/api/auth/login" and method == "POST":
                 res = self.auth_mgr.authenticate(body_dict.get("username", ""), body_dict.get("password", ""))
                 if res:
@@ -10214,6 +11022,7 @@ class DashboardServer:
             self.app.router.add_get("/index.html", self.handle_index)
             self.app.router.add_get("/manifest.json", self.handle_manifest)
             self.app.router.add_get("/api/status", self.handle_api_status)
+            self.app.router.add_get("/api/system/telemetry", self.handle_api_system_telemetry)
             self.app.router.add_post("/api/auth/login", self.handle_api_auth_login)
             self.app.router.add_post("/api/auth/local_unlock", self.handle_api_auth_local_unlock)
             self.app.router.add_post("/api/auth/logout", self.handle_api_auth_logout)
