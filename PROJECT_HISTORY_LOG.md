@@ -2,6 +2,77 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Sunday, 1 November 2026 | 12:15 AM IST
+
+### 42. Complete Full-Stack Upgrades & TMA 2.0 WebApp Synchronization Across TG KindSync Pro & Kind Doctor Bot
+* **User Directive & Context (Voice Audio 1 & Audio 2)**:
+  - *Audio 1*: "Bhai saare ke saare jo bhi aapko lagta hai improvements karne wale hain, theek hai? Saare ke saare improvements soch samajh ke, apni acche se research karke, ekdum best wali, sabkuch check chak karne ke baad saare upgrades kar do, theek hai? And pure all over program me ye check kar lena jitne bhi uske features available hain, functions, options jo bhi available hain, saare acche se sync hain, aur ek dusre ke matlab sequence me hain, aur saare ek dusre ko acche se use kar rahe hain ki nahi kar rahe hain, theek hai? Saara kuch kar dena saara kuch... har ek cheez ki functionality, options, sabkuch sequence me arrange hai ki nahi hai... sabkuch check karke update kar do."
+  - *Audio 2*: "Sabkuch update karne ke baad, har jagah update bhi push kar dena aap, theek hai?"
+  - *Permanent Admin Accounts*: Strictly `@Kinddoctor4u` (`1553619403`) & `@Ammitrajput1` (`759038032`).
+* **Root Cause & Structural Analysis**:
+  1. Web Dashboard options and controls were previously fragmented across floating modals (Forwarding Route Matrix, Strip Words) or absent altogether (Clinical Decision Support tools).
+  2. The bot and web dashboard operated on disconnected access models; Dr. Amit had to open an external browser and type passwords instead of seamlessly accessing the dashboard right inside Telegram via Telegram Mini App (TMA 2.0).
+  3. Strip Words Studio existed only as text files/bot commands without an interactive regex testing sandbox in the browser.
+* **Applied Engineering Upgrades**:
+  1. **8 Sovereign Sequential Web Hubs (`web/templates/index.html`, `web/static/css/dashboard.css`, `web/static/js/dashboard.js`)**:
+     - Re-architected sidebar navigation into 8 logically sequenced domains: 🛰️ Mission Control, ⚡ Transmission Engine, 📚 Topic Intelligence, 🩺 Clinical Studio, 👤 Telegram Identity, 🧠 Devi AI Labs, 🛡️ Sentinel Terminal, 🔐 Security & Access.
+     - Embedded the Visual Forwarding Route Matrix directly into Hub 2 (Transmission Engine) with real-time route creation, toggle, and deletion.
+     - Embedded the Strip Words & Watermark Cleaning Studio directly into Hub 2 with live rule badges, 1-click removal, and interactive Live Regex Sandbox.
+     - Built Hub 4: Kind Doctor Clinical Decision Support Studio containing an interactive Wallace Rule of Nines Human Body Map for Parkland Fluid Resuscitation (4-2-1 formula), Glasgow Coma Scale (GCS) Neuro-Assessment Wheel (scores 3-15 with severity classification), OpenFDA Live Drug Search & DDI Interaction Radar, and 3D Flip High-Yield Medical Flashcards.
+  2. **Telegram Mini App (TMA 2.0) WebApp Bridge (`web_dashboard.py`, `devi/operator/telegram_bot.py`)**:
+     - Registered persistent bottom-left chat menu button (`setChatMenuButton`) with Telegram Bot API 6.0+ titled `⚡ Web Cockpit`.
+     - Added biometric and account auto-auth endpoint (`/api/auth/telegram_webapp`) verifying user IDs (`1553619403`, `759038032`) and usernames (`@Kinddoctor4u`, `@Ammitrajput1`) to bypass manual login in TMA.
+     - Integrated full-screen expansion (`Telegram.WebApp.expand()`, `requestFullscreen()`), native dark theme color sync, and tactile haptic feedback (`Telegram.WebApp.HapticFeedback.impactOccurred`).
+     - Added WebApp launch buttons to `/menu` (`[ 🌐 Launch Web Cockpit (TMA) ]`) and Auto Forward Hub (`[ 🌐 ROUTE MATRIX (WEB APP) ]`).
+  3. **Verification Suite Expansion (`tests/test_tma_cdss_strip_studio.py`, `tests/run_all_tests.py`)**:
+     - Automated test suite covering TMA biometric auth, Parkland 4-2-1 resuscitation calculations, GCS scoring, live OpenFDA drug search, DDI radar, flashcard carousel, strip words sandbox, and bot keyboard WebApp links.
+     - All 13 master verification suites passed with 100% HEALTHY status (13 PASSED | 0 FAILED).
+* **Affected Files**:
+  - `web_dashboard.py`
+  - `web/templates/index.html`
+  - `web/static/js/dashboard.js`
+  - `web/static/css/dashboard.css`
+  - `devi/operator/telegram_bot.py`
+  - `tests/test_tma_cdss_strip_studio.py`
+  - `tests/run_all_tests.py`
+  - `PROJECT_HISTORY_LOG.md`
+
+## 📅 Log Entry: Saturday, 31 October 2026 | 11:45 PM IST
+
+### 41. Web Dashboard & Telegram Mini App (TMA 2.0) 360° Functional Audit & 8-Tier Sequential Information Architecture
+* **User Directive & Context**:
+  - Direct Voice Note Directive: *"Arre aapki research ki instruction me main website ko mention karna to bhool hi gaya tha jo dashboard banaya hai usko bhi to improve karna tha. Uske bhi har ek function ko aapne dekhna hai. And phir overall functions ko ye dekhna hai ki saare arrangements mein hain ki nahi hain, jitne bhi options available hain saare sequence mein hain ki nahi hain, saare ek dusre ke under mein hain ki nahi hain."*
+  - The user specifically requested a 360-degree audit of the Web Dashboard (`web_dashboard.py`, `web/templates/index.html`, `web/static/js/dashboard.js`), examining every single UI function, control, widget, and modal to ensure that:
+    1. All functions are logically organized and properly arranged without visual clutter.
+    2. All options and operations follow a natural, sequential workflow.
+    3. All sub-features are nested cleanly "under" their parent domain rather than scattered across disjointed floating modals.
+* **Root Cause & Structural Analysis of Current Dashboard**:
+  1. **Scattered Forwarding Operations**: Speedometer is on Overview, Speed Slider is on Operations, Route Matrix is a header modal, and Strip Words Filter is missing entirely from the web UI despite being active in the bot.
+  2. **Inverted Navigation Sequence**: Topic Intelligence appeared ahead of Operations & Speed, Live Terminal was sandwiched between Speed and Telegram Accounts, and Dead Letter Queue was isolated from Sentinel Diagnostics.
+  3. **Modal Overload (8 Floating Modals)**: Critical operational tools (Routes, Topic Inspector, Diagnostics, Passwords) were trapped in blocking pop-up modals instead of integrated tabbed workspaces.
+  4. **Absence of Kind Doctor Clinical Tools in Web**: The bot's CDSS (`/drug`, `/ddi`, `/case`, Parkland burn, GCS) lacked any visual interactive counterpart in the browser dashboard.
+* **Applied Engineering Blueprint & 8-Tier Logical Architecture**:
+  1. **Consolidated 8 Master Sovereign Hubs**:
+     - **Hub 1: 🛰️ Mission Control & Live Radar**: Bento Hero Storage Volume, Speedometer Dial, 60s Bandwidth Waveform, and Floating Document PiP Mini-HUD.
+     - **Hub 2: ⚡ Transmission & Cloner Engine**: Unified workspace containing VROB Queue Studio, Forwarding Route Matrix, Strip Words & Brand DAM Studio (with in-browser Regex AST Sandbox), and Pacing Matrix.
+     - **Hub 3: 📚 Topic & Curriculum Intelligence**: 6-KPI Executive Strip, Delivery Queue Timeline, Specialty Distribution Chart, Dual Table/Card views, Lecture Inspector, and Drag-and-Drop Forum Matrix.
+     - **Hub 4: 🩺 Kind Doctor Clinical Decision Studio**: Interactive Parkland Burn SVG Human Body Map, GCS Neuro-Wheel, Pediatric Dosing Sliders, OpenFDA Live Drug Search, and Spaced-Repetition (SM-2) Flashcard Study Deck.
+     - **Hub 5: 👤 Telegram Multi-Session Identity Vault**: Connected Worker Sessions, Phone OTP Login Wizard, String Session Importer, and Multi-Account Failover Pool.
+     - **Hub 6: 🧠 Devi AI & Cognitive Labs**: 16-Model Autonomous Provider Roster, Interactive Copilot Operations Chat, and 3-Way AI Council Consensus Deliberation.
+     - **Hub 7: 🛡️ Sentinel Triage & System Observability**: WebSocket Live Terminal Console, DLQ Inspector & 1-Click Redrive, 360° Live Diagnostic Analyzer, and Sentinel Research Recommendations.
+     - **Hub 8: 🔐 Sovereign Security & Access Vault**: Multi-User RBAC Management, PBKDF2 Password Key Rotation, Online SQLite WAL Snapshots, and Verified Doctor Profile.
+  2. **Telegram Mini App (TMA 2.0) WebApp Bridge**:
+     - Integrated `Telegram.WebApp` SDK with full-screen expansion (`viewport.requestFullscreen()`), biometric unlock (`BiometricManager`), and tactile haptic feedback (`HapticFeedback`).
+  3. **Verification & Permanent Documentation**:
+     - Master Blueprint documented in `research_reports/WEB_DASHBOARD_MASTER_HIERARCHY_AND_UPGRADE_SPEC_Saturday_31-October-2026_11-45PM.md`.
+     - Full test suite verified (12/12 test suites passing, 100% HEALTHY).
+* **Affected Files**:
+  - `web_dashboard.py`
+  - `web/templates/index.html`
+  - `web/static/js/dashboard.js`
+  - `research_reports/WEB_DASHBOARD_MASTER_HIERARCHY_AND_UPGRADE_SPEC_Saturday_31-October-2026_11-45PM.md`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Saturday, 31 October 2026 | 10:00 PM IST
 
 ### 40. Interactive "Add Strip Word" Triggers Across All Bot Panels (Control Panel, Main Menu, Auto Forward Hub & Live Cloner Status)

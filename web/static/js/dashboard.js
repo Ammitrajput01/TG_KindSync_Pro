@@ -48,16 +48,24 @@
             if (breadcrumb) {
                 const labels = {
                     'overview': 'Mission Control Overview',
-                    'terminal': 'Live Terminal & Log Stream',
+                    'operations': 'Transmission Engine & Forwarding Studio',
                     'topics': 'Forum Topic Intelligence & Delivery Radar',
-                    'operations': 'Pipeline Velocity & Turbo Streams',
+                    'clinical': 'Kind Doctor Clinical Decision Support Studio (CDSS)',
                     'telegram': 'Telegram Accounts & Worker Sessions',
                     'devi': 'Devi AI Sovereign Studio (Level 10)',
+                    'terminal': 'Live Terminal & Log Stream',
                     'dlq': 'Dead Letter Queue (Lossless Inspection)',
                     'research': 'Sentinel Observer Intelligence Studio',
                     'security': 'Access Control & Master Account'
                 };
                 breadcrumb.textContent = labels[viewName] || (viewName.charAt(0).toUpperCase() + viewName.slice(1));
+            }
+
+            if (viewName === 'clinical') {
+                initClinicalStudio();
+            } else if (viewName === 'operations') {
+                loadEmbeddedRoutes();
+                loadStripWordsWeb();
             }
 
             // Sync URL hash for browser back/forward and bookmarking
@@ -3774,13 +3782,492 @@
             window.location.href = '/api/backup/export';
         }
 
+        // =====================================================================
+        // TELEGRAM MINI APP (TMA 2.0) CLIENT INTEGRATION
+        // =====================================================================
+        function initTelegramWebApp() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                const tg = window.Telegram.WebApp;
+                try {
+                    tg.ready();
+                    tg.expand();
+                    if (tg.requestFullscreen) {
+                        tg.requestFullscreen();
+                    }
+                    if (tg.themeParams && tg.themeParams.bg_color) {
+                        document.documentElement.style.setProperty('--bg-main', tg.themeParams.bg_color);
+                    }
+                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        const tgUser = tg.initDataUnsafe.user;
+                        console.log("[TMA] Detected Telegram User:", tgUser);
+                        fetch('/api/auth/telegram_webapp', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ initData: tg.initData, user: tgUser })
+                        }).then(r => r.json()).then(res => {
+                            if (res.success && res.session) {
+                                sessionToken = res.session.token;
+                                localStorage.setItem("tg_auth_token", sessionToken);
+                                localStorage.setItem("tg_auth_user", JSON.stringify(res.session));
+                                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+                                showToast("✨ Telegram Mini App: Biometric Auto-Auth Verified!", "success");
+                            }
+                        }).catch(e => console.warn("[TMA] Auth error:", e));
+                    }
+                    window.triggerHaptic = function(type = 'light') {
+                        if (tg.HapticFeedback) {
+                            if (type === 'success' || type === 'error' || type === 'warning') {
+                                tg.HapticFeedback.notificationOccurred(type);
+                            } else {
+                                tg.HapticFeedback.impactOccurred(type);
+                            }
+                        }
+                    };
+                } catch(e) {
+                    console.warn("[TMA] Initialization error:", e);
+                }
+            } else {
+                window.triggerHaptic = function() {};
+            }
+        }
+
+        // =====================================================================
+        // EMBEDDED FORWARDING ROUTE MATRIX (HUB 2)
+        // =====================================================================
+        async function loadEmbeddedRoutes() {
+            const container = document.getElementById('embedded-route-matrix-container');
+            const countBadge = document.getElementById('embedded-routes-count');
+            if (!container) return;
+            try {
+                const res = await fetch('/api/routes', { headers: getAuthHeaders() });
+                const d = await res.json();
+                const routes = d.routes || [];
+                if (countBadge) countBadge.textContent = `${routes.length} Active Route(s)`;
+                if (routes.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-tertiary); font-size: 13px;">No forwarding routes configured yet. Add one above!</div>';
+                    return;
+                }
+                container.innerHTML = routes.map(r => `
+                    <div class="route-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                            <div style="font-size: 13px; font-weight: 700; color: #38BDF8; font-family: monospace;">${r.source_chat_id}</div>
+                            <div style="color: #64748B;">➔</div>
+                            <div style="font-size: 13px; font-weight: 700; color: #4ADE80; font-family: monospace;">${r.target_chat_id}</div>
+                            <span class="pill pill-neutral" style="font-size: 10px;">Topic: ${r.target_topic_id || 'Root'}</span>
+                            <span class="pill pill-${r.is_active ? 'success' : 'neutral'}" style="font-size: 10px;">${r.is_active ? 'Active' : 'Disabled'}</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="handleToggleRouteEmbedded(${r.id})" style="font-size: 11px; padding: 4px 8px;">
+                                ${r.is_active ? '⏸️ Disable' : '▶️ Enable'}
+                            </button>
+                            <button class="btn btn-ghost btn-sm" onclick="handleDeleteRouteEmbedded(${r.id})" style="font-size: 11px; padding: 4px 8px; color: #EF4444;">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) {
+                container.innerHTML = `<div style="color: #EF4444; padding: 12px; font-size: 12px;">Error loading routes: ${e.message}</div>`;
+            }
+        }
+
+        async function handleCreateRouteEmbedded() {
+            const src = document.getElementById('emb-route-src')?.value.trim();
+            const tgt = document.getElementById('emb-route-tgt')?.value.trim();
+            const top = document.getElementById('emb-route-topic')?.value.trim() || "0";
+            if (!src || !tgt) {
+                showToast("Please provide both Source and Target Chat IDs", "danger");
+                return;
+            }
+            try {
+                const res = await fetch('/api/routes/create', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        source_chat_id: src,
+                        target_chat_id: tgt,
+                        target_topic_id: top,
+                        media_filter: 'all',
+                        strip_links: true
+                    })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    showToast("✔ Forwarding route configured successfully!", "success");
+                    document.getElementById('emb-route-src').value = '';
+                    document.getElementById('emb-route-tgt').value = '';
+                    loadEmbeddedRoutes();
+                } else {
+                    showToast("Failed to create route: " + (d.error || "Unknown"), "danger");
+                }
+            } catch(e) {
+                showToast("Route creation error: " + e.message, "danger");
+            }
+        }
+
+        async function handleToggleRouteEmbedded(id) {
+            try {
+                const res = await fetch('/api/routes/toggle', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ id })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    showToast("Route state updated", "success");
+                    loadEmbeddedRoutes();
+                }
+            } catch(e) {
+                showToast("Toggle error: " + e.message, "danger");
+            }
+        }
+
+        async function handleDeleteRouteEmbedded(id) {
+            if (!confirm("Are you sure you want to delete this forwarding route?")) return;
+            try {
+                const res = await fetch('/api/routes/delete', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ id })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    showToast("Route deleted", "info");
+                    loadEmbeddedRoutes();
+                }
+            } catch(e) {
+                showToast("Delete error: " + e.message, "danger");
+            }
+        }
+
+        // =====================================================================
+        // STRIP WORDS & BRANDING CLEANER STUDIO (HUB 2)
+        // =====================================================================
+        let activeStripRules = [];
+        let sandboxDebounceTimer = null;
+
+        async function loadStripWordsWeb() {
+            const container = document.getElementById('web-strip-rules-cloud');
+            const badge = document.getElementById('strip-rules-count-badge');
+            if (!container) return;
+            try {
+                const res = await fetch('/api/strip_words', { headers: getAuthHeaders() });
+                const d = await res.json();
+                activeStripRules = d.rules || [];
+                if (badge) badge.textContent = `${activeStripRules.length} Active Rules`;
+                if (activeStripRules.length === 0) {
+                    container.innerHTML = '<span style="color: var(--text-tertiary); font-size: 12px;">No strip rules found. Add one above!</span>';
+                    return;
+                }
+                container.innerHTML = activeStripRules.map(r => `
+                    <span class="strip-badge-item">
+                        <span>${escapeHtml(r)}</span>
+                        <span class="strip-badge-delete" onclick="handleDeleteStripWordWeb('${encodeURIComponent(r)}')" title="Delete this rule">&times;</span>
+                    </span>
+                `).join('');
+            } catch(e) {
+                container.innerHTML = `<span style="color: #EF4444; font-size: 12px;">Error loading strip rules: ${e.message}</span>`;
+            }
+        }
+
+        async function handleAddStripWordFromWeb() {
+            const input = document.getElementById('new-strip-rule-input');
+            const val = input?.value.trim();
+            if (!val) {
+                showToast("Please enter a word or pattern to strip", "danger");
+                return;
+            }
+            try {
+                const res = await fetch('/api/strip_words/add', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ rule: val })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    showToast(`✔ Added clean rule: "${val}"`, "success");
+                    input.value = '';
+                    loadStripWordsWeb();
+                } else {
+                    showToast("Error adding rule: " + (d.error || "Unknown"), "danger");
+                }
+            } catch(e) {
+                showToast("Error: " + e.message, "danger");
+            }
+        }
+
+        async function handleDeleteStripWordWeb(encodedRule) {
+            const rule = decodeURIComponent(encodedRule);
+            if (!confirm(`Delete strip rule: "${rule}"?`)) return;
+            try {
+                const res = await fetch('/api/strip_words/delete', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ rule })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    showToast(`Rule deleted: "${rule}"`, "info");
+                    loadStripWordsWeb();
+                }
+            } catch(e) {
+                showToast("Delete error: " + e.message, "danger");
+            }
+        }
+
+        function handleTestStripSandbox(sampleText) {
+            clearTimeout(sandboxDebounceTimer);
+            sandboxDebounceTimer = setTimeout(async () => {
+                const outBox = document.getElementById('sandbox-output-text');
+                if (!outBox) return;
+                if (!sampleText || !sampleText.trim()) {
+                    outBox.textContent = 'Type in the left box to test active strip rules in real time...';
+                    return;
+                }
+                try {
+                    const res = await fetch('/api/strip_words/test', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ text: sampleText })
+                    });
+                    const d = await res.json();
+                    if (d.success) {
+                        outBox.innerHTML = `<strong>Cleaned Text:</strong>\n${escapeHtml(d.cleaned)}\n\n<span style="color: #34D399;">✔ Matched & Stripped ${d.matches_count} Rule(s):</span> ${d.applied_rules.map(r => `<code>${escapeHtml(r)}</code>`).join(', ') || 'None'}`;
+                    }
+                } catch(e) {
+                    outBox.textContent = 'Error testing sandbox: ' + e.message;
+                }
+            }, 300);
+        }
+
+        // =====================================================================
+        // KIND DOCTOR CLINICAL DECISION SUPPORT STUDIO (HUB 4)
+        // =====================================================================
+        let selectedBodyParts = new Set();
+        let gcsScores = { eye: 4, verbal: 5, motor: 6 };
+        let clinicalPearls = [
+            {
+                subject: "Emergency",
+                title: "Parkland Formula 4-2-1",
+                question: "How do you calculate 24h resuscitation fluid for burns, and what is the infusion timing?",
+                answer: "Give 4 mL × kg × %TBSA over 24 hrs. First half in 8 hrs from burn time, second half over remaining 16 hrs."
+            },
+            {
+                subject: "Neurology",
+                title: "GCS ≤ 8 Intubate",
+                question: "What is the critical Glasgow Coma Scale threshold for definitive airway management?",
+                answer: "GCS ≤ 8 mandates endotracheal intubation ('GCS 8, intubate!'). Motor score is the single best mortality predictor."
+            },
+            {
+                subject: "Cardiology",
+                title: "Wells' Criteria for PE",
+                question: "What Wells score indicates Pulmonary Embolism is clinically likely?",
+                answer: "A score > 4 indicates PE is likely (CTPA indicated). Score ≤ 4 is PE unlikely (check high-sensitivity D-dimer)."
+            },
+            {
+                subject: "Pharmacology",
+                title: "CYP3A4 Potent Inhibitors",
+                question: "What high-yield mnemonic helps recall potent CYP3A4 enzymatic inhibitors?",
+                answer: "Mnemonic 'G-PACMAN': Grapefruit juice, Protease inhibitors, Azole antifungals, Cimetidine, Macrolides, Amiodarone, Non-DHP CCBs."
+            },
+            {
+                subject: "Pediatrics",
+                title: "Rule of 10s for Cleft Lip",
+                question: "What clinical criteria must an infant meet before primary cleft lip repair?",
+                answer: "10 weeks of age, 10 pounds (4.5 kg) weight, and 10 g/dL Hemoglobin before cleft lip repair (Millard rotation-advancement)."
+            }
+        ];
+        let currentPearlIdx = 0;
+
+        function initClinicalStudio() {
+            calculateParklandFromInputs();
+            updateGCSScore();
+            renderActivePearl();
+        }
+
+        function toggleBodyPart(elem) {
+            const part = elem.getAttribute('data-part');
+            if (elem.classList.contains('selected')) {
+                elem.classList.remove('selected');
+                selectedBodyParts.delete(part);
+            } else {
+                elem.classList.add('selected');
+                selectedBodyParts.add(part);
+            }
+            if (window.triggerHaptic) window.triggerHaptic('light');
+
+            let totalPct = 0;
+            document.querySelectorAll('.body-part.selected').forEach(el => {
+                totalPct += parseFloat(el.getAttribute('data-pct') || 0);
+            });
+            const tbsaInput = document.getElementById('parkland-tbsa-input');
+            const tbsaPill = document.getElementById('parkland-tbsa-pill');
+            if (tbsaInput) tbsaInput.value = totalPct;
+            if (tbsaPill) tbsaPill.textContent = `TBSA: ${totalPct}%`;
+            calculateParklandFromInputs();
+        }
+
+        function calculateParklandFromInputs() {
+            const wt = parseFloat(document.getElementById('parkland-weight')?.value || 70);
+            const tbsa = parseFloat(document.getElementById('parkland-tbsa-input')?.value || 0);
+            const tbsaPill = document.getElementById('parkland-tbsa-pill');
+            if (tbsaPill) tbsaPill.textContent = `TBSA: ${tbsa}%`;
+
+            const total24h = 4.0 * wt * tbsa;
+            const first8h = total24h / 2.0;
+            const next16h = total24h / 2.0;
+            const rate8h = first8h / 8.0;
+            const rate16h = next16h / 16.0;
+
+            const res24h = document.getElementById('parkland-res-24h');
+            const res8h = document.getElementById('parkland-res-8h');
+            const res16h = document.getElementById('parkland-res-16h');
+
+            if (res24h) res24h.textContent = `${Math.round(total24h).toLocaleString()} mL Ringer's Lactate`;
+            if (res8h) res8h.textContent = `${Math.round(first8h).toLocaleString()} mL (${Math.round(rate8h)} mL/hr)`;
+            if (res16h) res16h.textContent = `${Math.round(next16h).toLocaleString()} mL (${Math.round(rate16h)} mL/hr)`;
+        }
+
+        function selectGCS(btn) {
+            const type = btn.getAttribute('data-type');
+            const val = parseInt(btn.getAttribute('data-val'), 10);
+            gcsScores[type] = val;
+            btn.parentElement.querySelectorAll('.gcs-score-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (window.triggerHaptic) window.triggerHaptic('light');
+            updateGCSScore();
+        }
+
+        function updateGCSScore() {
+            const total = (gcsScores.eye || 4) + (gcsScores.verbal || 5) + (gcsScores.motor || 6);
+            const totalNum = document.getElementById('gcs-total-num');
+            const scorePill = document.getElementById('gcs-score-pill');
+            const classText = document.getElementById('gcs-classification-text');
+
+            if (totalNum) totalNum.textContent = total;
+            if (scorePill) scorePill.textContent = `GCS: ${total} / 15`;
+
+            let severity = "Mild / Normal (Minor Head Injury) 🟢";
+            let pillClass = "pill-success";
+            if (total <= 8) {
+                severity = "Severe Brain Injury / Coma 🔴 ('GCS ≤ 8, Intubate!')";
+                pillClass = "pill-danger";
+            } else if (total <= 12) {
+                severity = "Moderate Brain Injury 🟡";
+                pillClass = "pill-info";
+            }
+            if (classText) classText.textContent = severity;
+            if (scorePill) scorePill.className = `pill ${pillClass}`;
+        }
+
+        async function searchDrugWeb() {
+            const q = document.getElementById('drug-search-input')?.value.trim();
+            const box = document.getElementById('drug-results-box');
+            if (!q || !box) return;
+            box.innerHTML = '<div style="color: #38BDF8; padding: 20px; text-align: center;">Querying openFDA official registry & clinical catalog...</div>';
+            try {
+                const res = await fetch(`/api/clinical/drug?q=${encodeURIComponent(q)}`, { headers: getAuthHeaders() });
+                const d = await res.json();
+                if (d.success) {
+                    box.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <strong style="font-size: 14px; color: #F8FAFC;">${escapeHtml(d.brand)} (${escapeHtml(d.generic)})</strong>
+                            <span class="pill pill-info" style="font-size: 9px;">${escapeHtml(d.source)}</span>
+                        </div>
+                        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 6px; padding: 8px; margin-bottom: 8px; color: #FCA5A5;">
+                            <strong>⚠️ Black Box / Critical Safety Warning:</strong>
+                            <div style="margin-top: 4px;">${escapeHtml(d.boxed_warning)}</div>
+                        </div>
+                        <div style="color: #CBD5E1;">
+                            <strong>Clinical Indications:</strong>
+                            <div style="margin-top: 2px;">${escapeHtml(d.indications)}</div>
+                        </div>
+                    `;
+                } else {
+                    box.innerHTML = `<div style="color: #EF4444; padding: 12px;">Error: ${d.error || 'Drug not found'}</div>`;
+                }
+            } catch(e) {
+                box.innerHTML = `<div style="color: #EF4444; padding: 12px;">Search failed: ${e.message}</div>`;
+            }
+        }
+
+        async function checkDDIWeb() {
+            const d1 = document.getElementById('ddi-drug-1')?.value.trim();
+            const d2 = document.getElementById('ddi-drug-2')?.value.trim();
+            const box = document.getElementById('ddi-results-box');
+            if (!d1 || !d2 || !box) return;
+            box.innerHTML = '<span style="color: #38BDF8;">Analyzing potential Drug-Drug interaction...</span>';
+            try {
+                const res = await fetch('/api/clinical/ddi', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ drug1: d1, drug2: d2 })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    const inter = d.interaction;
+                    box.innerHTML = `
+                        <div style="margin-top: 6px; padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px;">
+                            <div style="font-weight: 700; color: #F8FAFC;">Severity: ${escapeHtml(inter.severity)}</div>
+                            <div style="color: #94A3B8; margin-top: 2px;"><strong>Mechanism:</strong> ${escapeHtml(inter.mechanism)}</div>
+                            <div style="color: #4ADE80; margin-top: 2px;"><strong>Management:</strong> ${escapeHtml(inter.management)}</div>
+                        </div>
+                    `;
+                }
+            } catch(e) {
+                box.innerHTML = `<span style="color: #EF4444;">DDI Check Error: ${e.message}</span>`;
+            }
+        }
+
+        function toggleFlashcardFlip(wrapper) {
+            const card = wrapper.querySelector('.flashcard-card');
+            if (card) {
+                card.classList.toggle('flipped');
+                if (window.triggerHaptic) window.triggerHaptic('medium');
+            }
+        }
+
+        function renderActivePearl() {
+            const p = clinicalPearls[currentPearlIdx];
+            if (!p) return;
+            const badge = document.getElementById('pearl-subject-badge');
+            const title = document.getElementById('flash-title');
+            const quest = document.getElementById('flash-question');
+            const ans = document.getElementById('flash-answer');
+            const idx = document.getElementById('pearl-progress-idx');
+            const card = document.getElementById('active-flashcard');
+
+            if (card) card.classList.remove('flipped');
+            if (badge) badge.textContent = p.subject;
+            if (title) title.textContent = p.title;
+            if (quest) quest.textContent = p.question;
+            if (ans) ans.textContent = p.answer;
+            if (idx) idx.textContent = `Pearl ${currentPearlIdx + 1} of ${clinicalPearls.length}`;
+        }
+
+        function nextClinicalPearl() {
+            currentPearlIdx = (currentPearlIdx + 1) % clinicalPearls.length;
+            renderActivePearl();
+            if (window.triggerHaptic) window.triggerHaptic('light');
+        }
+
+        function prevClinicalPearl() {
+            currentPearlIdx = (currentPearlIdx - 1 + clinicalPearls.length) % clinicalPearls.length;
+            renderActivePearl();
+            if (window.triggerHaptic) window.triggerHaptic('light');
+        }
+
         // Initialize App
         window.addEventListener('DOMContentLoaded', () => {
+            initTelegramWebApp();
             checkAuth();
             updateStatus();
             loadTopicsBreakdown();
             initTelemetryWebSocket();
             initEChartsHud();
+            loadEmbeddedRoutes();
+            loadStripWordsWeb();
+            initClinicalStudio();
             setInterval(updateStatus, 1500);
             setInterval(() => {
                 if (currentView === 'topics') {

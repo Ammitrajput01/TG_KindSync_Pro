@@ -78,92 +78,90 @@
             </div>
 
             <nav class="sidebar-nav">
-                <!-- Group 1: Monitoring & Cloud Radar -->
+                <!-- Group 1: Live Radar & Pipeline Operations -->
                 <div class="nav-group">
                     <div class="nav-group-title">
-                        <span>Monitoring & Radar</span>
+                        <span>Transmission & Radar</span>
                         <span style="font-size: 8px; color: #38BDF8;">LIVE</span>
                     </div>
                     <ul class="nav-items">
                         <li>
                             <a href="#overview" class="nav-link active" onclick="switchView('overview'); return false;" id="nav-overview" role="tab" aria-selected="true">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-                                <span>Overview</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#topics" class="nav-link" onclick="switchView('topics'); return false;" id="nav-topics" role="tab" aria-selected="false">
-                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
-                                <span>Topic Intelligence</span>
-                                <span class="nav-badge info tabular" id="sidebar-topics-badge">90 Topics</span>
+                                <span>1. Mission Control</span>
                             </a>
                         </li>
                         <li>
                             <a href="#operations" class="nav-link" onclick="switchView('operations'); return false;" id="nav-operations" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                                <span>Pipeline & Speed</span>
-                                <span class="nav-badge success tabular" id="sidebar-speed-badge">Turbo 8x</span>
+                                <span>2. Transmission Engine</span>
+                                <span class="nav-badge success tabular" id="sidebar-speed-badge">VROB 8x</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#terminal" class="nav-link" onclick="switchView('terminal'); return false;" id="nav-terminal" role="tab" aria-selected="false">
-                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-                                <span>Live Terminal</span>
-                                <span class="nav-badge success tabular" id="sidebar-terminal-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);">LIVE</span>
+                            <a href="#topics" class="nav-link" onclick="switchView('topics'); return false;" id="nav-topics" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+                                <span>3. Topic Intelligence</span>
+                                <span class="nav-badge info tabular" id="sidebar-topics-badge">90 Topics</span>
                             </a>
                         </li>
                     </ul>
                 </div>
 
-                <!-- Group 2: Orchestration & Queue -->
+                <!-- Group 2: Clinical Decision & Telegram Identity -->
                 <div class="nav-group">
                     <div class="nav-group-title">
-                        <span>Management & Queue</span>
-                        <span style="font-size: 8px; color: #818CF8;">MTPROTO</span>
+                        <span>Clinical & Telegram</span>
+                        <span style="font-size: 8px; color: #10B981;">MED+TG</span>
                     </div>
                     <ul class="nav-items">
                         <li>
-                            <a href="#telegram" class="nav-link" onclick="switchView('telegram'); return false;" id="nav-telegram" role="tab" aria-selected="false">
-                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                                <span>Telegram Accounts</span>
-                                <span class="nav-badge tabular" id="sidebar-tg-badge">3</span>
+                            <a href="#clinical" class="nav-link" onclick="switchView('clinical'); return false;" id="nav-clinical" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                                <span>4. Clinical Studio</span>
+                                <span class="nav-badge tabular" style="background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.35);">CDSS</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#dlq" class="nav-link" onclick="switchView('dlq'); return false;" id="nav-dlq" role="tab" aria-selected="false">
-                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-                                <span>Dead Letter Queue</span>
-                                <span class="nav-badge danger tabular" id="sidebar-dlq-badge">0</span>
+                            <a href="#telegram" class="nav-link" onclick="switchView('telegram'); return false;" id="nav-telegram" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                <span>5. Telegram Identity</span>
+                                <span class="nav-badge tabular" id="sidebar-tg-badge">3</span>
                             </a>
                         </li>
                     </ul>
                 </div>
 
-                <!-- Group 3: Intelligence & Access -->
+                <!-- Group 3: Cognitive AI, Observability & Access -->
                 <div class="nav-group">
                     <div class="nav-group-title">
-                        <span>Intelligence & Access</span>
-                        <span style="font-size: 8px; color: #F472B6;">AI</span>
+                        <span>Cognitive & Sentinel</span>
+                        <span style="font-size: 8px; color: #F472B6;">AI+OPS</span>
                     </div>
                     <ul class="nav-items">
                         <li>
                             <a href="#devi" class="nav-link" onclick="switchView('devi'); return false;" id="nav-devi" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-                                <span>Devi AI Studio</span>
+                                <span>6. Devi AI Labs</span>
                                 <span class="nav-badge tabular" style="background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3);">LVL 10</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#research" class="nav-link" onclick="switchView('research'); return false;" id="nav-research" role="tab" aria-selected="false">
-                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                                <span>Sentinel Insights</span>
-                                <span class="nav-badge info tabular" id="sidebar-research-badge">11</span>
+                            <a href="#terminal" class="nav-link" onclick="switchView('terminal'); return false;" id="nav-terminal" role="tab" aria-selected="false">
+                                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                                <span>7. Sentinel Terminal</span>
+                                <span class="nav-badge success tabular" id="sidebar-terminal-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);">LIVE</span>
+                            </a>
+                        </li>
+                        <li style="display: none;">
+                            <a href="#dlq" class="nav-link" onclick="switchView('dlq'); return false;" id="nav-dlq" role="tab" aria-selected="false">
+                                <span>DLQ</span>
                             </a>
                         </li>
                         <li>
                             <a href="#security" class="nav-link" onclick="switchView('security'); return false;" id="nav-security" role="tab" aria-selected="false">
                                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                <span>Access & Users</span>
+                                <span>8. Security & Access</span>
                                 <span class="nav-badge tabular" style="background: rgba(251, 146, 60, 0.15); color: #FB923C; border: 1px solid rgba(251, 146, 60, 0.3);">Amit</span>
                             </a>
                         </li>
@@ -957,10 +955,11 @@
                             </table>
                         </div>
 
-                        <!-- Speed Throttling Control Panel -->
+                        <!-- Speed Throttling & VROB Pacing Control Panel -->
                         <div class="panel-section">
                             <div class="panel-header">
-                                <span class="panel-title">Engine Pacer & Bandwidth Throttling</span>
+                                <span class="panel-title">Engine Pacer, VROB Buffer & Bandwidth Throttling</span>
+                                <span class="pill pill-success tabular" id="vrob-sync-indicator">VROB Monotonic Strict FIFO: Active</span>
                             </div>
                             <div style="padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4);">
                                 <div style="display: flex; justify-content: space-between;">
@@ -968,6 +967,95 @@
                                     <span class="tabular" id="throttle-speed-val" style="font-weight: 700; color: var(--accent-primary);">Unlimited (Max Network)</span>
                                 </div>
                                 <input type="range" min="500" max="10000" step="250" value="10000" id="speed-slider" oninput="handleSpeedChange(this.value)" style="accent-color: var(--accent-primary);">
+                            </div>
+                        </div>
+
+                        <!-- Embedded Visual Forwarding Route Matrix -->
+                        <div class="panel-section" id="section-embedded-routes">
+                            <div class="panel-header">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 18px;">🔄</span>
+                                    <span class="panel-title">Visual Forwarding Route Matrix</span>
+                                </div>
+                                <span class="pill pill-info tabular" id="embedded-routes-count">0 Active Routes</span>
+                            </div>
+                            <div style="padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4);">
+                                <!-- Add New Route Quick Form -->
+                                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-medium); border-radius: var(--radius-md); padding: var(--space-4);">
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-3);">➕ Add New Forwarding Route</div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr 120px auto; gap: var(--space-3); align-items: flex-end;">
+                                        <div class="form-group">
+                                            <label class="form-label">Source Chat ID</label>
+                                            <input type="text" class="text-input" id="emb-route-src" placeholder="-1001234567890">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Target Chat ID</label>
+                                            <input type="text" class="text-input" id="emb-route-tgt" placeholder="-1009876543210">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Target Topic ID</label>
+                                            <input type="number" class="text-input" id="emb-route-topic" placeholder="0">
+                                        </div>
+                                        <button class="btn btn-primary" onclick="handleCreateRouteEmbedded()" style="height: 38px;">Add Route</button>
+                                    </div>
+                                </div>
+                                <!-- Active Routes Grid -->
+                                <div class="route-grid" id="embedded-route-matrix-container">
+                                    <div style="text-align: center; padding: var(--space-4); color: var(--text-tertiary);">Loading routes...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dedicated Strip Words & Watermark Cleaning Studio -->
+                        <div class="panel-section" id="section-strip-words-studio">
+                            <div class="panel-header">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 18px;">🛡️</span>
+                                    <span class="panel-title">Universal Strip Words & Brand Sanitization Studio</span>
+                                </div>
+                                <span class="pill pill-success tabular" id="strip-rules-count-badge">Loading rules...</span>
+                            </div>
+                            <div style="padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-5);">
+                                <!-- Add Strip Rule Input -->
+                                <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                                    <div class="form-group" style="flex: 1; min-width: 260px;">
+                                        <label class="form-label">New Strip Word / Regex Pattern (or Old ➔ New replacement)</label>
+                                        <input type="text" class="text-input" id="new-strip-rule-input" placeholder="e.g. @promochannel or #watermark or OldText ➔ NewText">
+                                    </div>
+                                    <button class="btn btn-primary" onclick="handleAddStripWordFromWeb()" style="height: 38px; display: flex; align-items: center; gap: 6px;">
+                                        <span>➕</span>
+                                        <span>Add Strip Rule</span>
+                                    </button>
+                                </div>
+
+                                <!-- Active Strip Rules Badge Cloud -->
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span class="form-label" style="margin: 0;">Active Strip Rules (Click ✕ to delete):</span>
+                                        <button class="btn btn-ghost btn-sm" onclick="loadStripWordsWeb()" style="font-size: 11px; padding: 2px 8px;">🔄 Resync Rules</button>
+                                    </div>
+                                    <div class="strip-rules-badge-cloud" id="web-strip-rules-cloud">
+                                        <span style="color: var(--text-tertiary); font-size: 12px;">Loading active clean rules...</span>
+                                    </div>
+                                </div>
+
+                                <!-- Interactive Live Regex Sandbox -->
+                                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); padding: var(--space-4);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <div style="font-size: 13px; font-weight: 700; color: #F8FAFC;">🧪 Live Caption Cleaning Sandbox</div>
+                                        <span class="pill pill-info" style="font-size: 10px;">Instant Real-Time Preview</span>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                                        <div>
+                                            <label class="form-label">Sample Input Caption / Text</label>
+                                            <textarea class="text-input" id="sandbox-input-text" placeholder="Paste sample message with watermarks here to test..." style="min-height: 90px; font-size: 12px; font-family: var(--font-mono); resize: vertical;" oninput="handleTestStripSandbox(this.value)"></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="form-label">Cleaned Output Preview</label>
+                                            <div class="regex-sandbox-diff" id="sandbox-output-text">Type in the left box to test active strip rules in real time...</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1181,7 +1269,244 @@
                 </section>
 
                 <!-- ==============================================================
-                     VIEW 3: TELEGRAM ACCOUNTS (ORCHESTRATION)
+                     VIEW 4: KIND DOCTOR CLINICAL DECISION SUPPORT STUDIO (HUB 4)
+                     ============================================================== -->
+                <section class="tab-view" id="view-clinical">
+                    <div class="clinical-studio-container">
+                        <!-- Verified Doctor Banner -->
+                        <div class="clinical-header-banner">
+                            <div style="display: flex; align-items: center; gap: 14px;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #10B981, #059669); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);">
+                                    👨‍⚕️
+                                </div>
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="font-size: 16px; font-weight: 800; color: #FFFFFF;">Kind Doctor Clinical Decision Support Studio (CDSS)</span>
+                                        <span class="pill pill-success">MBBS & Wards Reference</span>
+                                        <span class="pill pill-info">NEET-PG / USMLE</span>
+                                    </div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                                        Interactive evidence-based clinical calculators, openFDA drug safety radar, and high-yield study decks.
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn btn-secondary btn-sm" onclick="nextClinicalPearl()" style="border-color: rgba(16, 185, 129, 0.4); color: #34D399;">
+                                    💡 Next Clinical Pearl
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 2-Column Clinical Tools Grid -->
+                        <div class="clinical-tools-grid">
+                            
+                            <!-- 1. Interactive Parkland Burn Fluid Calculator & Body Map -->
+                            <div class="clinical-card">
+                                <div class="clinical-card-head">
+                                    <div class="clinical-card-title">
+                                        <span>🔥</span>
+                                        <span>Parkland Formula Burn Resuscitation</span>
+                                    </div>
+                                    <span class="pill pill-danger" id="parkland-tbsa-pill">TBSA: 0%</span>
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-tertiary);">
+                                    Tap body regions to toggle Wallace Rule of Nines (% TBSA). Total = 4 mL × Weight × % TBSA.
+                                </div>
+
+                                <!-- Interactive SVG Body Map -->
+                                <div class="body-map-interactive">
+                                    <svg viewBox="0 0 200 240" width="160" height="190">
+                                        <!-- Head (9%) -->
+                                        <circle cx="100" cy="25" r="18" class="body-part" data-part="head" data-pct="9" onclick="toggleBodyPart(this)" title="Head & Neck (9%)"/>
+                                        <text x="100" y="29" font-size="9" text-anchor="middle" fill="#CBD5E1" pointer-events="none">Head 9%</text>
+
+                                        <!-- Chest / Anterior Torso (18%) -->
+                                        <rect x="75" y="48" width="50" height="60" rx="6" class="body-part" data-part="torso" data-pct="18" onclick="toggleBodyPart(this)" title="Anterior Torso (18%)"/>
+                                        <text x="100" y="80" font-size="9" text-anchor="middle" fill="#CBD5E1" pointer-events="none">Torso 18%</text>
+
+                                        <!-- Left Arm (9%) -->
+                                        <rect x="42" y="52" width="28" height="55" rx="5" class="body-part" data-part="arm_l" data-pct="9" onclick="toggleBodyPart(this)" title="Left Arm (9%)"/>
+                                        <text x="56" y="82" font-size="8" text-anchor="middle" fill="#CBD5E1" pointer-events="none">Arm 9%</text>
+
+                                        <!-- Right Arm (9%) -->
+                                        <rect x="130" y="52" width="28" height="55" rx="5" class="body-part" data-part="arm_r" data-pct="9" onclick="toggleBodyPart(this)" title="Right Arm (9%)"/>
+                                        <text x="144" y="82" font-size="8" text-anchor="middle" fill="#CBD5E1" pointer-events="none">Arm 9%</text>
+
+                                        <!-- Perineum (1%) -->
+                                        <polygon points="90,110 110,110 100,122" class="body-part" data-part="perineum" data-pct="1" onclick="toggleBodyPart(this)" title="Perineum (1%)"/>
+
+                                        <!-- Left Leg (18%) -->
+                                        <rect x="68" y="125" width="28" height="85" rx="6" class="body-part" data-part="leg_l" data-pct="18" onclick="toggleBodyPart(this)" title="Left Leg (18%)"/>
+                                        <text x="82" y="165" font-size="8" text-anchor="middle" fill="#CBD5E1" pointer-events="none">Leg 18%</text>
+
+                                        <!-- Right Leg (18%) -->
+                                        <rect x="104" y="125" width="28" height="85" rx="6" class="body-part" data-part="leg_r" data-pct="18" onclick="toggleBodyPart(this)" title="Right Leg (18%)"/>
+                                        <text x="118" y="165" font-size="8" text-anchor="middle" fill="#CBD5E1" pointer-events="none">Leg 18%</text>
+                                    </svg>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                    <div class="form-group">
+                                        <label class="form-label">Patient Weight (kg)</label>
+                                        <input type="number" class="text-input" id="parkland-weight" value="70" oninput="calculateParklandFromInputs()">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Calculated TBSA (%)</label>
+                                        <input type="number" class="text-input" id="parkland-tbsa-input" value="0" min="0" max="100" oninput="calculateParklandFromInputs()">
+                                    </div>
+                                </div>
+
+                                <!-- Parkland Results Box -->
+                                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                                        <span style="color: #94A3B8;">Total 24h Ringer's Lactate:</span>
+                                        <strong style="color: #38BDF8;" id="parkland-res-24h">0 mL</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                                        <span style="color: #94A3B8;">First 8 Hours (50%):</span>
+                                        <strong style="color: #4ADE80;" id="parkland-res-8h">0 mL (0 mL/hr)</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                                        <span style="color: #94A3B8;">Next 16 Hours (50%):</span>
+                                        <strong style="color: #FBBF24;" id="parkland-res-16h">0 mL (0 mL/hr)</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Glasgow Coma Scale (GCS) Wheel & Assessment -->
+                            <div class="clinical-card">
+                                <div class="clinical-card-head">
+                                    <div class="clinical-card-title">
+                                        <span>🧠</span>
+                                        <span>Glasgow Coma Scale (GCS)</span>
+                                    </div>
+                                    <span class="pill pill-success" id="gcs-score-pill">GCS: 15 / 15</span>
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-tertiary);">
+                                    Head injury assessment: Eye (4) + Verbal (5) + Motor (6). GCS ≤ 8 requires airway protection.
+                                </div>
+
+                                <div class="gcs-selector-row">
+                                    <span class="form-label" style="font-size: 11px;">Eye Opening (E1 - E4)</span>
+                                    <div class="gcs-btn-group" id="gcs-group-eye">
+                                        <button type="button" class="gcs-score-btn" data-type="eye" data-val="1" onclick="selectGCS(this)">1 (None)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="eye" data-val="2" onclick="selectGCS(this)">2 (Pain)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="eye" data-val="3" onclick="selectGCS(this)">3 (Sound)</button>
+                                        <button type="button" class="gcs-score-btn active" data-type="eye" data-val="4" onclick="selectGCS(this)">4 (Spontaneous)</button>
+                                    </div>
+                                </div>
+
+                                <div class="gcs-selector-row">
+                                    <span class="form-label" style="font-size: 11px;">Verbal Response (V1 - V5)</span>
+                                    <div class="gcs-btn-group" id="gcs-group-verbal">
+                                        <button type="button" class="gcs-score-btn" data-type="verbal" data-val="1" onclick="selectGCS(this)">1 (None)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="verbal" data-val="2" onclick="selectGCS(this)">2 (Sounds)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="verbal" data-val="3" onclick="selectGCS(this)">3 (Words)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="verbal" data-val="4" onclick="selectGCS(this)">4 (Confused)</button>
+                                        <button type="button" class="gcs-score-btn active" data-type="verbal" data-val="5" onclick="selectGCS(this)">5 (Oriented)</button>
+                                    </div>
+                                </div>
+
+                                <div class="gcs-selector-row">
+                                    <span class="form-label" style="font-size: 11px;">Motor Response (M1 - M6)</span>
+                                    <div class="gcs-btn-group" id="gcs-group-motor">
+                                        <button type="button" class="gcs-score-btn" data-type="motor" data-val="1" onclick="selectGCS(this)">1 (None)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="motor" data-val="2" onclick="selectGCS(this)">2 (Ext)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="motor" data-val="3" onclick="selectGCS(this)">3 (Flex)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="motor" data-val="4" onclick="selectGCS(this)">4 (Withdraw)</button>
+                                        <button type="button" class="gcs-score-btn" data-type="motor" data-val="5" onclick="selectGCS(this)">5 (Localizes)</button>
+                                        <button type="button" class="gcs-score-btn active" data-type="motor" data-val="6" onclick="selectGCS(this)">6 (Obeys)</button>
+                                    </div>
+                                </div>
+
+                                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-size: 11px; color: #94A3B8;">Trauma Severity Classification:</div>
+                                        <div style="font-size: 14px; font-weight: 800; color: #34D399; margin-top: 2px;" id="gcs-classification-text">Mild / Normal (Minor Head Injury) 🟢</div>
+                                    </div>
+                                    <div style="font-size: 22px; font-weight: 900; color: #F8FAFC;" id="gcs-total-num">15</div>
+                                </div>
+                            </div>
+
+                            <!-- 3. OpenFDA Live Drug Search & DDI Radar -->
+                            <div class="clinical-card">
+                                <div class="clinical-card-head">
+                                    <div class="clinical-card-title">
+                                        <span>💊</span>
+                                        <span>OpenFDA Live Drug Safety & DDI Radar</span>
+                                    </div>
+                                    <span class="pill pill-info">Live FDA API</span>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="text" class="text-input" id="drug-search-input" placeholder="Search drug name (e.g. Paracetamol, Amiodarone)..." onkeydown="if(event.key==='Enter') searchDrugWeb()">
+                                    <button class="btn btn-primary" onclick="searchDrugWeb()">Search</button>
+                                </div>
+                                <div id="drug-results-box" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; font-size: 12px; min-height: 100px;">
+                                    <div style="color: var(--text-tertiary); text-align: center; padding: 20px;">Enter a drug name above to search Black Box Warnings and indications.</div>
+                                </div>
+
+                                <!-- Dual Drug DDI Radar -->
+                                <div style="border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="font-size: 11px; font-weight: 700; color: #F8FAFC;">⚡ Check Drug-Drug Interaction:</div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px;">
+                                        <input type="text" class="text-input" id="ddi-drug-1" placeholder="Drug 1 (e.g. Warfarin)">
+                                        <input type="text" class="text-input" id="ddi-drug-2" placeholder="Drug 2 (e.g. Aspirin)">
+                                        <button class="btn btn-secondary btn-sm" onclick="checkDDIWeb()">Check DDI</button>
+                                    </div>
+                                    <div id="ddi-results-box" style="font-size: 11.5px; color: #E2E8F0;"></div>
+                                </div>
+                            </div>
+
+                            <!-- 4. High-Yield Medical Flashcard Deck -->
+                            <div class="clinical-card">
+                                <div class="clinical-card-head">
+                                    <div class="clinical-card-title">
+                                        <span>🗂️</span>
+                                        <span>Kind Doctor High-Yield Clinical Pearls</span>
+                                    </div>
+                                    <span class="pill pill-neutral" id="pearl-subject-badge">Emergency</span>
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-tertiary);">
+                                    Interactive 3D Flip Card: Tap the card to reveal the high-yield clinical pearl & explanation.
+                                </div>
+
+                                <div class="flashcard-wrapper" onclick="toggleFlashcardFlip(this)">
+                                    <div class="flashcard-card" id="active-flashcard">
+                                        <div class="flashcard-front">
+                                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                <span class="pill pill-info" style="font-size: 9px;" id="flash-title">Parkland Formula 4-2-1</span>
+                                                <span style="font-size: 11px; color: #94A3B8;">Tap to flip 🔄</span>
+                                            </div>
+                                            <div style="font-size: 14px; font-weight: 700; color: #F8FAFC; text-align: center; margin: auto;" id="flash-question">
+                                                How do you calculate 24h resuscitation fluid for burns, and what is the infusion timing?
+                                            </div>
+                                            <div style="font-size: 10px; color: #64748B; text-align: center;">Kind Doctor Sovereign Study Deck</div>
+                                        </div>
+                                        <div class="flashcard-back">
+                                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                <span class="pill pill-success" style="font-size: 9px;">Clinical Answer</span>
+                                                <span style="font-size: 11px; color: #34D399;">Verified Pearl ✅</span>
+                                            </div>
+                                            <div style="font-size: 13px; color: #FFFFFF; line-height: 1.5; margin: auto;" id="flash-answer">
+                                                Give 4 mL × kg × %TBSA over 24 hrs. First half in 8 hrs from burn time, second half over remaining 16 hrs.
+                                            </div>
+                                            <div style="font-size: 10px; color: #34D399; text-align: center;">Tap again to flip back</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <button class="btn btn-ghost btn-sm" onclick="prevClinicalPearl()">⬅️ Previous</button>
+                                    <span style="font-size: 11px; color: var(--text-tertiary);" id="pearl-progress-idx">Pearl 1 of 5</span>
+                                    <button class="btn btn-secondary btn-sm" onclick="nextClinicalPearl()">Next ➡️</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==============================================================
+                     VIEW 5: TELEGRAM ACCOUNTS (ORCHESTRATION)
                      ============================================================== -->
                 <section class="tab-view" id="view-telegram">
                     <div class="panel-section">

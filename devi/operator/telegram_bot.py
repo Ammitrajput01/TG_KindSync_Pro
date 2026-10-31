@@ -1690,6 +1690,24 @@ class DeviTelegramBot:
                 json={"description": full_desc},
                 timeout=8
             )
+
+            # 4. Telegram Mini App (TMA 2.0) Persistent Chat Menu Button (API 6.0+)
+            dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+            lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+            dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+            with suppress(Exception):
+                await session.post(
+                    f"https://api.telegram.org/bot{self.token}/setChatMenuButton",
+                    json={
+                        "menu_button": {
+                            "type": "web_app",
+                            "text": "⚡ Web Cockpit",
+                            "web_app": {"url": dash_url}
+                        }
+                    },
+                    timeout=8
+                )
+
             logger.info("Bot commands and profile successfully synchronized with Telegram API.")
         except Exception as e:
             logger.warning(f"Failed to sync bot commands/profile: {e}")
@@ -2527,6 +2545,10 @@ class DeviTelegramBot:
             except Exception:
                 pass
 
+        dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+        lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+        dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+
         if not s_str:
             card_text = (
                 "📌 <b>HOW TO SETUP &amp; USE THIS BOT :-</b> https://t.me/KindDoctor4u\n"
@@ -2554,6 +2576,9 @@ class DeviTelegramBot:
                     [
                         {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
                         {"text": "🚀 START AUTO-SYNC", "callback_data": "act_fwd_start"}
+                    ],
+                    [
+                        {"text": "🌐 ROUTE MATRIX (WEB APP)", "web_app": {"url": f"{dash_url}#operations"}}
                     ]
                 ]
             }
@@ -2598,6 +2623,9 @@ class DeviTelegramBot:
                     [
                         {"text": "⚙️ FORWARD SETTINGS", "callback_data": "act_fwd_settings"},
                         fwd_pause_btn
+                    ],
+                    [
+                        {"text": "🌐 ROUTE MATRIX (WEB APP)", "web_app": {"url": f"{dash_url}#operations"}}
                     ]
                 ]
             }
@@ -5596,6 +5624,13 @@ class DeviTelegramBot:
                 ]
             }
             if self.is_admin(admin_id):
+                dash_port = int(os.getenv("DASHBOARD_PORT", "8080"))
+                lan_ip = os.getenv("SERVER_IP", "127.0.0.1")
+                dash_url = os.getenv("TG_DASHBOARD_URL") or f"http://{lan_ip}:{dash_port}"
+                keyboard["inline_keyboard"].append([
+                    {"text": "🌐 Launch Web Cockpit (TMA)", "web_app": {"url": dash_url}},
+                    {"text": "🎛️ Master Panel", "callback_data": "act_panel"}
+                ])
                 keyboard["inline_keyboard"].append([
                     {"text": fwd_pause_btn_txt, "callback_data": fwd_pause_cb},
                     {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}

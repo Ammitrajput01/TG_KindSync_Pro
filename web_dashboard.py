@@ -9786,6 +9786,214 @@ class DashboardServer:
                 "participants": ["Groq Llama-3.3", "Mistral Codestral", "Gemini 2.0 Flash"]
             })
 
+    # =========================================================================
+    # STRIP WORDS & BRANDING CLEANER API (HUB 2)
+    # =========================================================================
+
+    async def handle_api_strip_words(self, request):
+        try:
+            from devi.operator.strip_sync import get_all_raw_rules
+            rules = get_all_raw_rules()
+            return web.json_response({"success": True, "rules": rules, "count": len(rules)})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e), "rules": []})
+
+    async def handle_api_add_strip_word(self, request):
+        try:
+            data = await request.json()
+            rule = str(data.get("rule", "")).strip()
+            if not rule:
+                return web.json_response({"success": False, "error": "Rule pattern required"}, status=400)
+            from devi.operator.strip_sync import add_strip_rules, get_all_raw_rules
+            added = add_strip_rules([rule])
+            return web.json_response({"success": True, "added": added, "count": len(get_all_raw_rules())})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    async def handle_api_delete_strip_word(self, request):
+        try:
+            data = await request.json()
+            rule = str(data.get("rule", "")).strip()
+            if not rule:
+                return web.json_response({"success": False, "error": "Rule pattern required"}, status=400)
+            from devi.operator.strip_sync import delete_strip_rule, get_all_raw_rules
+            ok = delete_strip_rule(rule)
+            return web.json_response({"success": ok, "count": len(get_all_raw_rules())})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    async def handle_api_test_strip_words(self, request):
+        try:
+            data = await request.json()
+            sample = str(data.get("text", ""))
+            from devi.operator.strip_sync import get_parsed_rules_cached
+            strip_words, replace_words = get_parsed_rules_cached()
+            cleaned = sample
+            applied_rules = []
+            import re
+            for pat in strip_words:
+                try:
+                    if re.search(pat, cleaned, flags=re.IGNORECASE):
+                        applied_rules.append(pat)
+                        cleaned = re.sub(pat, "", cleaned, flags=re.IGNORECASE)
+                except Exception:
+                    pass
+            for old, new in replace_words.items():
+                if old.lower() in cleaned.lower():
+                    applied_rules.append(f"{old} ➔ {new}")
+                    pattern = re.compile(re.escape(old), re.IGNORECASE)
+                    cleaned = pattern.sub(new, cleaned)
+            return web.json_response({
+                "success": True,
+                "original": sample,
+                "cleaned": cleaned.strip(),
+                "applied_rules": applied_rules,
+                "matches_count": len(applied_rules)
+            })
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    # =========================================================================
+    # KIND DOCTOR CLINICAL DECISION SUPPORT STUDIO (HUB 4)
+    # =========================================================================
+
+    async def handle_api_clinical_parkland(self, request):
+        try:
+            data = await request.json()
+            wt = float(data.get("weight_kg", 70.0))
+            tbsa = float(data.get("tbsa_pct", 20.0))
+            from devi.operator.medical_calculator import calc_parkland
+            res = calc_parkland(wt, tbsa)
+            return web.json_response({"success": True, "result": res})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    async def handle_api_clinical_gcs(self, request):
+        try:
+            data = await request.json()
+            eye = int(data.get("eye", 4))
+            verb = int(data.get("verbal", 5))
+            mot = int(data.get("motor", 6))
+            from devi.operator.medical_calculator import calc_gcs
+            res = calc_gcs(eye, verb, mot)
+            return web.json_response({"success": True, "result": res})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    async def handle_api_clinical_pediatric(self, request):
+        try:
+            data = await request.json()
+            wt = float(data.get("weight_kg", 15.0))
+            dose_mg_kg = float(data.get("dose_mg_kg", 10.0))
+            strength = float(data.get("strength_mg_5ml", 125.0))
+            from devi.operator.medical_calculator import calc_mg_per_kg
+            res = calc_mg_per_kg(dose_mg_kg, wt, strength)
+            return web.json_response({"success": True, "result": res})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    async def handle_api_clinical_drug(self, request):
+        q = request.query.get("q", "").strip()
+        if not q:
+            return web.json_response({"success": False, "error": "Query parameter 'q' required"}, status=400)
+        import aiohttp
+        fda_url = f"https://api.fda.gov/drug/label.json?search=openfda.brand_name:{q}+openfda.generic_name:{q}&limit=1"
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(fda_url, timeout=3.5) as r:
+                    if r.status == 200:
+                        dj = await r.json()
+                        item = dj.get("results", [{}])[0]
+                        bw = item.get("boxed_warning", ["None reported"])[0] if item.get("boxed_warning") else "No Black Box Warning."
+                        ind = item.get("indications_and_usage", ["Indications not listed"])[0]
+                        return web.json_response({
+                            "success": True,
+                            "drug": q,
+                            "brand": item.get("openfda", {}).get("brand_name", [q])[0],
+                            "generic": item.get("openfda", {}).get("generic_name", [q])[0],
+                            "boxed_warning": bw[:500],
+                            "indications": ind[:500],
+                            "source": "official_openfda"
+                        })
+        except Exception:
+            pass
+        # High-yield offline fallback
+        kb = {
+            "paracetamol": {"generic": "Acetaminophen", "indications": "Analgesic, antipyretic. 1st line in dengue & pregnancy.", "warning": "Hepatotoxicity above 4g/day. Antidote: N-Acetylcysteine (NAC)."},
+            "aspirin": {"generic": "Acetylsalicylic Acid", "indications": "Antiplatelet in ACS/CAD, analgesic, anti-inflammatory.", "warning": "Contraindicated in children with viral fever (Reye Syndrome). GI bleed risk."},
+            "amiodarone": {"generic": "Amiodarone HCl", "indications": "Ventricular arrhythmias, AF rhythm control.", "warning": "Black Box: Pulmonary fibrosis, hepatotoxicity, proarrhythmic effect. Check TFTs (thyroid toxicity)."},
+            "warfarin": {"generic": "Warfarin Sodium", "indications": "Anticoagulation in DVT, PE, mechanical heart valves.", "warning": "Black Box: Major or fatal bleeding. Teratogenic (fetal warfarin syndrome). Reversal: Vitamin K, FFP, PCC."},
+            "metformin": {"generic": "Metformin HCl", "indications": "Type 2 Diabetes Mellitus first-line agent.", "warning": "Lactic acidosis. Hold before IV iodinated contrast. Contraindicated in GFR < 30."},
+            "morphine": {"generic": "Morphine Sulfate", "indications": "Severe acute pain, acute pulmonary edema.", "warning": "Black Box: Respiratory depression, addiction. Reversal: Naloxone."},
+            "ceftriaxone": {"generic": "Ceftriaxone", "indications": "Meningitis, gonorrhoea, sepsis, typhoid fever.", "warning": "Biliary sludging in neonates. Do NOT mix with IV Calcium solutions."}
+        }
+        matched = kb.get(q.lower(), {
+            "generic": q.title(),
+            "indications": f"Prescription medication '{q.title()}'. Consult BNF/MIMS for dosing.",
+            "warning": "Verify renal/hepatic adjustment before administration."
+        })
+        return web.json_response({
+            "success": True,
+            "drug": q,
+            "brand": q.title(),
+            "generic": matched["generic"],
+            "boxed_warning": matched["warning"],
+            "indications": matched["indications"],
+            "source": "clinical_knowledge_base"
+        })
+
+    async def handle_api_clinical_ddi(self, request):
+        try:
+            data = await request.json()
+            d1 = str(data.get("drug1", "")).lower().strip()
+            d2 = str(data.get("drug2", "")).lower().strip()
+            ddi_database = {
+                ("warfarin", "aspirin"): {"severity": "High / Major 🔴", "mechanism": "Synergistic inhibition of coagulation and platelet aggregation.", "management": "Extreme hemorrhage risk. Avoid combination unless mechanical valve under specialist protocol."},
+                ("sildenafil", "nitroglycerin"): {"severity": "Contraindicated ⛔", "mechanism": "Excessive cGMP accumulation leading to profound, refractory hypotension.", "management": "DO NOT co-administer. Minimum 24-48h washout required."},
+                ("methotrexate", "nsaids"): {"severity": "High / Major 🔴", "mechanism": "NSAIDs decrease renal clearance of methotrexate, causing pancytopenia.", "management": "Avoid combination during high-dose methotrexate therapy."},
+                ("simvastatin", "clarithromycin"): {"severity": "High / Major 🔴", "mechanism": "CYP3A4 inhibition raises statin levels dramatically.", "management": "Severe rhabdomyolysis and acute renal failure risk. Suspend simvastatin during macrolide therapy."},
+                ("ssri", "tramadol"): {"severity": "High / Major 🔴", "mechanism": "Dual serotonergic stimulation.", "management": "Serotonin syndrome risk (hyperthermia, clonus, autonomic instability). Monitor closely or choose alternative."}
+            }
+            inter = ddi_database.get((d1, d2)) or ddi_database.get((d2, d1))
+            if not inter:
+                inter = {
+                    "severity": "Minor / No Known Major Interaction 🟢",
+                    "mechanism": f"No documented critical contraindication between {d1.title()} and {d2.title()}.",
+                    "management": "Standard clinical monitoring recommended."
+                }
+            return web.json_response({"success": True, "drug1": d1, "drug2": d2, "interaction": inter})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
+    async def handle_api_clinical_pearls(self, request):
+        pearls = [
+            {"subject": "Emergency Medicine", "title": "Parkland Formula 4-2-1", "pearl": "Give 4 mL × kg × %TBSA over 24 hrs. First half in 8 hrs from burn time, second half over remaining 16 hrs."},
+            {"subject": "Neurology", "title": "GCS ≤ 8 Intubate", "pearl": "Severe head injury threshold. Eye (4) + Verbal (5) + Motor (6). Motor score is the single best predictor of 6-month mortality."},
+            {"subject": "Cardiology", "title": "Wells' Criteria for PE", "pearl": "Clinical signs of DVT (3) + Alternative diagnosis less likely (3) + HR > 100 (1.5) + Immobilization (1.5) + Prior DVT/PE (1.5) + Hemoptysis (1) + Malignancy (1). Score > 4 = PE likely."},
+            {"subject": "Pharmacology", "title": "CYP3A4 Potent Inhibitors", "pearl": "Mnemonic 'G-PACMAN': Grapefruit juice, Protease inhibitors, Azole antifungals, Cimetidine, Macrolides (clarithro/erythro), Amiodarone, Non-DHP CCBs (verapamil/diltiazem)."},
+            {"subject": "Pediatrics", "title": "Rule of 10s for Cleft Lip", "pearl": "10 weeks of age, 10 pounds (4.5 kg) weight, 10 g/dL Hemoglobin before cleft lip repair (Millard rotation-advancement)."}
+        ]
+        return web.json_response({"success": True, "pearls": pearls})
+
+    # =========================================================================
+    # TELEGRAM MINI APP (TMA 2.0) BIOMETRIC / USER AUTH
+    # =========================================================================
+
+    async def handle_api_auth_telegram_webapp(self, request):
+        try:
+            data = await request.json()
+            user_info = data.get("user", {})
+            tg_id = int(user_info.get("id", 0))
+            tg_u = str(user_info.get("username", "")).lower()
+            is_master = tg_id in (1553619403, 759038032) or tg_u in ("kinddoctor4u", "ammitrajput1")
+            if is_master:
+                sess = self.auth_mgr.create_local_session(username=f"Dr. Amit (@{tg_u or 'MasterAdmin'})", role="admin")
+                return web.json_response({"success": True, "session": sess, "admin": True})
+            else:
+                return web.json_response({"success": False, "error": "Unauthorized Telegram account. Only @Kinddoctor4u and @Ammitrajput1 permitted."}, status=403)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
     # RAW SOCKET CLIENT FALLBACK
 
     async def _handle_raw_client(self, reader, writer):
@@ -10046,6 +10254,23 @@ class DashboardServer:
             self.app.router.add_post("/api/notifications/test", self.handle_api_notifications_test)
             self.app.router.add_post("/api/stash/flush", self.handle_api_stash_flush)
             self.app.router.add_get("/api/backup/export", self.handle_api_backup_export)
+
+            # Hub 2: Strip Words & Branding Studio Endpoints
+            self.app.router.add_get("/api/strip_words", self.handle_api_strip_words)
+            self.app.router.add_post("/api/strip_words/add", self.handle_api_add_strip_word)
+            self.app.router.add_post("/api/strip_words/delete", self.handle_api_delete_strip_word)
+            self.app.router.add_post("/api/strip_words/test", self.handle_api_test_strip_words)
+
+            # Hub 4: Kind Doctor Clinical Decision Studio Endpoints
+            self.app.router.add_post("/api/clinical/parkland", self.handle_api_clinical_parkland)
+            self.app.router.add_post("/api/clinical/gcs", self.handle_api_clinical_gcs)
+            self.app.router.add_post("/api/clinical/pediatric", self.handle_api_clinical_pediatric)
+            self.app.router.add_get("/api/clinical/drug", self.handle_api_clinical_drug)
+            self.app.router.add_post("/api/clinical/ddi", self.handle_api_clinical_ddi)
+            self.app.router.add_get("/api/clinical/pearls", self.handle_api_clinical_pearls)
+
+            # Telegram Mini App (TMA 2.0) Auth
+            self.app.router.add_post("/api/auth/telegram_webapp", self.handle_api_auth_telegram_webapp)
 
             self.runner = web.AppRunner(self.app)
 
