@@ -2,6 +2,26 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Sunday, 1 November 2026 | 05:00 AM IST
+
+### 51. Kind Doctor Bot Universal Media Downloader: yt-dlp Dependency & Cloud VPS Self-Healing Fix
+* **User Directive & Context (Screenshot from Telegram)**:
+  - *User Execution*: `/ytdl https://www.youtube.com/watch?v=xvT1jH8B9AM&list=RDMMxvT1jH8B9AM&index=1`
+  - *Bot Failure Response*: `❌ Media Download Failed: yt-dlp is not installed in the python environment. Please verify the link is publicly accessible.`
+  - *Permanent Admin Accounts*: Strictly `@Kinddoctor4u` (`1553619403`) & `@Ammitrajput1` (`759038032`).
+* **Root Cause Forensics**:
+  1. `requirements.txt` previously omitted `yt-dlp`. While `yt-dlp` was installed in the local developer Python environment, it was missing from the Oracle Cloud VPS production virtual environment (`/home/ubuntu/TG_KindSync_Pro/.venv`).
+  2. `devi/operator/media_downloader.py` threw `RuntimeError("yt-dlp is not installed in the python environment.")` immediately upon import failure without attempting autonomous self-healing or installation.
+* **Applied Engineering Upgrades**:
+  1. Added `yt-dlp>=2024.10.0` to `requirements.txt`.
+  2. Added autonomous `ensure_yt_dlp()` self-healing auto-loader in `devi/operator/media_downloader.py` which dynamically pip-installs and imports `yt-dlp` if missing from any active runtime.
+  3. Connected to Oracle Cloud VPS (`130.210.1.32`) via SSH and installed `yt-dlp` directly in the `.venv` (`.venv/bin/pip install -U yt-dlp`).
+  4. Synchronized git repository on VPS and restarted `tg-kinddoc-bot.service`.
+* **Affected Files**:
+  - `requirements.txt`
+  - `devi/operator/media_downloader.py`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Sunday, 1 November 2026 | 04:55 AM IST
 
 ### 50. GitHub Repository Branding Sync, Workspace Clutter Pruning & Cloning State Preservation

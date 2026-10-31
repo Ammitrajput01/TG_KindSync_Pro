@@ -33,9 +33,37 @@ try:
     import yt_dlp
     YT_DLP_AVAILABLE = True
 except ImportError:
+    yt_dlp = None
     YT_DLP_AVAILABLE = False
 
 logger = logging.getLogger("DEVI.MediaDownloader")
+
+
+def ensure_yt_dlp() -> bool:
+    """Self-healing helper: automatically installs yt-dlp if missing from environment."""
+    global yt_dlp, YT_DLP_AVAILABLE
+    if YT_DLP_AVAILABLE and yt_dlp is not None:
+        return True
+    try:
+        import yt_dlp as imported_ydl
+        yt_dlp = imported_ydl
+        YT_DLP_AVAILABLE = True
+        return True
+    except ImportError:
+        pass
+
+    logger.info("[!] yt-dlp not found in active python environment. Attempting self-healing pip install...")
+    try:
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"], timeout=180)
+        import yt_dlp as imported_ydl
+        yt_dlp = imported_ydl
+        YT_DLP_AVAILABLE = True
+        logger.info("[+] yt-dlp installed and imported successfully via self-healing pipeline!")
+        return True
+    except Exception as e:
+        logger.error(f"[!] Self-healing pip install of yt-dlp failed: {e}")
+        return False
 
 BASE_PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
 DOWNLOADS_DIR = BASE_PROJECT_DIR / "cache" / "media_downloads"
@@ -127,7 +155,7 @@ class MediaDownloaderEngine:
 
     async def extract_info(self, url: str, max_playlist_items: int = 50) -> Dict[str, Any]:
         """Extracts media metadata without downloading the file."""
-        if not YT_DLP_AVAILABLE:
+        if not YT_DLP_AVAILABLE and not ensure_yt_dlp():
             raise RuntimeError("yt-dlp is not installed in the python environment.")
 
         def _extract():
@@ -204,8 +232,8 @@ class MediaDownloaderEngine:
         Downloads a single video/audio track with best compatibility (1080p/720p MP4).
         Returns metadata dict with local file paths.
         """
-        if not YT_DLP_AVAILABLE:
-            raise RuntimeError("yt-dlp is not installed.")
+        if not YT_DLP_AVAILABLE and not ensure_yt_dlp():
+            raise RuntimeError("yt-dlp is not installed in the python environment.")
 
         def _download():
             opts = self._get_base_ydl_opts()
