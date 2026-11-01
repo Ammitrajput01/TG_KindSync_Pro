@@ -49,20 +49,38 @@ def test_env_in_memory_synchronization():
     test_tgt = "-1001234567890"
     test_rules = "-1009876543210:101:-1001234567890:201,-1009876543210:102:-1001234567890:202"
 
-    from dotenv import set_key
-    update_env_file(chat_id=test_src, topic_id=0, mode="1")
-    update_env_file(chat_id=test_tgt, topic_id=0, mode="2")
-    set_key(".env", "FORWARDING_RULES", test_rules)
-    os.environ["FORWARDING_RULES"] = test_rules
+    env_path = ".env"
+    original_env_content = None
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            original_env_content = f.read()
+    orig_env_vars = {k: os.environ.get(k) for k in ("SOURCE_CHAT", "SOURCE_TOPIC", "TARGET_CHAT", "TARGET_TOPIC", "FORWARDING_RULES")}
 
-    # Load AppConfig with override=True
-    cfg = AppConfig.load(routing_mode=2)
-    assert str(cfg.source_chat) == test_src, f"Expected {test_src}, got {cfg.source_chat}"
-    assert str(cfg.target_chat) == test_tgt, f"Expected {test_tgt}, got {cfg.target_chat}"
-    assert len(cfg.forwarding_rules) == 2, f"Expected 2 rules, got {len(cfg.forwarding_rules)}"
-    assert cfg.forwarding_rules[0]["source_topic"] == 101, "First rule source topic should be 101"
-    assert cfg.forwarding_rules[1]["target_topic"] == 202, "Second rule target topic should be 202"
-    print("    [+] Env, os.environ, and AppConfig.load() synchronized accurately!")
+    try:
+        from dotenv import set_key
+        update_env_file(chat_id=test_src, topic_id=0, mode="1")
+        update_env_file(chat_id=test_tgt, topic_id=0, mode="2")
+        set_key(".env", "FORWARDING_RULES", test_rules)
+        os.environ["FORWARDING_RULES"] = test_rules
+
+        # Load AppConfig with override=True
+        cfg = AppConfig.load(routing_mode=2)
+        assert str(cfg.source_chat) == test_src, f"Expected {test_src}, got {cfg.source_chat}"
+        assert str(cfg.target_chat) == test_tgt, f"Expected {test_tgt}, got {cfg.target_chat}"
+        assert len(cfg.forwarding_rules) == 2, f"Expected 2 rules, got {len(cfg.forwarding_rules)}"
+        assert cfg.forwarding_rules[0]["source_topic"] == 101, "First rule source topic should be 101"
+        assert cfg.forwarding_rules[1]["target_topic"] == 202, "Second rule target topic should be 202"
+        print("    [+] Env, os.environ, and AppConfig.load() synchronized accurately!")
+    finally:
+        # Strictly restore original .env and os.environ so production config is never corrupted
+        if original_env_content is not None:
+            with open(env_path, "w", encoding="utf-8") as f:
+                f.write(original_env_content)
+        for k, v in orig_env_vars.items():
+            if v is not None:
+                os.environ[k] = v
+            else:
+                os.environ.pop(k, None)
 
 import pytest
 

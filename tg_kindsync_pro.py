@@ -1121,8 +1121,8 @@ def startup_animation():
 class PerformanceConfig:
     workers: int = 1
     queue_size: int = 150
-    upload_parallelism: int = 12
-    adaptive: bool = False
+    upload_parallelism: int = 40
+    adaptive: bool = True
     media_filter: str = "all"
     keywords: list = field(default_factory=list)
     exclude_words: list = field(default_factory=list)
@@ -1152,7 +1152,7 @@ class AppConfig:
     batch_name: str = ""
 
     @classmethod
-    def load(cls, media_filter="all", workers=1, parallelism=12, adaptive=False, routing_mode=1, run_dlq=False, live_mode=False, auto_shutdown=False, direct_forward: Optional[bool] = None):
+    def load(cls, media_filter="all", workers=1, parallelism=40, adaptive=True, routing_mode=1, run_dlq=False, live_mode=False, auto_shutdown=False, direct_forward: Optional[bool] = None):
         load_dotenv(".env", override=False)
         try:
             api_id = int(os.getenv("API_ID", 0) or 0)
@@ -5041,7 +5041,7 @@ class TerminalPlatform:
             clear_screen()
             proc = PipelineProcessor(self.rpc, self.streamer, self.state, self.cfg, self.log, self.metrics, self.dlq, self.session_mgr)
             
-            mode_name = "Live 24/7 Mode" if self.cfg.live_mode else ("Balanced Mode" if getattr(self.cfg.perf, "upload_parallelism", 12) == 12 else ("God Mode" if getattr(self.cfg.perf, "upload_parallelism", 12) == 40 else "Safe Mode"))
+            mode_name = "Live 24/7 Mode" if self.cfg.live_mode else ("God Mode" if getattr(self.cfg.perf, "upload_parallelism", 40) == 40 else ("Balanced Mode" if getattr(self.cfg.perf, "upload_parallelism", 40) == 12 else "Safe Mode"))
             AdminTelemetry.dispatch(client, "🟢 [MONITOR] Forwarder Session Started", {
                 "Selected Mode": mode_name,
                 "Source Route": f"`{self.cfg.source_chat}` (Topic: `{self.cfg.source_topic}`)",
@@ -6758,6 +6758,28 @@ async def run_group_cloner_tool(session_mgr):
     existing_rules = [r.strip() for r in existing_rules_str.split(",") if r.strip() and len(r.split(":")) >= 4] if existing_rules_str else []
     prev_src = os.getenv("SOURCE_CHAT", "").strip()
     prev_tgt = os.getenv("TARGET_CHAT", "").strip()
+
+    # Self-healing fallback: If .env has dummy values or is missing, recover from SQLite group_clone_sessions
+    is_dummy = ("9876543210" in existing_rules_str) or ("9876543210" in prev_src)
+    if is_dummy or not existing_rules:
+        try:
+            state_mgr = StateManager()
+            await state_mgr.start()
+            latest = await state_mgr.get_latest_clone_session()
+            if latest and latest.get("source_chat") and latest.get("target_chat"):
+                db_topics = await state_mgr.get_clone_session_topics(latest["source_chat"], latest["target_chat"])
+                if db_topics:
+                    db_rules = [f"{t['source_chat']}:{t['source_topic']}:{t['target_chat']}:{t['target_topic']}" for t in db_topics]
+                    existing_rules = db_rules
+                    prev_src = latest["source_chat"]
+                    prev_tgt = latest["target_chat"]
+                    update_env_file(chat_id=prev_src, topic_id=0, mode="1")
+                    update_env_file(chat_id=prev_tgt, topic_id=0, mode="2")
+                    from dotenv import set_key
+                    set_key(".env", "FORWARDING_RULES", ",".join(existing_rules))
+                    os.environ["FORWARDING_RULES"] = ",".join(existing_rules)
+        except Exception as db_sess_err:
+            logger.debug(f"DB clone session recovery error: {db_sess_err}")
     
     cloner_choice = "fresh"
     if existing_rules or (prev_src and prev_src != "0" and prev_tgt and prev_tgt != "0"):
@@ -6773,7 +6795,8 @@ async def run_group_cloner_tool(session_mgr):
             f"[bold cyan]🔄 PREVIOUS GROUP CLONE SESSION DETECTED[/]\n\n"
             f"• Source Group    : [yellow]{src_disp}[/]\n"
             f"• Target Group    : [yellow]{tgt_disp}[/]\n"
-            f"• Structure Mode  : {topics_disp}\n\n"
+            f"• Structure Mode  : {topics_disp}\n"
+            f"• Speed Pipeline  : [bold red]🔥 God Mode (40 Sockets - Strict Sequence)[/]\n\n"
             f"[bold green][1][/] ⚡ [bold white]RESUME & CONTINUE[/] [dim](Skip completed files, continue where it stopped)[/]\n"
             f"[bold yellow][2][/] 🔄 [bold white]RE-SCAN & SYNC TOPICS[/] [dim](Check for newly added source topics & append to target)[/]\n"
             f"[bold magenta][3][/] 🆕 [bold white]START FRESH CLONE[/] [dim](Pick new source & target group)[/]\n"
@@ -6792,7 +6815,7 @@ async def run_group_cloner_tool(session_mgr):
 
     if cloner_choice == "resume":
         r_mode = 2 if existing_rules else 1
-        console.print(f"\n[bold green]✔ Resuming existing group clone ({len(existing_rules)} topics mapped)![/]" if existing_rules else f"\n[bold green]✔ Resuming direct group clone ({prev_src} ➔ {prev_tgt})![/]")
+        console.print(f"\n[bold green]✔ Resuming existing group clone ({len(existing_rules)} topics mapped) in God Mode (40 Sockets)![/]" if existing_rules else f"\n[bold green]✔ Resuming direct group clone ({prev_src} ➔ {prev_tgt}) in God Mode (40 Sockets)![/]")
         
         # Export state snapshot
         now = datetime.now()
@@ -6815,7 +6838,7 @@ async def run_group_cloner_tool(session_mgr):
 
         confirm = await safe_input("\nStart Streaming Remaining Messages Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
         if confirm and confirm.upper() == "YES":
-            return (1, 12, False, "all", r_mode, False, False)
+            return (1, 40, True, "all", r_mode, False, False)
         return None
 
     # Step 1: Choose SOURCE Group
@@ -8778,8 +8801,8 @@ async def run_menu(session_mgr):
             "[dim]─────────────────────────────────────────────────[/]\n"
             f" [bold green]{LB}0][/] ⚡ [bold white]Instant Auto-Resume[/] [bold yellow]⭐[/] [dim]· Continue Last Session Directly[/]\n"
             f" [bold green]{LB}1][/] 🟢 [bold white]Safe Mode[/] [dim]· 4 Workers (Slow Nets)[/]\n"
-            f" [bold blue]{LB}2][/] ⚖️ [bold white]Balanced Mode[/] [bold yellow]⭐[/] [dim]· 12 Workers (Default)[/]\n"
-            f" [bold red]{LB}3][/] 🔥 [bold white]God Mode[/] [dim]· 40 Workers (Gigabit Turbo)[/]\n"
+            f" [bold blue]{LB}2][/] ⚖️ [bold white]Balanced Mode[/] [dim]· 12 Workers (Standard)[/]\n"
+            f" [bold red]{LB}3][/] 🔥 [bold white]God Mode[/] [bold yellow]⭐[/] [dim]· 40 Workers (Gigabit Turbo - Default)[/]\n"
             f" [bold magenta]{LB}4][/] 🔴 [bold white]Live 24/7 Mode[/] [dim]· Real-Time Auto-Forward[/]",
             title="[bold cyan] 1 [/]",
             border_style="cyan",
@@ -8864,7 +8887,7 @@ async def run_menu(session_mgr):
         if has_active_session:
             route_preview = f"{cur_src} ➔ {cur_tgt}" if (cur_src and cur_tgt) else f"{len(cur_rules.split(','))} Topic Rules Configured"
             prompt_lines.append(f"  [bold green]⚡ Active Route:[/] [yellow]{route_preview}[/]  ·  Press [bold green][0][/] or [bold green][R][/] to [bold green]Resume Instantly[/]")
-        prompt_lines.append("  [dim]Enter[/] [bold cyan]0–19[/] [dim]or[/] [bold green]R[/][dim]  ·  [/][bold green]0 / R[/][dim] = Auto-Resume  ·  Press [bold green][Enter][/] for [/][bold yellow]2[/][dim] = Balanced Mode[/]")
+        prompt_lines.append("  [dim]Enter[/] [bold cyan]0–19[/] [dim]or[/] [bold green]R[/][dim]  ·  [/][bold green]0 / R[/][dim] = Auto-Resume  ·  Press [bold green][Enter][/] for [/][bold red]3[/][dim] = God Mode (High Speed - Strict Sequence)[/]")
         
         console.print(Panel(
             "\n".join(prompt_lines),
@@ -8872,7 +8895,7 @@ async def run_menu(session_mgr):
             box=box.ROUNDED,
             padding=(0, 1)
         ))
-        ch = await safe_input("👉 Enter Choice [0-19 / R] (Default: 2 - Balanced Mode)", allow_cancel=False, default_val="2")
+        ch = await safe_input("👉 Enter Choice [0-19 / R] (Default: 3 - God Mode)", allow_cancel=False, default_val="3")
         ch_clean = ch.strip().lower()
 
         # Attach / Stop background forwarder shortcuts
@@ -8895,6 +8918,30 @@ async def run_menu(session_mgr):
             cur_src_top = os.getenv("SOURCE_TOPIC", "0").strip()
             cur_tgt_top = os.getenv("TARGET_TOPIC", "0").strip()
 
+            # Self-healing fallback: If .env has dummy values or is missing, recover from SQLite group_clone_sessions
+            is_dummy = ("9876543210" in cur_rules) or ("9876543210" in cur_src)
+            if is_dummy or not ((cur_src and cur_tgt and cur_src != "0" and cur_tgt != "0") or cur_rules):
+                try:
+                    state_mgr = StateManager()
+                    await state_mgr.start()
+                    latest = await state_mgr.get_latest_clone_session()
+                    if latest and latest.get("source_chat") and latest.get("target_chat"):
+                        db_topics = await state_mgr.get_clone_session_topics(latest["source_chat"], latest["target_chat"])
+                        if db_topics:
+                            db_rules = [f"{t['source_chat']}:{t['source_topic']}:{t['target_chat']}:{t['target_topic']}" for t in db_topics]
+                            cur_rules = ",".join(db_rules)
+                            cur_src = latest["source_chat"]
+                            cur_tgt = latest["target_chat"]
+                            cur_src_top = str(db_topics[0]["source_topic"])
+                            cur_tgt_top = str(db_topics[0]["target_topic"])
+                            update_env_file(chat_id=cur_src, topic_id=0, mode="1")
+                            update_env_file(chat_id=cur_tgt, topic_id=0, mode="2")
+                            from dotenv import set_key
+                            set_key(".env", "FORWARDING_RULES", cur_rules)
+                            os.environ["FORWARDING_RULES"] = cur_rules
+                except Exception as db_rec_err:
+                    logger.debug(f"Auto-resume DB recovery error: {db_rec_err}")
+
             if not ((cur_src and cur_tgt and cur_src != "0" and cur_tgt != "0") or cur_rules):
                 console.print("\n[yellow]⚠️ No active previous session found in .env. Please configure Source & Target first (Option 5 or 7).[/]")
                 await asyncio.sleep(2.0)
@@ -8912,10 +8959,10 @@ async def run_menu(session_mgr):
                 f"• Source Channel  : [bold yellow]{cur_src}[/] (Topic: `{cur_src_top}`)\n"
                 f"• Target Channel  : [bold yellow]{cur_tgt}[/] (Topic: `{cur_tgt_top}`)\n"
                 + (f"• Mapped Topics   : [bold green]{rules_count} Forum Topics[/]\n" if routing_mode == 2 else "") +
-                f"• Transmission    : [bold cyan]Balanced Mode (12 Workers, 12 Parallel Sockets)[/]\n"
+                f"• Transmission    : [bold red]God Mode (High Speed - 40 Sockets, Strict Sequence Guaranteed)[/]\n"
                 f"• Crash-Recovery  : [bold green]SQLite WAL Bookmarks Active (Skips Completed)[/]\n\n"
-                " [bold green][Enter] / [1][/] 🚀 [bold white]Start Streaming Remaining Messages Now[/]\n"
-                " [bold yellow][2][/] ⚙️ [bold white]Change Speed / Transmission Mode (Safe / God / Live)[/]\n"
+                " [bold green][Enter] / [1][/] 🚀 [bold white]Start Streaming Remaining Messages Now (God Mode)[/]\n"
+                " [bold yellow][2][/] ⚙️ [bold white]Change Speed / Transmission Mode (Safe / Balanced / Live)[/]\n"
                 " [bold cyan][0][/] ⬅️ Return to Main Menu",
                 border_style="green", box=box.ROUNDED
             ))
@@ -8925,16 +8972,16 @@ async def run_menu(session_mgr):
             elif res_c == "2":
                 console.print("\n[bold cyan]Select Transmission Speed for Resume:[/]")
                 console.print(" [1] 🟢 Safe Mode (4 Workers)")
-                console.print(" [2] ⚖️ Balanced Mode (12 Workers - Recommended)")
-                console.print(" [3] 🔥 God Mode (40 Workers)")
+                console.print(" [2] ⚖️ Balanced Mode (12 Workers)")
+                console.print(" [3] 🔥 God Mode (40 Workers - Recommended Default)")
                 console.print(" [4] 🔴 Live 24/7 Mode")
-                spd_c = await safe_input("Choose Speed (1/2/3/4)", valid_options=["1", "2", "3", "4"], default_val="2")
+                spd_c = await safe_input("Choose Speed (1/2/3/4)", valid_options=["1", "2", "3", "4"], default_val="3")
                 if spd_c == "1": return (1, 4, False, "all", routing_mode, False, False)
                 elif spd_c == "2": return (1, 12, False, "all", routing_mode, False, False)
                 elif spd_c == "3": return (1, 40, True, "all", routing_mode, False, False)
-                elif spd_c == "4": return (1, 12, False, "all", routing_mode, False, True)
+                elif spd_c == "4": return (1, 40, True, "all", routing_mode, False, True)
             else:
-                return (1, 12, False, "all", routing_mode, False, False)
+                return (1, 40, True, "all", routing_mode, False, False)
 
         # 1-4: Transmission Modes
         elif ch in ["1", "2", "3", "4"]:
@@ -9132,8 +9179,8 @@ async def start_platform(auto_start: bool = False):
         try:
             if is_auto and first_run:
                 first_run = False
-                console.print("\n[bold green]🚀 AUTO-START:[/] [cyan]Launching Real-Time Live Forwarding in Balanced Mode (12 Workers)...[/]")
-                menu_result = (12, 1, False, None, "balanced", False, True)
+                console.print("\n[bold green]🚀 AUTO-START:[/] [cyan]Launching Real-Time Live Forwarding in God Mode (High Speed - 40 Sockets, Strict Sequence)...[/]")
+                menu_result = (1, 40, True, None, "god", False, True)
             else:
                 menu_result = await run_menu(session_mgr)
             if menu_result is None: continue 

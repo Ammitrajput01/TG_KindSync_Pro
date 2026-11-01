@@ -8786,8 +8786,8 @@ async def run_menu(session_mgr):
             "[dim]─────────────────────────────────────────────────[/]\n"
             f" [bold green]{LB}0][/] ⚡ [bold white]Instant Auto-Resume[/] [bold yellow]⭐[/] [dim]· Continue Last Session Directly[/]\n"
             f" [bold green]{LB}1][/] 🟢 [bold white]Safe Mode[/] [dim]· 4 Workers (Slow Nets)[/]\n"
-            f" [bold blue]{LB}2][/] ⚖️ [bold white]Balanced Mode[/] [bold yellow]⭐[/] [dim]· 12 Workers (Default)[/]\n"
-            f" [bold red]{LB}3][/] 🔥 [bold white]God Mode[/] [dim]· 40 Workers (Gigabit Turbo)[/]\n"
+            f" [bold blue]{LB}2][/] ⚖️ [bold white]Balanced Mode[/] [dim]· 12 Workers (Standard)[/]\n"
+            f" [bold red]{LB}3][/] 🔥 [bold white]God Mode[/] [bold yellow]⭐[/] [dim]· 40 Workers (Gigabit Turbo - Default)[/]\n"
             f" [bold magenta]{LB}4][/] 🔴 [bold white]Live 24/7 Mode[/] [dim]· Real-Time Auto-Forward[/]",
             title="[bold cyan] 1 [/]",
             border_style="cyan",
@@ -8872,7 +8872,7 @@ async def run_menu(session_mgr):
         if has_active_session:
             route_preview = f"{cur_src} ➔ {cur_tgt}" if (cur_src and cur_tgt) else f"{len(cur_rules.split(','))} Topic Rules Configured"
             prompt_lines.append(f"  [bold green]⚡ Active Route:[/] [yellow]{route_preview}[/]  ·  Press [bold green][0][/] or [bold green][R][/] to [bold green]Resume Instantly[/]")
-        prompt_lines.append("  [dim]Enter[/] [bold cyan]0–19[/] [dim]or[/] [bold green]R[/][dim]  ·  [/][bold green]0 / R[/][dim] = Auto-Resume  ·  Press [bold green][Enter][/] for [/][bold yellow]2[/][dim] = Balanced Mode[/]")
+        prompt_lines.append("  [dim]Enter[/] [bold cyan]0–19[/] [dim]or[/] [bold green]R[/][dim]  ·  [/][bold green]0 / R[/][dim] = Auto-Resume  ·  Press [bold green][Enter][/] for [/][bold red]3[/][dim] = God Mode (High Speed - Strict Sequence)[/]")
         
         console.print(Panel(
             "\n".join(prompt_lines),
@@ -8880,7 +8880,7 @@ async def run_menu(session_mgr):
             box=box.ROUNDED,
             padding=(0, 1)
         ))
-        ch = await safe_input("👉 Enter Choice [0-19 / R] (Default: 2 - Balanced Mode)", allow_cancel=False, default_val="2")
+        ch = await safe_input("👉 Enter Choice [0-19 / R] (Default: 3 - God Mode)", allow_cancel=False, default_val="3")
         ch_clean = ch.strip().lower()
 
         # Attach / Stop background forwarder shortcuts
@@ -8920,10 +8920,10 @@ async def run_menu(session_mgr):
                 f"• Source Channel  : [bold yellow]{cur_src}[/] (Topic: `{cur_src_top}`)\n"
                 f"• Target Channel  : [bold yellow]{cur_tgt}[/] (Topic: `{cur_tgt_top}`)\n"
                 + (f"• Mapped Topics   : [bold green]{rules_count} Forum Topics[/]\n" if routing_mode == 2 else "") +
-                f"• Transmission    : [bold cyan]Balanced Mode (12 Workers, 12 Parallel Sockets)[/]\n"
+                f"• Transmission    : [bold red]God Mode (High Speed - 40 Sockets, Strict Sequence Guaranteed)[/]\n"
                 f"• Crash-Recovery  : [bold green]SQLite WAL Bookmarks Active (Skips Completed)[/]\n\n"
-                " [bold green][Enter] / [1][/] 🚀 [bold white]Start Streaming Remaining Messages Now[/]\n"
-                " [bold yellow][2][/] ⚙️ [bold white]Change Speed / Transmission Mode (Safe / God / Live)[/]\n"
+                " [bold green][Enter] / [1][/] 🚀 [bold white]Start Streaming Remaining Messages Now (God Mode)[/]\n"
+                " [bold yellow][2][/] ⚙️ [bold white]Change Speed / Transmission Mode (Safe / Balanced / Live)[/]\n"
                 " [bold cyan][0][/] ⬅️ Return to Main Menu",
                 border_style="green", box=box.ROUNDED
             ))
@@ -8933,16 +8933,16 @@ async def run_menu(session_mgr):
             elif res_c == "2":
                 console.print("\n[bold cyan]Select Transmission Speed for Resume:[/]")
                 console.print(" [1] 🟢 Safe Mode (4 Workers)")
-                console.print(" [2] ⚖️ Balanced Mode (12 Workers - Recommended)")
-                console.print(" [3] 🔥 God Mode (40 Workers)")
+                console.print(" [2] ⚖️ Balanced Mode (12 Workers)")
+                console.print(" [3] 🔥 God Mode (40 Workers - Recommended Default)")
                 console.print(" [4] 🔴 Live 24/7 Mode")
-                spd_c = await safe_input("Choose Speed (1/2/3/4)", valid_options=["1", "2", "3", "4"], default_val="2")
+                spd_c = await safe_input("Choose Speed (1/2/3/4)", valid_options=["1", "2", "3", "4"], default_val="3")
                 if spd_c == "1": return (1, 4, False, "all", routing_mode, False, False)
                 elif spd_c == "2": return (1, 12, False, "all", routing_mode, False, False)
                 elif spd_c == "3": return (1, 40, True, "all", routing_mode, False, False)
-                elif spd_c == "4": return (1, 12, False, "all", routing_mode, False, True)
+                elif spd_c == "4": return (1, 40, True, "all", routing_mode, False, True)
             else:
-                return (1, 12, False, "all", routing_mode, False, False)
+                return (1, 40, True, "all", routing_mode, False, False)
 
         # 1-4: Transmission Modes
         elif ch in ["1", "2", "3", "4"]:
