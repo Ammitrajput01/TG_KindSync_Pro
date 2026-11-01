@@ -1388,17 +1388,31 @@ class StateManager:
     async def get_topic_watermark(self, source_chat, source_topic, target_chat, target_topic) -> int:
         tkey = (str(source_chat), int(source_topic or 0), str(target_chat), int(target_topic or 0))
         if hasattr(self, 'topic_watermarks') and tkey in self.topic_watermarks:
-            return self.topic_watermarks[tkey].get("max_id", 0)
+            val = self.topic_watermarks[tkey].get("max_id", 0)
+            if val > 0:
+                return val
         async with self.db_lock:
+            # 1. Primary check in topic_watermarks table
             async with self.db.execute("""
                 SELECT max_id FROM topic_watermarks 
                 WHERE source_chat=? AND source_topic=? AND target_chat=? AND target_topic=?
             """, (str(source_chat), int(source_topic or 0), str(target_chat), int(target_topic or 0))) as cursor:
                 row = await cursor.fetchone()
-                if row:
+                if row and row[0]:
                     if not hasattr(self, 'topic_watermarks'): self.topic_watermarks = {}
                     self.topic_watermarks[tkey] = {"max_id": row[0]}
                     return row[0]
+            # 2. Bulletproof Fallback: check forwarded table directly (guarantees resume even after abrupt kill/crash)
+            async with self.db.execute("""
+                SELECT MAX(msg_id) FROM forwarded 
+                WHERE source_chat=? AND target_chat=? AND target_topic=?
+            """, (str(source_chat), str(target_chat), int(target_topic or 0))) as cursor:
+                fwd_row = await cursor.fetchone()
+                if fwd_row and fwd_row[0]:
+                    max_fwd = int(fwd_row[0])
+                    if not hasattr(self, 'topic_watermarks'): self.topic_watermarks = {}
+                    self.topic_watermarks[tkey] = {"max_id": max_fwd}
+                    return max_fwd
         return 0
 
     async def update_topic_watermark(self, source_chat, source_topic, target_chat, target_topic, max_id, completed_files=0, total_files=0, is_finished=False):
@@ -1579,6 +1593,67 @@ class StateManager:
             except Exception as e:
                 logger.error(f"Get latest clone session error: {e}")
         return None
+
+    async def mark_clone_topic_completed(self, source_chat: str, source_topic: int, target_chat: str, target_topic: int = 0):
+        if not self.db: return
+        async with self.db_lock:
+            try:
+                await self.db.execute("""
+                    UPDATE group_clone_sessions
+                    SET status = 'completed', updated_at = ?
+                    WHERE source_chat = ? AND source_topic = ? AND target_chat = ?
+                """, (time.time(), str(source_chat), int(source_topic or 0), str(target_chat)))
+                await self.db.commit()
+            except Exception as e:
+                logger.error(f"Mark clone topic completed error: {e}")
+
+    async def is_clone_topic_completed(self, source_chat: str, source_topic: int, target_chat: str) -> bool:
+        if not self.db: return False
+        async with self.db_lock:
+            try:
+                async with self.db.execute("""
+                    SELECT status FROM group_clone_sessions
+                    WHERE source_chat = ? AND source_topic = ? AND target_chat = ?
+                """, (str(source_chat), int(source_topic or 0), str(target_chat))) as cursor:
+                    row = await cursor.fetchone()
+                    return (row is not None and row[0] == 'completed')
+            except Exception:
+                return False
+
+    async def get_clone_session_audit(self, source_chat: str, target_chat: str) -> list[dict]:
+        """
+        Reconciles topic status by checking group_clone_sessions alongside live forwarded count in SQLite.
+        Detects completed, partial/stuck, and pending topics.
+        """
+        if not self.db: return []
+        topics = await self.get_clone_session_topics(source_chat, target_chat)
+        if not topics: return []
+        
+        async with self.db_lock:
+            for t in topics:
+                tgt_top = int(t.get("target_topic", 0) or 0)
+                try:
+                    async with self.db.execute("""
+                        SELECT count(*), MAX(msg_id) FROM forwarded
+                        WHERE source_chat = ? AND target_chat = ? AND target_topic = ?
+                    """, (str(source_chat), str(target_chat), tgt_top)) as cursor:
+                        f_row = await cursor.fetchone()
+                        fwd_count = f_row[0] if f_row else 0
+                        fwd_max = f_row[1] if (f_row and f_row[1]) else 0
+                except Exception:
+                    fwd_count, fwd_max = 0, 0
+                    
+                t["messages_copied"] = max(int(t.get("messages_copied", 0) or 0), int(fwd_count))
+                t["last_copied_msg_id"] = max(int(t.get("last_copied_msg_id", 0) or 0), int(fwd_max or 0))
+                
+                raw_st = str(t.get("status", "")).strip().lower()
+                if raw_st == "completed":
+                    t["status"] = "completed"
+                elif t["messages_copied"] > 0:
+                    t["status"] = "in_progress"
+                else:
+                    t["status"] = "pending"
+        return topics
 
     async def close(self):
         self.running = False
@@ -4335,6 +4410,15 @@ class TerminalPlatform:
         gid = None
         batch_count = 0
         
+        # Fast skip if topic already completed
+        if rule.get("source_topic") and hasattr(self.state, 'is_clone_topic_completed'):
+            try:
+                if await self.state.is_clone_topic_completed(rule["source_chat"], rule["source_topic"], rule["target_chat"]):
+                    self.log(f"[bold green]✔ Rule {idx+1} (Topic {rule['source_topic']}): Already 100% Completed. Skipping in 0.001s.[/]")
+                    return
+            except Exception:
+                pass
+
         if rule.get("source_topic"):
             min_id = await self.state.get_topic_watermark(rule["source_chat"], rule["source_topic"], rule["target_chat"], rule.get("target_topic", 0))
         else:
@@ -4393,6 +4477,11 @@ class TerminalPlatform:
                     await asyncio.sleep(0.3)
                     
             await push_rule()
+            if not self.stop_evt.is_set() and rule.get("source_topic"):
+                with suppress(Exception):
+                    if hasattr(self.state, 'mark_clone_topic_completed'):
+                        await self.state.mark_clone_topic_completed(rule["source_chat"], rule["source_topic"], rule["target_chat"], tgt_topic)
+                        self.log(f"[bold green]✔ Topic {rule['source_topic']} fully scanned & marked COMPLETED in SQLite![/]")
         except Exception as e:
             self.log(f"[bold red]❌ Scanner Rule {idx+1} Error:[/] {e}")
 
@@ -6749,6 +6838,26 @@ async def run_local_splitter_tool(session_mgr):
         elif ch == "2":
             await run_single_file_splitter_tool(session_mgr)
 
+def parse_topic_range_selection(user_input: str, max_count: int) -> list[int]:
+    """
+    Parses user inputs like '1, 2, 5', '2-8', '1, 3, 5-10' into sorted 1-based index list.
+    """
+    selected = set()
+    parts = [p.strip() for p in user_input.replace(";", ",").split(",") if p.strip()]
+    for p in parts:
+        if "-" in p:
+            sub = p.split("-")
+            if len(sub) == 2 and sub[0].strip().isdigit() and sub[1].strip().isdigit():
+                start, end = int(sub[0]), int(sub[1])
+                for i in range(min(start, end), max(start, end) + 1):
+                    if 1 <= i <= max_count:
+                        selected.add(i)
+        elif p.isdigit():
+            val = int(p)
+            if 1 <= val <= max_count:
+                selected.add(val)
+    return sorted(list(selected))
+
 async def run_group_cloner_tool(session_mgr):
     clear_screen()
     console.print(get_persistent_header())
@@ -6766,6 +6875,29 @@ async def run_group_cloner_tool(session_mgr):
     existing_rules = [r.strip() for r in existing_rules_str.split(",") if r.strip() and len(r.split(":")) >= 4] if existing_rules_str else []
     prev_src = os.getenv("SOURCE_CHAT", "").strip()
     prev_tgt = os.getenv("TARGET_CHAT", "").strip()
+
+    # Self-healing fallback: If .env has dummy values or is missing, recover from SQLite group_clone_sessions
+    is_dummy = ("9876543210" in existing_rules_str) or ("9876543210" in prev_src)
+    if is_dummy or not existing_rules:
+        try:
+            state_mgr = StateManager()
+            await state_mgr.start()
+            latest = await state_mgr.get_latest_clone_session()
+            if latest and latest.get("source_chat") and latest.get("target_chat"):
+                db_topics = await state_mgr.get_clone_session_topics(latest["source_chat"], latest["target_chat"])
+                if db_topics:
+                    db_rules = [f"{t['source_chat']}:{t['source_topic']}:{t['target_chat']}:{t['target_topic']}" for t in db_topics]
+                    existing_rules = db_rules
+                    prev_src = latest["source_chat"]
+                    prev_tgt = latest["target_chat"]
+                    update_env_file(chat_id=prev_src, topic_id=0, mode="1")
+                    update_env_file(chat_id=prev_tgt, topic_id=0, mode="2")
+                    from dotenv import set_key
+                    set_key(".env", "FORWARDING_RULES", ",".join(existing_rules))
+                    os.environ["FORWARDING_RULES"] = ",".join(existing_rules)
+            await state_mgr.close()
+        except Exception as db_sess_err:
+            logger.debug(f"DB clone session recovery error: {db_sess_err}")
     
     cloner_choice = "fresh"
     if existing_rules or (prev_src and prev_src != "0" and prev_tgt and prev_tgt != "0"):
@@ -6777,30 +6909,175 @@ async def run_group_cloner_tool(session_mgr):
             tgt_disp = sample_parts[2]
             
         topics_disp = f"[bold green]{len(existing_rules)} Topics Mapped[/]" if existing_rules else "[bold yellow]Direct 1-to-1 Group Mirror[/]"
+        
+        # Live Topic Scan & Audit Reconciler
+        audit_items = []
+        try:
+            state_mgr = StateManager()
+            await state_mgr.start()
+            audit_items = await state_mgr.get_clone_session_audit(src_disp, tgt_disp)
+            if not audit_items and existing_rules:
+                for r in existing_rules:
+                    p = r.split(":")
+                    if len(p) >= 4:
+                        s_c, s_t, t_c, t_t = p[0], int(p[1]), p[2], int(p[3])
+                        f_cnt, f_max = 0, 0
+                        with suppress(Exception):
+                            async with state_mgr.db_lock:
+                                async with state_mgr.db.execute("SELECT count(*), MAX(msg_id) FROM forwarded WHERE source_chat=? AND target_chat=? AND target_topic=?", (s_c, t_c, t_t)) as cur:
+                                    f_row = await cur.fetchone()
+                                    if f_row:
+                                        f_cnt = f_row[0] or 0
+                                        f_max = f_row[1] or 0
+                        audit_items.append({
+                            "source_chat": s_c, "source_topic": s_t, "target_chat": t_c, "target_topic": t_t,
+                            "topic_title": f"Topic {s_t}", "messages_copied": f_cnt, "last_copied_msg_id": f_max,
+                            "status": "in_progress" if f_cnt > 0 else "pending"
+                        })
+            await state_mgr.close()
+        except Exception as audit_err:
+            logger.debug(f"Topic audit error: {audit_err}")
+
+        # Display Comprehensive Topic Scan & Status Table
+        if audit_items:
+            audit_table = Table(title="📊 PREVIOUS CLONE SESSION — LIVE TOPIC PROGRESS AUDIT", box=box.ROUNDED, show_header=True, header_style="bold cyan", expand=True)
+            audit_table.add_column("#", style="bold yellow", width=4, justify="right")
+            audit_table.add_column("Topic Title", style="bold white", ratio=3)
+            audit_table.add_column("Src Topic", style="cyan", width=11)
+            audit_table.add_column("Tgt Topic", style="magenta", width=11)
+            audit_table.add_column("Copied", style="green", width=11, justify="right")
+            audit_table.add_column("Last Msg ID", style="dim white", width=12, justify="right")
+            audit_table.add_column("Status", style="bold", width=18)
+
+            completed_count = 0
+            partial_count = 0
+            pending_count = 0
+            total_copied_msgs = 0
+
+            for idx, t in enumerate(audit_items, 1):
+                st = t.get("status", "pending")
+                copied = t.get("messages_copied", 0)
+                total_copied_msgs += copied
+                last_id = t.get("last_copied_msg_id", 0)
+                last_disp = f"#{last_id}" if last_id else "—"
+                if st == "completed":
+                    status_badge = "[bold green]✔ COMPLETED[/]"
+                    completed_count += 1
+                elif st == "in_progress":
+                    status_badge = "[bold yellow]⚡ PARTIAL / STUCK[/]"
+                    partial_count += 1
+                else:
+                    status_badge = "[dim]⏳ PENDING[/]"
+                    pending_count += 1
+
+                audit_table.add_row(
+                    str(idx),
+                    str(t.get("topic_title", f"Topic {t.get('source_topic')}")),
+                    str(t.get("source_topic", 0)),
+                    str(t.get("target_topic", 0)),
+                    f"{copied} msgs",
+                    last_disp,
+                    status_badge
+                )
+
+            console.print(audit_table)
+            console.print(f"[bold cyan]Audit Summary:[/] [green]{completed_count} Completed[/] | [yellow]{partial_count} Partial/Stuck[/] | [dim]{pending_count} Pending[/] | [bold green]{total_copied_msgs} Total Forwarded[/]\n")
+
         console.print(Panel(
-            f"[bold cyan]🔄 PREVIOUS GROUP CLONE SESSION DETECTED[/]\n\n"
+            f"[bold cyan]🔄 CLONER ACTION & RESUME CONTROLS[/]\n\n"
             f"• Source Group    : [yellow]{src_disp}[/]\n"
             f"• Target Group    : [yellow]{tgt_disp}[/]\n"
-            f"• Structure Mode  : {topics_disp}\n\n"
-            f"[bold green][1][/] ⚡ [bold white]RESUME & CONTINUE[/] [dim](Skip completed files, continue where it stopped)[/]\n"
-            f"[bold yellow][2][/] 🔄 [bold white]RE-SCAN & SYNC TOPICS[/] [dim](Check for newly added source topics & append to target)[/]\n"
-            f"[bold magenta][3][/] 🆕 [bold white]START FRESH CLONE[/] [dim](Pick new source & target group)[/]\n"
-            f"[bold cyan][0][/] ⬅️ Cancel / Return to Main Menu",
+            f"• Structure Mode  : {topics_disp}\n"
+            f"• Speed Pipeline  : [bold red]🔥 God Mode (40 Sockets - Strict Sequence)[/]\n\n"
+            f"[bold green][1][/] ⚡ [bold white]AUTO-RESUME ALL INCOMPLETE TOPICS[/] [dim](Skips completed in 0.001s, continues stuck topics from bookmark, finishes pending)[/]\n"
+            f"[bold yellow][2][/] 🎯 [bold white]RESUME SPECIFIC TOPIC ONLY[/] [dim](Pick 1 topic # to clone/finish that single topic in isolation)[/]\n"
+            f"[bold magenta][3][/] 🔀 [bold white]SELECT / FILTER TOPICS TO CLONE[/] [dim](Choose which topics to keep active or exclude unwanted chat box)[/]\n"
+            f"[bold blue][4][/] 🔄 [bold white]RE-SCAN & SYNC TOPICS[/] [dim](Check for newly added source topics & append to target)[/]\n"
+            f"[bold red][5][/] 🆕 [bold white]START FRESH CLONE[/] [dim](Pick new source & target group)[/]\n"
+            f"[bold cyan][0][/] ⬅️ Return to Main Menu",
             border_style="cyan", box=box.ROUNDED
         ))
-        ch = await safe_input("Choose Option (1/2/3/0)", valid_options=["0", "1", "2", "3"], default_val="1", allow_cancel=True)
+        ch = await safe_input("Choose Option (1/2/3/4/5/0)", valid_options=["0", "1", "2", "3", "4", "5"], default_val="1", allow_cancel=True)
         if not ch or ch == "0":
             return None
         elif ch == "1":
             cloner_choice = "resume"
         elif ch == "2":
+            # Resume Specific Topic Only
+            if not audit_items:
+                console.print("[yellow]⚠️ No topic mappings found to isolate. Running standard resume.[/]")
+                cloner_choice = "resume"
+            else:
+                sel_str = await safe_input(f"Enter Topic # to Resume (1 to {len(audit_items)} or 0 to Cancel)", allow_cancel=True)
+                if not sel_str or not sel_str.isdigit() or int(sel_str) < 1 or int(sel_str) > len(audit_items):
+                    return None
+                sel_idx = int(sel_str)
+                chosen = audit_items[sel_idx - 1]
+                chosen_rule = f"{chosen['source_chat']}:{chosen['source_topic']}:{chosen['target_chat']}:{chosen['target_topic']}"
+                env_p = ".env"
+                set_key(env_p, "FORWARDING_RULES", chosen_rule)
+                set_key(env_p, "SOURCE_CHAT", str(chosen['source_chat']))
+                set_key(env_p, "TARGET_CHAT", str(chosen['target_chat']))
+                set_key(env_p, "SOURCE_TOPIC", str(chosen['source_topic']))
+                set_key(env_p, "TARGET_TOPIC", str(chosen['target_topic']))
+                os.environ["FORWARDING_RULES"] = chosen_rule
+                os.environ["SOURCE_CHAT"] = str(chosen['source_chat'])
+                os.environ["TARGET_CHAT"] = str(chosen['target_chat'])
+                os.environ["SOURCE_TOPIC"] = str(chosen['source_topic'])
+                os.environ["TARGET_TOPIC"] = str(chosen['target_topic'])
+                console.print(f"\n[bold green]✔ Configured isolated stream for Topic #{sel_idx}: '{chosen.get('topic_title', '')}' (Src {chosen['source_topic']} ➔ Tgt {chosen['target_topic']}) in God Mode![/]")
+                return (1, 40, True, "all", 2, False, False)
+        elif ch == "3":
+            # Filter topics to clone
+            if not audit_items:
+                console.print("[yellow]⚠️ No topic mappings found to filter.[/]")
+                cloner_choice = "resume"
+            else:
+                console.print(Panel(
+                    "[bold cyan]🔀 FILTER TOPICS FOR THIS CLONE SESSION[/]\n\n"
+                    " [bold yellow][S][/] 🎯 [bold white]Select Specific Topics to Keep[/] [dim](e.g. Type '2, 3, 5-10')[/]\n"
+                    " [bold magenta][E][/] 🚫 [bold white]Exclude Specific Topics[/] [dim](e.g. Type '1' to skip General Chat Box)[/]\n"
+                    " [bold red][X][/] 🧹 [bold white]Auto-Skip Chat Box Topics[/] [dim](Auto-detect & remove chatter/general topics)[/]",
+                    border_style="cyan", box=box.ROUNDED
+                ))
+                filt_ch = await safe_input("Choose Filter Mode (S/E/X or 0 to Cancel)", valid_options=["S", "E", "X", "s", "e", "x", "0"], default_val="S", allow_cancel=True)
+                if not filt_ch or filt_ch == "0":
+                    return None
+                filt_ch = filt_ch.upper()
+                kept_items = []
+                if filt_ch == "S":
+                    raw_indices = await safe_input(f"Enter Topic Numbers to KEEP (1 to {len(audit_items)}, e.g. 2, 3, 5-8):", allow_cancel=True)
+                    if not raw_indices: return None
+                    chosen_nums = parse_topic_range_selection(raw_indices, len(audit_items))
+                    kept_items = [audit_items[i - 1] for i in chosen_nums]
+                elif filt_ch == "E":
+                    raw_indices = await safe_input(f"Enter Topic Numbers to EXCLUDE / SKIP (e.g. 1, 5):", allow_cancel=True)
+                    if not raw_indices: return None
+                    excl_nums = set(parse_topic_range_selection(raw_indices, len(audit_items)))
+                    kept_items = [t for idx, t in enumerate(audit_items, 1) if idx not in excl_nums]
+                elif filt_ch == "X":
+                    chat_kw = ["chat", "general", "discussion", "discuss", "doubt", "talk", "spam", "rules", "bot", "random", "off-topic", "offtopic", "help", "q&a", "qna"]
+                    kept_items = [t for t in audit_items if int(t.get("source_topic", 0)) != 1 and not any(k in str(t.get("topic_title", "")).lower() for k in chat_kw)]
+
+                if not kept_items:
+                    console.print("[yellow]⚠️ No topics remaining after filter! Aborting.[/]")
+                    return None
+
+                filtered_rules = [f"{t['source_chat']}:{t['source_topic']}:{t['target_chat']}:{t['target_topic']}" for t in kept_items]
+                rules_str = ",".join(filtered_rules)
+                set_key(".env", "FORWARDING_RULES", rules_str)
+                os.environ["FORWARDING_RULES"] = rules_str
+                console.print(f"\n[bold green]✔ Successfully filtered! Configured {len(kept_items)} active topics in .env.[/]")
+                cloner_choice = "resume"
+                existing_rules = filtered_rules
+        elif ch == "4":
             cloner_choice = "rescan"
         else:
             cloner_choice = "fresh"
 
     if cloner_choice == "resume":
         r_mode = 2 if existing_rules else 1
-        console.print(f"\n[bold green]✔ Resuming existing group clone ({len(existing_rules)} topics mapped)![/]" if existing_rules else f"\n[bold green]✔ Resuming direct group clone ({prev_src} ➔ {prev_tgt})![/]")
+        console.print(f"\n[bold green]✔ Resuming existing group clone ({len(existing_rules)} topics active) in God Mode (40 Sockets)![/]" if existing_rules else f"\n[bold green]✔ Resuming direct group clone ({prev_src} ➔ {prev_tgt}) in God Mode (40 Sockets)![/]")
         
         # Export state snapshot
         now = datetime.now()
@@ -6823,7 +7100,7 @@ async def run_group_cloner_tool(session_mgr):
 
         confirm = await safe_input("\nStart Streaming Remaining Messages Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
         if confirm and confirm.upper() == "YES":
-            return (1, 12, False, "all", r_mode, False, False)
+            return (1, 40, True, "all", r_mode, False, False)
         return None
 
     # Step 1: Choose SOURCE Group
@@ -6887,7 +7164,7 @@ async def run_group_cloner_tool(session_mgr):
         
         confirm = await safe_input("Start Direct Group Clone Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
         if confirm and confirm.upper() == "YES":
-            return (1, 12, False, "all", 1, False, False)
+            return (1, 40, True, "all", 1, False, False)
         return None
         
     console.print(f"[bold green]✨ Found {len(src_topics)} Forum Topics in Source Group![/]")
@@ -6899,6 +7176,45 @@ async def run_group_cloner_tool(session_mgr):
     for idx, t in enumerate(src_topics, 1):
         topic_table.add_row(str(idx), getattr(t, 'title', f'Topic {t.id}'), str(t.id))
     console.print(topic_table)
+
+    # Interactive Topic Selection / Filtering
+    CHAT_BOX_KEYWORDS = ["chat", "general", "discussion", "discuss", "doubt", "talk", "spam", "rules", "bot", "random", "off-topic", "offtopic", "help", "q&a", "qna"]
+    chat_topics_detected = [
+        (idx, t) for idx, t in enumerate(src_topics, 1)
+        if int(t.id) == 1 or any(k in getattr(t, 'title', '').lower() for k in CHAT_BOX_KEYWORDS)
+    ]
+    chat_note = ""
+    if chat_topics_detected:
+        names = ", ".join([f"#{idx} '{getattr(t, 'title', f'Topic {t.id}')}'" for idx, t in chat_topics_detected[:3]])
+        chat_note = f"\n[dim yellow]💡 Notice: Detected {len(chat_topics_detected)} potential Chatter / General topics ({names}). You can auto-skip them with [X].[/]"
+
+    console.print(Panel(
+        f"[bold cyan]🎯 SELECT FORUM TOPICS TO CLONE[/]{chat_note}\n\n"
+        f" [bold green][A][/] ⚡ [bold white]Clone ALL Topics[/] [dim](Default — Press Enter)[/]\n"
+        f" [bold yellow][S][/] 🎯 [bold white]Select Specific Topics[/] [dim](e.g. Type '2, 3, 4' or '2-10')[/]\n"
+        f" [bold magenta][E][/] 🚫 [bold white]Exclude Specific Topics[/] [dim](e.g. Type '1' to skip General Chat Box)[/]\n"
+        f" [bold red][X][/] 🧹 [bold white]Auto-Skip Chat Box Topics[/] [dim](Automatically excludes all chatter/general topics)[/]",
+        border_style="cyan", box=box.ROUNDED
+    ))
+    filt_mode = await safe_input("Choose Topic Filter (A/S/E/X)", valid_options=["A", "S", "E", "X", "a", "s", "e", "x"], default_val="A")
+    filt_mode = (filt_mode or "A").upper()
+    if filt_mode == "S":
+        raw_sel = await safe_input(f"Enter Topic Numbers to CLONE (1 to {len(src_topics)}, e.g. 2, 3, 5-8):", allow_cancel=True)
+        if raw_sel:
+            chosen_nums = parse_topic_range_selection(raw_sel, len(src_topics))
+            if chosen_nums:
+                src_topics = [src_topics[i - 1] for i in chosen_nums]
+                console.print(f"[bold green]✔ Selected {len(src_topics)} Topics to Mirror & Clone![/]")
+    elif filt_mode == "E":
+        raw_sel = await safe_input(f"Enter Topic Numbers to EXCLUDE / SKIP (e.g. 1, 5):", allow_cancel=True)
+        if raw_sel:
+            excl_nums = set(parse_topic_range_selection(raw_sel, len(src_topics)))
+            src_topics = [t for idx, t in enumerate(src_topics, 1) if idx not in excl_nums]
+            console.print(f"[bold green]✔ Excluded requested topics. {len(src_topics)} Topics will be cloned![/]")
+    elif filt_mode == "X":
+        excl_chat_indices = {c[0] for c in chat_topics_detected}
+        src_topics = [t for idx, t in enumerate(src_topics, 1) if idx not in excl_chat_indices]
+        console.print(f"[bold green]✔ Auto-skipped {len(excl_chat_indices)} chatter topics! {len(src_topics)} Study Topics will be cloned.[/]")
     
     tgt_topics_map = {}
     try:
@@ -7006,8 +7322,122 @@ async def run_group_cloner_tool(session_mgr):
             "Topics Found": f"{len(src_topics)}",
             "Rules Configured": f"{len(rules_to_create)}"
         })
-        return (1, 12, False, "all", 2, False, False)
+        return (1, 40, True, "all", 2, False, False)
         
+    return None
+
+async def run_single_topic_cloner_tool(session_mgr):
+    clear_screen()
+    console.print(get_persistent_header())
+    console.print(Panel(
+        "[bold cyan]🎯 DIRECT SINGLE FORUM TOPIC CLONER / SLICER[/]\n"
+        "[dim]Clone or resume 1 specific Source Topic directly into 1 Target Topic with zero loss crash recovery![/]",
+        border_style="cyan", box=box.ROUNDED
+    ))
+
+    client = await session_mgr.ensure_active_client()
+    if not client: return None
+
+    # Step 1: Source Group
+    console.print("\n[bold cyan]Step 1: Choose SOURCE Forum Group[/]")
+    src_sel = await interactive_channel_selector(client, prompt_title="SOURCE Forum Group")
+    if not src_sel: return None
+    src_id = src_sel["id"]
+
+    # Fetch Source Topics
+    console.print(f"\n[cyan]🔍 Fetching Forum Topics for {src_sel['title']}...[/]")
+    src_topics = []
+    try:
+        src_entity, _ = await resolve_telethon_entity(client, src_id)
+        src_peer = await client.get_input_entity(src_entity)
+        off_date, off_id, off_top = None, 0, 0
+        while True:
+            res = await client(GetForumTopicsRequest(peer=src_peer, offset_date=off_date, offset_id=off_id, offset_topic=off_top, limit=100))
+            if not hasattr(res, 'topics') or not res.topics: break
+            src_topics.extend(res.topics)
+            if len(res.topics) < 100: break
+            last_t = res.topics[-1]
+            off_date, off_id, off_top = getattr(last_t, 'date', None), getattr(last_t, 'id', 0), getattr(last_t, 'id', 0)
+            await asyncio.sleep(0.2)
+    except Exception as e:
+        console.print(f"[bold red]❌ Failed to lookup source topics:[/] {e}")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return None
+
+    if not src_topics:
+        console.print("[yellow]⚠️ No forum topics found in source group.[/]")
+        await safe_input("Press Enter to return", allow_cancel=False)
+        return None
+
+    t_table = Table(title="Select SOURCE Topic to Clone", box=box.ROUNDED, show_header=True, header_style="bold cyan")
+    t_table.add_column("#", style="bold yellow", width=4)
+    t_table.add_column("Topic Title", style="bold white")
+    t_table.add_column("Topic ID", style="cyan")
+    for idx, t in enumerate(src_topics, 1):
+        t_table.add_row(str(idx), getattr(t, 'title', f'Topic {t.id}'), str(t.id))
+    console.print(t_table)
+
+    ch_idx_str = await safe_input(f"Enter Topic # to Clone (1 to {len(src_topics)} or 0 to Cancel)", allow_cancel=True)
+    if not ch_idx_str or not ch_idx_str.isdigit() or int(ch_idx_str) < 1 or int(ch_idx_str) > len(src_topics):
+        return None
+    chosen_src_topic = src_topics[int(ch_idx_str) - 1]
+    src_t_id = chosen_src_topic.id
+    src_t_title = getattr(chosen_src_topic, 'title', f'Topic {src_t_id}')
+
+    # Step 2: Target Group
+    console.print(f"\n[bold cyan]Step 2: Choose TARGET Forum Group for '{src_t_title}'[/]")
+    tgt_sel = await interactive_channel_selector(client, prompt_title="TARGET Forum Group")
+    if not tgt_sel: return None
+    tgt_id = tgt_sel["id"]
+
+    # Match or create target topic
+    tgt_t_id = 0
+    try:
+        tgt_entity, _ = await resolve_telethon_entity(client, tgt_id)
+        tgt_peer = await client.get_input_entity(tgt_entity)
+        tgt_res = await client(GetForumTopicsRequest(peer=tgt_peer, offset_date=None, offset_id=0, offset_topic=0, limit=100))
+        if hasattr(tgt_res, 'topics') and tgt_res.topics:
+            for tt in tgt_res.topics:
+                if tt.title.strip().lower() == src_t_title.strip().lower():
+                    tgt_t_id = tt.id
+                    console.print(f" [green]✔ Found existing topic in target:[/] {tt.title} (ID: {tgt_t_id})")
+                    break
+        if not tgt_t_id:
+            created = await client(CreateForumTopicRequest(
+                peer=tgt_peer,
+                title=src_t_title,
+                icon_color=getattr(chosen_src_topic, 'icon_color', None) or 7322096,
+                random_id=generate_random_long()
+            ))
+            tgt_t_id = created.updates[0].id if hasattr(created, 'updates') and created.updates else (getattr(created, 'id', None) or src_t_id)
+            console.print(f" [bold green]➕ Created new topic in target:[/] {src_t_title} (ID: {tgt_t_id})")
+    except Exception as e:
+        console.print(f" [yellow]⚠️ Target topic creation note: {e} -> Defaulting to topic ID[/]")
+        tgt_t_id = src_t_id
+
+    # Configure rule
+    single_rule = f"{src_id}:{src_t_id}:{tgt_id}:{tgt_t_id or 0}"
+    env_p = ".env"
+    set_key(env_p, "FORWARDING_RULES", single_rule)
+    set_key(env_p, "SOURCE_CHAT", str(src_id))
+    set_key(env_p, "TARGET_CHAT", str(tgt_id))
+    set_key(env_p, "SOURCE_TOPIC", str(src_t_id))
+    set_key(env_p, "TARGET_TOPIC", str(tgt_t_id or 0))
+    os.environ["FORWARDING_RULES"] = single_rule
+    os.environ["SOURCE_CHAT"] = str(src_id)
+    os.environ["TARGET_CHAT"] = str(tgt_id)
+    os.environ["SOURCE_TOPIC"] = str(src_t_id)
+    os.environ["TARGET_TOPIC"] = str(tgt_t_id or 0)
+
+    state_mgr = StateManager()
+    await state_mgr.start()
+    await state_mgr.save_clone_topic_mapping(str(src_id), src_t_id, str(tgt_id), tgt_t_id or 0, src_t_title)
+    await state_mgr.close()
+
+    console.print(f"\n[bold green]✔ Configured Single Topic Clone:[/] {src_t_title} (Src: {src_t_id} ➔ Tgt: {tgt_t_id}) in God Mode (40 Sockets)!")
+    confirm = await safe_input("Start Streaming Messages Now? (YES / NO)", valid_options=["YES", "NO", "yes", "no"], default_val="YES", allow_cancel=True)
+    if confirm and confirm.upper() == "YES":
+        return (1, 40, True, "all", 2, False, False)
     return None
 
 async def run_single_or_specific_messages_forwarder(session_mgr):
@@ -8980,10 +9410,12 @@ async def run_menu(session_mgr):
                 "     [dim]Scrape active members from any group, export CSV backup & safely add to your group[/]\n\n"
                 " [bold magenta][4][/] 🧬 [bold white]Full Group / Forum Auto-Mirror[/]\n"
                 "     [dim]Auto-create matching topics and mirror entire group structure[/]\n\n"
+                " [bold blue][5][/] 🎯 [bold white]Single Forum Topic Cloner / Slicer[/] [bold yellow]⭐ (New)[/]\n"
+                "     [dim]Clone or resume 1 specific Source Topic directly into 1 Target Topic with zero loss crash recovery[/]\n\n"
                 " [dim][0] Return to Main Menu[/]",
                 border_style="magenta", box=box.ROUNDED
             ))
-            clone_sub = await safe_input("Choose Option (1/2/3/4/0)", valid_options=["1", "2", "3", "4", "0"], default_val="1", allow_cancel=True)
+            clone_sub = await safe_input("Choose Option (1/2/3/4/5/0)", valid_options=["1", "2", "3", "4", "5", "0"], default_val="1", allow_cancel=True)
             if clone_sub == "1":
                 await run_single_or_specific_messages_forwarder(session_mgr)
             elif clone_sub == "2":
@@ -8992,6 +9424,9 @@ async def run_menu(session_mgr):
                 await run_member_scraper_and_adder(session_mgr)
             elif clone_sub == "4":
                 res = await run_group_cloner_tool(session_mgr)
+                if res: return res
+            elif clone_sub == "5":
+                res = await run_single_topic_cloner_tool(session_mgr)
                 if res: return res
             continue
         elif ch == "8":

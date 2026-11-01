@@ -27,6 +27,7 @@ from tests.test_media_downloader import run_media_downloader_suite
 from tests.test_master_vrob_and_cdss import main as run_vrob_and_cdss_suite
 from tests.test_tma_cdss_strip_studio import main as run_tma_cdss_strip_studio_suite
 from tests.test_collapsible_sidebar_and_responsive_header import test_collapsible_sidebar_and_header as run_sidebar_and_header_suite
+from tests.test_cloner_topic_scan_and_resume import main as run_cloner_topic_scan_suite
 from tests.test_kind_doctor_upgrades import (
     test_telegram_bot_name_sync,
     test_unified_branding_toggle_logic,
@@ -62,6 +63,7 @@ async def run_all():
         ("Virtual Reorder Buffer (VROB), Biometric Vault & CDSS", run_vrob_and_cdss_suite),
         ("TMA 2.0 WebApp, Clinical Studio & Strip Words Studio", run_tma_cdss_strip_studio_suite),
         ("Collapsible Mini Sidebar & Responsive Header", run_sidebar_and_header_suite),
+        ("Cloner Topic Scan, Watermark SQLite Fallback & Selective Resume", run_cloner_topic_scan_suite),
     ]
 
     passed = 0
