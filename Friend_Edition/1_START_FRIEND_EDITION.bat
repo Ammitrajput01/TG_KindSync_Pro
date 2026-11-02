@@ -14,24 +14,36 @@ echo        Oracle Cloud Mumbai VPS (24/7 High-Speed Telegram Cloner)
 echo        Powered by: Kind Doctor ^& Team (@Kinddoctor4u)
 echo ==============================================================================
 echo.
-echo   [1] Connect to Oracle Terminal (Interactive Setup ^& Select Topics)
-echo   [2] Start 24/7 Autopilot (Runs continuously in background even if PC is OFF)
-echo   [3] View Quick How-To-Use Guide
-echo   [4] Auto-Fix ^& Verify SSH Key Permissions
+echo   [1] Run Standalone Locally on this PC (Recommended - Zero VPS / Runs on PC)
+echo   [2] Connect to Oracle Terminal (Interactive Setup & Select Topics)
+echo   [3] Start 24/7 Autopilot on Oracle VPS (Runs in background even if PC is OFF)
+echo   [4] View Quick How-To-Use Guide
+echo   [5] Auto-Fix & Verify SSH Key Permissions
 echo.
 echo   [0] Exit
 echo ==============================================================================
 echo.
-set /p "CHOICE=Enter your choice [1-4 or 0]: "
+set /p "CHOICE=Enter your choice [1-5 or 0]: "
 
-if "%CHOICE%"=="1" goto RUN_INTERACTIVE
-if "%CHOICE%"=="2" goto RUN_AUTOPILOT
-if "%CHOICE%"=="3" goto VIEW_GUIDE
-if "%CHOICE%"=="4" goto FIX_PERMISSIONS
+if "%CHOICE%"=="1" goto RUN_LOCAL
+if "%CHOICE%"=="2" goto RUN_INTERACTIVE
+if "%CHOICE%"=="3" goto RUN_AUTOPILOT
+if "%CHOICE%"=="4" goto VIEW_GUIDE
+if "%CHOICE%"=="5" goto FIX_PERMISSIONS
 if "%CHOICE%"=="0" exit /b 0
 
-echo [!] Invalid choice. Please select from 1 to 4 or 0.
+echo [!] Invalid choice. Please select from 1 to 5 or 0.
 timeout /t 2 >nul
+goto MAIN_MENU
+
+:RUN_LOCAL
+cls
+if exist "RUN_LOCALLY_ON_MY_PC.bat" (
+    call "RUN_LOCALLY_ON_MY_PC.bat"
+) else (
+    python tg_kindsync_pro.py
+)
+pause
 goto MAIN_MENU
 
 :RUN_INTERACTIVE

@@ -1,20 +1,39 @@
 ==============================================================================
-   TG KINDSYNC PRO — FRIEND EDITION (ORACLE CLOUD 24/7 SETUP)
+   TG KINDSYNC PRO — FRIEND EDITION (QUICK START GUIDE)
 ==============================================================================
 
-Welcome! This folder is specially prepared for Friend's 24/7 Telegram Cloner.
+Welcome! This folder contains everything needed to run TG KindSync Pro.
+You can run it in TWO WAYS:
 
-HOW TO START (2 OPTIONS):
 ------------------------------------------------------------------------------
-[OPTION 1: Interactive Terminal Setup & Cloner]
-- Double-click: CONNECT_ORACLE_FRIEND.bat
-- It will connect to your isolated workspace on Oracle Cloud.
-- Choose source & target group/topics from the interactive menu.
+METHOD 1: RUN LOCALLY ON YOUR OWN PC (RECOMMENDED - 100% LOCAL & PRIVATE)
+------------------------------------------------------------------------------
+No cloud server, no VPS, and no SSH key required! It runs 100% on your PC.
 
-[OPTION 2: 24/7 Autopilot Background Service]
-- Double-click: START_ORACLE_FRIEND_24_7.bat
-- It will run your cloner 24/7 in background even when your PC is turned OFF!
+1. Make sure Python 3.10+ is installed on your Windows PC:
+   - Download from: https://www.python.org/downloads/
+   - IMPORTANT: Check the box "Add python.exe to PATH" during installation.
+
+2. Simply Double-Click:
+   👉 `RUN_LOCALLY_ON_MY_PC.bat`  (or option [1] in `1_START_FRIEND_EDITION.bat`)
+
+3. On first run:
+   - It will automatically install all needed libraries (Telethon, Rich, etc.).
+   - Enter your phone number (+91...) and OTP to login to your Telegram account.
+   - Choose your source and destination channels/topics from the interactive menu.
+   - That's it! High-speed cloning begins immediately on your PC.
+
+------------------------------------------------------------------------------
+METHOD 2: CONNECT TO ORACLE CLOUD VPS (24/7 REMOTE MODE)
+------------------------------------------------------------------------------
+Use this if you want the forwarder to run 24/7 on the cloud server even when
+your PC is turned OFF.
+
+1. Double-click: `1_START_FRIEND_EDITION.bat`
+2. Select Option [2] to connect to the terminal and configure your run.
+3. Select Option [3] to launch the 24/7 Autopilot daemon on the server.
 
 ==============================================================================
-Note: All files here are strictly isolated from Doctor's Master Edition.
+Note: All your sessions and data are completely isolated and private.
+Powered by Kind Doctor & Team (@Kinddoctor4u)
 ==============================================================================

@@ -493,20 +493,22 @@ class TelegramWebLoginManager:
                 "verified_at": datetime.now().isoformat()
             }
             self._save_cached_profile(session_name, user_data)
-            self._save_cached_profile("session_forwarder", user_data)
             self.active_session_name = session_name
             self.pending_logins.pop(login_id, None)
 
             with suppress(Exception):
                 await client.disconnect()
 
-            # Synchronize newly verified credentials directly into session_forwarder.session
+            # Preserve primary account: only synchronize into session_forwarder.session if
+            # session_forwarder does not exist yet or if explicitly named session_forwarder.
             created_sess = self.base_dir / f"{session_name}.session"
             primary_sess = self.base_dir / "session_forwarder.session"
-            if created_sess.exists() and str(created_sess.resolve()) != str(primary_sess.resolve()):
-                with suppress(Exception):
-                    import shutil
-                    shutil.copy2(created_sess, primary_sess)
+            if not primary_sess.exists() or session_name == "session_forwarder":
+                self._save_cached_profile("session_forwarder", user_data)
+                if created_sess.exists() and str(created_sess.resolve()) != str(primary_sess.resolve()):
+                    with suppress(Exception):
+                        import shutil
+                        shutil.copy2(created_sess, primary_sess)
 
             return {
                 "success": True,
@@ -555,7 +557,6 @@ class TelegramWebLoginManager:
             fwd_path = self.base_dir / "session_forwarder.session"
             
             self._save_cached_profile(sess_name, user_data)
-            self._save_cached_profile("session_forwarder", user_data)
             self.active_session_name = sess_name
             
             from telethon.sessions import SQLiteSession
@@ -567,13 +568,16 @@ class TelegramWebLoginManager:
             acc_sqlite.save()
             acc_sqlite.close()
 
-            fwd_sqlite = SQLiteSession(str(self.base_dir / "session_forwarder"))
-            if temp_client.session.dc_id and temp_client.session.server_address and temp_client.session.port:
-                fwd_sqlite.set_dc(temp_client.session.dc_id, temp_client.session.server_address, temp_client.session.port)
-            if temp_client.session.auth_key:
-                fwd_sqlite.auth_key = temp_client.session.auth_key
-            fwd_sqlite.save()
-            fwd_sqlite.close()
+            # Only populate session_forwarder if it doesn't already exist
+            if not fwd_path.exists():
+                self._save_cached_profile("session_forwarder", user_data)
+                fwd_sqlite = SQLiteSession(str(self.base_dir / "session_forwarder"))
+                if temp_client.session.dc_id and temp_client.session.server_address and temp_client.session.port:
+                    fwd_sqlite.set_dc(temp_client.session.dc_id, temp_client.session.server_address, temp_client.session.port)
+                if temp_client.session.auth_key:
+                    fwd_sqlite.auth_key = temp_client.session.auth_key
+                fwd_sqlite.save()
+                fwd_sqlite.close()
 
             await temp_client.disconnect()
 

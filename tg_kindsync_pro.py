@@ -471,6 +471,17 @@ _CLEAN_RULES_CACHE = {
     "replace_words": {}
 }
 
+def sync_strip_words_to_friend():
+    """Keeps Friend_Edition/strip_words.txt continuously synchronized with root strip_words.txt."""
+    try:
+        f_path = Path("Friend_Edition") / "strip_words.txt"
+        r_path = Path("strip_words.txt")
+        if r_path.exists() and f_path.parent.exists():
+            if not f_path.exists() or r_path.stat().st_mtime != f_path.stat().st_mtime:
+                shutil.copy2(r_path, f_path)
+    except Exception:
+        pass
+
 def get_clean_rules():
     """
     Loads permanent clean words and replacement pairs from:
@@ -479,6 +490,7 @@ def get_clean_rules():
     Caches results and auto-reloads whenever strip_words.txt or .env is edited.
     """
     global _CLEAN_RULES_CACHE
+    sync_strip_words_to_friend()
     strip_file = Path("strip_words.txt")
     env_file = Path(".env")
     
@@ -2501,7 +2513,10 @@ async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, *
             logger.warning(f"Telegram FloodWait hit ({e.seconds}s). Auto-sleeping {wait_time}s before retry (Attempt {attempt})...")
             if e.seconds > 600 or attempt >= 25:
                 raise
-            await asyncio.sleep(wait_time)
+        except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError):
+            # Fatal authorization or content protection errors: immediately raise without sleeping or retrying!
+            # Eliminates 181s (10 exponential retry delays) on protected channels.
+            raise
         except RPCError as e:
             GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"RPCError ({type(e).__name__})", severity=0.3)
             if attempt >= max_retries:
@@ -3032,6 +3047,7 @@ class MemoryStreamer:
             task_sizes = {}
             file_id = generate_random_long()
 
+            uploader = None
             try:
                 # ⚡ FAST MTPROTO MULTI-SOCKET PARALLEL ACCELERATOR (25+ MB/s Wire Speed)
                 if size >= 2 * 1024 * 1024:
@@ -3042,6 +3058,14 @@ class MemoryStreamer:
                         stream = downloader.download(input_loc, file_size=size, part_size_kb=512, connection_count=8)
                     except Exception as fe:
                         stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
+
+                    try:
+                        from fast_transfer import ParallelTransferrer
+                        uploader = ParallelTransferrer(client, dc_id=client.session.dc_id)
+                        upload_conns = min(6, ParallelTransferrer.get_optimal_connections(size))
+                        await uploader.init_upload(file_id=file_id, file_size=size, part_size_kb=512, connection_count=upload_conns)
+                    except Exception as ue:
+                        uploader = None
                 else:
                     stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
 
@@ -3068,33 +3092,55 @@ class MemoryStreamer:
                     while len(buffer) >= UP_CHUNK_SIZE:
                         payload = bytes(buffer[:UP_CHUNK_SIZE])
                         del buffer[:UP_CHUNK_SIZE]
+                        if uploader:
+                            await uploader.upload_part(payload)
+                            part_idx += 1
+                            uploaded_bytes += len(payload)
+                            self.metrics["bytes_uploaded"] += len(payload)
+                            if self.ui_callback:
+                                self.ui_callback(name, min(size, uploaded_bytes), size)
+                        else:
+                            t = asyncio.create_task(self._send_chunk(client, file_id, part_idx, total_parts, payload, is_big))
+                            in_flight.add(t)
+                            task_sizes[t] = len(payload)
+                            part_idx += 1
+
+                            # Dynamic Cruise Control Parallelism (starts high at 32-40, scales dynamically with smart brake)
+                            concurrency = GLOBAL_CRUISE_CONTROLLER.get_concurrency()
+                            while len(in_flight) >= concurrency:
+                                await drain_one(in_flight, task_sizes)
+                                concurrency = GLOBAL_CRUISE_CONTROLLER.get_concurrency()
+                        await asyncio.sleep(0)
+
+                if buffer:
+                    payload = bytes(buffer)
+                    if uploader:
+                        await uploader.upload_part(payload)
+                        part_idx += 1
+                        uploaded_bytes += len(payload)
+                        self.metrics["bytes_uploaded"] += len(payload)
+                        if self.ui_callback:
+                            self.ui_callback(name, min(size, uploaded_bytes), size)
+                    else:
                         t = asyncio.create_task(self._send_chunk(client, file_id, part_idx, total_parts, payload, is_big))
                         in_flight.add(t)
                         task_sizes[t] = len(payload)
                         part_idx += 1
 
-                        # Dynamic Cruise Control Parallelism (starts high at 32-40, scales dynamically with smart brake)
-                        concurrency = GLOBAL_CRUISE_CONTROLLER.get_concurrency()
-                        while len(in_flight) >= concurrency:
-                            await drain_one(in_flight, task_sizes)
-                            concurrency = GLOBAL_CRUISE_CONTROLLER.get_concurrency()
-                        await asyncio.sleep(0)
-
-                if buffer:
-                    payload = bytes(buffer)
-                    t = asyncio.create_task(self._send_chunk(client, file_id, part_idx, total_parts, payload, is_big))
-                    in_flight.add(t)
-                    task_sizes[t] = len(payload)
-                    part_idx += 1
-
-                while in_flight:
-                    await drain_one(in_flight, task_sizes)
+                if uploader:
+                    await uploader.finish_upload()
+                else:
+                    while in_flight:
+                        await drain_one(in_flight, task_sizes)
 
                 if is_big:
                     return InputFileBig(id=file_id, parts=part_idx, name=name)
                 return InputFile(id=file_id, parts=part_idx, name=name, md5_checksum="")
 
             except (FileReferenceExpiredError, RPCError, Exception) as e:
+                if uploader:
+                    with suppress(Exception):
+                        await uploader._cleanup()
                 err_str = str(e).lower()
                 is_expired = isinstance(e, FileReferenceExpiredError) or "file reference has expired" in err_str or "filereference" in err_str
                 if is_expired and attempt < max_file_ref_retries - 1:
@@ -3804,7 +3850,7 @@ class PipelineProcessor:
 
         success_flag = False
         direct_forward_success = False
-        attempt_direct = getattr(self.cfg, "direct_forward", False)
+        attempt_direct = getattr(self.cfg, "direct_forward", False) and str(source_chat) not in self._restricted_channels
 
         if attempt_direct:
             try:
@@ -3830,6 +3876,7 @@ class PipelineProcessor:
                 success_flag = True
                 direct_forward_success = True
             except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError) as e:
+                self._restricted_channels.add(str(source_chat))
                 self.log(f"[yellow]🔒 Direct Forward Restricted ({type(e).__name__}) -> Fallback to RAM Streamer[/]")
             except Exception as e:
                 self.log(f"[yellow]ℹ Direct Forward bypass -> Streamer: {str(e)[:60]}[/]")
@@ -3898,26 +3945,28 @@ class PipelineProcessor:
                         direct_media_copied = False
 
                         # Tier 1: Instant Server-Side MTProto Media Reference Copy (0.1s latency, zero byte download/upload)
-                        try:
-                            sent_media = await self.rpc.execute(
-                                lambda c: c.send_file(
-                                    _parse_chat_id(target_chat),
-                                    m.media,
-                                    caption=cap_main,
-                                    thumb=t_path,
-                                    reply_to=resolved_topic,
-                                    parse_mode="md",
-                                    supports_streaming=True,
-                                    silent=silent_mode
-                                ),
-                                client=client,
-                                timeout=35.0
-                            )
-                            direct_media_copied = True
-                        except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError) as ex_restr:
-                            self.log(f"[yellow]🔒 Direct Media Copy Restricted ({type(ex_restr).__name__}) -> Fallback to RAM Streamer[/]")
-                        except Exception as ex_direct:
-                            logger.debug(f"Direct server-side media copy bypass: {ex_direct}")
+                        if str(source_chat) not in self._restricted_channels:
+                            try:
+                                sent_media = await self.rpc.execute(
+                                    lambda c: c.send_file(
+                                        _parse_chat_id(target_chat),
+                                        m.media,
+                                        caption=cap_main,
+                                        thumb=t_path,
+                                        reply_to=resolved_topic,
+                                        parse_mode="md",
+                                        supports_streaming=True,
+                                        silent=silent_mode
+                                    ),
+                                    client=client,
+                                    timeout=35.0
+                                )
+                                direct_media_copied = True
+                            except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError) as ex_restr:
+                                self._restricted_channels.add(str(source_chat))
+                                self.log(f"[yellow]🔒 Direct Media Copy Restricted ({type(ex_restr).__name__}) -> Fallback to RAM Streamer[/]")
+                            except Exception as ex_direct:
+                                logger.debug(f"Direct server-side media copy bypass: {ex_direct}")
 
                         if not direct_media_copied:
                             # Tier 2: High-Speed In-Memory RAM Streamer (For restricted channels or expired references)
@@ -4171,6 +4220,7 @@ class TerminalPlatform:
         self.tgt_info = "Detecting Target..."
         self._kw_re_cache = {}
         self._ex_re_cache = {}
+        self._restricted_channels = set()
 
     def log(self, text: str):
         self.logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] {text}")

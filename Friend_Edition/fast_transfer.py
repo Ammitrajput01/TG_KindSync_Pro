@@ -24,6 +24,7 @@ import inspect
 import logging
 import math
 import os
+import socket
 import time
 from pathlib import Path
 from typing import Optional, List, AsyncGenerator, Union, BinaryIO, Tuple
@@ -146,6 +147,27 @@ class UploadSender:
             pass
 
 
+def _tune_connection_socket(conn) -> None:
+    """
+    Applies enterprise TCP socket buffer optimizations (TCP_NODELAY and 4MB buffers)
+    to eliminate Nagle delays and maximize bandwidth-delay product to Telegram DCs.
+    """
+    try:
+        writer = getattr(conn, "_writer", None)
+        if writer:
+            sock = writer.get_extra_info("socket")
+            if sock:
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                for opt in (getattr(socket, "SO_RCVBUF", None), getattr(socket, "SO_SNDBUF", None)):
+                    if opt is not None:
+                        try:
+                            sock.setsockopt(socket.SOL_SOCKET, opt, 4 * 1024 * 1024)
+                        except OSError:
+                            pass
+    except Exception:
+        pass
+
+
 class ParallelTransferrer:
     """
     Orchestrates multiple MTProto connections against a Telegram DC
@@ -200,6 +222,7 @@ class ParallelTransferrer:
             local_addr=local_addr,
         )
         await sender.connect(conn)
+        _tune_connection_socket(conn)
 
         if not self.auth_key:
             auth = await self.client(ExportAuthorizationRequest(self.dc_id))
