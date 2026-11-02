@@ -2191,8 +2191,9 @@ class MultiSessionManager:
         self.session_names = []
         self.active_index = 0
         self._round_robin_idx = 0
-        self.pool_mode = False
+        self.pool_mode = os.getenv("MULTI_ACCOUNT_POOL", "true").strip().lower() in ("true", "1", "yes")
         self._flood_cooldowns = {}
+        self._authorized_session_names = set()
         self._discover_sessions()
 
     def _discover_sessions(self):
@@ -2222,6 +2223,8 @@ class MultiSessionManager:
             name = str(Path(sf).with_suffix(""))
             try:
                 cl = TelegramClient(name, self.api_id, self.api_hash, **TELEGRAM_DEVICE_PARAMS)
+                cl._session_name = Path(name).name
+                cl._session_mgr = self
                 self.session_names.append(Path(name).name)
                 self.clients.append(cl)
             except Exception as e:
@@ -2232,8 +2235,11 @@ class MultiSessionManager:
             
         if not self.clients:
             name = "session_forwarder"
+            cl = TelegramClient(name, self.api_id, self.api_hash, **TELEGRAM_DEVICE_PARAMS)
+            cl._session_name = name
+            cl._session_mgr = self
             self.session_names.append(name)
-            self.clients.append(TelegramClient(name, self.api_id, self.api_hash, **TELEGRAM_DEVICE_PARAMS))
+            self.clients.append(cl)
 
         if self.active_index >= len(self.clients):
             self.active_index = 0
@@ -2245,6 +2251,8 @@ class MultiSessionManager:
             return self.clients[idx]
         
         client = TelegramClient(clean_name, self.api_id, self.api_hash, **TELEGRAM_DEVICE_PARAMS)
+        client._session_name = clean_name
+        client._session_mgr = self
         self.session_names.append(clean_name)
         self.clients.append(client)
         return client
@@ -2337,6 +2345,7 @@ class MultiSessionManager:
             if self.api_id and self.api_hash and not self.clients:
                 self._discover_sessions()
 
+        self._authorized_session_names.clear()
         # Connect clients without blindly prompting repeated logins for non-primary sessions
         for idx, client in enumerate(self.clients):
             if not client.is_connected():
@@ -2345,6 +2354,7 @@ class MultiSessionManager:
             if idx == self.active_index and not await client.is_user_authorized():
                 await interactive_telegram_login(client)
             if await client.is_user_authorized():
+                self._authorized_session_names.add(self.session_names[idx])
                 with suppress(Exception):
                     async for _ in client.iter_dialogs(limit=1):
                         pass
@@ -2382,9 +2392,13 @@ class MultiSessionManager:
             idx = self._round_robin_idx % len(self.clients)
             self._round_robin_idx += 1
             sname = self.session_names[idx]
-            if now >= self._flood_cooldowns.get(sname, 0):
-                return self.clients[idx]
-        return self.clients[self.active_index] if self.clients else None
+            cl = self.clients[idx]
+            is_auth = (sname in self._authorized_session_names) if self._authorized_session_names else cl.is_connected()
+            if is_auth and now >= self._flood_cooldowns.get(sname, 0):
+                return cl
+        if 0 <= self.active_index < len(self.clients):
+            return self.clients[self.active_index]
+        return self.clients[0]
 
     async def get_sessions_status(self) -> list:
         status_list = []
@@ -2509,6 +2523,9 @@ async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, *
         except FloodWaitError as e:
             GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"Telegram FloodWait ({e.seconds}s)", severity=0.7)
             GLOBAL_RATE_BUDGETER.record_flood_wait(e.seconds)
+            s_name = getattr(client, "_session_name", "") or getattr(getattr(client, "session", None), "filename", "")
+            if s_name and hasattr(client, "_session_mgr") and client._session_mgr:
+                client._session_mgr.mark_flood_wait(s_name, e.seconds)
             wait_time = int(e.seconds) + 1
             logger.warning(f"Telegram FloodWait hit ({e.seconds}s). Auto-sleeping {wait_time}s before retry (Attempt {attempt})...")
             if e.seconds > 600 or attempt >= 25:
@@ -3050,15 +3067,23 @@ class MemoryStreamer:
             uploader = None
             try:
                 # ⚡ FAST MTPROTO MULTI-SOCKET PARALLEL ACCELERATOR (25+ MB/s Wire Speed)
-                if size >= 2 * 1024 * 1024:
-                    try:
-                        from fast_transfer import ParallelTransferrer
-                        dc_id, input_loc = utils.get_input_location(msg.media)
-                        downloader = ParallelTransferrer(client, dc_id=dc_id)
-                        stream = downloader.download(input_loc, file_size=size, part_size_kb=512, connection_count=8)
-                    except Exception as fe:
-                        stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
+                async def _get_download_stream():
+                    if size >= 2 * 1024 * 1024:
+                        try:
+                            from fast_transfer import ParallelTransferrer
+                            dc_id, input_loc = utils.get_input_location(msg.media)
+                            downloader = ParallelTransferrer(client, dc_id=dc_id)
+                            async for chk in downloader.download(input_loc, file_size=size, part_size_kb=512, connection_count=8):
+                                yield chk
+                            return
+                        except Exception as fe:
+                            logger.info(f"Fast parallel downloader fallback to iter_download: {fe}")
+                    async for chk in client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size):
+                        yield chk
 
+                stream = _get_download_stream()
+
+                if size >= 2 * 1024 * 1024:
                     try:
                         from fast_transfer import ParallelTransferrer
                         uploader = ParallelTransferrer(client, dc_id=client.session.dc_id)
@@ -3066,8 +3091,6 @@ class MemoryStreamer:
                         await uploader.init_upload(file_id=file_id, file_size=size, part_size_kb=512, connection_count=upload_conns)
                     except Exception as ue:
                         uploader = None
-                else:
-                    stream = client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size)
 
                 async for chunk in stream:
                     if stop_event.is_set(): raise asyncio.CancelledError()
@@ -3093,12 +3116,22 @@ class MemoryStreamer:
                         payload = bytes(buffer[:UP_CHUNK_SIZE])
                         del buffer[:UP_CHUNK_SIZE]
                         if uploader:
-                            await uploader.upload_part(payload)
-                            part_idx += 1
-                            uploaded_bytes += len(payload)
-                            self.metrics["bytes_uploaded"] += len(payload)
-                            if self.ui_callback:
-                                self.ui_callback(name, min(size, uploaded_bytes), size)
+                            try:
+                                await uploader.upload_part(payload)
+                                part_idx += 1
+                                uploaded_bytes += len(payload)
+                                self.metrics["bytes_uploaded"] += len(payload)
+                                if self.ui_callback:
+                                    self.ui_callback(name, min(size, uploaded_bytes), size)
+                            except Exception as up_err:
+                                logger.info(f"Parallel uploader fallback to standard send_chunk: {up_err}")
+                                with suppress(Exception):
+                                    await uploader._cleanup()
+                                uploader = None
+                                t = asyncio.create_task(self._send_chunk(client, file_id, part_idx, total_parts, payload, is_big))
+                                in_flight.add(t)
+                                task_sizes[t] = len(payload)
+                                part_idx += 1
                         else:
                             t = asyncio.create_task(self._send_chunk(client, file_id, part_idx, total_parts, payload, is_big))
                             in_flight.add(t)
@@ -3115,12 +3148,22 @@ class MemoryStreamer:
                 if buffer:
                     payload = bytes(buffer)
                     if uploader:
-                        await uploader.upload_part(payload)
-                        part_idx += 1
-                        uploaded_bytes += len(payload)
-                        self.metrics["bytes_uploaded"] += len(payload)
-                        if self.ui_callback:
-                            self.ui_callback(name, min(size, uploaded_bytes), size)
+                        try:
+                            await uploader.upload_part(payload)
+                            part_idx += 1
+                            uploaded_bytes += len(payload)
+                            self.metrics["bytes_uploaded"] += len(payload)
+                            if self.ui_callback:
+                                self.ui_callback(name, min(size, uploaded_bytes), size)
+                        except Exception as up_err:
+                            logger.info(f"Parallel uploader fallback to standard send_chunk: {up_err}")
+                            with suppress(Exception):
+                                await uploader._cleanup()
+                            uploader = None
+                            t = asyncio.create_task(self._send_chunk(client, file_id, part_idx, total_parts, payload, is_big))
+                            in_flight.add(t)
+                            task_sizes[t] = len(payload)
+                            part_idx += 1
                     else:
                         t = asyncio.create_task(self._send_chunk(client, file_id, part_idx, total_parts, payload, is_big))
                         in_flight.add(t)
@@ -3128,8 +3171,14 @@ class MemoryStreamer:
                         part_idx += 1
 
                 if uploader:
-                    await uploader.finish_upload()
-                else:
+                    try:
+                        await uploader.finish_upload()
+                    except Exception as fin_err:
+                        logger.info(f"Parallel uploader finish fallback: {fin_err}")
+                        with suppress(Exception):
+                            await uploader._cleanup()
+                        uploader = None
+                if not uploader:
                     while in_flight:
                         await drain_one(in_flight, task_sizes)
 
@@ -9247,25 +9296,38 @@ async def run_account_switcher_tool(session_mgr):
             uid = str(u.get("id") or "N/A")
             table.add_row(str(idx), s["name"], fname, uname, uid, act_badge)
             
+        pool_badge = "[bold green]ENABLED (Round-Robin Active)[/]" if session_mgr.pool_mode else "[dim]DISABLED (Single Account Only)[/]"
         console.print(Panel(
-            "[bold cyan]👥 TELEGRAM MULTI-ACCOUNT & SESSION SWITCHER[/]\n"
-            "[dim]Manage your accounts or add your friend's account seamlessly on this machine.[/]",
+            f"[bold cyan]👥 TELEGRAM MULTI-ACCOUNT & SESSION SWITCHER[/]\n"
+            f"[dim]Manage your accounts or add your friend's account seamlessly on this machine.[/]\n"
+            f"• Multi-Account Pool Mode: {pool_badge}",
             border_style="cyan", box=box.ROUNDED
         ))
         console.print(table)
         
         console.print(Panel(
             " [bold green][1..N][/] Switch Active Account (Set Default)\n"
+            " [bold yellow][P][/] 🔀 Toggle Multi-Account Load Balancing Pool\n"
             " [bold cyan][A][/] ➕ Add / Login New Telegram Account\n"
             " [bold red][D][/] 🗑️ Delete / Disconnect a Session File\n"
             " [dim][0] Return to Main Menu[/]",
             border_style="dim", box=box.ROUNDED
         ))
         
-        choice = await safe_input("Choose Option (1..N / A / D / 0)", allow_cancel=True, default_val="0")
+        choice = await safe_input("Choose Option (1..N / P / A / D / 0)", allow_cancel=True, default_val="0")
         if not choice or choice == "0":
             break
             
+        if choice.upper() == "P":
+            session_mgr.pool_mode = not session_mgr.pool_mode
+            env_p = Path(".env")
+            if env_p.exists():
+                set_key(".env", "MULTI_ACCOUNT_POOL", "true" if session_mgr.pool_mode else "false")
+            mode_str = "ENABLED" if session_mgr.pool_mode else "DISABLED"
+            console.print(f"\n[bold green]✔ Multi-Account Load Balancing Pool is now:[/] [cyan]{mode_str}[/]")
+            await asyncio.sleep(1.2)
+            continue
+
         if choice.isdigit() and 1 <= int(choice) <= len(status_list):
             sel_idx = int(choice) - 1
             session_mgr.set_active_session(sel_idx)

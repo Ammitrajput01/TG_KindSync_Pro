@@ -2828,6 +2828,44 @@ This log permanently documents root causes, architectural patterns, historical b
   - Master test runner `python tests/run_all_tests.py`: **15 / 15 test suites PASSED with 0 ERRORS (100% HEALTHY)**.
   - Strict deployment policy observed: Local verification only, no automatic push or remote deployment executed.
 
+---
+
+## 📅 Log Entry: Tuesday, 03 November 2026 | 02:58 AM
+
+### 49. Multi-Account Pool Mode Activation, Fail-Safe Streaming Downloader/Uploader Fallbacks & Zero-FloodWait Routing
+* **User Directives & Live Symptoms (Audio 1 & Audio 2 Forensics)**:
+  - *Audio 1*: *"Bhai shayad aap bhool gaye ki hamara program kaise bana tha ye last wala update jo aapne kiya ye kyu kiya? And please, ab na pure program ko acche se detail mein scan karo, acche se analyze karo, acche se read karo, acche se study karo and sab kuch dekho sab kuch well arranged hai ki nahi hai... aur jo hamara main program ka kaam hai wo sab kuch chal raha hai ki nahi chal raha hai... Aur kyuki aap hi ne suggest kiya tha ki agar main isme teen accounts login kar doon ya 4 5 6 7 8 jitne marzi account login kar doon Telegram ke, toh aap unko use karke sequencing maintain karke messages ko jaldi upload karoge. Theek hai? Toh ye sab pe dhyan do aur is cheez ko thoda check karo ki kaam kar raha hai ki nahi kar raha... Uske baad ye har jagah push kar do update kyuki already program ab pause hai, toh ab har jagah update kar dena, uske baad main dekhta hoon kya karna hai."*
+  - *Audio 2*: *"Aur haan sabhi versions ko update kar dena, friend wale ko bhi... dekho kisi mein bhi koi error nahi aana chahiye, theek hai?"*
+* **Root Cause & Architectural Deep Scan**:
+  1. **Multi-Account Pool Was Inactive (`pool_mode = False`)**:
+     - `MultiSessionManager` had full session discovery for multiple `.session` files, but `self.pool_mode = False` was hardcoded at `__init__`.
+     - When users logged in 3 to 8 Telegram accounts, `get_client()` was strictly returning only `self.clients[self.active_index]`. The extra accounts sat completely idle!
+  2. **Uncaught Async Generator Exception in Parallel Downloader**:
+     - In `MemoryStreamer.stream_media`, `stream = downloader.download(...)` only created an `AsyncGenerator`.
+     - If network/cross-DC/permission issues arose during `async for chunk in stream:`, it escaped the generator setup `try...except` and aborted the file without falling back to standard `client.iter_download(msg.media)`.
+  3. **FloodWait Auto-Cooldown Disconnect**:
+     - `with_retry_call()` caught `FloodWaitError` but did not actively report the cooldown back to `MultiSessionManager`, preventing seamless account rotation when one account encountered rate limits.
+* **Permanent Implementation**:
+  1. **Dynamic Multi-Account Pool Mode (`MULTI_ACCOUNT_POOL=true`)**:
+     - Activated `self.pool_mode = os.getenv("MULTI_ACCOUNT_POOL", "true").strip().lower() in ("true", "1", "yes")` by default in both `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py`.
+     - `get_client()` automatically rotates in round-robin fashion across all authorized, non-cooling-down connected accounts.
+     - Tracked `self._authorized_session_names` during `start_all()` to guarantee only verified, logged-in accounts receive tasks.
+  2. **Resilient Dual-Tier Streaming Fallback Engine (`_get_download_stream`)**:
+     - Wrapped media downloads in `_get_download_stream()`: Attempts 8-connection `ParallelTransferrer.download` first; on ANY exception, seamlessly logs and continues with native `client.iter_download(...)`.
+     - Upload chunks now wrap `uploader.upload_part(payload)` in an inline fallback: if a parallel upload socket times out, it gracefully reverts to `_send_chunk` without dropping a single byte.
+  3. **Automated FloodWait Account Evasion**:
+     - Connected `with_retry_call()` to `client._session_mgr.mark_flood_wait(s_name, e.seconds)` so that any account placed on FloodWait is immediately sidelined while healthy accounts continue cloning at full speed.
+  4. **Interactive TUI Multi-Account Pool Switcher**:
+     - Updated Option `[6]` Account Switcher with live Pool Mode status badge (`[bold green]ENABLED (Round-Robin Active)[/]`) and `[P] 🔀 Toggle Multi-Account Load Balancing Pool` shortcut.
+  5. **100% Codebase Parity**:
+     - Synchronized all updates across `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py`.
+* **Verification & Results**:
+  - `tests/test_multi_login.py`: **4 / 4 PASSED** (`test_auth_manager_initialization`, `test_auth_tokens_and_rbac`, `test_multi_session_manager`, `test_telegram_web_login_manager`).
+  - `tests/test_pipeline_processor_media.py`: **3 / 3 PASSED**.
+  - Master test runner `python tests/run_all_tests.py`: **15 / 15 test suites PASSED with 0 ERRORS (100% HEALTHY)**.
+  - User authorization granted: Ready for push and deployment as requested.
+
+
 
 
 
