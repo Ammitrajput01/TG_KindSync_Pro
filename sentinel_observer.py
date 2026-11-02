@@ -197,6 +197,42 @@ class TelegramReporter:
             uptime_sec = int(time.monotonic() - STATE.start_time)
             hours, rem = divmod(uptime_sec, 3600)
             mins, _ = divmod(rem, 60)
+
+            # Server Hardware Telemetry (Disk, RAM, CPU, Host Uptime)
+            hw_lines = []
+            try:
+                import psutil
+                vm = psutil.virtual_memory()
+                ram_tot = vm.total / (1024**3)
+                ram_used = (vm.total - vm.available) / (1024**3)
+                ram_free = vm.available / (1024**3)
+                
+                root_m = "C:\\" if sys.platform == "win32" else "/"
+                du = psutil.disk_usage(root_m)
+                disk_tot = du.total / (1024**3)
+                disk_used = du.used / (1024**3)
+                disk_free = du.free / (1024**3)
+
+                cpu_p = psutil.cpu_percent(interval=None) or 0.0
+                cpu_cnt = psutil.cpu_count(logical=True) or 1
+                
+                b_time = psutil.boot_time()
+                host_up_sec = int(time.time() - b_time)
+                h_days = host_up_sec // 86400
+                h_hrs = (host_up_sec % 86400) // 3600
+                h_mins = (host_up_sec % 3600) // 60
+                host_up_str = f"{h_days}d {h_hrs}h {h_mins}m"
+                
+                hw_lines.extend([
+                    f"**Disk Space**: `{disk_used:.1f} GB` used / `{disk_tot:.1f} GB` (`{disk_free:.1f} GB` free - `{du.percent}%`)",
+                    f"**RAM Health**: `{ram_used:.1f} GB` used / `{ram_tot:.1f} GB` (`{ram_free:.1f} GB` free - `{vm.percent}%`)",
+                    f"**CPU & Host**: `{cpu_p:.1f}%` ({cpu_cnt} cores) · Host Uptime: `{host_up_str}`"
+                ])
+            except Exception:
+                pass
+
+            hw_section = ("• " + "\n• ".join(hw_lines) + "\n") if hw_lines else ""
+
             status_card = (
                 f"📊 **[{DEVI_NAME} LIVE ENGINE TELEMETRY]**\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -205,6 +241,7 @@ class TelegramReporter:
                 f"• **Data Streamed**: `{data_str}` (Peak `{STATE.peak_speed_mb:.2f} MB/s`)\n"
                 f"• **Active Subject**: `{STATE.current_subject}`\n"
                 f"• **Total DB Records**: `{db_stats['total_forwarded']:,}` msgs tracked\n"
+                f"{hw_section}"
                 f"• **FloodWaits**: `{STATE.flood_waits_detected}` ({STATE.flood_wait_seconds_total:.1f}s delay)\n"
                 f"• **Engine Uptime**: `{hours}h {mins}m`\n"
                 f"• **Web Dashboard**: `http://{STATE.lan_ip}:{STATE.web_port}`\n"

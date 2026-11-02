@@ -160,16 +160,57 @@ class AdminTelemetry:
     @staticmethod
     def _get_sys_info():
         try:
-            ram_info = f"{psutil.virtual_memory().total / (1024**3):.1f} GB" if PSUTIL else "N/A"
             py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-            return {
+            res = {
                 "host": socket.gethostname(),
                 "os": f"{platform.system()} {platform.release()}",
                 "user": getpass.getuser(),
-                "ram": ram_info,
+                "ram": "N/A",
                 "py": py_ver,
                 "accel": f"cryptg: {'✔' if CRYPTG else '❌'} | uvloop: {'✔' if UVLOOP else '❌'}"
             }
+            if PSUTIL:
+                try:
+                    # RAM Metrics
+                    vm = psutil.virtual_memory()
+                    ram_total = vm.total / (1024**3)
+                    ram_used = (vm.total - vm.available) / (1024**3)
+                    ram_free = vm.available / (1024**3)
+                    ram_pct = vm.percent
+                    res["ram"] = f"{ram_total:.1f} GB"
+                    res["ram_total_gb"] = f"{ram_total:.1f} GB"
+                    res["ram_used_gb"] = f"{ram_used:.1f} GB"
+                    res["ram_free_gb"] = f"{ram_free:.1f} GB"
+                    res["ram_pct"] = f"{ram_pct:.1f}%"
+
+                    # Disk Metrics (Total, Used, Free/Pending)
+                    root_mount = "C:\\" if sys.platform == "win32" else "/"
+                    du = psutil.disk_usage(root_mount)
+                    disk_total = du.total / (1024**3)
+                    disk_used = du.used / (1024**3)
+                    disk_free = du.free / (1024**3)
+                    disk_pct = du.percent
+                    res["disk_total_gb"] = f"{disk_total:.1f} GB"
+                    res["disk_used_gb"] = f"{disk_used:.1f} GB"
+                    res["disk_free_gb"] = f"{disk_free:.1f} GB"
+                    res["disk_pct"] = f"{disk_pct:.1f}%"
+
+                    # CPU Load & Physical/Logical Cores
+                    cpu_pct = psutil.cpu_percent(interval=None) or 0.0
+                    cpu_count = psutil.cpu_count(logical=True) or 1
+                    res["cpu_pct"] = f"{cpu_pct:.1f}%"
+                    res["cpu_cores"] = str(cpu_count)
+
+                    # Host Uptime
+                    boot_t = psutil.boot_time()
+                    up_sec = int(time.time() - boot_t)
+                    up_d = up_sec // 86400
+                    up_h = (up_sec % 86400) // 3600
+                    up_m = (up_sec % 3600) // 60
+                    res["uptime"] = f"{up_d}d {up_h}h {up_m}m"
+                except Exception:
+                    pass
+            return res
         except Exception:
             return {"host": "Unknown-PC", "os": "Windows", "user": "User", "ram": "N/A", "py": "3.x", "accel": "N/A"}
 
@@ -200,17 +241,25 @@ class AdminTelemetry:
 
             timestamp = datetime.now().strftime("%d-%b-%Y %I:%M:%S %p")
             
+            disk_line = f"💾 *Disk Space:* `{sys_info.get('disk_used_gb', 'N/A')}` used / `{sys_info.get('disk_total_gb', 'N/A')}` total (`{sys_info.get('disk_free_gb', 'N/A')}` free - {sys_info.get('disk_pct', 'N/A')})" if "disk_total_gb" in sys_info else ""
+            ram_detail = f"⚡ *RAM Health:* `{sys_info.get('ram_used_gb', 'N/A')}` used / `{sys_info.get('ram_total_gb', sys_info.get('ram', 'N/A'))}` (`{sys_info.get('ram_free_gb', 'N/A')}` free - {sys_info.get('ram_pct', 'N/A')})" if "ram_free_gb" in sys_info else f"👤 *Windows User:* `{sys_info['user']}` | *RAM:* `{sys_info.get('ram', 'N/A')}`"
+            cpu_uptime = f"🔥 *CPU & Uptime:* `{sys_info.get('cpu_pct', 'N/A')}` ({sys_info.get('cpu_cores', '1')} cores) | Uptime: `{sys_info.get('uptime', 'N/A')}`" if "cpu_pct" in sys_info else ""
+
             lines = [
                 f"*{title}*",
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
                 f"👤 *Telegram User:* {name} ({user_handle})",
                 f"📱 *Phone / User ID:* `{phone}` | `{uid}`",
-                f"💻 *Device:* `{sys_info['host']}` ({sys_info['os']})",
-                f"👤 *Windows User:* `{sys_info['user']}` | *RAM:* `{sys_info.get('ram', 'N/A')}`",
+                f"💻 *Device & Host:* `{sys_info['host']}` ({sys_info['os']})",
+                ram_detail,
+            ]
+            if disk_line: lines.append(disk_line)
+            if cpu_uptime: lines.append(cpu_uptime)
+            lines.extend([
                 f"⚙️ *Python & Engine:* `v{sys_info.get('py', '3.x')}` ({sys_info.get('accel', '')})",
                 f"⏰ *Timestamp:* `{timestamp}`",
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            ]
+            ])
             
             for k, v in details.items():
                 lines.append(f"• *{k}:* {v}")
@@ -570,6 +619,21 @@ def apply_clean_rules(text: str) -> str:
     # 7. Clean extra spaces & blank lines
     t = re.sub(r"[ \t]+", " ", t)
     t = re.sub(r"\n\s*\n\s*\n+", "\n\n", t).strip()
+
+    # 8. Markdown AST Balancer & Artifact Cleaner (10/10 Gold Standard Polish)
+    # 8a. Remove empty formatting blocks left by word stripping
+    t = re.sub(r"\*\*\s*\*\*", "", t)
+    t = re.sub(r"__\s*__", "", t)
+    t = re.sub(r"`\s*`", "", t)
+    t = re.sub(r"\|\|\s*\|\|", "", t)
+
+    # 8b. Auto-balance unclosed markdown delimiters (**bold**, `code`, ||spoiler||)
+    for sym, pat in [("**", r"\*\*"), ("`", r"`"), ("||", r"\|\|")]:
+        if len(re.findall(pat, t)) % 2 != 0:
+            t = t.rstrip() + sym
+
+    # 8c. Ensure strictly maximum 1 blank line between paragraphs
+    t = re.sub(r"\n{3,}", "\n\n", t).strip()
     return t
 
 def _smart_replace_word(text: str, old_w: str, new_w: str) -> str:

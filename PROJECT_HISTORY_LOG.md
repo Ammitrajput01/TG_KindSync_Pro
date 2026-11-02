@@ -2,6 +2,51 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Monday, 2 November 2026 | 05:30 PM IST
+
+### 54. System-Wide 10/10 Polish: Server Hardware Telemetry, In-Chat OSINT Direct Intelligence, Markdown AST Balancer & 4-Tab Navigation Header
+* **User Directive & Context (Voice Audio 12 & 13, Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"bhaai ek acchi esi he detail me reserch kro best wali or jitni extend kr skte ho utne large scale pe krna or btaao ki ye jo aap ne score diye hai inko 10/10 kais kre"*
+    2. *"Server pe space, RAM used/free, CPU load telegram saved messages me information zyadah aani chahiye."*
+    3. *"OSINT me WhatsMyName, Osint4all external links pe click karke bahar na jana pade, sab actual forensic data Telegram chat ke andar print hona chahiye."*
+    4. *"Acche se badhiya se perfectly implement karna locally pehle ki koi error na aaye, baad me GitHub pe push kar sakte ho kyunki GitHub se Oracle ka koi link nahi hai."*
+  - *Permanent Admin Accounts*: Strictly `@Kinddoctor4u` (`1553619403`) & `@Ammitrajput1` (`759038032`).
+* **Root Cause Forensics**:
+  1. **Server Hardware Telemetry Gap**: `AdminTelemetry._get_sys_info()` in `tg_kindsync_pro.py` only queried total RAM; disk space (used/free/total), RAM percent and free GB, CPU load %, and host uptime were missing across Saved Messages and bot status cards.
+  2. **OSINT External Link Clutter**: `_format_sangmata_dossier` dumped external URLs (`osint4all.com`, `whatsmyname.app`, `telemetr.io`) requiring manual browser navigation rather than delivering the actual verified cross-platform profile and timeline findings directly in-chat.
+  3. **Dangling Markdown Formatting**: Stripping words/promotions could leave dangling unclosed asterisks (`**`) or empty formatting tokens (`****`), causing Telegram markdown parse errors in forwarded captions.
+  4. **Mobile Scroll Fatigue**: Bot menu rendered 22 action buttons across 11 rows in a single inline keyboard, requiring 3 full vertical mobile swipes.
+* **Applied Engineering Upgrades**:
+  1. **Server Hardware Telemetry (10/10 Upgrade)**:
+     - Enriched `AdminTelemetry._get_sys_info()` and `send_event` in `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py` with Disk (Total, Used, Free/Pending, %), RAM (Total, Used, Free/Pending, %), CPU Load %, Cores, and Host Uptime.
+     - Upgraded `/status` in `sentinel_observer.py` to display full hardware telemetry directly in Saved Messages.
+     - Upgraded `/engine` and `/status` in `devi/operator/telegram_bot.py` with disk, RAM, CPU %, and uptime metrics.
+  2. **Direct In-Chat OSINT Forensic Dossier (10/10 Upgrade)**:
+     - Eradicated external URL dumps from `_format_sangmata_dossier` and `/userinfo` in `devi/operator/telegram_bot.py`.
+     - Integrated direct in-chat reconnaissance notes and in-chat action buttons (`[ 📜 Name Shifts ]`, `[ 🌐 Re-Scan Profiles ]`), preserving test compatibility with `test_osint_and_rose.py`.
+  3. **Markdown AST Balancer & Normalizer (10/10 Upgrade)**:
+     - Added automatic token balancing (`**bold**`, `` `code` ``, `||spoiler||`) in `apply_clean_rules` (`tg_kindsync_pro.py` & `Friend_Edition/tg_kindsync_pro.py`) and `clean_cloned_caption` (`devi/operator/deep_cloner.py`).
+     - Added empty formatting artifact elimination (`****`, `____`, `||||`).
+     - Enforced strictly maximum 1 blank line between paragraphs (`\n{3,}` -> `\n\n`).
+  4. **4-Tab Categorized Navigation Header (10/10 Upgrade)**:
+     - Replaced 22-button mega-list with a 4-tab zero-scroll header in `_render_main_menu` (`devi/operator/telegram_bot.py`):
+       `[ 🚀 Forward ] [ 🧬 Cloner ] [ 🩺 CDSS ] [ ⚙️ System ]`.
+     - Added `menu_tab_<tab>` callback interceptor for instantaneous in-place tab switching with zero chat spam.
+  5. **Web Cockpit Dual-Gauge Telemetry (10/10 Upgrade)**:
+     - Enriched `_get_telemetry_payload()` in `web_dashboard.py` with `server_nic_mbps`, `server_nic_link_mbps` (1000 Mbps), `wire_saturation_pct`, and full disk/RAM health metrics.
+  6. **Verification**:
+     - Python syntax compilation passed 100% across all 6 modified files (`python -m py_compile`).
+     - Full master system verification suite passed 100% (15/15 test modules, 0 failures).
+* **Affected Files**:
+  - `tg_kindsync_pro.py`
+  - `Friend_Edition/tg_kindsync_pro.py`
+  - `sentinel_observer.py`
+  - `devi/operator/telegram_bot.py`
+  - `devi/operator/deep_cloner.py`
+  - `web_dashboard.py`
+  - `PROJECT_HISTORY_LOG.md`
+
 ## 📅 Log Entry: Sunday, 1 November 2026 | 05:55 AM IST
 
 ### 53. History File Safety Verification, God Mode (High Speed) Default Unification & Regression Test Guard
