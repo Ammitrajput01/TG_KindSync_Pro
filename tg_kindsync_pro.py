@@ -2356,7 +2356,7 @@ class MultiSessionManager:
             if await client.is_user_authorized():
                 self._authorized_session_names.add(self.session_names[idx])
                 with suppress(Exception):
-                    async for _ in client.iter_dialogs(limit=1):
+                    async for _ in client.iter_dialogs(limit=150):
                         pass
 
     async def ensure_active_client(self):
@@ -2533,6 +2533,17 @@ async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, *
         except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError):
             # Fatal authorization or content protection errors: immediately raise without sleeping or retrying!
             # Eliminates 181s (10 exponential retry delays) on protected channels.
+            raise
+        except ValueError as e:
+            if "Could not find the input entity" in str(e):
+                logger.info("Uncached input entity detected in with_retry_call, warming client dialogs cache...")
+                with suppress(Exception):
+                    async for _ in client.iter_dialogs(limit=150):
+                        pass
+                if attempt >= 3:
+                    raise
+                await asyncio.sleep(1.0)
+                continue
             raise
         except RPCError as e:
             GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"RPCError ({type(e).__name__})", severity=0.3)
@@ -2988,8 +2999,9 @@ class MemoryStreamer:
                 GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"Chunk Send Error ({type(e).__name__})", severity=0.35)
                 raise
 
-    async def stream_media(self, msg, stop_event: asyncio.Event, client=None):
+    async def stream_media(self, msg, stop_event: asyncio.Event, client=None, download_client=None):
         client = client or self.rpc.session_mgr.get_client()
+        dl_client = download_client or getattr(self, "primary_client", None) or (self.rpc.session_mgr.clients[self.rpc.session_mgr.active_index] if (hasattr(self.rpc, "session_mgr") and self.rpc.session_mgr and self.rpc.session_mgr.clients) else client)
         file_obj = getattr(msg, "file", None)
         size = int(getattr(file_obj, "size", 0) or 0)
         if size <= 0:
@@ -3072,13 +3084,13 @@ class MemoryStreamer:
                         try:
                             from fast_transfer import ParallelTransferrer
                             dc_id, input_loc = utils.get_input_location(msg.media)
-                            downloader = ParallelTransferrer(client, dc_id=dc_id)
+                            downloader = ParallelTransferrer(dl_client, dc_id=dc_id)
                             async for chk in downloader.download(input_loc, file_size=size, part_size_kb=512, connection_count=8):
                                 yield chk
                             return
                         except Exception as fe:
                             logger.info(f"Fast parallel downloader fallback to iter_download: {fe}")
-                    async for chk in client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size):
+                    async for chk in dl_client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size):
                         yield chk
 
                 stream = _get_download_stream()
@@ -3201,7 +3213,7 @@ class MemoryStreamer:
                     chat_peer = getattr(msg, "chat_id", None) or getattr(msg, "peer_id", None)
                     if chat_peer:
                         try:
-                            fresh_msgs = await client.get_messages(chat_peer, ids=[msg.id])
+                            fresh_msgs = await dl_client.get_messages(chat_peer, ids=[msg.id])
                             if fresh_msgs and fresh_msgs[0] and fresh_msgs[0].media:
                                 msg = fresh_msgs[0]
                                 file_obj = getattr(msg, "file", None)
@@ -3595,6 +3607,9 @@ class PipelineProcessor:
         self.topic_title_cache = {}
         self.batch_index_records = []
         self._restricted_channels = restricted_channels if restricted_channels is not None else set()
+        if self.streamer and self.session_mgr and hasattr(self.session_mgr, "clients") and self.session_mgr.clients:
+            with suppress(Exception):
+                self.streamer.primary_client = self.session_mgr.clients[self.session_mgr.active_index]
 
     def __getattr__(self, name):
         if name == "_restricted_channels":
@@ -4155,7 +4170,8 @@ class PipelineProcessor:
                         await asyncio.sleep(delay)
                         if stop_event.is_set(): return
                         try:
-                            cl = self.session_mgr.get_client()
+                            # Source chat messages MUST be read using primary authorized forwarder session
+                            cl = self.session_mgr.clients[self.session_mgr.active_index] if (self.session_mgr and self.session_mgr.clients) else self.session_mgr.get_client()
                             fresh_msgs = await cl.get_messages(_parse_chat_id(source_chat), ids=[m.id for m in w_item.messages])
                             if fresh_msgs and any(fresh_msgs):
                                 w_item.messages = [m for m in fresh_msgs if m]

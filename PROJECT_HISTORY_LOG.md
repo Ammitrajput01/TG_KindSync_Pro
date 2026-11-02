@@ -2865,6 +2865,51 @@ This log permanently documents root causes, architectural patterns, historical b
   - Master test runner `python tests/run_all_tests.py`: **15 / 15 test suites PASSED with 0 ERRORS (100% HEALTHY)**.
   - User authorization granted: Ready for push and deployment as requested.
 
+---
+
+## 📅 Log Entry: Tuesday, 03 November 2026 | 03:55 AM
+
+### 50. VPS In-Memory Process Refresh, Master Session Alignment & Source Downloader / Upload Pool Decoupling
+* **User Directives & Live Symptoms (Audio 3 & Tmux Screenshot Forensics)**:
+  - *Audio 3*: *"Bhai abhi bhi script chal rahi hai aur dekho yahi error aa raha hai, theek hai? Usko abhi chal raha hai chalta hua maine chhod diya hai. Aap khud usko rok ke scan kar... abhi usko scan kar lo fir usko rok dena, fir uske baad jo bhi hai fixes kar dena, aur uske baad jab fix ho jaye to mujhe final report de dena, and bus theek hai, jaldi se kar do please."*
+  - *Terminal Screenshot*:
+    - Tmux window `kindsync` on Oracle VPS (`130.210.1.32`) still displayed: `❌ Stream Failed ID #17694: 'PipelineProcessor' object has no attribute '_restricted_channels'`.
+    - Live progress: 4 / 322 messages (1.2%), Errors: 166.
+* **Root Cause & Architectural Deep Scan**:
+  1. **Stale In-Memory Bytecode in VPS Tmux**:
+     - Remote process inspection revealed `PID 384475` running `.venv/bin/python tg_kindsync_pro.py` inside tmux `kindsync`, launched at 20:52 UTC.
+     - While `git pull` updated the `.py` files on disk at 21:30 UTC, running Python processes hold compiled module bytecode in RAM and do not reload unless restarted.
+  2. **Session Role Misalignment in Multi-Login Switcher**:
+     - Inspection of all VPS session databases revealed that `session_forwarder.session` had been overwritten with `Pooja (ID: 1659687042)` during recent multi-account logins.
+     - `Pooja` was not a member of the source channel (`-1003903797493` - `DAMS - Night Is Dark`).
+     - Dr. Amit Singh's master account `Kind (@Kinddoctor4u, ID: 1553619403)` stored in `Main.session` was the true member of both source and target channels.
+  3. **Coupled Downloader / Uploader Client in Multi-Account Pool**:
+     - `stream_media` and `Auto-DLQ` background retries used `self.session_mgr.get_client()` for both downloading source messages and uploading to destination.
+     - When `get_client()` rotated to secondary pool accounts (which only have access to the destination channel, not the private source channel), `get_messages` failed with `Could not find the input entity for PeerChannel(3903797493)`.
+  4. **Stale Friend Edition on Oracle VPS**:
+     - `/home/ubuntu/TG_KindSync_Friend/tg_kindsync_pro.py` was still running the pre-update build from November 1st.
+* **Applied Engineering Upgrades**:
+  1. **Clean Process Termination & Session Restoration**:
+     - Terminated stale process `PID 384475` and destroyed outdated tmux session.
+     - Restored `Main.session` (`@Kinddoctor4u`, ID: `1553619403`) as the authoritative `session_forwarder.session` and updated `telegram_accounts_cache.json`.
+  2. **Source Downloader / Destination Uploader Decoupling**:
+     - Updated `MemoryStreamer.stream_media` with dedicated `dl_client`: downloading from source chat and refreshing expired file references (`FileReferenceExpiredError`) strictly uses `primary_client` (`Kinddoctor4u`), while `client` rotates round-robin across all authorized pool accounts for high-speed multi-account destination upload.
+     - Auto-DLQ background retries strictly use `self.session_mgr.clients[self.session_mgr.active_index]` for message re-fetching from source.
+  3. **Auto-Warming Access Hash Cache**:
+     - Enhanced `MultiSessionManager.start_all()` to cache 150 dialogs on startup across all logged-in accounts.
+     - Enhanced `with_retry_call()` to automatically warm `client.iter_dialogs(limit=150)` upon any `Could not find the input entity` error.
+  4. **Oracle VPS Friend Edition Synchronization**:
+     - Synchronized `tg_kindsync_pro.py`, `fast_transfer.py`, and `strip_words.txt` into `/home/ubuntu/TG_KindSync_Friend/` and restarted `tg-forwarder-friend.service`.
+* **Verification & Results**:
+  - `tests/test_pipeline_processor_media.py` & `tests/test_multi_login.py`: **7 / 7 PASSED**.
+  - Master test runner `tests/run_all_tests.py`: **15 / 15 test suites PASSED with 0 ERRORS (100% HEALTHY)**.
+  - **Live Oracle VPS Verification**: Relaunched `tg_kindsync_pro.py` in tmux `kindsync`. Resumed Rule 1 (`DAMS - Night Is Dark ➔ BE Mine`):
+    - `1.Gen Anatomy.mp4` (701.8 MB) streamed and successfully sent (`✔ Sent`).
+    - `1 Foramen of skull @Dams_new_robot.pdf` (2.7 MB) successfully sent (`✔ Sent`).
+    - `3 Dural Venous Sinus @Dams_new_robot.mp4` (380.6 MB) streamed and successfully sent (`✔ Sent`).
+    - Over 1.08 GB transferred live at ~14 Mbps without any `_restricted_channels` crash.
+
+
 
 
 
