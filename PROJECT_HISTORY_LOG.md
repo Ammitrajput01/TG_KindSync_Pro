@@ -2788,6 +2788,47 @@ This log permanently documents root causes, architectural patterns, historical b
   - Fast transfer optimal connection calculations verified in `tests/test_fast_transfer_and_telemetry.py`.
   - Strict deployment policy strictly honored: ZERO automatic git push, ZERO commands sent to Oracle Cloud VPS (`130.210.1.32`).
 
+---
+
+## 📅 Log Entry: Tuesday, 03 November 2026 | 02:45 AM
+
+### 48. PipelineProcessor `_restricted_channels` AttributeError Fix & Content Cloning Stream Restoration
+* **User Directives & Live Symptoms (Audio & Screenshot Forensics)**:
+  - *Audio Transcript*: *"Bhai humne jo last wala update kiya hai aur shayad maine accounts usme jo login kiye hain... uske baad na ye error aa raha hai aur na wo sirf matlab cloning nahi kar raha... wo sirf kya kar raha hai wo na jo subject shuru hone se pehle naam deta tha wo sirf aa raha hai group mein lekin content nahi aa raha. Please check karo aur mujhe batao kya problem aa rahi hai... fir usko fix bhi karna hai yaar jaldi batao mujhe research karke achhe se."*
+  - *Terminal Screenshot*:
+    - `[21:06:21] ✨ Subject Header Posted: 💉 ANATOMY`
+    - `[21:06:21] ✨ Subject Header Posted: 💉 ANAESTHESIA`
+    - `[21:06:22] ❌ Stream Failed ID #17539: 'PipelineProcessor' object has no attribute '_restricted_channels'`
+    - `[21:06:22] 🔄 Auto-DLQ Self-Healing retry triggered for Message #17441...`
+    - `[21:06:22] ❌ Stream Failed ID #17440: 'PipelineProcessor' object has no attribute '_restricted_channels'`
+    - Metrics: 112 Errors, 0 messages sent out, only subject dividers arriving in the Telegram target group.
+* **Root Cause Analysis**:
+  1. **Missing Attribute on Worker Instance**:
+     - In commit `cc82713`, the channel restriction cache `self._restricted_channels = set()` was added inside `TerminalPlatform.__init__` (line 4223).
+     - However, message execution is handled by `PipelineProcessor.process_item` / `execute` (lines 3853, 3879, 3948, 3966), where `self` is an instance of `PipelineProcessor`, not `TerminalPlatform`.
+     - `PipelineProcessor.__init__` never initialized `self._restricted_channels`.
+  2. **Order of Execution Explaining Why Only Subject Headers Were Sent**:
+     - At line 3849: `await self.check_and_send_subject_header(...)` ran first, successfully transmitting the subject header card (`✨ 🦴 ANATOMY ✨`) to the Telegram group.
+     - Immediately on the next step (line 3853): `attempt_direct = getattr(self.cfg, "direct_forward", False) and str(source_chat) not in self._restricted_channels` accessed `self._restricted_channels`, which immediately raised an unhandled `AttributeError: 'PipelineProcessor' object has no attribute '_restricted_channels'`.
+     - The message failed and was sent to DLQ without any media or message content ever being forwarded or uploaded.
+* **Permanent Implementation**:
+  1. **Instance Attribute Initialization with Shared Engine Set (`PipelineProcessor.__init__`)**:
+     - Updated `PipelineProcessor.__init__` to accept `restricted_channels=None` and initialize `self._restricted_channels = restricted_channels if restricted_channels is not None else set()`.
+     - In `TerminalPlatform.run_forwarder` (line 5245), passed `restricted_channels=self._restricted_channels` so that when any worker discovers a content-protected channel via `ChatForwardsRestrictedError`, all concurrent workers immediately share this knowledge in real time.
+  2. **Defensive Dynamic Fallback (`__getattr__`)**:
+     - Added `__getattr__` fallback to `PipelineProcessor` returning a default set if `_restricted_channels` is ever accessed on any edge-case or uninitialized instance.
+  3. **Album Tier 1 Restriction Cache Check**:
+     - Wrapped album fast server-side copy with `if str(source_chat) not in self._restricted_channels:` to ensure albums on restricted channels also bypass doomed RPC calls in 0ms.
+  4. **Full Parity across Both Engines**:
+     - Applied identical bulletproof fixes to both `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py`.
+  5. **Mock Test Suite Hardening**:
+     - Added `dlq.append = AsyncMock()` to `tests/test_pipeline_processor_media.py` across all test cases.
+* **Verification & Results**:
+  - `tests/test_pipeline_processor_media.py`: **3 / 3 PASSED in 1.36s** (`test_streaming_mode_executes_media_when_direct_forward_is_false`, `test_streaming_fallback_when_restricted`, `test_text_messages_marked_success_and_sent`).
+  - Master test runner `python tests/run_all_tests.py`: **15 / 15 test suites PASSED with 0 ERRORS (100% HEALTHY)**.
+  - Strict deployment policy observed: Local verification only, no automatic push or remote deployment executed.
+
+
 
 
 

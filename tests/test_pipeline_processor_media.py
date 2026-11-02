@@ -150,6 +150,7 @@ async def test_streaming_fallback_when_restricted():
     }
 
     dlq = MagicMock()
+    dlq.append = AsyncMock()
     session_mgr = MagicMock()
     session_mgr.get_client = MagicMock(return_value=MagicMock())
 

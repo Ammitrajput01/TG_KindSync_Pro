@@ -3530,7 +3530,7 @@ def detect_subject(text: str = "", filename: str = ""):
 # 11. PIPELINE PROCESSOR & DUAL SESSION HEADERS
 # ============================================================
 class PipelineProcessor:
-    def __init__(self, rpc, streamer, state, cfg, ui_log, metrics, dlq, session_mgr):
+    def __init__(self, rpc, streamer, state, cfg, ui_log, metrics, dlq, session_mgr, restricted_channels=None):
         self.rpc = rpc
         self.streamer = streamer
         self.state = state
@@ -3545,6 +3545,13 @@ class PipelineProcessor:
         self.last_subject_sent = {}
         self.topic_title_cache = {}
         self.batch_index_records = []
+        self._restricted_channels = restricted_channels if restricted_channels is not None else set()
+
+    def __getattr__(self, name):
+        if name == "_restricted_channels":
+            self._restricted_channels = set()
+            return self._restricted_channels
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     async def check_and_send_subject_header(self, active_messages, target_chat, resolved_topic, client, silent_mode):
         auto_subj_env = os.getenv("AUTO_SUBJECT_HEADERS", "true").strip().lower() in ("true", "1", "yes")
@@ -3895,28 +3902,32 @@ class PipelineProcessor:
                     direct_album_sent = False
                     if media_items:
                         # Tier 1: Fast Server-Side MTProto Media Reference Copy (0.2s latency, zero bandwidth)
-                        try:
-                            await self.rpc.execute(
-                                lambda c: c.send_file(
-                                    _parse_chat_id(target_chat),
-                                    media_items,
-                                    caption=caps,
-                                    thumb=t_path,
-                                    reply_to=resolved_topic,
-                                    parse_mode="md",
-                                    silent=silent_mode
-                                ),
-                                client=client,
-                                timeout=45.0
-                            )
-                            self.log(f"[bold green]⚡ Fast Direct-Copied Album ({len(media_items)} files)[/] [dim](ID: #{item.first_id})[/]")
-                            for m in active_messages:
-                                self.log(f"  ↳ {format_media_log_detail(m, prefix='Copied')}")
-                            self.metrics["albums_forwarded"] += 1
-                            success_flag = True
-                            direct_album_sent = True
-                        except Exception as ex_album_fast:
-                            self.log(f"[yellow]ℹ Server-side album copy bypass -> RAM Streamer: {str(ex_album_fast)[:60]}[/]")
+                        if str(source_chat) not in self._restricted_channels:
+                            try:
+                                await self.rpc.execute(
+                                    lambda c: c.send_file(
+                                        _parse_chat_id(target_chat),
+                                        media_items,
+                                        caption=caps,
+                                        thumb=t_path,
+                                        reply_to=resolved_topic,
+                                        parse_mode="md",
+                                        silent=silent_mode
+                                    ),
+                                    client=client,
+                                    timeout=45.0
+                                )
+                                self.log(f"[bold green]⚡ Fast Direct-Copied Album ({len(media_items)} files)[/] [dim](ID: #{item.first_id})[/]")
+                                for m in active_messages:
+                                    self.log(f"  ↳ {format_media_log_detail(m, prefix='Copied')}")
+                                self.metrics["albums_forwarded"] += 1
+                                success_flag = True
+                                direct_album_sent = True
+                            except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError) as ex_album_restr:
+                                self._restricted_channels.add(str(source_chat))
+                                self.log(f"[yellow]🔒 Direct Album Copy Restricted ({type(ex_album_restr).__name__}) -> Fallback to RAM Streamer[/]")
+                            except Exception as ex_album_fast:
+                                self.log(f"[yellow]ℹ Server-side album copy bypass -> RAM Streamer: {str(ex_album_fast)[:60]}[/]")
 
                     if not direct_album_sent and media_items:
                         # Tier 2: High-Speed Parallel In-Memory RAM Streamer
@@ -5242,7 +5253,7 @@ class TerminalPlatform:
             await self.fetch_names()
             
             clear_screen()
-            proc = PipelineProcessor(self.rpc, self.streamer, self.state, self.cfg, self.log, self.metrics, self.dlq, self.session_mgr)
+            proc = PipelineProcessor(self.rpc, self.streamer, self.state, self.cfg, self.log, self.metrics, self.dlq, self.session_mgr, restricted_channels=self._restricted_channels)
             
             mode_name = "Live 24/7 Mode" if self.cfg.live_mode else ("God Mode" if getattr(self.cfg.perf, "upload_parallelism", 40) == 40 else ("Balanced Mode" if getattr(self.cfg.perf, "upload_parallelism", 40) == 12 else "Safe Mode"))
             AdminTelemetry.dispatch(client, "🟢 [MONITOR] Forwarder Session Started", {
