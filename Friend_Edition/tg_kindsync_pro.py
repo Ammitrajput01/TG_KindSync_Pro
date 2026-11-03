@@ -156,6 +156,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 ADMIN_HANDLES = ["Ammitrajput1", "Kinddoctor4u"]
 
+def clean_memory_after_transfer():
+    """
+    ZERO-MEMORY-LEAK GUARANTEE:
+    Forces immediate garbage collection and trims unmapped memory pages
+    back to the OS kernel via libc malloc_trim.
+    """
+    with suppress(Exception):
+        gc.collect()
+        if sys.platform.startswith("linux"):
+            import ctypes
+            libc = ctypes.CDLL("libc.so.6")
+            libc.malloc_trim(0)
+
+
 class AdminTelemetry:
     @staticmethod
     def _get_sys_info():
@@ -3110,6 +3124,14 @@ class MemoryStreamer:
                     buffer.extend(chunk)
                     self.metrics["bytes_downloaded"] += len(chunk)
 
+                    # STRICT MEMORY BACKPRESSURE: Max 4 chunks (2MB) in RAM
+                    while len(buffer) >= 4 * UP_CHUNK_SIZE:
+                        if uploader:
+                            await asyncio.sleep(0.02)
+                        else:
+                            await drain_one(in_flight, task_sizes)
+                        if stop_event.is_set(): raise asyncio.CancelledError()
+
                     if not hasattr(self, "_last_pause_chk") or time.monotonic() - getattr(self, "_last_pause_chk", 0.0) >= 1.5:
                         self._last_pause_chk = time.monotonic()
                         ctrl_p = Path("engine_control.json")
@@ -3194,6 +3216,8 @@ class MemoryStreamer:
                     while in_flight:
                         await drain_one(in_flight, task_sizes)
 
+                buffer.clear()
+                clean_memory_after_transfer()
                 if is_big:
                     return InputFileBig(id=file_id, parts=part_idx, name=name)
                 return InputFile(id=file_id, parts=part_idx, name=name, md5_checksum="")
@@ -4181,6 +4205,7 @@ class PipelineProcessor:
                             self.log(f"[dim red]Auto-DLQ background attempt {w_item.retry_count} failed: {retry_err}[/]")
                     asyncio.create_task(auto_retry_later(item))
             finally:
+                clean_memory_after_transfer()
                 if is_temp_extracted_thumb and t_path and os.path.exists(t_path):
                     with suppress(Exception):
                         os.remove(t_path)

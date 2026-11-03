@@ -580,6 +580,13 @@ class DeepClonerEngine:
         last_progress_time = asyncio.get_event_loop().time()
         reply_to_filter = source_topic_id if source_topic_id > 0 else None
         vrob = VirtualReorderBuffer(capacity=16)
+        # Purge stale temp cache
+        with suppress(Exception):
+            import tempfile
+            stale_dir = Path(tempfile.gettempdir()) / "kindsync_clone_cache"
+            if stale_dir.exists():
+                for sf in stale_dir.glob("*"):
+                    with suppress(Exception): sf.unlink()
 
         try:
             async for msg in user_client.iter_messages(src_peer, reply_to=reply_to_filter, reverse=True):
@@ -772,6 +779,12 @@ class DeepClonerEngine:
                                     with suppress(Exception):
                                         if tmp_path.exists():
                                             tmp_path.unlink()
+                                    with suppress(Exception):
+                                        import gc
+                                        gc.collect()
+                                        if sys.platform.startswith("linux"):
+                                            import ctypes
+                                            ctypes.CDLL("libc.so.6").malloc_trim(0)
                         elif msg.text:
                             await user_client.send_message(
                                 tgt_peer,

@@ -149,8 +149,8 @@ class UploadSender:
 
 def _tune_connection_socket(conn) -> None:
     """
-    Applies enterprise TCP socket buffer optimizations (TCP_NODELAY and 4MB buffers)
-    to eliminate Nagle delays and maximize bandwidth-delay product to Telegram DCs.
+    Applies enterprise TCP socket buffer optimizations (TCP_NODELAY and 1MB buffers)
+    to eliminate Nagle delays, maximize bandwidth, and keep memory footprint strictly lean.
     """
     try:
         writer = getattr(conn, "_writer", None)
@@ -161,7 +161,7 @@ def _tune_connection_socket(conn) -> None:
                 for opt in (getattr(socket, "SO_RCVBUF", None), getattr(socket, "SO_SNDBUF", None)):
                     if opt is not None:
                         try:
-                            sock.setsockopt(socket.SOL_SOCKET, opt, 4 * 1024 * 1024)
+                            sock.setsockopt(socket.SOL_SOCKET, opt, 1024 * 1024)
                         except OSError:
                             pass
     except Exception:
