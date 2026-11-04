@@ -2393,6 +2393,34 @@ class MultiSessionManager:
         for client in self.clients:
             with suppress(Exception): await client.disconnect()
 
+    async def logout_and_reset_all_sessions(self) -> int:
+        """
+        Disconnects all active Telethon clients and deletes all Telegram session files
+        and SQLite sidecars (*.session, *.session-journal, *.session-wal, *.session-shm).
+        Resets active account index to 0. Returns number of removed session files.
+        """
+        await self.disconnect_all()
+        removed_count = 0
+        for pat in ["*.session", "*.session-journal", "*.session-wal", "*.session-shm"]:
+            for f in Path(".").glob(pat):
+                try:
+                    f.unlink(missing_ok=True)
+                    removed_count += 1
+                except Exception as e:
+                    logger.warning(f"Could not remove session file {f}: {e}")
+        self.clients.clear()
+        self.session_names.clear()
+        self.active_index = 0
+        self._round_robin_idx = 0
+        self._authorized_session_names.clear()
+        self._flood_cooldowns.clear()
+        env_p = Path(".env")
+        if env_p.exists():
+            with suppress(Exception):
+                set_key(".env", "ACTIVE_SESSION_INDEX", "0")
+        self._discover_sessions()
+        return removed_count
+
     def get_client(self):
         if not self.clients:
             return None
@@ -3909,6 +3937,14 @@ class PipelineProcessor:
             source_topic = self.cfg.source_topic or 0
 
         client = self.session_mgr.get_client()
+        primary_client = self.session_mgr.clients[self.session_mgr.active_index] if (self.session_mgr and getattr(self.session_mgr, "clients", None)) else client
+
+        # Multi-Account Failover Guard: Verify secondary account can resolve target entity
+        if client != primary_client:
+            try:
+                await client.get_input_entity(_parse_chat_id(target_chat))
+            except Exception:
+                client = primary_client
 
         unprocessed_messages = []
         for m in item.messages:
@@ -3947,6 +3983,12 @@ class PipelineProcessor:
         direct_forward_success = False
         attempt_direct = getattr(self.cfg, "direct_forward", False) and str(source_chat) not in self._restricted_channels
 
+        if attempt_direct and client != primary_client:
+            try:
+                await client.get_input_entity(_parse_chat_id(source_chat))
+            except Exception:
+                client = primary_client
+
         if attempt_direct:
             try:
                 msg_ids = [m.id for m in active_messages]
@@ -3970,9 +4012,41 @@ class PipelineProcessor:
                     self.log(format_media_log_detail(m, prefix="⚡ Direct Sent"))
                 success_flag = True
                 direct_forward_success = True
-            except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError) as e:
+            except ChatForwardsRestrictedError as e:
                 self._restricted_channels.add(str(source_chat))
                 self.log(f"[yellow]🔒 Direct Forward Restricted ({type(e).__name__}) -> Fallback to RAM Streamer[/]")
+            except (ChannelPrivateError, ChatAdminRequiredError, ValueError) as e:
+                if client != primary_client:
+                    try:
+                        await self.rpc.execute(
+                            lambda c: c.forward_messages(
+                                entity=_parse_chat_id(target_chat),
+                                messages=msg_ids,
+                                from_peer=_parse_chat_id(source_chat),
+                                silent=silent_mode
+                            ),
+                            client=primary_client,
+                            timeout=45.0
+                        )
+                        client = primary_client
+                        if len(active_messages) > 1:
+                            self.log(f"[bold green]⚡ Direct Forwarded Album via Primary Failover ({len(active_messages)} msgs)[/] [dim](ID: #{item.first_id})[/]")
+                            for m in active_messages:
+                                self.log(f"  ↳ {format_media_log_detail(m, prefix='Forwarded')}")
+                            self.metrics["albums_forwarded"] += 1
+                        else:
+                            m = active_messages[0]
+                            self.log(format_media_log_detail(m, prefix="⚡ Direct Sent (Primary Failover)"))
+                        success_flag = True
+                        direct_forward_success = True
+                    except ChatForwardsRestrictedError:
+                        self._restricted_channels.add(str(source_chat))
+                        self.log("[yellow]🔒 Direct Forward Restricted -> Fallback to RAM Streamer[/]")
+                    except Exception as p_err:
+                        self.log(f"[yellow]ℹ Direct Forward bypass -> Streamer: {str(p_err)[:60]}[/]")
+                else:
+                    self._restricted_channels.add(str(source_chat))
+                    self.log(f"[yellow]🔒 Direct Forward Restricted ({type(e).__name__}) -> Fallback to RAM Streamer[/]")
             except Exception as e:
                 self.log(f"[yellow]ℹ Direct Forward bypass -> Streamer: {str(e)[:60]}[/]")
 
@@ -4012,8 +4086,11 @@ class PipelineProcessor:
                                 success_flag = True
                                 direct_album_sent = True
                             except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError) as ex_album_restr:
-                                self._restricted_channels.add(str(source_chat))
-                                self.log(f"[yellow]🔒 Direct Album Copy Restricted ({type(ex_album_restr).__name__}) -> Fallback to RAM Streamer[/]")
+                                if client == primary_client and isinstance(ex_album_restr, ChatForwardsRestrictedError):
+                                    self._restricted_channels.add(str(source_chat))
+                                    self.log(f"[yellow]🔒 Direct Album Copy Restricted ({type(ex_album_restr).__name__}) -> Fallback to RAM Streamer[/]")
+                                else:
+                                    self.log(f"[yellow]ℹ Direct Album Copy bypass ({type(ex_album_restr).__name__}) -> Fallback to RAM Streamer[/]")
                             except Exception as ex_album_fast:
                                 self.log(f"[yellow]ℹ Server-side album copy bypass -> RAM Streamer: {str(ex_album_fast)[:60]}[/]")
 
@@ -4062,8 +4139,11 @@ class PipelineProcessor:
                                 )
                                 direct_media_copied = True
                             except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError) as ex_restr:
-                                self._restricted_channels.add(str(source_chat))
-                                self.log(f"[yellow]🔒 Direct Media Copy Restricted ({type(ex_restr).__name__}) -> Fallback to RAM Streamer[/]")
+                                if client == primary_client and isinstance(ex_restr, ChatForwardsRestrictedError):
+                                    self._restricted_channels.add(str(source_chat))
+                                    self.log(f"[yellow]🔒 Direct Media Copy Restricted ({type(ex_restr).__name__}) -> Fallback to RAM Streamer[/]")
+                                else:
+                                    self.log(f"[yellow]ℹ Direct Media Copy bypass ({type(ex_restr).__name__}) -> Fallback to RAM Streamer[/]")
                             except Exception as ex_direct:
                                 logger.debug(f"Direct server-side media copy bypass: {ex_direct}")
 
@@ -4183,6 +4263,19 @@ class PipelineProcessor:
             except (KeyboardInterrupt, asyncio.CancelledError):
                 raise
             except Exception as e:
+                if client != primary_client:
+                    self.log(f"[bold yellow]⚠️ Secondary account note ({type(e).__name__}: {str(e)[:45]}) -> Auto-failover retry with Primary Account...[/]")
+                    try:
+                        saved_pool = self.session_mgr.pool_mode
+                        self.session_mgr.pool_mode = False
+                        try:
+                            await self.execute(item, stop_event)
+                            return
+                        finally:
+                            self.session_mgr.pool_mode = saved_pool
+                    except Exception as retry_primary_err:
+                        e = retry_primary_err
+
                 await self.dlq.append(source_chat, item.first_id, e, target_chat=target_chat, target_topic=target_topic or 0)
                 self.log(f"[bold red]❌ Stream Failed ID #{item.first_id}:[/] {str(e)[:100]}")
                 success_flag = False
@@ -6345,11 +6438,32 @@ async def advanced_cleaner_menu():
             count = 0
             try:
                 backup_path = backup_active_database(reason="cleaner_purge")
+                try:
+                    conn = sqlite3.connect(DB_FILE, timeout=30.0)
+                    for tbl in [
+                        "forwarded", "source_watermarks", "topic_watermarks",
+                        "group_clone_sessions", "local_folder_uploads",
+                        "telegram_group_topics", "telegram_topic_items",
+                        "route_subject_markers"
+                    ]:
+                        with suppress(Exception):
+                            conn.execute(f"DROP TABLE IF EXISTS {tbl}")
+                    conn.execute("VACUUM")
+                    conn.commit()
+                    conn.close()
+                except Exception as db_e:
+                    logger.debug(f"DB drop tables warning: {db_e}")
                 for file in [*_active_db_sidecars(), "tg_thumb_cached.jpg"]:
                     if os.path.exists(file):
-                        os.remove(file)
-                        count += 1
-                console.print(f"\n[bold green]✨ Done! Removed {count} active DB/cache file(s).[/]")
+                        with suppress(Exception):
+                            os.remove(file)
+                            count += 1
+                with suppress(Exception):
+                    if os.path.exists("dead_letter.jsonl"): os.remove("dead_letter.jsonl")
+                with suppress(Exception):
+                    telem_f = Path("logs") / "engine_telemetry.json"
+                    if telem_f.exists(): os.remove(telem_f)
+                console.print(f"\n[bold green]✨ Done! Removed {count} active DB/cache file(s) and cleared all tracking tables.[/]")
                 if backup_path: console.print(f"[dim]Safety backup: {backup_path}[/]")
             except Exception as e:
                 console.print(f"\n[bold red]❌ Purge aborted; active database preserved.[/] {e}")
@@ -6504,23 +6618,48 @@ async def mode_toggle_menu():
 async def wipe_memory():
     clear_screen()
     console.print(get_persistent_header())
-    console.print(Panel("[bold yellow]⚠️ WIPE FORWARDING HISTORY[/]", border_style="yellow", box=box.ROUNDED))
-    confirm = await safe_input("Type 'yes' to clear database history and restart scan fresh", allow_cancel=True)
+    console.print(Panel(
+        "[bold yellow]⚠️ COMPLETE RESET OF FORWARDING & CLONE HISTORY[/]\n\n"
+        "This utility will completely reset all tracking and bookmarks:\n"
+        "• All forwarded message records (`forwarded` table)\n"
+        "• Channel & Topic watermarks (`source_watermarks`, `topic_watermarks`)\n"
+        "• Clone session progress & mappings (`group_clone_sessions`)\n"
+        "• Topic indexer caches (`telegram_group_topics`, `telegram_topic_items`)\n"
+        "• Subject divider markers & local upload trackers\n"
+        "• Dead letter queues (`dead_letter.jsonl`) & Telemetry logs\n\n"
+        "[green]✔ Physical disk space will be reclaimed via SQLite VACUUM.[/]\n"
+        "[dim]Next scan or clone will start 100% fresh from Message #1.[/]",
+        border_style="yellow", box=box.ROUNDED
+    ))
+    confirm = await safe_input("Type 'yes' to wipe all history and restart fresh", allow_cancel=True)
     if confirm and confirm.lower() == "yes":
         try:
-            backup_path = backup_active_database(reason="history_wipe")
-            conn = sqlite3.connect(DB_FILE)
-            conn.execute("DROP TABLE IF EXISTS forwarded")
-            conn.execute("DROP TABLE IF EXISTS source_watermarks")
+            backup_path = backup_active_database(reason="full_history_wipe")
+            conn = sqlite3.connect(DB_FILE, timeout=30.0)
+            tables_to_drop = [
+                "forwarded", "source_watermarks", "topic_watermarks",
+                "group_clone_sessions", "local_folder_uploads",
+                "telegram_group_topics", "telegram_topic_items",
+                "route_subject_markers"
+            ]
+            for tbl in tables_to_drop:
+                with suppress(Exception):
+                    conn.execute(f"DROP TABLE IF EXISTS {tbl}")
             conn.execute("VACUUM")
             conn.commit()
             conn.close()
-            safe_remove_active_database_files()
-            console.print("[green]✔ History wiped and Physical Disk Space reclaimed (VACUUM successful)![/]")
-            if backup_path: console.print(f"[dim]Safety backup: {backup_path}[/]")
+            with suppress(Exception): safe_remove_active_database_files()
+            with suppress(Exception):
+                if os.path.exists("dead_letter.jsonl"): os.remove("dead_letter.jsonl")
+            with suppress(Exception):
+                telem_f = Path("logs") / "engine_telemetry.json"
+                if telem_f.exists(): os.remove(telem_f)
+            console.print("\n[bold green]✔ All Forwarding, Topic & Clone History completely wiped clean![/]")
+            console.print("[bold green]✔ Database VACUUM complete. Next run will scan 100% fresh from Message #1![/]")
+            if backup_path: console.print(f"[dim]Safety backup created at: {backup_path}[/]")
         except Exception as e:
-            console.print(f"[bold red]❌ History wipe aborted; active database preserved.[/] {e}")
-        await asyncio.sleep(1.5)
+            console.print(f"[bold red]❌ History wipe error:[/] {e}")
+        await safe_input("\nPress Enter to return to Main Menu", allow_cancel=False)
 
 def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
@@ -7099,7 +7238,6 @@ async def run_group_cloner_tool(session_mgr):
                     prev_tgt = latest["target_chat"]
                     update_env_file(chat_id=prev_src, topic_id=0, mode="1")
                     update_env_file(chat_id=prev_tgt, topic_id=0, mode="2")
-                    from dotenv import set_key
                     set_key(".env", "FORWARDING_RULES", ",".join(existing_rules))
                     os.environ["FORWARDING_RULES"] = ",".join(existing_rules)
             await state_mgr.close()
@@ -9351,11 +9489,12 @@ async def run_account_switcher_tool(session_mgr):
             " [bold yellow][P][/] 🔀 Toggle Multi-Account Load Balancing Pool\n"
             " [bold cyan][A][/] ➕ Add / Login New Telegram Account\n"
             " [bold red][D][/] 🗑️ Delete / Disconnect a Session File\n"
+            " [bold red][R][/] 🚪 Reset Login & Logout ALL Accounts (Fresh Start)\n"
             " [dim][0] Return to Main Menu[/]",
             border_style="dim", box=box.ROUNDED
         ))
         
-        choice = await safe_input("Choose Option (1..N / P / A / D / 0)", allow_cancel=True, default_val="0")
+        choice = await safe_input("Choose Option (1..N / P / A / D / R / 0)", allow_cancel=True, default_val="0")
         if not choice or choice == "0":
             break
             
@@ -9413,6 +9552,26 @@ async def run_account_switcher_tool(session_mgr):
                     console.print(f"[yellow]File {s_file} not found on disk.[/]")
                 await asyncio.sleep(1.2)
             continue
+
+        elif choice.upper() == "R":
+            console.print(Panel(
+                "[bold red]⚠️ LOGOUT ALL ACCOUNTS & RESET LOGIN[/]\n\n"
+                "Are you sure you want to log out of ALL Telegram accounts on this machine?\n"
+                "• All .session files will be permanently deleted.\n"
+                "• All background clients will be disconnected.\n"
+                "• Next time you run, you can perform a 100% fresh login.",
+                border_style="red", box=box.ROUNDED
+            ))
+            confirm = await safe_input("Type 'LOGOUT' to confirm full reset", allow_cancel=True)
+            if confirm == "LOGOUT":
+                n = await session_mgr.logout_and_reset_all_sessions()
+                console.print(f"\n[bold green]✔ All accounts logged out and {n} session file(s) safely removed![/]")
+                await safe_input("\nPress Enter to return", allow_cancel=False)
+                break
+            else:
+                console.print("[yellow]Cancelled. Accounts remain logged in.[/]")
+                await asyncio.sleep(1.0)
+                continue
 
 async def run_menu(session_mgr):
     while True:
@@ -9482,6 +9641,7 @@ async def run_menu(session_mgr):
             f" [bold yellow]{LB}13][/] 🩺 [bold white]System Diagnostics[/] [dim]· Latency & Integrity[/]\n"
             f" [bold green]{LB}14][/] ♻️ [bold white]Reset History & DB[/] [dim]· Fresh Re-Scan #1[/]\n"
             f" [bold cyan]{LB}15][/] 🧹 [bold white]Deep Cleaner & Purge[/] [dim]· Sessions & Logs[/]\n"
+            f" [bold red]{LB}20][/] 🚪 [bold white]Reset Login & Logout All[/] [dim]· Purge All Saved Accounts[/]\n"
             f" [bold magenta]{LB}18][/] 🚀 [bold white]Check & Install Updates[/] [bold yellow]⭐[/] [dim]· 1-Click Code Sync[/]\n"
             f" [bold red]{LB}16][/] ❌ [bold white]Safe Exit[/] [dim]· Flush DB WAL & Shutdown[/]",
             title="[bold green] 4 [/]",
@@ -9522,7 +9682,7 @@ async def run_menu(session_mgr):
         if has_active_session:
             route_preview = f"{cur_src} ➔ {cur_tgt}" if (cur_src and cur_tgt) else f"{len(cur_rules.split(','))} Topic Rules Configured"
             prompt_lines.append(f"  [bold green]⚡ Active Route:[/] [yellow]{route_preview}[/]  ·  Press [bold green][0][/] or [bold green][R][/] to [bold green]Resume Instantly[/]")
-        prompt_lines.append("  [dim]Enter[/] [bold cyan]0–19[/] [dim]or[/] [bold green]R[/][dim]  ·  [/][bold green]0 / R[/][dim] = Auto-Resume  ·  Press [bold green][Enter][/] for [/][bold red]3[/][dim] = God Mode (High Speed - Strict Sequence)[/]")
+        prompt_lines.append("  [dim]Enter[/] [bold cyan]0–20[/] [dim]or[/] [bold green]R[/][dim]  ·  [/][bold green]0 / R[/][dim] = Auto-Resume  ·  Press [bold green][Enter][/] for [/][bold red]3[/][dim] = God Mode (High Speed - Strict Sequence)[/]")
         
         console.print(Panel(
             "\n".join(prompt_lines),
@@ -9530,7 +9690,7 @@ async def run_menu(session_mgr):
             box=box.ROUNDED,
             padding=(0, 1)
         ))
-        ch = await safe_input("👉 Enter Choice [0-19 / R] (Default: 3 - God Mode)", allow_cancel=False, default_val="3")
+        ch = await safe_input("👉 Enter Choice [0-20 / R] (Default: 3 - God Mode)", allow_cancel=False, default_val="3")
         ch_clean = ch.strip().lower()
 
         # Attach / Stop background forwarder shortcuts
@@ -9545,7 +9705,7 @@ async def run_menu(session_mgr):
             continue
 
         # 0 or R: Instant Auto-Resume Previous Session
-        if ch_clean in ("0", "r", "resume", "20"):
+        if ch_clean in ("0", "r", "resume"):
             load_dotenv(override=True)
             cur_src = os.getenv("SOURCE_CHAT", "").strip()
             cur_tgt = os.getenv("TARGET_CHAT", "").strip()
@@ -9571,7 +9731,6 @@ async def run_menu(session_mgr):
                             cur_tgt_top = str(db_topics[0]["target_topic"])
                             update_env_file(chat_id=cur_src, topic_id=0, mode="1")
                             update_env_file(chat_id=cur_tgt, topic_id=0, mode="2")
-                            from dotenv import set_key
                             set_key(".env", "FORWARDING_RULES", cur_rules)
                             os.environ["FORWARDING_RULES"] = cur_rules
                 except Exception as db_rec_err:
@@ -9740,6 +9899,28 @@ async def run_menu(session_mgr):
         elif ch == "19":
             await run_account_switcher_tool(session_mgr)
             continue
+        elif ch == "20":
+            clear_screen()
+            console.print(get_persistent_header())
+            console.print(Panel(
+                "[bold red]🚪 RESET TELEGRAM LOGIN & LOGOUT ALL ACCOUNTS[/]\n\n"
+                "This action will completely disconnect and delete ALL Telegram session files from this machine:\n"
+                "• Primary Account (`session_forwarder.session`)\n"
+                "• All Secondary & Pool Account Sessions\n"
+                "• All Session Locks & Journal Sidecars\n\n"
+                "[yellow]⚠️ Are you sure you want to log out of all accounts on this machine?[/]",
+                border_style="red", box=box.ROUNDED
+            ))
+            confirm = await safe_input("Type 'LOGOUT' to confirm full reset", allow_cancel=True)
+            if confirm == "LOGOUT":
+                n = await session_mgr.logout_and_reset_all_sessions()
+                console.print(f"\n[bold green]✔ Done! {n} session file(s) safely deleted and all accounts logged out.[/]")
+                console.print("[cyan]Next time you launch or connect, you will be prompted for a fresh login.[/]")
+                await safe_input("\nPress Enter to return to Main Menu", allow_cancel=False)
+            else:
+                console.print("[yellow]Cancelled. Accounts remain securely logged in.[/]")
+                await asyncio.sleep(1.2)
+            continue
         elif ch == "16":
             clear_screen()
             console.print(get_persistent_header())
@@ -9811,8 +9992,9 @@ async def start_platform(auto_start: bool = False):
     except Exception as auth_err:
         logger.warning(f"Initial login check: {auth_err}")
     
-    # Auto-start check for 100% hands-free execution
-    is_auto = auto_start or ("--auto" in sys.argv) or ("--live" in sys.argv) or (os.getenv("AUTO_START_LIVE", "").strip() in ("1", "true", "yes"))
+    # Auto-start check for 100% hands-free execution (detects --auto, --live, env var, or non-interactive headless pipe)
+    is_headless = not sys.stdin.isatty() if hasattr(sys.stdin, "isatty") else False
+    is_auto = auto_start or ("--auto" in sys.argv) or ("--live" in sys.argv) or (os.getenv("AUTO_START_LIVE", "").strip() in ("1", "true", "yes")) or is_headless
     first_run = True
     
     while True:
@@ -9823,7 +10005,10 @@ async def start_platform(auto_start: bool = False):
                 menu_result = (1, 40, True, None, "god", False, True)
             else:
                 menu_result = await run_menu(session_mgr)
-            if menu_result is None: continue 
+            if menu_result is None:
+                if is_headless:
+                    await asyncio.sleep(2.0)
+                continue 
             
             w_count, parallel, is_adaptive, m_filter, routing_mode, dlq_flag, live_mode = menu_result
             update_env_file(mode="perf", perf_data={"workers": w_count, "parallelism": parallel, "adaptive": is_adaptive})

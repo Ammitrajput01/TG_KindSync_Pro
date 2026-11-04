@@ -913,6 +913,174 @@ class GlobalOSINTResolver:
                 except Exception:
                     pass
 
+            async def check_tiktok():
+                try:
+                    url = f"https://www.tiktok.com/@{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "TikTok",
+                                "icon": "🎵",
+                                "url": f"https://www.tiktok.com/@{clean_u}",
+                                "detail": "Public Video Creator"
+                            })
+                except Exception:
+                    pass
+
+            async def check_pinterest():
+                try:
+                    url = f"https://www.pinterest.com/{clean_u}/"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Pinterest",
+                                "icon": "📌",
+                                "url": f"https://www.pinterest.com/{clean_u}/",
+                                "detail": "Active Board Curator"
+                            })
+                except Exception:
+                    pass
+
+            async def check_youtube():
+                try:
+                    url = f"https://www.youtube.com/@{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "YouTube",
+                                "icon": "▶️",
+                                "url": f"https://www.youtube.com/@{clean_u}",
+                                "detail": "Channel Creator"
+                            })
+                except Exception:
+                    pass
+
+            async def check_twitch():
+                try:
+                    url = f"https://www.twitch.tv/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Twitch",
+                                "icon": "🟣",
+                                "url": f"https://www.twitch.tv/{clean_u}",
+                                "detail": "Live Streamer Profile"
+                            })
+                except Exception:
+                    pass
+
+            async def check_soundcloud():
+                try:
+                    url = f"https://soundcloud.com/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "SoundCloud",
+                                "icon": "🎧",
+                                "url": f"https://soundcloud.com/{clean_u}",
+                                "detail": "Audio & Music Creator"
+                            })
+                except Exception:
+                    pass
+
+            async def check_spotify():
+                try:
+                    url = f"https://open.spotify.com/user/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Spotify",
+                                "icon": "🟢",
+                                "url": f"https://open.spotify.com/user/{clean_u}",
+                                "detail": "Music Listener / Curator"
+                            })
+                except Exception:
+                    pass
+
+            async def check_disqus():
+                try:
+                    url = f"https://disqus.com/by/{clean_u}/"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Disqus",
+                                "icon": "💬",
+                                "url": f"https://disqus.com/by/{clean_u}/",
+                                "detail": "Forum Commenter"
+                            })
+                except Exception:
+                    pass
+
+            async def check_gravatar():
+                try:
+                    url = f"https://en.gravatar.com/{clean_u}.json"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Gravatar",
+                                "icon": "👤",
+                                "url": f"https://en.gravatar.com/{clean_u}",
+                                "detail": "Globally Recognized Avatar"
+                            })
+                except Exception:
+                    pass
+
+            async def check_vimeo():
+                try:
+                    url = f"https://vimeo.com/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Vimeo",
+                                "icon": "🎬",
+                                "url": f"https://vimeo.com/{clean_u}",
+                                "detail": "Filmmaker / Video Creator"
+                            })
+                except Exception:
+                    pass
+
+            async def check_aboutme():
+                try:
+                    url = f"https://about.me/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "About.me",
+                                "icon": "📇",
+                                "url": f"https://about.me/{clean_u}",
+                                "detail": "Personal Bio Page"
+                            })
+                except Exception:
+                    pass
+
+            async def check_buymeacoffee():
+                try:
+                    url = f"https://www.buymeacoffee.com/{clean_u}"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "BuyMeACoffee",
+                                "icon": "☕",
+                                "url": f"https://www.buymeacoffee.com/{clean_u}",
+                                "detail": "Creator Support Hub"
+                            })
+                except Exception:
+                    pass
+
+            async def check_substack():
+                try:
+                    url = f"https://{clean_u}.substack.com/"
+                    async with session.get(url, timeout=2.5) as r:
+                        if r.status == 200:
+                            findings.append({
+                                "platform": "Substack",
+                                "icon": "📰",
+                                "url": f"https://{clean_u}.substack.com/",
+                                "detail": "Newsletter Author"
+                            })
+                except Exception:
+                    pass
+
             await asyncio.gather(
                 check_github(),
                 check_gitlab(),
@@ -932,6 +1100,18 @@ class GlobalOSINTResolver:
                 check_steam(),
                 check_keybase(),
                 check_linktree(),
+                check_tiktok(),
+                check_pinterest(),
+                check_youtube(),
+                check_twitch(),
+                check_soundcloud(),
+                check_spotify(),
+                check_disqus(),
+                check_gravatar(),
+                check_vimeo(),
+                check_aboutme(),
+                check_buymeacoffee(),
+                check_substack(),
                 return_exceptions=True
             )
 
@@ -939,7 +1119,7 @@ class GlobalOSINTResolver:
             "username": clean_u,
             "found_count": len(findings),
             "findings": findings,
-            "scanned_count": 18,
+            "scanned_count": 30,
             "search_links": self.get_osint_search_links(clean_u)
         }
 
@@ -947,7 +1127,7 @@ class GlobalOSINTResolver:
         """Formats cross-platform username findings into clean Markdown for Telegram."""
         findings = scan_result.get("findings", [])
         u = scan_result.get("username", "")
-        scanned = scan_result.get("scanned_count", 18)
+        scanned = scan_result.get("scanned_count", 30)
         if not findings:
             return (
                 f"🌐 **Cross-Platform Footprint (`@{u}` — 0/{scanned} Networks):**\n"

@@ -2,6 +2,109 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Thursday, 5 November 2026 | 03:45 AM IST
+
+### 59. Oracle VPS Bot Service Forensics, Telegram `chat_join_request` Handler & Forum Supergroup Fallback
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"Actually today what happened I just opened my group in which my bot was there Kind Dr Bot was there. Before what it was doing it was doing like when 10 10 people joined request were pending So what I did I just accepted them Before it used to do send welcome message but today it didn't send us and didn't send message welcome message in the group and even in private pm both was sending their information Yeah that information was also missing today I don't know because of server it happens or is there any problem Can you check for that also and check for whole bot and its function and its codes also each and every line..."*
+    2. Terminal Screenshot provided showing Cloner crash on Oracle Linux VPS: `UnboundLocalError: cannot access local variable 'set_key' where it is not associated with a value` at line 7467.
+* **Root Cause Forensics**:
+  1. **Oracle Linux VPS Bot Inactive (Dead)**:
+     - Forensic SSH inspection revealed `tg-kinddoc-bot.service` was in `inactive (dead)` status on Oracle Cloud VPS (`130.210.1.32`) since `Wed 2026-11-04 20:19:25 UTC`.
+     - During maintenance / Option 16 (choice 2: Complete Services Shutdown), `sudo systemctl stop tg-kinddoc-bot` had been executed and the bot process was never restarted. Because the process was offline on the VPS, zero Telegram updates or member events were received.
+  2. **Missing `chat_join_request` Dispatcher Branch**:
+     - In `devi/operator/telegram_bot.py` line 1778, `"chat_join_request"` was requested in `allowed_updates`, but the polling dispatcher loop at line 1786 had NO `elif "chat_join_request" in update:` branch.
+     - While membership join requests were pending admin approval, the bot dropped the updates entirely without sending applicant OSINT alerts to admins.
+  3. **Forum Topic Fallback Requirement**:
+     - For supergroups with topics enabled, Bot API `sendMessage` without `message_thread_id` can fail if topic routing is enforced by Telegram.
+  4. **Oracle VPS Cloner Code Sync Lag**:
+     - The local working copy had fixed the `set_key` scoping bug (removing inner imports), but because of the strict no-auto-push policy, Oracle Linux VPS was still running commit `3bfa66a` containing inner `from dotenv import set_key` lines, causing `UnboundLocalError` when Option 8 (Cloner) was executed on the server.
+* **Applied Engineering Upgrades**:
+  1. **Autonomous `chat_join_request` Interceptor & 1-Click Moderation**:
+     - Added `_handle_chat_join_request(self, session, join_req)` to intercept prospective members as soon as they request to join.
+     - Automatically runs live SangMata username shift tracker and 30-platform OSINT radar.
+     - Dispatches an actionable alert to Master Admins (`1553619403` and `759038032`) with `[✅ Approve Request]` (`act_appr_join_{chat_id}_{user_id}`) and `[❌ Decline Request]` (`act_decl_join_{chat_id}_{user_id}`) inline buttons.
+     - Added callback query handlers calling Telegram Bot API `approveChatJoinRequest` and `declineChatJoinRequest`, editing the admin alert message in-place to confirm the action.
+  2. **Forum Supergroup Resilience Fallback**:
+     - In `_send_message`, added auto-retry fallback: if Telegram returns `message thread not found` or `thread id` error when posting to a forum group, it automatically retries targeting General Topic 1 (`message_thread_id=1`).
+  3. **Bytecode-Level Scoping Test**:
+     - Added automated unit test in [tests/test_join_request_and_cloner_fix.py](file:///c:/TG_KindSync_Pro/tests/test_join_request_and_cloner_fix.py) verifying that `set_key` is not in `co_varnames` (local variables) of `run_group_cloner_tool` in both `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py`.
+* **Verification & Stability**:
+  - `tests/test_join_request_and_cloner_fix.py`: 2/2 PASSED (100%).
+  - `tests/test_osint_and_rose.py`: 9/9 PASSED (100%).
+  - `tests/run_all_tests.py`: 15/15 PASSED (100%).
+
+---
+
+## 📅 Log Entry: Thursday, 5 November 2026 | 03:15 AM IST
+
+### 58. Deep System-Wide Audit: Welcome Card Action In-Place Retention, 30-Platform Sovereign OSINT Engine, Headless Non-Interactive Guard & Card Button Matrix
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"Do the research again or whatsoever you have did. You did it thoroughly again with more extensive research... increase your parameters, use your own skills, use your own agents, search on Internet, search on Google, Yahoo, Baidu, all hacking forums, programmer forums, GitHub repositories... check everything line by line, word to word."*
+    2. *"Many features are not available in card options and those options are also not available in the settings, like welcome messages settings."*
+    3. *"Some settings are going back if we click on that feature that is available on the card. I am clicking on it and it's going back."*
+    4. *"Add stripping word in cards in settings or features of the kinddoctor bot."*
+    5. *"When bot searches for information of person who added/joined group, expand to 12+ platforms / OSINT directories."*
+* **Root Cause Forensics**:
+  1. **Card "Clicking and Going Back" Reversion Bug**: In `devi/operator/telegram_bot.py`, callback handlers for `w_tog_`, `w_ttl_`, `w_dest_`, and `cleanwelcome` checked `if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:`. Because Telegram message objects often lack HTML tags in `msg.text` or when rendered from different message contexts, this check evaluated to `False` and executed the `else:` branch, forcefully rendering `_render_control_panel_card` instead of keeping the user on the Welcome Settings Card.
+  2. **Non-Interactive / Headless TTY EOF Infinite Loop Hazard**: When running `tg_kindsync_pro.py` in the background with `nohup` (as in `deploy/RUN_24_7_TERMUX.sh`), `sys.stdin.isatty()` is `False`. Because `RUN_24_7_TERMUX.sh` ran `python tg_kindsync_pro.py` without `--auto`, `safe_input()` caught `EOFError` and returned `None`, which caused the menu loop (`while True: if menu_result is None: continue`) to spin at 100% CPU.
+  3. **Duplicate Dossier Footprint**: `_format_sangmata_dossier` appended `extra_cp` right above `links_str`, which internally also appended `cross_platform_text.strip()`, printing cross-platform reconnaissance twice in every member dossier.
+  4. **OSINT Platform Scope**: `osint_resolver.py` previously checked 18 developer platforms. User requested comprehensive cross-platform coverage including major creator and community platforms.
+* **Applied Engineering Upgrades**:
+  1. **Deterministic Callback Query Retention**:
+     - Separated `pnl_` (Control Panel) and `w_` (Welcome Card) callback actions in `devi/operator/telegram_bot.py`. Actions starting with `w_` now unconditionally refresh and retain the Welcome Settings Card in-place.
+     - Added defensive unhandled callback fallback (`answerCallbackQuery`) so Telegram client spinners never freeze or time out.
+     - Added dual navigation buttons `[🎛️ Control Panel]` and `[⬅️ Main Menu]` to `_render_welcome_settings_card`.
+  2. **Full Card & Main Menu Action Matrix**:
+     - Added `[➕ Add Strip Word]` (`act_strip_add`) and `[🏷️ Active Strip Rules]` to Card 2 (Cloner) and Card 3 (Route).
+     - Added `[➕ Add Strip Word]` (`act_strip_add`) to Main Menu Tab 2 (`clone`).
+     - Added `[👋 Welcome Settings]` (`act_welcome_settings`) and `[🎛️ Master Control Panel]` (`act_panel`) to Main Menu Tab 4 (`sys`).
+  3. **30-Platform Sovereign OSINT Engine**:
+     - Expanded `osint_resolver.probe_cross_platform_username` from 18 to 30 concurrent non-blocking platforms: GitHub, GitLab, DockerHub, Dev.to, HackerNews, Telegram Web, Codeforces, Reddit, Chess.com, PyPI, npm, Medium, Pastebin, Replit, Kaggle, Steam, Keybase, Linktree, TikTok, Pinterest, YouTube, Twitch, SoundCloud, Spotify, Disqus, Gravatar, Vimeo, About.me, BuyMeACoffee, and Substack.
+     - Cleaned duplicate section rendering in `_format_sangmata_dossier`.
+  4. **Headless Execution & Termux Safety**:
+     - Added `is_headless = not sys.stdin.isatty()` guard in `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py`. In headless/nohup mode, it auto-enables God Mode Live Forwarding and sleeps if menu returns `None`, completely preventing 100% CPU infinite spin.
+     - Updated `deploy/RUN_24_7_TERMUX.sh` to explicitly pass `--auto` on launch.
+* **Verification & Stability**:
+  - Master test suite: 15/15 passed (100% Healthy).
+  - Pytest OSINT & Rose suite: 9/9 passed (100% Healthy).
+
+## 📅 Log Entry: Thursday, 5 November 2026 | 02:30 AM IST
+
+### 57. Multi-Account Resilient Failover, Reset Login Session Purge, Complete SQLite History Wipe & Cloner `set_key` Shadowing Fix
+* **User Directive & Context (Dr. Amit Singh)**:
+  - Directives:
+    1. *"Fatal Error in Cloner: `cannot access local variable 'set_key' where it is not associated with a value` in line 7467."* (Reported via terminal screenshot)
+    2. *"I want to add one more button in functions Like when we are running tg kind sync pro when we run we got menus in that menu I want to add one more option that is reset login Means that feature I want to add because I want to Reset all the accounts that is logged in should logged out from the tg kind sync pro."*
+    3. *"When I added yesterday Now three accounts I added my own It was not working that feature was not working one account was sending one message only and other was not working and third one was forwarding as usual so I do not know it was not functioning... fix each and everything logically."*
+    4. *"I was resetting the programme and cleaning the history also but the previous history that was loaded it was not getting cleaned after pressing cleaned button or selecting the clean feature So just fix it."*
+    5. *"Why you suggesting me augram turbo companion glass HUDPAR I don't want to do a gramme and in tg kind sink nothing is there for augram So just delete everything about a AyUgram from our project of tg kind sync pro This is separate project from Ayugram."*
+* **Root Cause Forensics**:
+  1. **Variable Scope Shadowing (`set_key`)**: Inner `from dotenv import set_key` lines inside `run_group_cloner_tool` (line 7102) and `run_menu` (line 9574) created a local variable that shadowed the module-level import (`line 82`). Any execution path reaching `set_key(env_p, "FORWARDING_RULES", rules_joined)` before the inner import line threw Python's `UnboundLocalError`.
+  2. **Multi-Account Channel Access Poisoning & Lack of Failover**: In multi-account pool mode, accounts rotated round-robin. If a secondary account was not a member of the target channel or lacked write permissions, Telethon threw `ChannelPrivateError` / `ChatAdminRequiredError` / `ValueError` ("Could not find input entity"). The forwarder caught this, mistakenly added the *source* channel to `_restricted_channels` (shutting off direct forwarding for all subsequent messages for all accounts), and routed the message to DLQ instead of falling back to the verified Primary account.
+  3. **Incomplete History Wipe Scope**: `wipe_memory()` (Option 14) and `advanced_cleaner_menu()` (Option 15, choice 2) previously only deleted rows from `forwarded` and `source_watermarks`. All topic-level bookmarks (`topic_watermarks`, `group_clone_sessions`, `telegram_group_topics`, `telegram_topic_items`, `local_folder_uploads`) were left untouched in SQLite, meaning topic clone and resume operations still saw and respected old watermarks.
+* **Applied Engineering Upgrades**:
+  1. **Eliminated `set_key` Inner Shadowing**: Removed inner imports in `run_group_cloner_tool` and `run_menu` across both `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py`, guaranteeing clean module-level scope.
+  2. **Universal Reset Login & Session File Deletion (`logout_and_reset_all_sessions`)**:
+     - Added `MultiSessionManager.logout_and_reset_all_sessions()` which cleanly disconnects all Telethon clients, unlinks all `*.session`, `*.session-journal`, `*.session-wal`, and `*.session-shm` files from the filesystem, resets active account index to 0, and clears authorization caches.
+     - Added Option `[20] 🚪 Reset Login & Logout All` to Main Menu Card 4.
+     - Added Option `[R] 🚪 Reset Login & Logout ALL Accounts (Fresh Start)` to the Account Switcher Tool (Option 19).
+  3. **Multi-Account Resilient Failover & Access Verification**:
+     - Integrated pre-flight target and source entity resolution for secondary accounts in `PipelineProcessor.execute`. If a secondary account cannot resolve the channel, traffic transparently routes through `primary_client`.
+     - In `attempt_direct`, if secondary account encounters access errors, it immediately falls back to `primary_client` for direct forwarding.
+     - Confined `_restricted_channels` additions strictly to genuine `ChatForwardsRestrictedError` encountered on the verified `primary_client`.
+     - Added automatic failover retry in `execute()`: if any secondary client encounters a stream/send failure, the message is immediately retried with `primary_client` before any DLQ entry is recorded.
+  4. **Exhaustive SQLite State Purge**:
+     - Overhauled `wipe_memory()` and `advanced_cleaner_menu()` to drop/truncate all 8 state tables (`forwarded`, `source_watermarks`, `topic_watermarks`, `group_clone_sessions`, `local_folder_uploads`, `telegram_group_topics`, `telegram_topic_items`, `route_subject_markers`), execute SQLite `VACUUM`, and remove `dead_letter.jsonl` and `logs/engine_telemetry.json`.
+  5. **AyuGram Exclusion Verification**:
+     - Verified zero active imports or runtime dependencies on AyuGram across the entire workspace (all 0 occurrences).
+* **Verification & Stability**:
+  - Full system test suite: 15/15 passed (100% Healthy).
+  - Pytest OSINT & Rose suite: 9/9 passed (100% Healthy).
+  - Both `tg_kindsync_pro.py` and `Friend_Edition/tg_kindsync_pro.py` fully synchronized.
+
 ## 📅 Log Entry: Tuesday, 3 November 2026 | 02:35 PM IST
 
 ### 56. Strict Zero-Memory-Leak Architecture: 4-Chunk Backpressure Window, Socket Buffer Normalization & Deterministic Heap Trimming

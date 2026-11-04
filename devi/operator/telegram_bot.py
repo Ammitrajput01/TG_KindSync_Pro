@@ -1535,9 +1535,6 @@ class DeviTelegramBot:
             risk_str = f"⚡ **Shift Velocity:** 🚨 High Velocity ({shifts_count} Identity Shifts Detected)\n"
 
         cross_platform_text = dossier.get("cross_platform_text", "")
-        extra_cp = f"\n{cross_platform_text}" if cross_platform_text else ""
-
-        links_str = ""
         clean_u = uname.lstrip("@") if uname and uname != "No Username" else ""
         osint_intel_lines = [
             "\n🛡️ **SOVEREIGN OSINT RADAR (Integrated OSINT4All & OSINT Framework Recon):**"
@@ -1546,7 +1543,7 @@ class DeviTelegramBot:
             osint_intel_lines.append(cross_platform_text.strip())
         else:
             if clean_u and not clean_u.isdigit():
-                osint_intel_lines.append(f"• **Digital Recon Handle**: `@{clean_u}` · Scanned across 18 developer & creator platforms")
+                osint_intel_lines.append(f"• **Digital Recon Handle**: `@{clean_u}` · Scanned across 30 developer, creator & social networks")
                 osint_intel_lines.append("• **Cross-Platform Status**: Direct In-Chat Verification Active (Zero External Click-Outs Required)")
             else:
                 osint_intel_lines.append("• **Entity Type**: Anonymous / ID-Only Member (Targeted via Biometric Vault & Name Shifts)")
@@ -1565,7 +1562,6 @@ class DeviTelegramBot:
             f"{phone_str}\n"
             f"📜 **Name History (SangMata Timeline):**\n" + "\n".join(name_lines) + "\n\n"
             f"🏷️ **Username History (SangMata Timeline):**\n" + "\n".join(uname_lines) + "\n"
-            f"{extra_cp}"
             f"{links_str}"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"🛡️ *Kind Doctor Live Sentinel • SangMata Biometrics*"
@@ -1791,6 +1787,8 @@ class DeviTelegramBot:
                                     self.create_tracked_task(self._handle_callback_query(session, update["callback_query"]))
                                 elif "my_chat_member" in update:
                                     self.create_tracked_task(self._handle_my_chat_member(session, update["my_chat_member"]))
+                                elif "chat_join_request" in update:
+                                    self.create_tracked_task(self._handle_chat_join_request(session, update["chat_join_request"]))
                                 elif "chat_member" in update:
                                     self.create_tracked_task(self._handle_chat_member(session, update["chat_member"]))
                                 elif "message" in update:
@@ -1800,6 +1798,17 @@ class DeviTelegramBot:
                 except Exception as e:
                     logger.warning(f"Telegram polling error: {e}")
                     await asyncio.sleep(4)
+
+    def _format_ttl_display(self, seconds: int) -> str:
+        if seconds <= 0:
+            return "Never (Permanent)"
+        elif seconds >= 86400 and seconds % 86400 == 0:
+            return f"{seconds // 86400}d ({seconds}s)"
+        elif seconds >= 3600 and seconds % 3600 == 0:
+            return f"{seconds // 3600}h ({seconds}s)"
+        elif seconds >= 60 and seconds % 60 == 0:
+            return f"{seconds // 60}m ({seconds}s)"
+        return f"{seconds}s"
 
     def _format_clean_html(self, text: str) -> str:
         """Converts Markdown formatting (**bold**, _italic_, `code`, [link](url)) to robust Telegram HTML so asterisks never show."""
@@ -1887,6 +1896,10 @@ class DeviTelegramBot:
                         if "TOPIC_CLOSED" in err_txt and payload.get("message_thread_id"):
                             logger.warning(f"Topic {payload.get('message_thread_id')} in {chat_id} is closed! Falling back to General topic...")
                             payload.pop("message_thread_id", None)
+                            continue
+                        elif any(kw in err_txt.lower() for kw in ["thread not found", "thread_id", "thread id", "forum"]) and not payload.get("message_thread_id"):
+                            logger.info(f"Forum supergroup detected for {chat_id}, retrying with General topic 1...")
+                            payload["message_thread_id"] = 1
                             continue
 
                         # Fallback: Strip HTML tags and markdown markers so clean readable text is sent without raw stars/taare
@@ -2241,6 +2254,92 @@ class DeviTelegramBot:
         except Exception as e:
             logger.warning(f"Error in _handle_my_chat_member: {e}")
 
+    async def _handle_chat_join_request(self, session: aiohttp.ClientSession, join_req: dict):
+        """
+        Auto-intercepts pending chat join requests, immediately runs SangMata + 30-platform OSINT radar,
+        and dispatches an actionable 1-click Approval/Decline alert to Master Admins.
+        """
+        try:
+            chat = join_req.get("chat", {})
+            user = join_req.get("from", {})
+            chat_id = chat.get("id")
+            user_id = user.get("id")
+            if not chat_id or not user_id or user.get("is_bot"):
+                return
+
+            chat_title = chat.get("title", "Study Group")
+            full_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "User"
+            username = user.get("username") or ""
+            bio = join_req.get("bio") or ""
+
+            logger.info(f"🚨 [JOIN-REQUEST] User {full_name} (@{username}, ID: {user_id}) requested to join {chat_title} ({chat_id})")
+
+            # 1. Track dossier & run OSINT scan
+            dossier = self._track_user_dossier(user)
+            safe_full_name = html.escape(full_name)
+            safe_grp_title = html.escape(chat_title)
+            user_tag = f"<b>@{html.escape(username)}</b>" if username else f'<a href="tg://user?id={user_id}"><b>{safe_full_name}</b></a>'
+
+            try:
+                from devi.operator.osint_resolver import osint_resolver
+                live_sm = await osint_resolver.fetch_live_sangmata_history(user_id)
+                if live_sm:
+                    if live_sm.get("names"):
+                        dossier["name_history"] = live_sm["names"]
+                    if live_sm.get("usernames"):
+                        dossier["username_history"] = live_sm["usernames"]
+                    dossier["changes_count"] = live_sm.get("total_shifts", dossier.get("changes_count", 0))
+            except Exception as ex:
+                logger.debug(f"SangMata fetch error in _handle_chat_join_request: {ex}")
+
+            if username:
+                try:
+                    from devi.operator.osint_resolver import osint_resolver
+                    probe_res = await osint_resolver.probe_cross_platform_username(username)
+                    if probe_res:
+                        dossier["cross_platform_text"] = osint_resolver.format_cross_platform_card(probe_res)
+                        dossier["cross_platform_findings"] = probe_res.get("findings", [])
+                except Exception as ex:
+                    logger.debug(f"Cross-platform probe error in _handle_chat_join_request: {ex}")
+
+            dossier_card = self._format_sangmata_dossier(
+                dossier,
+                title_prefix="PENDING JOIN REQUEST — APPLICANT INTELLIGENCE"
+            )
+
+            bio_section = f"\n📝 <b>Applicant Bio:</b> <i>{html.escape(bio)}</i>" if bio else ""
+
+            admin_text = (
+                f"🚨 <b>NEW PENDING JOIN REQUEST DETECTED</b>\n"
+                f"👥 <b>Target Group:</b> <code>{safe_grp_title}</code> (<code>{chat_id}</code>)\n"
+                f"👤 <b>Applicant:</b> {user_tag} (<code>{user_id}</code>){bio_section}\n\n"
+                f"{dossier_card}"
+            )
+
+            admin_markup = {
+                "inline_keyboard": [
+                    [
+                        {"text": "✅ Approve Request", "callback_data": f"act_appr_join_{chat_id}_{user_id}"},
+                        {"text": "❌ Decline Request", "callback_data": f"act_decl_join_{chat_id}_{user_id}"}
+                    ],
+                    [
+                        {"text": "🔍 Deep OSINT Scan", "callback_data": f"osint_user_{user_id}"},
+                        {"text": "🚫 Ban & Block", "callback_data": f"ban_{chat_id}_{user_id}"}
+                    ]
+                ]
+            }
+
+            for adm_id in self.master_admin_ids:
+                await self._send_message(
+                    session,
+                    adm_id,
+                    admin_text,
+                    reply_markup=admin_markup,
+                    parse_mode="HTML"
+                )
+        except Exception as e:
+            logger.warning(f"Error in _handle_chat_join_request: {e}")
+
     async def _handle_chat_member(self, session: aiohttp.ClientSession, chat_member: dict):
         """Auto-detects newly joined members, tracks SangMata dossier, and posts Welcome + OSINT Audit Card."""
         try:
@@ -2406,7 +2505,7 @@ class DeviTelegramBot:
         grp_title = self._get_group_title(target_chat_id)
         w_enabled = bool(g_settings.get("welcome_enabled", 1))
         w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
-        w_ttl_str = f"{w_timeout}s" if w_timeout > 0 else "Never (Permanent)"
+        w_ttl_str = self._format_ttl_display(w_timeout)
 
         j_enabled = bool(g_settings.get("join_track_enabled", 1))
         j_dest = str(g_settings.get("join_track_dest", "pm")).lower().strip()
@@ -2435,8 +2534,14 @@ class DeviTelegramBot:
             "💡 <i>Tap any button below to toggle settings instantly without typing commands!</i>"
         )
 
-        next_ttl = 60 if w_timeout == 30 else (90 if w_timeout == 60 else (120 if w_timeout == 90 else (0 if w_timeout == 120 else 30)))
-        ttl_btn_text = f"⏱️ TTL: {w_ttl_str} ➔ {next_ttl}s" if next_ttl > 0 else f"⏱️ TTL: {w_ttl_str} ➔ Never"
+        ttl_cycle = [60, 3600, 43200, 86400, 0]
+        if w_timeout in ttl_cycle:
+            next_idx = (ttl_cycle.index(w_timeout) + 1) % len(ttl_cycle)
+            next_ttl = ttl_cycle[next_idx]
+        else:
+            next_ttl = 43200
+        next_disp = self._format_ttl_display(next_ttl)
+        ttl_btn_text = f"⏱️ TTL: {w_ttl_str} ➔ {next_disp}"
 
         markup = {
             "inline_keyboard": [
@@ -2493,7 +2598,7 @@ class DeviTelegramBot:
 
         w_enabled = bool(g_settings.get("welcome_enabled", 1))
         w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
-        w_ttl_str = f"{w_timeout}s" if w_timeout > 0 else "Never (Permanent)"
+        w_ttl_str = self._format_ttl_display(w_timeout)
 
         j_enabled = bool(g_settings.get("join_track_enabled", 1))
         j_dest = str(g_settings.get("join_track_dest", "pm")).lower().strip()
@@ -2547,7 +2652,8 @@ class DeviTelegramBot:
                     {"text": "🔄 Refresh", "callback_data": f"act_w_refresh_{target_chat_id}"}
                 ],
                 [
-                    {"text": "🔙 Back to Control Panel", "callback_data": "act_panel"}
+                    {"text": "🎛️ Control Panel", "callback_data": "act_panel"},
+                    {"text": "⬅️ Main Menu", "callback_data": "act_menu"}
                 ]
             ]
         }
@@ -3033,12 +3139,16 @@ class DeviTelegramBot:
                         {"text": "📋 View Active Jobs", "callback_data": "act_clonejobs"}
                     ],
                     [
+                        {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_stripwords"}
+                    ],
+                    [
                         {"text": "⏸️ Pause All Jobs", "callback_data": "act_cloner_pause_all"},
                         {"text": "▶️ Resume All Jobs", "callback_data": "act_cloner_resume_all"}
                     ],
                     [
-                        {"text": "🏷️ Strip Words Studio", "callback_data": "act_help_strip"},
-                        {"text": "⏱️ Velocity & Pacing", "callback_data": "act_help_pacing"}
+                        {"text": "⏱️ Velocity & Pacing", "callback_data": "act_help_pacing"},
+                        {"text": "🔄 Auto-Forward Guide", "callback_data": "act_help_route"}
                     ],
                     [
                         {"text": "⬅️ Back to Main Menu", "callback_data": "act_menu"},
@@ -3633,6 +3743,10 @@ class DeviTelegramBot:
                     {"text": "📊 Live Cloner Status", "callback_data": "act_clonestatus"}
                 ],
                 [
+                    {"text": "➕ Add Strip Word", "callback_data": "act_strip_add"},
+                    {"text": "🏷️ Active Strip Rules", "callback_data": "act_stripwords"}
+                ],
+                [
                     {"text": "📑 Topic Index Guide", "callback_data": "act_indexhelp"},
                     {"text": "⚡ 1-Click Auto-Scan", "callback_data": "act_scan"}
                 ],
@@ -3662,15 +3776,19 @@ class DeviTelegramBot:
             action_rows = [
                 [
                     {"text": "🖥️ Hardware Telemetry", "callback_data": "act_telemetry"},
-                    {"text": "🕵️ SangMata OSINT Radar", "callback_data": "act_osinthelp"}
+                    {"text": "👋 Welcome Settings", "callback_data": "act_welcome_settings"}
                 ],
                 [
-                    {"text": "📦 Instant DB Backup", "callback_data": "act_backup"},
-                    {"text": "🛡️ Group Admin Controls", "callback_data": "act_adminhelp"}
+                    {"text": "🕵️ SangMata OSINT Radar", "callback_data": "act_osinthelp"},
+                    {"text": "📦 Instant DB Backup", "callback_data": "act_backup"}
                 ],
                 [
-                    {"text": "⏱️ Velocity & Pacing", "callback_data": "act_pacinghelp"},
-                    {"text": "🌐 Web Cockpit Guide", "callback_data": "act_webhelp"}
+                    {"text": "🛡️ Group Admin Controls", "callback_data": "act_adminhelp"},
+                    {"text": "⏱️ Velocity & Pacing", "callback_data": "act_pacinghelp"}
+                ],
+                [
+                    {"text": "🌐 Web Cockpit Guide", "callback_data": "act_webhelp"},
+                    {"text": "🎛️ Master Control Panel", "callback_data": "act_panel"}
                 ]
             ]
         else:  # Default: "fwd"
@@ -4678,18 +4796,19 @@ class DeviTelegramBot:
                 await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
                 return
             elif action.startswith("w_tog_") or action.startswith("pnl_w_tog_"):
+                is_pnl = action.startswith("pnl_")
                 tgt_c = int(action.replace("w_tog_", "").replace("pnl_w_tog_", ""))
                 curr_s = self._get_group_settings(tgt_c)
                 new_w = 0 if curr_s.get("welcome_enabled", 1) else 1
                 self._save_group_setting(tgt_c, "welcome_enabled", new_w)
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Welcome: {'ENABLED ✅' if new_w else 'DISABLED ❌'}"})
-                msg_txt_cur = msg_obj.get("text", "")
-                if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:
-                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
-                else:
+                if is_pnl:
                     await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                else:
+                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
                 return
             elif action.startswith("w_ttl_") or action.startswith("pnl_w_ttl_"):
+                is_pnl = action.startswith("pnl_")
                 clean_act = action.replace("pnl_w_ttl_", "w_ttl_")
                 parts_ttl = clean_act.split("_")
                 tgt_c = int(parts_ttl[2])
@@ -4697,13 +4816,13 @@ class DeviTelegramBot:
                 self._save_group_setting(tgt_c, "welcome_timeout", new_ttl)
                 ttl_disp = f"{new_ttl}s" if new_ttl > 0 else "Never (Permanent)"
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Auto-Delete TTL: {ttl_disp} ⏱️"})
-                msg_txt_cur = msg_obj.get("text", "")
-                if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:
-                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
-                else:
+                if is_pnl:
                     await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                else:
+                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
                 return
             elif action.startswith("w_dest_") or action.startswith("pnl_sm_tog_"):
+                is_pnl = action.startswith("pnl_")
                 tgt_c = int(action.replace("w_dest_", "").replace("pnl_sm_tog_", ""))
                 curr_s = self._get_group_settings(tgt_c)
                 cur_dest = str(curr_s.get("join_track_dest", "pm")).lower().strip()
@@ -4724,11 +4843,10 @@ class DeviTelegramBot:
                 self._save_group_setting(tgt_c, "join_track_dest", new_dest)
                 self._save_group_setting(tgt_c, "join_track_enabled", new_en)
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": msg_txt})
-                msg_txt_cur = msg_obj.get("text", "")
-                if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:
-                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
-                else:
+                if is_pnl:
                     await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                else:
+                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
                 return
             elif action.startswith("w_reset_"):
                 tgt_c = int(action.replace("w_reset_", ""))
@@ -4756,16 +4874,18 @@ class DeviTelegramBot:
                         del_count += 1
                 self._clear_logged_welcome_messages(target_chat_id)
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"🧹 Purged {del_count} Welcome Cards!", "show_alert": False})
-                msg_txt_cur = msg_obj.get("text", "")
-                if "WELCOME & GREETINGS CONTROL" in msg_txt_cur:
-                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
-                else:
+                if action.startswith("pnl_"):
                     await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
+                else:
+                    await self._render_welcome_settings_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
                 return
             elif action in ("panel", "control", "settings", "botpanel", "act_panel"):
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Master Control Panel ✨"})
                 await self._render_control_panel_card(session, chat_id, admin_id, message_thread_id=thread_id, edit_message_id=msg_id)
                 return
+            # Defensive Fallback: always answer callback query so Telegram client never times out or reverts
+            with suppress(Exception):
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Processed ✨"})
             return
 
         if not self.is_admin(admin_id):
@@ -4828,6 +4948,36 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, f"👢 Member `{target_user_id}` has been kicked from group `{grp_id}`.")
             except Exception as e:
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}"})
+
+        # 3b. Approve or Decline Join Request
+        elif data.startswith("act_appr_join_") or data.startswith("act_decl_join_"):
+            is_approve = data.startswith("act_appr_join_")
+            prefix = "act_appr_join_" if is_approve else "act_decl_join_"
+            raw_target = data[len(prefix):]
+            if "_" in raw_target:
+                p_chat_id, p_user_id = raw_target.rsplit("_", 1)
+                target_chat_id = int(p_chat_id)
+                target_user_id = int(p_user_id)
+                endpoint = "approveChatJoinRequest" if is_approve else "declineChatJoinRequest"
+                action_word = "Approved" if is_approve else "Declined"
+                try:
+                    async with session.post(
+                        f"https://api.telegram.org/bot{self.token}/{endpoint}",
+                        json={"chat_id": target_chat_id, "user_id": target_user_id},
+                        timeout=12
+                    ) as resp:
+                        if resp.status == 200:
+                            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"✅ Join request {action_word}!"})
+                            cb_m_id = cb_msg.get("message_id")
+                            if cb_m_id:
+                                cur_t = cb_msg.get("text", "")
+                                notice = f"✅ <b>[JOIN REQUEST {action_word.upper()}]</b> by Admin @{cb_from.get('username') or cb_from.get('first_name', 'Admin')}\n\n"
+                                await self._edit_message(session, chat_id, cb_m_id, notice + cur_t, reply_markup=None)
+                        else:
+                            err_resp = await resp.text()
+                            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {err_resp[:40]}", "show_alert": True})
+                except Exception as e:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}", "show_alert": True})
 
         # 4. Ban & Block Member permanently
         elif data.startswith("ban_"):
@@ -8122,11 +8272,21 @@ class DeviTelegramBot:
                 return
 
             try:
-                ttl_val = int(parts[1].strip())
+                raw_arg = parts[1].strip().lower()
+                if raw_arg.endswith("d"):
+                    ttl_val = int(raw_arg[:-1]) * 86400
+                elif raw_arg.endswith("h"):
+                    ttl_val = int(raw_arg[:-1]) * 3600
+                elif raw_arg.endswith("m"):
+                    ttl_val = int(raw_arg[:-1]) * 60
+                elif raw_arg.endswith("s"):
+                    ttl_val = int(raw_arg[:-1])
+                else:
+                    ttl_val = int(raw_arg)
                 if ttl_val < 0:
                     ttl_val = 0
                 self._save_group_setting(target_chat_id, "welcome_timeout", ttl_val)
-                ttl_desc = f"{ttl_val} seconds" if ttl_val > 0 else "Never (Permanent)"
+                ttl_desc = self._format_ttl_display(ttl_val)
                 await self._send_message(
                     session,
                     chat_id,
@@ -8134,7 +8294,7 @@ class DeviTelegramBot:
                     message_thread_id=thread_id
                 )
             except ValueError:
-                await self._send_message(session, chat_id, "❌ Please specify valid seconds, e.g. `/welcometimeout 60` or `0` for permanent.", message_thread_id=thread_id)
+                await self._send_message(session, chat_id, "❌ Please specify valid time, e.g. `/welcometimeout 12h`, `/welcometimeout 1d`, or `/welcometimeout 43200` (or `0` for permanent).", message_thread_id=thread_id)
 
         elif cmd == "/setwelcome":
             target_chat_id = self._resolve_study_group_id(chat_id)

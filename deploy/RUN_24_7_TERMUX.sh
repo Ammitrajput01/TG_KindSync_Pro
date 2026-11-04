@@ -38,8 +38,8 @@ nohup python web_dashboard.py > logs/dashboard_service.log 2>&1 &
 DASH_PID=$!
 echo " • 📊 Web Dashboard Started on Port 8080 (PID: $DASH_PID)"
 
-# 6. Start Main Forwarder Engine in Background
-nohup python tg_kindsync_pro.py > logs/forwarder_service.log 2>&1 &
+# 6. Start Main Forwarder Engine in Background (with --auto for hands-free nohup execution)
+nohup python tg_kindsync_pro.py --auto > logs/forwarder_service.log 2>&1 &
 FWD_PID=$!
 echo " • ⚡ Forwarder Engine Started (PID: $FWD_PID)"
 
