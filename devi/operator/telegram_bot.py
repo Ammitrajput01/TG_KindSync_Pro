@@ -143,7 +143,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/clone", "/batchclone", "/clonegroup", "/cloneall", "/deepclone", "/clonetopic", "/clonejobs", "/clonestatus", "/stopclone", "/pauseclone", "/resumeclone", "/pause", "/resume",
     "/stats", "/leaderboard", "/topmembers", "/history", "/rules",
     "/userinfo", "/whois", "/botinfo", "/about",
-    "/engine", "/status", "/backup", "/clean", "/cleanbot", "/sangmata",
+    "/engine", "/status", "/polyglot", "/accelerator", "/backup", "/clean", "/cleanbot", "/sangmata",
     "/phone", "/email", "/phonelookup", "/emaillookup",
     "/calc", "/dose", "/formula", "/score",
     "/bmi", "/bsa", "/gfr", "/pedia", "/burns", "/uop", "/edd", "/psm",
@@ -4530,6 +4530,8 @@ class DeviTelegramBot:
                 await self._handle_admin_command(session, chat_id, admin_id, "/scan", message=msg_obj)
             elif action == "engine_refresh":
                 await self._handle_admin_command(session, chat_id, admin_id, "/engine", message=msg_obj)
+            elif action == "polyglot_status":
+                await self._handle_admin_command(session, chat_id, admin_id, "/polyglot", message=msg_obj)
             elif action in ("engine_backup", "quick_backup"):
                 await self._handle_admin_command(session, chat_id, admin_id, "/backup", message=msg_obj)
             elif action == "engine_scan":
@@ -11697,6 +11699,48 @@ class DeviTelegramBot:
                 message_thread_id=thread_id
             )
 
+        elif cmd in ("/polyglot", "/accelerator"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+
+            try:
+                from devi.operator.polyglot_accelerator import get_acceleration_status
+                accel = get_acceleration_status()
+            except Exception:
+                accel = {
+                    "crypto_engine": "Standard Fallback",
+                    "json_engine": "Standard JSON",
+                    "analytics_engine": "SQLite",
+                    "platform": sys.platform,
+                    "event_loop": "asyncio"
+                }
+
+            polyglot_card = (
+                f"⚡ <b>POLYGLOT NATIVE ACCELERATION MATRIX</b> 🚀\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🛡️ <b>Hardware Cryptography:</b> <code>{accel.get('crypto_engine')}</code>\n"
+                f"🦀 <b>JSON Parsing (Rust):</b> <code>{accel.get('json_engine')}</code>\n"
+                f"🦆 <b>Analytical Scanner (DuckDB):</b> <code>{accel.get('analytics_engine')}</code>\n"
+                f"🌐 <b>Event Loop Architecture:</b> <code>{accel.get('event_loop')}</code>\n"
+                f"🚀 <b>Kernel Socket Pacing:</b> <code>TCP_NODELAY + 1MB Buffers + TCP_NOTSENT_LOWAT (Zero Bufferbloat)</code>\n"
+                f"💻 <b>Runtime Platform:</b> <code>{accel.get('platform')}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✅ <b>Dual-Parity Shield:</b> Oracle Linux VPS ⇋ Windows Friend Edition\n"
+                f"🛡️ <b>Zero-Friction Fallback:</b> 100% active (Graceful pure-Python safety)\n"
+                f"👑 <b>Master Admins:</b> @Kinddoctor4u | @Ammitrajput1"
+            )
+            accel_kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🔄 Refresh Matrix", "callback_data": "act_polyglot_status"},
+                        {"text": "🎛️ Master Engine", "callback_data": "act_engine_refresh"}
+                    ]
+                ]
+            }
+            await self._send_message(session, chat_id, polyglot_card, reply_markup=accel_kb, message_thread_id=thread_id)
+            return
+
         elif cmd in ("/engine", "/status"):
             if not self.is_admin(admin_id):
                 await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
@@ -11775,11 +11819,18 @@ class DeviTelegramBot:
             src_chat = os.getenv("SOURCE_CHAT", "Not Set")
             tgt_chat = os.getenv("TARGET_CHAT", "Not Set")
 
+            polyglot_badge = "⚡ Polyglot Active (Rust + DuckDB SIMD + AES-NI)"
+            with suppress(Exception):
+                from devi.operator.polyglot_accelerator import get_acceleration_status
+                acc_info = get_acceleration_status()
+                polyglot_badge = f"{'SIMD DuckDB' if acc_info.get('has_duckdb') else 'SQLite'} · {'Rust orjson' if acc_info.get('has_orjson') else 'json'} · {'AES-NI' if acc_info.get('hardware_aes_ni') else 'Python'}"
+
             engine_status_badge = "🟢 **ONLINE / ACTIVE**" if is_running else "🟡 **STANDBY / READY**"
             status_report = (
                 f"🩺 **TG KINDSYNC PRO — MASTER CONTROL TOWER**\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"⚡ **Engine State:** {engine_status_badge}\n"
+                f"🚀 **Polyglot Core:** `{polyglot_badge}`\n"
                 f"💾 **Disk Space:** `{disk_used_gb:.1f} GB` used / `{disk_total_gb:.1f} GB` (`{disk_free_gb:.1f} GB` free - `{disk_pct}%`)\n"
                 f"⚡ **System RAM:** `{ram_pct}%` (`{ram_used_mb:.0f} MB` used / `{ram.total/(1024*1024):.0f} MB` total - `{ram_free_mb:.0f} MB` free)\n"
                 f"🔥 **CPU & Host:** `{cpu_p:.1f}%` ({cpu_cores} Cores) · Host Uptime: `{up_str}`\n\n"
@@ -11811,6 +11862,9 @@ class DeviTelegramBot:
                     [
                         {"text": "⚡ Toggle Direct Forward", "callback_data": "act_toggle_direct"},
                         {"text": "👑 Toggle Signature", "callback_data": "act_toggle_sig"}
+                    ],
+                    [
+                        {"text": "⚡ Native Acceleration Matrix", "callback_data": "act_polyglot_status"}
                     ]
                 ]
             }

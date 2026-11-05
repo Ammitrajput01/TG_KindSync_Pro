@@ -149,21 +149,25 @@ class UploadSender:
 
 def _tune_connection_socket(conn) -> None:
     """
-    Applies enterprise TCP socket buffer optimizations (TCP_NODELAY and 1MB buffers)
-    to eliminate Nagle delays, maximize bandwidth, and keep memory footprint strictly lean.
+    Applies enterprise TCP socket buffer optimizations (TCP_NODELAY, 1MB buffers,
+    and Linux TCP_NOTSENT_LOWAT pacing) to eliminate Nagle delays, bufferbloat, and maximize throughput.
     """
     try:
         writer = getattr(conn, "_writer", None)
         if writer:
             sock = writer.get_extra_info("socket")
             if sock:
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                for opt in (getattr(socket, "SO_RCVBUF", None), getattr(socket, "SO_SNDBUF", None)):
-                    if opt is not None:
-                        try:
-                            sock.setsockopt(socket.SOL_SOCKET, opt, 1024 * 1024)
-                        except OSError:
-                            pass
+                try:
+                    from polyglot_accelerator import tune_socket_kernel_pacing
+                    tune_socket_kernel_pacing(sock)
+                except Exception:
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                    for opt in (getattr(socket, "SO_RCVBUF", None), getattr(socket, "SO_SNDBUF", None)):
+                        if opt is not None:
+                            try:
+                                sock.setsockopt(socket.SOL_SOCKET, opt, 1024 * 1024)
+                            except OSError:
+                                pass
     except Exception:
         pass
 

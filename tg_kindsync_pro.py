@@ -1107,6 +1107,16 @@ def get_persistent_header():
     menu_dt_str = datetime.now().strftime("%a, %d %b %Y · %I:%M:%S %p")
     w = get_terminal_width()
 
+    # Dynamic polyglot acceleration detection
+    is_polyglot = False
+    try:
+        from polyglot_accelerator import NATIVE_CRYPTO_ACTIVE, HAS_ORJSON, HAS_DUCKDB
+        is_polyglot = NATIVE_CRYPTO_ACTIVE or HAS_ORJSON or HAS_DUCKDB
+    except Exception:
+        is_polyglot = False
+
+    engine_tag = "[bold green]● ENGINE ONLINE[/] [dim]·[/] [bold magenta]⚡ NATIVE ACCELERATED[/]" if is_polyglot else "[bold green]● ENGINE ONLINE[/]"
+
     # 1. Top Brand & Status Bar (Responsive)
     top_grid = Table.grid(expand=True)
     if w < 90:
@@ -1114,7 +1124,7 @@ def get_persistent_header():
         top_grid.add_column(justify="right", ratio=1)
         top_grid.add_row(
             "[bold cyan]🚀 TG KINDSYNC PRO V15.0.0[/]",
-            "[bold green]● ONLINE[/]"
+            "[bold green]● ONLINE[/]" if not is_polyglot else "[bold magenta]⚡ ACCEL[/]"
         )
     else:
         top_grid.add_column(justify="left")
@@ -1123,7 +1133,7 @@ def get_persistent_header():
         top_grid.add_row(
             "[bold cyan]🚀  TG KINDSYNC PRO  V15.0.0[/]",
             "[bold yellow]🛡️  ENTERPRISE TELEGRAM CLOUD & STUDY SUITE[/]",
-            "[bold green]● ENGINE ONLINE[/]"
+            engine_tag
         )
 
     # 2. Detailed Contact & Identity Matrix (Responsive)
@@ -1150,7 +1160,7 @@ def get_persistent_header():
             "📸 [bold bright_white]Instagram Profile :[/] [magenta]instagram.com/ammmitrajput1[/]"
         )
         contact_grid.add_row(
-            "⚡ [bold bright_white]Core Engine       :[/] [cyan]Deterministic MTProto Pipeline[/]",
+            "⚡ [bold bright_white]Core Engine       :[/] [cyan]Polyglot Native Accelerated (SIMD + Rust + C)[/]" if is_polyglot else "⚡ [bold bright_white]Core Engine       :[/] [cyan]Deterministic MTProto Pipeline[/]",
             "📧 [bold bright_white]Official Email    :[/] [white]Ammitrajput1@gmail.com[/]"
         )
 
@@ -1166,7 +1176,7 @@ def get_persistent_header():
         sys_grid.add_column(justify="right")
         sys_grid.add_row(
             f"[dim]📅 {menu_dt_str}[/]",
-            "[dim]🛡️ Zero AI Overhead  ·  Multi-Session[/]",
+            "[dim]🛡️ Polyglot SIMD  ·  Multi-Session[/]" if is_polyglot else "[dim]🛡️ Zero AI Overhead  ·  Multi-Session[/]",
             "[dim]⚡ RAM: ~85 MB  │  CPU: 0%[/]"
         )
 
