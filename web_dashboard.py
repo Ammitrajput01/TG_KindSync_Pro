@@ -645,6 +645,26 @@ class TelegramWebLoginManager:
 
 
 # ================================================================================
+# POLYGLOT NATIVE ACCELERATION TELEMETRY ADAPTER
+# ================================================================================
+def get_polyglot_status_safe() -> dict:
+    """Returns runtime status of native acceleration layers with graceful fallback."""
+    try:
+        from polyglot_accelerator import get_acceleration_status
+        return get_acceleration_status()
+    except Exception:
+        return {
+            "crypto_engine": "Standard Python Crypto",
+            "json_engine": "Python stdlib json",
+            "analytics_engine": "SQLite Standard Engine",
+            "event_loop": "asyncio",
+            "hardware_aes_ni": False,
+            "has_duckdb": False,
+            "has_orjson": False,
+            "platform": f"{sys.platform} ({'64-bit' if sys.maxsize > 2**32 else '32-bit'})"
+        }
+
+# ================================================================================
 # DEEP SYSTEM & PROGRAM RUNTIME TELEMETRY ENGINE
 # ================================================================================
 _system_telemetry_cache = None
@@ -834,6 +854,7 @@ def get_deep_system_telemetry(force_refresh: bool = False) -> dict:
             "active_sockets": active_sockets_count
         },
         "programs": programs,
+        "polyglot_acceleration": get_polyglot_status_safe(),
         "timestamp": now
     }
     _system_telemetry_cache = result
@@ -9575,6 +9596,7 @@ class DashboardServer:
             "is_paused": is_paused,
             "unread_insights_count": research_count,
             "topics_summary": self._get_topics_breakdown().get("summary", {}),
+            "polyglot_acceleration": get_polyglot_status_safe(),
             "system_telemetry": get_deep_system_telemetry(),
         }
 
@@ -10365,6 +10387,9 @@ class DashboardServer:
         data = await asyncio.to_thread(get_deep_system_telemetry, force_refresh=force_flag)
         return web.json_response(data)
 
+    async def handle_api_polyglot_status(self, request):
+        return web.json_response(get_polyglot_status_safe())
+
     async def handle_api_backup(self, request):
         if self.reporter:
             try:
@@ -11059,6 +11084,7 @@ class DashboardServer:
             self.app.router.add_get("/index.html", self.handle_index)
             self.app.router.add_get("/manifest.json", self.handle_manifest)
             self.app.router.add_get("/api/status", self.handle_api_status)
+            self.app.router.add_get("/api/polyglot/status", self.handle_api_polyglot_status)
             self.app.router.add_get("/api/system/telemetry", self.handle_api_system_telemetry)
             self.app.router.add_post("/api/auth/login", self.handle_api_auth_login)
             self.app.router.add_post("/api/auth/local_unlock", self.handle_api_auth_local_unlock)

@@ -202,3 +202,4 @@ def get_acceleration_status() -> Dict[str, Any]:
         "has_orjson": HAS_ORJSON,
         "platform": f"{sys.platform} ({sys.maxsize > 2**32 and '64-bit' or '32-bit'})"
     }
+

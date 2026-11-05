@@ -28,6 +28,31 @@ from tests.test_master_vrob_and_cdss import main as run_vrob_and_cdss_suite
 from tests.test_tma_cdss_strip_studio import main as run_tma_cdss_strip_studio_suite
 from tests.test_collapsible_sidebar_and_responsive_header import test_collapsible_sidebar_and_header as run_sidebar_and_header_suite
 from tests.test_cloner_topic_scan_and_resume import main as run_cloner_topic_scan_suite
+from tests.test_polyglot_accelerator import (
+    test_fast_json_roundtrip,
+    test_duckdb_vector_scanner_singleton,
+    test_duckdb_vector_scan_ids_fallback,
+    test_tune_socket_kernel_pacing,
+    test_get_acceleration_status
+)
+from tests.test_dashboard_polyglot import (
+    test_polyglot_status_safe_structure,
+    test_html_polyglot_elements,
+    test_js_polyglot_handlers,
+    test_dashboard_status_dict_includes_polyglot
+)
+
+def run_polyglot_suite():
+    test_fast_json_roundtrip()
+    test_duckdb_vector_scanner_singleton()
+    test_duckdb_vector_scan_ids_fallback()
+    test_tune_socket_kernel_pacing()
+    test_get_acceleration_status()
+    test_polyglot_status_safe_structure()
+    test_html_polyglot_elements()
+    test_js_polyglot_handlers()
+    test_dashboard_status_dict_includes_polyglot()
+    print("[SUCCESS] ALL POLYGLOT ACCELERATION & WEB DASHBOARD TESTS PASSED 100%!")
 from tests.test_kind_doctor_upgrades import (
     test_telegram_bot_name_sync,
     test_unified_branding_toggle_logic,
@@ -64,6 +89,7 @@ async def run_all():
         ("TMA 2.0 WebApp, Clinical Studio & Strip Words Studio", run_tma_cdss_strip_studio_suite),
         ("Collapsible Mini Sidebar & Responsive Header", run_sidebar_and_header_suite),
         ("Cloner Topic Scan, Watermark SQLite Fallback & Selective Resume", run_cloner_topic_scan_suite),
+        ("Polyglot Native Acceleration & Web Cockpit Matrix", run_polyglot_suite),
     ]
 
     passed = 0

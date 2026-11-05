@@ -697,6 +697,42 @@
             } catch(e) {}
         }
 
+        function updatePolyglotTelemetry(poly) {
+            if (!poly) return;
+            const isNative = poly.hardware_aes_ni || poly.has_orjson || poly.has_duckdb;
+            const badgeLabel = document.getElementById('polyglot-badge-label');
+            if (badgeLabel) {
+                badgeLabel.textContent = isNative ? "NATIVE ACCELERATED ⚡" : "PURE PYTHON SHIELD 🛡️";
+            }
+            const statusPill = document.getElementById('poly-status-pill');
+            if (statusPill) {
+                statusPill.textContent = isNative ? "ACTIVE · DUAL-PARITY ⚡" : "PURE PYTHON SHIELD 🛡️";
+            }
+            const cryptoEl = document.getElementById('poly-crypto-val');
+            if (cryptoEl && poly.crypto_engine) cryptoEl.textContent = poly.crypto_engine;
+            const jsonEl = document.getElementById('poly-json-val');
+            if (jsonEl && poly.json_engine) jsonEl.textContent = poly.json_engine;
+            const duckEl = document.getElementById('poly-duckdb-val');
+            if (duckEl && poly.analytics_engine) duckEl.textContent = poly.analytics_engine;
+            const socketEl = document.getElementById('poly-socket-val');
+            if (socketEl) {
+                const isLinux = (poly.platform || '').toLowerCase().includes('linux');
+                socketEl.textContent = isLinux ? "TCP_NOTSENT_LOWAT + NODELAY (Linux Kernel Pacing)" : "TCP_NODELAY + 1MB Buffers (Zero Delay)";
+            }
+        }
+
+        async function fetchPolyglotStatus() {
+            try {
+                const res = await fetch('/api/polyglot/status', { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const data = await res.json();
+                    updatePolyglotTelemetry(data);
+                }
+            } catch(e) {
+                console.warn("Failed to fetch polyglot status:", e);
+            }
+        }
+
         async function updateStatus() {
             try {
                 const t0 = performance.now();
@@ -715,6 +751,9 @@
                     return;
                 }
                 const d = await res.json();
+                if (d.polyglot_acceleration) {
+                    updatePolyglotTelemetry(d.polyglot_acceleration);
+                }
 
                 // 1. Dynamic Speed Calculation
                 const curSpeed = parseFloat(d.speed_mb || d.current_speed_mb || 0);
@@ -3463,6 +3502,9 @@
         }
 
         function handleTelemetryPacket(d) {
+            if (d.polyglot_acceleration) {
+                updatePolyglotTelemetry(d.polyglot_acceleration);
+            }
             const curSpeed = parseFloat(d.speed_mb || d.current_speed_mb || 0);
             const peakSpeed = parseFloat(d.peak_speed_mb || 0);
             updateEChartsHud(curSpeed, peakSpeed);
