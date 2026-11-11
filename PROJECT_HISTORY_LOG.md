@@ -2,6 +2,39 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Wednesday, 11 November 2026 | 04:55 PM IST
+
+### 65. Public Dashboard Privacy Hardening & How-It-Works Operator Guide Integration
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"About dashboard I have one problem Okay you are saying that we have dashboard who can access which can access everyone But one thing is See I am running this one on server on my own server Ok so if I'm doing my processes Y to show it to others if they are going to do it on local PC So is it useful or not... Anyone can access"*
+    2. *"Are these information available on board or not Because People needs to open it and it should be available That how its work And whatever it is Means for people only that information should be available for people only not my personal"*
+    3. *Permanent Admin Accounts*: Strictly `@Kinddoctor4u` (`1553619403`) & `@Ammitrajput1` (`759038032`).
+* **Root Cause & Architectural Opportunities**:
+  - Exposing personal Telegram ID numbers (`1553619403`) or server internals on a web UI creates unnecessary privacy leakage.
+  - Furthermore, general users or friends who clone the repository and run the dashboard locally lacked a clean, accessible "How It Works" guide on the dashboard explaining the 4-step local synchronization workflow.
+* **Applied Engineering Upgrades**:
+  1. **Personal Identity Sanitization (`web/templates/index.html`)**:
+     - Removed numerical Telegram ID `1553619403` from public dashboard view, replacing with general verified support handle links (`@Kinddoctor4u`).
+     - Verified zero exposure of Oracle Cloud VPS IP address (`130.210.1.32`), SSH keys, or private session tokens.
+  2. **Interactive "How It Works & Quick Start Guide" Card (`web/templates/index.html`)**:
+     - Embedded a luxury 4-step operational guide card on `#view-overview`:
+       - `1️⃣ Connect Telegram`: Scan QR or OTP to link personal account locally.
+       - `2️⃣ Select Source & Target`: Configure source/target channel topics without disk staging.
+       - `3️⃣ Choose Speed Mode`: Safe (4 Sockets), Balanced (12 Sockets), God Mode (40 Sockets).
+       - `4️⃣ Real-Time Observability`: Monitor live Speedometer, transfer count, and logs in Sentinel Terminal.
+  3. **Privacy Separation Invariant**:
+     - Clarified architectural separation: Local PC users see ONLY their own local PC stats; Oracle Cloud VPS runs protected behind Telegram Bot (`@KindDoc_bot`) with zero public web ports.
+* **Verification & Stability**:
+  - Dashboard Polyglot Suite (`tests/test_dashboard_polyglot.py`): **4 / 4 PASSED (100% Healthy)**.
+  - All 17 Master Test Suites: **17 / 17 PASSED (100% Healthy)**.
+  - Oracle Cloud VPS Live State: **100% UNTOUCHED (streaming smoothly in tmux session kindsync)**.
+* **Affected Files**:
+  - `web/templates/index.html`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Wednesday, 11 November 2026 | 04:30 PM IST
 
 ### 64. Complete 75-Skill Arsenal Armed: Full Reverse-Engineering, Cyber Offensive/Defensive, MTProto High-Throughput & Code Review Excellence Equipped
