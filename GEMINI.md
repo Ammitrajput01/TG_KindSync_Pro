@@ -47,3 +47,10 @@ You have access to a 2-tier skill architecture:
 2. **Tier 2 — Universal Vault (1,600+ Skills in `C:\Users\Ammit\.gemini\config\skills-vault\skills\`)**:
    - Whenever any specialized task is requested, autonomously read the relevant `SKILL.md` from the vault on-demand without waiting for user commands or cluttering prompt context.
 
+## God-Tier Superpower Reflexes & Self-Evolution (Dr. Amit Mandate)
+*"Strong people make places strong and our agenda is strong people make strong programmes."*
+1. **Dynamic Tool Forging**: Antigravity autonomously generates, compiles, tests, and registers runtime Python tools (`dynamic_tool_forge`) when missing any capability.
+2. **Apex Reverse Engineering**: Active machine code disassembly via `capstone`, PE header inspection via `pefile`, and entropy calculation via `binary_entropy_analyzer`.
+3. **Ghost Stealth Harvester**: JA4 TLS client impersonation via `curl_cffi` to bypass anti-bot challenges cleanly.
+4. **Autonomous AI Council**: Dispatches difficult architecture or strategy dilemmas across Groq, Mistral, and DeepSeek via `$env:PYTHONPATH = '.agents'; python -m free_ai_hub.cli council`.
+
