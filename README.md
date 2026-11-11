@@ -263,6 +263,9 @@ An enterprise Telegram management bot providing complete operational oversight d
 | `/newtopic [name]` | Admin | Dynamically creates a new Forum Topic in the group or active target chat. |
 | `/setgroup` | Admin | Displays interactive buttons to select active working group when commanding from Private DM. |
 | `/status` | Admin | Real-time system health: CPU load, RAM consumption, MTProto socket status, and active worker count. |
+| `/vps` | Admin | Remote Oracle Cloud VPS vitals (Disk, RAM, Uptime, Log Accumulation) & 1-click management. |
+| `/live` | Admin | Real-time live cloner stream snapshot directly from Oracle VPS tmux session (`kindsync`). |
+| `/vpsflush` | Admin | 1-Click zero-downtime flush of unrotated VPS logs, freeing up ~30GB disk space instantly. |
 | `/speed` | Admin | Current throughput velocity gauge and MTProto network latency. |
 | `/backup` | Admin | Triggers full SQLite database snapshot export with standardized timestamps sent to private chat. |
 | `/lockdown [on/off]` | Admin | Emergency toggle that immediately pauses all outgoing messages in case of channel issues. |

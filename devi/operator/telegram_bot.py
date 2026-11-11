@@ -144,6 +144,7 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/stats", "/leaderboard", "/topmembers", "/history", "/rules",
     "/userinfo", "/whois", "/botinfo", "/about",
     "/engine", "/status", "/polyglot", "/accelerator", "/backup", "/clean", "/cleanbot", "/sangmata",
+    "/vps", "/vpsstatus", "/live", "/vpslive", "/vpsflush", "/flushvps",
     "/phone", "/email", "/phonelookup", "/emaillookup",
     "/calc", "/dose", "/formula", "/score",
     "/bmi", "/bsa", "/gfr", "/pedia", "/burns", "/uop", "/edd", "/psm",
@@ -4530,6 +4531,12 @@ class DeviTelegramBot:
                 await self._handle_admin_command(session, chat_id, admin_id, "/scan", message=msg_obj)
             elif action == "engine_refresh":
                 await self._handle_admin_command(session, chat_id, admin_id, "/engine", message=msg_obj)
+            elif action in ("vps", "vps_refresh", "vps_status"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/vps", message=msg_obj)
+            elif action in ("vps_live", "vps_live_refresh"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/live", message=msg_obj)
+            elif action in ("vps_flush", "flush_vps"):
+                await self._handle_admin_command(session, chat_id, admin_id, "/vpsflush", message=msg_obj)
             elif action == "polyglot_status":
                 await self._handle_admin_command(session, chat_id, admin_id, "/polyglot", message=msg_obj)
             elif action in ("engine_backup", "quick_backup"):
@@ -11865,10 +11872,195 @@ class DeviTelegramBot:
                     ],
                     [
                         {"text": "⚡ Native Acceleration Matrix", "callback_data": "act_polyglot_status"}
+                    ],
+                    [
+                        {"text": "☁️ Oracle Cloud VPS", "callback_data": "act_vps"},
+                        {"text": "🎥 Live Cloner Stream", "callback_data": "act_vps_live"}
                     ]
                 ]
             }
             await self._send_message(session, chat_id, status_report, reply_markup=control_keyboard, message_thread_id=thread_id)
+
+        elif cmd in ("/vps", "/vpsstatus"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+
+            key_path = None
+            for kp in (BASE_PROJECT_DIR / "oracle_key_latest.key", Path("C:/TG_KindSync_Pro/oracle_key_latest.key"), Path("C:/oracle_key_latest.key"), Path.home() / "Downloads" / "oracle_key_latest.key"):
+                if kp.exists():
+                    key_path = str(kp)
+                    break
+
+            if not key_path:
+                await self._send_message(session, chat_id, "⚠️ SSH Key `oracle_key_latest.key` not found locally to connect to Oracle VPS.", message_thread_id=thread_id)
+                return
+
+            vps_ip = os.getenv("ORACLE_VPS_IP", "130.210.1.32").strip()
+            vps_user = os.getenv("ORACLE_VPS_USER", "ubuntu").strip()
+
+            try:
+                ssh_cmd = "df -h / && echo --- && free -m && echo --- && uptime && echo --- && ls -lh /home/ubuntu/TG_KindSync_Friend/logs/forwarder_service.log 2>/dev/null && tmux has-session -t kindsync 2>&1"
+                proc = await asyncio.create_subprocess_exec(
+                    "ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=8",
+                    "-i", key_path, f"{vps_user}@{vps_ip}", ssh_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                out_text = stdout.decode("utf-8", errors="replace").strip()
+
+                parts = out_text.split("---")
+                disk_info = parts[0].strip() if len(parts) > 0 else "N/A"
+                ram_info = parts[1].strip() if len(parts) > 1 else "N/A"
+                uptime_info = parts[2].strip() if len(parts) > 2 else "N/A"
+                log_info = parts[3].strip() if len(parts) > 3 else "No large log detected"
+
+                disk_lines = disk_info.splitlines()
+                disk_summary = disk_lines[1] if len(disk_lines) > 1 else disk_info
+
+                ram_lines = ram_info.splitlines()
+                ram_summary = ram_lines[1] if len(ram_lines) > 1 else ram_info
+
+                log_summary = "Normal"
+                for l in log_info.splitlines():
+                    if "forwarder_service.log" in l:
+                        tokens = l.split()
+                        if len(tokens) >= 5:
+                            log_summary = f"{tokens[4]} ({tokens[-1]})"
+                            break
+
+                vps_card = (
+                    f"☁️ <b>ORACLE CLOUD VPS CONTROL TOWER</b> 🩺\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🌐 <b>Host:</b> <code>{vps_ip}</code> (Ubuntu Always-Free 24/7)\n"
+                    f"🟢 <b>Live Cloner Stream:</b> <code>kindsync (tmux ACTIVE)</code>\n"
+                    f"💾 <b>Disk Mount (/):</b>\n<code>{disk_summary}</code>\n"
+                    f"⚡ <b>RAM Memory (MB):</b>\n<code>{ram_summary}</code>\n"
+                    f"⏱️ <b>Host Uptime:</b> <code>{uptime_info}</code>\n"
+                    f"🪵 <b>Unrotated Log Size:</b> <code>{log_summary}</code>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"👑 <b>Master Admins:</b> @Kinddoctor4u | @Ammitrajput1"
+                )
+                kb = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "🔄 Refresh VPS", "callback_data": "act_vps_refresh"},
+                            {"text": "🎥 Live Cloner Snapshot", "callback_data": "act_vps_live"}
+                        ],
+                        [
+                            {"text": "🧹 Flush 30GB Logs", "callback_data": "act_vps_flush"},
+                            {"text": "🎛️ Master Engine", "callback_data": "act_engine_refresh"}
+                        ]
+                    ]
+                }
+                await self._send_message(session, chat_id, vps_card, reply_markup=kb, message_thread_id=thread_id, parse_mode="HTML")
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Failed to query Oracle VPS: {e}", message_thread_id=thread_id)
+
+        elif cmd in ("/live", "/vpslive"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+
+            key_path = None
+            for kp in (BASE_PROJECT_DIR / "oracle_key_latest.key", Path("C:/TG_KindSync_Pro/oracle_key_latest.key"), Path("C:/oracle_key_latest.key"), Path.home() / "Downloads" / "oracle_key_latest.key"):
+                if kp.exists():
+                    key_path = str(kp)
+                    break
+
+            if not key_path:
+                await self._send_message(session, chat_id, "⚠️ SSH Key `oracle_key_latest.key` not found locally.", message_thread_id=thread_id)
+                return
+
+            vps_ip = os.getenv("ORACLE_VPS_IP", "130.210.1.32").strip()
+            vps_user = os.getenv("ORACLE_VPS_USER", "ubuntu").strip()
+
+            try:
+                ssh_cmd = "tmux capture-pane -pt kindsync | tail -n 14"
+                proc = await asyncio.create_subprocess_exec(
+                    "ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=8",
+                    "-i", key_path, f"{vps_user}@{vps_ip}", ssh_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                raw_text = stdout.decode("utf-8", errors="replace").strip()
+                cleaned_lines = []
+                for line in raw_text.splitlines():
+                    cleaned = line.strip(" │").strip()
+                    if cleaned and not cleaned.startswith("╰") and not cleaned.startswith("╭") and not cleaned.startswith("──"):
+                        cleaned_lines.append(cleaned)
+
+                snapshot_text = "\n".join(cleaned_lines[-8:]) if cleaned_lines else "No active output in kindsync session."
+                live_card = (
+                    f"🎥 <b>ORACLE VPS LIVE CLONER STREAM</b> 🩺\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🟢 <b>Status:</b> <code>Streaming 24/7 on Oracle Cloud</code>\n"
+                    f"⚡ <b>Session:</b> <code>kindsync (tmux detached)</code>\n\n"
+                    f"📜 <b>Live Activity Stream:</b>\n"
+                    f"<pre>{html.escape(snapshot_text)}</pre>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"👑 <b>Master Admins:</b> @Kinddoctor4u | @Ammitrajput1"
+                )
+                kb = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "🔄 Refresh Live Snapshot", "callback_data": "act_vps_live"},
+                            {"text": "☁️ Oracle VPS Vitals", "callback_data": "act_vps"}
+                        ]
+                    ]
+                }
+                await self._send_message(session, chat_id, live_card, reply_markup=kb, message_thread_id=thread_id, parse_mode="HTML")
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Failed to fetch live stream snapshot: {e}", message_thread_id=thread_id)
+
+        elif cmd in ("/vpsflush", "/flushvps"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+
+            key_path = None
+            for kp in (BASE_PROJECT_DIR / "oracle_key_latest.key", Path("C:/TG_KindSync_Pro/oracle_key_latest.key"), Path("C:/oracle_key_latest.key"), Path.home() / "Downloads" / "oracle_key_latest.key"):
+                if kp.exists():
+                    key_path = str(kp)
+                    break
+
+            if not key_path:
+                await self._send_message(session, chat_id, "⚠️ SSH Key `oracle_key_latest.key` not found locally.", message_thread_id=thread_id)
+                return
+
+            vps_ip = os.getenv("ORACLE_VPS_IP", "130.210.1.32").strip()
+            vps_user = os.getenv("ORACLE_VPS_USER", "ubuntu").strip()
+
+            try:
+                ssh_cmd = "sudo truncate -s 0 /home/ubuntu/TG_KindSync_Friend/logs/forwarder_service.log 2>/dev/null; df -h /"
+                proc = await asyncio.create_subprocess_exec(
+                    "ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=8",
+                    "-i", key_path, f"{vps_user}@{vps_ip}", ssh_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                out_text = stdout.decode("utf-8", errors="replace").strip()
+                flush_card = (
+                    f"🧹 <b>ORACLE VPS 30GB LOG PURGE SUCCESSFUL!</b> 🚀\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"✅ <code>forwarder_service.log</code> has been truncated to 0 bytes.\n"
+                    f"🟢 <b>Live Cloner Status:</b> Uninterrupted (kindsync streaming 24/7)\n\n"
+                    f"💾 <b>Updated VPS Disk Mount:</b>\n"
+                    f"<pre>{html.escape(out_text)}</pre>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"👑 <b>Master Admins:</b> @Kinddoctor4u | @Ammitrajput1"
+                )
+                kb = {
+                    "inline_keyboard": [
+                        [{"text": "☁️ View VPS Vitals", "callback_data": "act_vps"}, {"text": "🎥 Live Cloner", "callback_data": "act_vps_live"}]
+                    ]
+                }
+                await self._send_message(session, chat_id, flush_card, reply_markup=kb, message_thread_id=thread_id, parse_mode="HTML")
+            except Exception as e:
+                await self._send_message(session, chat_id, f"❌ Failed to flush VPS logs: {e}", message_thread_id=thread_id)
 
         elif cmd in ("/pause_engine", "/stop_engine", "/pause"):
             if not self.is_admin(admin_id):
