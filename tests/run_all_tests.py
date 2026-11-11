@@ -33,8 +33,12 @@ from tests.test_polyglot_accelerator import (
     test_duckdb_vector_scanner_singleton,
     test_duckdb_vector_scan_ids_fallback,
     test_tune_socket_kernel_pacing,
-    test_get_acceleration_status
+    test_get_acceleration_status,
+    test_classify_medical_subject,
+    test_config_hot_reloader,
+    test_predictive_flood_pacer
 )
+from tests.test_join_request_and_cloner_fix import run_test_suite as run_join_request_suite
 from tests.test_dashboard_polyglot import (
     test_polyglot_status_safe_structure,
     test_html_polyglot_elements,
@@ -48,6 +52,8 @@ def run_polyglot_suite():
     test_duckdb_vector_scan_ids_fallback()
     test_tune_socket_kernel_pacing()
     test_get_acceleration_status()
+    test_classify_medical_subject()
+    test_predictive_flood_pacer()
     test_polyglot_status_safe_structure()
     test_html_polyglot_elements()
     test_js_polyglot_handlers()
@@ -89,6 +95,7 @@ async def run_all():
         ("TMA 2.0 WebApp, Clinical Studio & Strip Words Studio", run_tma_cdss_strip_studio_suite),
         ("Collapsible Mini Sidebar & Responsive Header", run_sidebar_and_header_suite),
         ("Cloner Topic Scan, Watermark SQLite Fallback & Selective Resume", run_cloner_topic_scan_suite),
+        ("Join Request Handler & Direct Topic Cloner Fix", run_join_request_suite),
         ("Polyglot Native Acceleration & Web Cockpit Matrix", run_polyglot_suite),
     ]
 

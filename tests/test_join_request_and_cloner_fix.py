@@ -55,7 +55,21 @@ def test_handle_chat_join_request_dispatch():
         assert "osint_user_998877" in buttons
         assert "ban_-10099887766_998877" in buttons
 
-    asyncio.run(_runner())
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.submit(asyncio.run, _runner()).result()
+    else:
+        asyncio.run(_runner())
+
+def run_test_suite():
+    test_no_unbound_local_set_key_in_cloner()
+    test_handle_chat_join_request_dispatch()
+    print("[SUCCESS] ALL JOIN REQUEST & CLONER PROXY TESTS PASSED 100%!")
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__])

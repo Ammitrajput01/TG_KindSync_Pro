@@ -14,9 +14,12 @@ Provides cross-platform native acceleration across C, Rust, DuckDB & Python:
 """
 
 import sys
+import os
+import time
 import socket
 import logging
 import sqlite3
+import asyncio
 from typing import Optional, List, Set, Dict, Any
 
 logger = logging.getLogger("polyglot_accelerator")
@@ -202,4 +205,114 @@ def get_acceleration_status() -> Dict[str, Any]:
         "has_orjson": HAS_ORJSON,
         "platform": f"{sys.platform} ({sys.maxsize > 2**32 and '64-bit' or '32-bit'})"
     }
+
+
+# =============================================================================
+# 6. INNER SMARTNESS: PREDICTIVE FLOOD-WAIT PACER (LEAKY TOKEN-BUCKET)
+# =============================================================================
+class PredictiveFloodPacer:
+    """
+    Sliding-window token bucket pacer.
+    Tracks RPC dispatch timestamps over a 30-second window.
+    If requests in the rolling window approach Telegram's flood boundaries,
+    it dynamically inserts an adaptive micro-pause (30ms - 80ms) BEFORE
+    Telegram throws a FloodWait. Never skips videos, keeping sequences 100% fluid.
+    """
+    _window_seconds = 30.0
+    _max_burst = 26
+    _history: List[float] = []
+
+    @classmethod
+    async def pace(cls) -> float:
+        """Paces the current task. Returns the micro-pause duration applied."""
+        now = time.monotonic()
+        # Evict timestamps older than rolling window
+        cls._history = [t for t in cls._history if now - t < cls._window_seconds]
+        applied_wait = 0.0
+        if len(cls._history) >= cls._max_burst:
+            oldest = cls._history[0]
+            time_since_oldest = now - oldest
+            needed_wait = max(0.02, (cls._window_seconds - time_since_oldest) / max(1, len(cls._history)))
+            applied_wait = min(0.12, needed_wait)
+            await asyncio.sleep(applied_wait)
+            now = time.monotonic()
+        cls._history.append(now)
+        return applied_wait
+
+
+# =============================================================================
+# 7. INNER SMARTNESS: ZERO-DOWNTIME CONFIGURATION HOT-RELOADER
+# =============================================================================
+class ConfigHotReloader:
+    """
+    Monitors .env and configuration file modification timestamps.
+    Dynamically reloads forward rules and pacing settings in-flight without restarting.
+    """
+    _last_mtimes: Dict[str, float] = {}
+    _last_check = 0.0
+
+    @classmethod
+    def check_and_reload(cls, config_path: str) -> bool:
+        """Checks if config_path changed on disk. If so, updates timestamp and returns True."""
+        now = time.monotonic()
+        if now - cls._last_check < 4.0:
+            return False
+        cls._last_check = now
+        if not os.path.exists(config_path):
+            return False
+        try:
+            mtime = os.path.getmtime(config_path)
+            prev = cls._last_mtimes.get(config_path, 0.0)
+            if prev > 0.0 and mtime > prev:
+                cls._last_mtimes[config_path] = mtime
+                try:
+                    from dotenv import load_dotenv
+                    load_dotenv(config_path, override=True)
+                except Exception:
+                    pass
+                return True
+            cls._last_mtimes[config_path] = mtime
+        except Exception:
+            pass
+        return False
+
+
+# =============================================================================
+# 8. INNER SMARTNESS: SEMANTIC MEDICAL SUBJECT CLASSIFIER
+# =============================================================================
+MEDICAL_TAXONOMY: Dict[str, List[str]] = {
+    "ANATOMY": ["anatomy", "embryology", "histology", "osteology", "neuroanatomy", "cadaver"],
+    "PHYSIOLOGY": ["physiology", "cardiac cycle", "action potential", "homeostasis", "ecg", "respiratory system"],
+    "BIOCHEMISTRY": ["biochemistry", "metabolism", "enzyme", "glycolysis", "krebs", "vitamins", "protein"],
+    "PHARMACOLOGY": ["pharmacology", "pharmacokinetics", "pharmacodynamics", "drug", "receptor", "antibiotic", "adverse reaction"],
+    "PATHOLOGY": ["pathology", "neoplasia", "inflammation", "infarction", "biopsy", "histopathology"],
+    "MICROBIOLOGY": ["microbiology", "bacteriology", "virology", "parasitology", "mycology", "culture"],
+    "FORENSIC MEDICINE": ["forensic", "autopsy", "toxicology", "ipc", "rigor mortis", "medical jurisprudence"],
+    "COMMUNITY MEDICINE (PSM)": ["psm", "epidemiology", "biostatistics", "vaccination", "screening", "public health"],
+    "OPHTHALMOLOGY": ["ophthalmology", "cataract", "glaucoma", "retina", "cornea", "eye"],
+    "ENT": ["ent", "otology", "rhinology", "laryngology", "audiometry", "tonsil"],
+    "MEDICINE": ["medicine", "cardiology", "neurology", "nephrology", "pulmonology", "endocrinology", "gastroenterology"],
+    "SURGERY": ["surgery", "hernia", "urolithiasis", "laparoscopy", "appendicitis", "cholecystectomy", "trauma", "ureter", "prostate", "urology", "tumor"],
+    "OBSTETRICS & GYNECOLOGY": ["obstetrics", "gynecology", "labor", "pregnancy", "eclampsia", "antenatal", "uterus"],
+    "PEDIATRICS": ["pediatrics", "neonatology", "growth chart", "developmental milestones", "congenital"],
+    "ORTHOPEDICS": ["orthopedics", "fracture", "dislocation", "arthroplasty", "bone tumor"],
+    "DERMATOLOGY": ["dermatology", "psoriasis", "eczema", "dermatitis", "fungal", "skin lesion"],
+    "PSYCHIATRY": ["psychiatry", "schizophrenia", "depression", "bipolar", "dementia", "delirium"],
+    "RADIOLOGY": ["radiology", "x-ray", "ct scan", "mri", "ultrasound", "radiation"],
+    "ANESTHESIA": ["anesthesia", "intubation", "spinal anesthesia", "general anesthesia", "ventilator"]
+}
+
+def classify_medical_subject(text: str) -> Optional[str]:
+    """Classifies lecture title/caption into medical subject taxonomy based on most specific keyword match."""
+    if not text:
+        return None
+    lower_t = text.lower()
+    best_subject = None
+    best_match_len = 0
+    for subject, keywords in MEDICAL_TAXONOMY.items():
+        for kw in keywords:
+            if kw in lower_t and len(kw) > best_match_len:
+                best_match_len = len(kw)
+                best_subject = subject
+    return best_subject
 

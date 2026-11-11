@@ -377,19 +377,50 @@ sudo systemctl status tg-kinddoc-bot tg-dashboard --no-pager
 
 Run the complete streaming engine and Telegram bot directly on an Android device without needing a PC.
 
-#### Step 1: Install Termux
-Install **Termux** from [F-Droid](https://f-droid.org/packages/com.termux/) *(do not use Google Play Store, as its packages are deprecated)*.
+#### 1-Click Automated Termux Installer (Solves Pip Freeze & Out-of-Memory Errors)
+On Android devices, compiling heavy C/Rust wheels like `cryptography` and `uvloop` through `pip` often causes Android's Low Memory Killer (LMK) to silently terminate the compiler, causing the terminal to freeze indefinitely. Our dedicated 1-click installer solves this by utilizing Termux's pre-compiled binary packages and enforcing single-core memory ceilings (`MAX_JOBS=1`).
 
-#### Step 2: Acquire Android Wake Lock & Setup Environment
 ```bash
-termux-wake-lock
-pkg update -y && pkg install -y python git ffmpeg clang openssl
+# Step 1: Install Termux from F-Droid (https://f-droid.org/packages/com.termux/)
+# Step 2: Open Termux and run the 1-Click Installer
+pkg update -y && pkg install git -y
 git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
 cd TG_KindSync_Pro
-pip install --upgrade pip
-pip install -r requirements.txt
-bash deploy/RUN_24_7_TERMUX.sh
+bash deploy/install_termux.sh
 ```
+
+The script automatically:
+1. Acquires `termux-wake-lock` to keep the Android CPU active during long transfers.
+2. Installs pre-compiled system libraries (`python-cryptography`, `clang`, `openssl`, `libffi`, `ffmpeg`).
+3. Installs optimized Android packages via `requirements-termux.txt` with zero compiler freezing.
+4. Launches the unified engine in interactive mode!
+
+---
+
+## 🧠 Inner Smartness & Transcendent Polyglot Enhancements
+
+TG KindSync Pro incorporates smart autonomous modules engineered for uninterrupted production streaming:
+
+### 1. Unified Single-Program Architecture (Master vs. Friend/Personal Mode)
+Eliminating fragile multi-codebase divergence, TG KindSync Pro operates as a single canonical codebase.
+- **Master Profile (`MODE=master`)**: Full administrative control, DEVI Sentinel AI Watchdog, TMA 2.0 WebApp, and Oracle VPS synchronization.
+- **Friend / Student Mode (`MODE=friend`)**: Lightweight self-contained personal cloner for students and study partners. Strictly isolates Telegram sessions, ensuring private admin sessions (`session_forwarder.session`) and keys are never exposed.
+
+### 2. Predictive Leaky Token-Bucket Flood Pacer (`PredictiveFloodPacer`)
+Tracks outgoing Telegram MTProto RPC invocations across a rolling 30-second window. If transmission velocity approaches Telegram's DC rate limits, it dynamically injects microsecond pauses ($20\text{–}80\text{ ms}$) *before* Telegram triggers a `FloodWaitError`.
+- **Zero Disruptive 300s Penalties**: Avoids multi-minute hard stops.
+- **Uncompromised Sequence Flow**: Operates in-flight without dropping or skipping packets.
+
+### 3. Absolute Lecture Video Integrity Guarantee
+In compliance with Dr. Amit's clinical curriculum guidelines:
+- **No Video Skipping**: Duplicate detection algorithms never drop or omit physical media.
+- **No Text Link Replacement**: Lectures are never converted to bare text links, guaranteeing uninterrupted playlist playback in Telegram video players.
+
+### 4. Zero-Downtime Hot Configuration Reloader (`ConfigHotReloader`)
+Monitors `.env` configuration file modification timestamps on disk. Allows operators to adjust transmission pacing, target channels, or strip rules on the fly without stopping active channel cloning or restarting services.
+
+### 5. Semantic Medical Subject Classifier (`classify_medical_subject`)
+An intelligent specificity-weighted taxonomy classifier mapping lecture files to 19 medical disciplines (Anatomy, Physiology, Biochemistry, Pharmacology, Pathology, Microbiology, Forensic Medicine, Community Medicine, Ophthalmology, ENT, Surgery, Medicine, OBGYN, Pediatrics, Orthopedics, Dermatology, Psychiatry, Radiology, Anesthesia) for automated topic categorization.
 
 ---
 

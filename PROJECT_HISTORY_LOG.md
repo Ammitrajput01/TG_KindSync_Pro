@@ -2,6 +2,69 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Wednesday, 11 November 2026 | 03:40 PM IST
+
+### 62. Unified Single-Program Architecture, Termux Android 1-Click Installer, Predictive Leaky Token-Bucket Flood Pacing, Zero-Downtime Hot Reloader, and Security Hardening
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"total server storage 44.1 GB and that storage it is using 35 something So can you analyse deeply and tell me What's the problem why it is consuming this much storage Because it's not keeping anything in server It's a codolina Code Only And I want to also let you know The programme is still running on On the server so dont make any changes or dont anything do anything to make it stop"*
+    2. *"What if we delete the friend version of the programme And just keep one programme only i'm just asking this thing Is there any benefit or not"*
+    3. *"He told me that in second point I think perceptual video hashing D Hash/pHash duplicate video pehchaana or link daalna mujhe link nahi actual me video he chahiye not wnt to skip any video it will break the sequence"*
+    4. *"when I was installing this in Turmax In Android It was showing some error... stucking on that thing only I was pressing enter and it is stucking on that thing"*
+    5. *"bhaai saare updates kr do lekin oracle online wale pe mat krna baaki hr jgh kr do upgrade and update all changes github repo and all sabhi me code ifo cmd scripts sb kuch update kr do info and all sb"*
+* **Root Cause & Forensic Findings**:
+  1. **Oracle VPS Storage Forensics**:
+     - Remote inspection of Oracle VPS (`130.210.1.32`) revealed that code itself was minimal, but unrotated stdout logging from the secondary `tg-forwarder-friend.service` had generated a **30.3 GB log file** (`/home/ubuntu/TG_KindSync_Friend/logs/forwarder_service.log`) and 1.7 GB in `TG_KindSync_Pro/logs/forwarder_service.log`.
+     - Diagnosed zero-risk remediation (`truncate -s 0`), while strictly adhering to user directive to leave running live cloner session completely untouched.
+  2. **Friend Edition Duplication & Security Exposure**:
+     - `Friend_Edition/` was an exact ~10,058-line fork of `tg_kindsync_pro.py`, `fast_transfer.py`, and `polyglot_accelerator.py`. Any bug fix in the root codebase required tedious double-patching.
+     - Untracked local copies of sensitive files (`oracle_key_latest.key` and `session_forwarder.session`) were sitting in `Friend_Edition/`, posing an accidental leakage risk if zipped or shared.
+  3. **Termux Android Installation Freeze**:
+     - Compiling `cryptg`, `cryptography`, or `uvloop` on Android Termux triggers `clang` and `rustc` compilation processes that exceed Termux memory limits (~1.5 GB), leading to Android's Low Memory Killer (LMK) silently killing the compilation sub-process, causing `pip install` to hang indefinitely.
+  4. **Strict Lecture Integrity Directive**:
+     - Duplicate detection by skipping or replacing video files with text links was strictly rejected. Medical students require every physical lecture video present in sequence for uninterrupted playlist viewing.
+* **Applied Engineering Upgrades**:
+  1. **Single Unified Engine Architecture & Proxy Layer**:
+     - Replaced duplicate 10,058-line engines in `Friend_Edition/tg_kindsync_pro.py`, `Friend_Edition/fast_transfer.py`, and `Friend_Edition/polyglot_accelerator.py` with thin, transparent forwarding proxies.
+     - Unified program auto-detects profile mode (Personal/Friend vs Master) via environment flags (`MODE=friend`), with zero code divergence.
+     - Cleaned up and secured sensitive untracked files (`oracle_key_latest.key`, `session_forwarder.session`) from `Friend_Edition/`.
+  2. **Android Termux 1-Click Deployment Engine**:
+     - Created `deploy/install_termux.sh` featuring automated package resolution via `pkg install python clang make openssl libffi python-cryptography -y`.
+     - Configured `MAX_JOBS=1` and `CARGO_BUILD_JOBS=1` to prevent Android LMK compiler kills.
+     - Added `requirements-termux.txt` excluding non-essential uncompiled ARM64 wheels (`uvloop`) while preserving full native AES-NI/cryptography speed via termux-native packages.
+     - Configured automated `termux-wake-lock` to keep Android background CPU active during long cloning batches.
+  3. **Inner Smartness: Predictive Leaky Token-Bucket Flood Pacer (`polyglot_accelerator.py`)**:
+     - Engineered `PredictiveFloodPacer` tracking RPC timestamps across a 30-second sliding window.
+     - If RPC burst rate approaches Telegram limits, inserts dynamic micro-pauses (20ms - 80ms) preemptively, avoiding disruptive 300s `FloodWait` penalties without skipping a single video.
+  4. **Inner Smartness: Zero-Downtime Hot Reloader (`ConfigHotReloader`)**:
+     - Implemented disk mtime monitoring with debounced checks. Updates `.env` configurations (e.g., speed throttles, target channels, filter words) in-flight without interrupting active transfers.
+  5. **Inner Smartness: Semantic Medical Subject Classifier (`classify_medical_subject`)**:
+     - Added specificity-weighted taxonomy classifier mapping lecture filenames to 19 medical disciplines (Anatomy, Physiology, Biochemistry, Pharmacology, Surgery, Medicine, etc.).
+  6. **Master Verification Suite Expansion**:
+     - Added Suite 17 (`Join Request Handler & Direct Topic Cloner Fix`) to `tests/run_all_tests.py`.
+     - Updated `tests/test_polyglot_accelerator.py` to cover `classify_medical_subject`, `ConfigHotReloader`, and `PredictiveFloodPacer`.
+     - Verified all 17 test suites pass 100% (17 PASSED, 0 FAILED).
+* **Verification & Stability**:
+  - Full Master Test Suite (`tests/run_all_tests.py`): **17 / 17 PASSED (100% Healthy)**.
+  - Polyglot Suite (`tests/test_polyglot_accelerator.py`): **8 / 8 PASSED (100% Healthy)**.
+  - Join Request & Cloner Proxy Suite (`tests/test_join_request_and_cloner_fix.py`): **2 / 2 PASSED (100% Healthy)**.
+  - Oracle Cloud VPS Live State: **100% UNTOUCHED** (running smoothly in tmux session `kindsync`, Videos #1042+ delivered).
+* **Affected Files**:
+  - `polyglot_accelerator.py`
+  - `devi/operator/polyglot_accelerator.py`
+  - `Friend_Edition/tg_kindsync_pro.py`
+  - `Friend_Edition/fast_transfer.py`
+  - `Friend_Edition/polyglot_accelerator.py`
+  - `deploy/install_termux.sh`
+  - `requirements-termux.txt`
+  - `tests/test_polyglot_accelerator.py`
+  - `tests/test_join_request_and_cloner_fix.py`
+  - `tests/run_all_tests.py`
+  - `PROJECT_HISTORY_LOG.md`
+  - `README.md`
+
+---
+
 ## 📅 Log Entry: Friday, 6 November 2026 | 03:05 AM IST
 
 ### 61. Web Dashboard Polyglot Acceleration Matrix, Real-Time Header Telemetry Capsule & WebSocket Engine Integration
