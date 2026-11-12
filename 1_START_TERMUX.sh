@@ -5,7 +5,6 @@
 # Developer & Systems Architect: Dr. Amit Singh (Kind Doctor)
 # Branding: Kind Doctor & Team · Telegram: @Kinddoctor4u
 # ==============================================================================
-set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -125,3 +124,4 @@ while true; do
             ;;
     esac
 done
+

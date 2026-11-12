@@ -395,11 +395,12 @@ Our dedicated Android engine completely solves this:
 
 #### 🚀 Fast Installation (Single Copy & Paste in Termux)
 
-Open Termux and run this single command:
+Open Termux and run this single command (100% automated, zero Y/N prompts):
 
 ```bash
-# 1. Update packages & configure Git mobile network buffers
-pkg update -y && pkg install git -y
+# 1. Non-interactive setup & Git network buffer optimization
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y && apt-get install -y git -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 git config --global http.version HTTP/1.1
 git config --global http.postBuffer 524288000
 
@@ -407,7 +408,7 @@ git config --global http.postBuffer 524288000
 git clone --depth 1 https://github.com/Ammitrajput01/TG_KindSync_Pro.git
 cd TG_KindSync_Pro
 
-# 3. Launch the 1-Click Master Terminal (Auto-installs dependencies on first run!)
+# 3. Launch 1-Click Master Terminal (Auto-installs all dependencies on first run!)
 bash 1_START_TERMUX.sh
 ```
 
@@ -416,8 +417,8 @@ bash 1_START_TERMUX.sh
 | Launcher File | Role | Operational Description |
 |:---|:---:|:---|
 | **[`1_START_TERMUX.sh`](1_START_TERMUX.sh)** | 📱 **Mobile Master HUD** | 1-Click interactive terminal for Android. Detects first-time runs, self-heals dependencies, and presents the 8-option mobile control tower. |
-| **[`deploy/install_termux.sh`](deploy/install_termux.sh)** | ⚡ **1-Click Installer** | Installs pre-compiled native packages (`python-psutil`, `python-pillow`, `python-cryptography`) with zero compilation and zero CMake delays. |
-| **[`deploy/RUN_24_7_TERMUX.sh`](deploy/RUN_24_7_TERMUX.sh)** | 🔋 **24/7 Autopilot** | Detached background daemon running forwarder, bot, and dashboard with screen-off CPU wake-lock. |
+| **[`START_24_7_TERMUX.sh`](START_24_7_TERMUX.sh)** | 🔋 **24/7 Autopilot** | 1-Click detached background daemon running forwarder, bot, and dashboard with screen-off CPU wake-lock. |
+| **[`deploy/install_termux.sh`](deploy/install_termux.sh)** | ⚡ **1-Click Installer** | 100% automated non-interactive installer for pre-compiled native packages (`python-psutil`, `python-pillow`, `python-cryptography`). |
 
 - **Method 1: Interactive Mobile Control Tower (Recommended)**:
   ```bash
@@ -425,9 +426,9 @@ bash 1_START_TERMUX.sh
   ```
   *(Launches the full interactive menu: QR scan login, 24/7 autopilot, live logs, diagnostic checks, and bot management).*
 
-- **Method 2: Direct 24/7 Background Runner**:
+- **Method 2: Direct 24/7 Always-Online Background Autopilot**:
   ```bash
-  bash deploy/RUN_24_7_TERMUX.sh
+  bash START_24_7_TERMUX.sh
   ```
   *(Launches the Forwarder Engine, Kind Doctor Bot Daemon, and Web Dashboard in the background. You can turn off your screen and put your phone in your pocket!)*
   - View Live Streaming Logs: `tail -f logs/forwarder_service.log`
