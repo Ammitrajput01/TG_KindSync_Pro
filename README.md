@@ -378,25 +378,57 @@ sudo systemctl status tg-kinddoc-bot tg-dashboard --no-pager
 
 ### 📱 3. Android Smartphone & Tablet Setup (Termux 24/7 Autopilot)
 
-Run the complete streaming engine and Telegram bot directly on an Android device without needing a PC.
+Run the complete streaming engine, DEVI Operator Bot, and Web Dashboard directly on an Android smartphone or tablet without needing a PC or VPS.
 
-#### 1-Click Automated Termux Installer (Solves Pip Freeze & Out-of-Memory Errors)
-On Android devices, compiling heavy C/Rust wheels like `cryptography` and `uvloop` through `pip` often causes Android's Low Memory Killer (LMK) to silently terminate the compiler, causing the terminal to freeze indefinitely. Our dedicated 1-click installer solves this by utilizing Termux's pre-compiled binary packages and enforcing single-core memory ceilings (`MAX_JOBS=1`).
+#### ⚡ 1-Click Automated Termux Setup (Zero-Freeze & Zero-CMake Architecture)
+
+> [!IMPORTANT]
+> **Install Termux from F-Droid**: Always download Termux from [F-Droid](https://f-droid.org/packages/com.termux/). The Google Play Store build of Termux is obsolete and cannot download packages.
+
+On Android devices, attempting to compile packages like `psutil`, `cryptography`, or `duckdb` from PyPI triggers source compilation (often building `CMake 4.4.4` or heavy Rust wheels), which exhausts RAM and causes Android's Low Memory Killer (LMK) to terminate the terminal. Furthermore, PyPI upgrades (`pip install --upgrade pip`) are forbidden in Termux.
+
+Our dedicated Android engine completely solves this:
+1. **Zero-Compilation Pip**: Pure Python wheels only in `requirements-termux.txt`.
+2. **Pre-Compiled Native C Libraries**: `python-psutil`, `python-pillow`, and `python-cryptography` are installed instantly via Termux's native `pkg` package manager.
+3. **Git Mobile Stability**: Enforces HTTP/1.1 and 512MB post-buffers to permanently prevent `curl 92 HTTP/2 stream 5 reset` aborts on mobile networks.
+4. **24/7 Background Wake Lock**: Acquires `termux-wake-lock` to keep the Android CPU active when the screen is turned off.
+
+#### 🚀 Fast Installation (Copy & Paste in Termux)
+
+Open Termux and run this single command:
 
 ```bash
-# Step 1: Install Termux from F-Droid (https://f-droid.org/packages/com.termux/)
-# Step 2: Open Termux and run the 1-Click Installer
+# 1. Update packages & configure Git mobile network buffers
 pkg update -y && pkg install git -y
-git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
+git config --global http.version HTTP/1.1
+git config --global http.postBuffer 524288000
+
+# 2. Fast shallow clone of repository
+git clone --depth 1 https://github.com/Ammitrajput01/TG_KindSync_Pro.git
 cd TG_KindSync_Pro
+
+# 3. Run the 1-Click Android Installer
 bash deploy/install_termux.sh
 ```
 
-The script automatically:
-1. Acquires `termux-wake-lock` to keep the Android CPU active during long transfers.
-2. Installs pre-compiled system libraries (`python-cryptography`, `clang`, `openssl`, `libffi`, `ffmpeg`).
-3. Installs optimized Android packages via `requirements-termux.txt` with zero compiler freezing.
-4. Launches the unified engine in interactive mode!
+#### 🎮 Running the Platform on Android:
+
+- **Option A: Interactive Menu & QR Code Login (Recommended First Run)**:
+  ```bash
+  python tg_kindsync_pro.py
+  ```
+  *(Displays the full 19-quadrant terminal interface and renders ASCII QR code for 1-tap mobile linking).*
+
+- **Option B: 24/7 Background Autopilot**:
+  ```bash
+  bash deploy/RUN_24_7_TERMUX.sh
+  ```
+  *(Launches the Forwarder Engine, Kind Doctor Bot Daemon, and Web Dashboard in the background with automatic log rotation. You can safely turn off your screen!)*
+  - View Live Logs: `tail -f logs/forwarder_service.log`
+  - Stop All Background Processes: `pkill -f python`
+
+> [!TIP]
+> **Battery Optimization**: To prevent Android OS from putting Termux to sleep, navigate to `Android Settings ➔ Apps ➔ Termux ➔ Battery ➔ Set to "Unrestricted"`.
 
 ---
 

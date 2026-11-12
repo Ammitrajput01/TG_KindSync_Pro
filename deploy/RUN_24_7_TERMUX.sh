@@ -2,8 +2,12 @@
 # ==============================================================================
 # 📱 TG KINDSYNC PRO - 24/7 ANDROID TERMUX BACKGROUND RUNNER
 # ==============================================================================
+set -e
 
-cd "$(dirname "$0")/.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
+
 echo "============================================================"
 echo "  📱 TG KINDSYNC PRO - 24/7 ANDROID TERMUX RUNNER"
 echo "  - High-Speed Medical Forwarder & Operator Daemon"
@@ -12,19 +16,20 @@ echo "============================================================"
 # 1. Acquire Android Wake Lock (Prevents Android from killing CPU when screen is off)
 if command -v termux-wake-lock &> /dev/null; then
     echo "[+] Activating Android Termux Wake Lock (24/7 Background Running)..."
-    termux-wake-lock
+    termux-wake-lock || true
 fi
 
 # 2. Check Python Environment
-mkdir -p logs db_backups member_backups
+mkdir -p logs db_backups member_backups data archives
 if [ -d ".venv" ]; then
     source .venv/bin/activate
 fi
 
 # 3. Kill existing running processes if any
-pkill -f "python tg_kindsync_pro.py" 2>/dev/null || true
-pkill -f "python -m devi.operator.telegram_bot" 2>/dev/null || true
-pkill -f "python web_dashboard.py" 2>/dev/null || true
+pkill -f "python.*tg_kindsync_pro" 2>/dev/null || true
+pkill -f "python.*telegram_bot" 2>/dev/null || true
+pkill -f "python.*web_dashboard" 2>/dev/null || true
+sleep 1
 
 echo "[+] Starting Forwarder, Bot Daemon, and Dashboard in Background..."
 
