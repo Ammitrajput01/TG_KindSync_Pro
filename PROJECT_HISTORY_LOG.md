@@ -2,6 +2,37 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Friday, 13 November 2026 | 01:50 AM IST
+
+### 75. Integration of Ultimate Termux Master Installer (`KINDSYNC_MASTER.sh`): Auto-Recovery, Mirror Switching & 5-Choice Operation HUD
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. User provided the full Master Installer architecture (`KINDSYNC_MASTER.sh` / `install_kindsync.sh`) to permanently solve all Termux edge-cases.
+    2. Requested complete GitHub integration and documentation update so all users can execute zero-prompt installation.
+* **Applied Engineering Upgrades**:
+  1. **Master Installer Script (`KINDSYNC_MASTER.sh`)**:
+     - Pre-flight Termux environment check (`uname -m` ARM64 detection).
+     - Package manager healing via `dpkg --configure -a`.
+     - Mirror rate-limit auto-healing to Cloudflare primary CDN & Grimler fallback.
+     - Native C package installation (`python`, `git`, `openssl`, `ffmpeg`, `python-cryptography`, `python-psutil`, `python-pillow`).
+     - Safe Git clone & merge (respects local unstaged modifications).
+     - Self-healing `.venv` (detects and recreates missing or non-system-site-packages venvs).
+     - Pure binary wheel installation (`--only-binary=:all:` with `--no-cache-dir`) preventing CMake 4.4.4 compilation.
+     - In-line Python module verification test.
+     - 5-choice operation menu (Foreground QR Login, 24/7 Background, Install Only, Edit .env, Diagnostics).
+  2. **Documentation & GitHub Synchronization**:
+     - Updated Section 3 of `README.md` with the universal 1-click bootstrap.
+* **Verification & Results**:
+  - Codebase verified.
+  - Live Oracle VPS Status: **100% UNTOUCHED, STREAMING LIVE WITHOUT INTERRUPTION**.
+* **Affected Files**:
+  - `KINDSYNC_MASTER.sh`
+  - `install.sh`
+  - `README.md`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Friday, 13 November 2026 | 01:45 AM IST
 
 ### 74. Universal 1-Click All-in-One Auto-Install & Immediate QR Launch (`install.sh` & Universal Termux Bootstrap)

@@ -393,13 +393,13 @@ Our dedicated Android engine completely solves this:
 3. **Git Mobile Stability**: Enforces HTTP/1.1 and 512MB post-buffers to permanently prevent `curl 92 HTTP/2 stream 5 reset` aborts on mobile networks.
 4. **24/7 Background Wake Lock**: Acquires `termux-wake-lock` to keep the Android CPU active when the screen is turned off.
 
-#### 🚀 1-Click All-In-One Copy-Paste (Auto-Install & Immediate Launch)
+#### 🚀 1-Click All-In-One Master Installer (Single Copy & Paste in Termux)
 
-Open Termux and paste this single command. It will automatically resolve mirrors, install all native and Python dependencies without any prompts, configure background wake-locks, and **immediately launch the QR Login screen**:
+Open Termux and paste this single command. It automatically resolves mirrors, repairs interrupted packages, installs all pre-compiled native and Python dependencies without any prompts, configures 24/7 wake-locks, and opens the master launch menu:
 
 ```bash
 # ==============================================================================
-# 📱 TG KINDSYNC PRO — 1-CLICK AUTO-INSTALL & IMMEDIATE LAUNCH
+# 📱 TG KINDSYNC PRO — 1-CLICK ALL-IN-ONE MASTER INSTALLER (ANDROID TERMUX)
 # ==============================================================================
 PREFIX_DIR="${PREFIX:-/data/data/com.termux/files/usr}"
 echo "deb https://packages-cf.termux.dev/apt/termux-main stable main" > "$PREFIX_DIR/etc/apt/sources.list"
@@ -408,7 +408,7 @@ apt-get update -y && (yes '' | apt-get install -y git -o Dpkg::Options::="--forc
 git config --global http.version HTTP/1.1
 git config --global http.postBuffer 524288000
 [ -d "TG_KindSync_Pro" ] && (cd TG_KindSync_Pro && git pull origin main) || (git clone --depth 1 https://github.com/Ammitrajput01/TG_KindSync_Pro.git && cd TG_KindSync_Pro)
-bash 1_START_KINDSYNC.sh
+bash KINDSYNC_MASTER.sh
 ```
 
 > [!NOTE]
@@ -420,6 +420,7 @@ Just like Windows `.bat` launchers, TG KindSync Pro provides dedicated 1-click b
 
 | Launcher File | Role | Operational Description |
 |:---|:---:|:---|
+| **[`KINDSYNC_MASTER.sh`](KINDSYNC_MASTER.sh)** | 👑 **Master Installer** | **1-Click Self-Healing Master Installer**: Mirror fix, pre-compiled wheels, venv repair, and 5-choice launch menu. |
 | **[`1_START_KINDSYNC.sh`](1_START_KINDSYNC.sh)** | ⚡ **Direct Engine** | **Directly starts TG KindSync Pro**: QR scan login, video cloner, table of contents indexer, and multipart forwarder. |
 | **[`2_START_BOT.sh`](2_START_BOT.sh)** | 🤖 **Operator Bot** | **Directly starts Kind Doctor Bot**: 24/7 daemon for `@KindDoc_bot`. |
 | **[`3_START_WEB_DASHBOARD.sh`](3_START_WEB_DASHBOARD.sh)** | 📊 **Web Cockpit** | **Directly starts Web Dashboard** on `http://localhost:8080`. |
@@ -429,18 +430,23 @@ Just like Windows `.bat` launchers, TG KindSync Pro provides dedicated 1-click b
 
 #### 🏃 How to Run on Android:
 
-- **Option A: Direct Start TG KindSync Pro (Interactive Terminal)**:
+- **Option A: Master Installer & Self-Healer**:
+  ```bash
+  bash KINDSYNC_MASTER.sh
+  ```
+
+- **Option B: Direct Start TG KindSync Pro (Interactive Terminal & QR Scan)**:
   ```bash
   bash 1_START_KINDSYNC.sh
   ```
 
-- **Option B: 24/7 Always-Online Background Autopilot (Screen Off)**:
+- **Option C: 24/7 Always-Online Background Autopilot (Screen Off)**:
   ```bash
   bash 4_START_24_7_AUTOPILOT.sh
   ```
   *(View live streaming logs anytime: `tail -f logs/forwarder_service.log`)*
 
-- **Option C: Master Mobile Control Center**:
+- **Option D: Master Mobile Control Center**:
   ```bash
   bash 1_START_TERMUX.sh
   ```
