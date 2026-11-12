@@ -14,12 +14,20 @@ if command -v termux-wake-lock &> /dev/null; then
     termux-wake-lock || true
 fi
 
-# 2. Dependency Health & Self-Healing Check
+# 2. Activate virtual environment if present
+if [ -d ".venv" ]; then
+    source .venv/bin/activate 2>/dev/null || true
+fi
+
+# 3. Dependency Health & Self-Healing Check
 if ! python -c "import aiosqlite, telethon, rich" 2>/dev/null || [ ! -f ".env" ]; then
     echo "============================================================"
     echo "  🚀 Verifying & installing dependencies..."
     echo "============================================================"
     bash deploy/install_termux.sh
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate 2>/dev/null || true
+    fi
 fi
 
 # 4. Interactive Master Menu Loop

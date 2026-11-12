@@ -15,9 +15,16 @@ if command -v termux-wake-lock &> /dev/null; then
 fi
 
 # 2. Dependency Health Verification
+if [ -d ".venv" ]; then
+    source .venv/bin/activate 2>/dev/null || true
+fi
+
 if ! python -c "import aiosqlite, telethon, rich" 2>/dev/null || [ ! -f ".env" ]; then
     echo "[*] Initializing environment & dependencies..."
     bash deploy/install_termux.sh
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate 2>/dev/null || true
+    fi
 fi
 
 # 4. Create runtime folders

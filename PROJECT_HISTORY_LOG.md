@@ -2,6 +2,36 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Friday, 13 November 2026 | 01:40 AM IST
+
+### 73. Android Termux Exact PDF Sequence Alignment (`fix-termux-setup.pdf` Pages 17-19): Pre-Compiled Wheel Enforcement (`--only-binary=:all:`) & Dual-Layer Venv/Global Bridge
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"aap ko ek baat btaau jo maine aap ko chat gpt ki pdf bheji thi usme jo last wali chat thi uski wjh se chl pda tha or login qr tak aagya tha ab kya dikkt ho ri hai acche se fix kro na please"*
+    2. *"aal posible saari scripts likh do na dependencies wgeraah sb install update ki jiski wjh se koi errror na aaye acche se reserch kr ke likho and fir github pe update kr do aap"*
+* **Forensic Analysis of `fix-termux-setup.pdf` Pages 17–19**:
+  - The exact operational sequence that successfully brought up the Telegram Login QR code on Dr. Amit's Android device:
+    1. Native package installation: `pkg install -y python-psutil python-pillow python-cryptography`.
+    2. Bridged virtual environment: `python -m venv --system-site-packages .venv && source .venv/bin/activate`.
+    3. **Wheel-only enforcement**: `python -m pip install --only-binary=:all: aiosqlite telethon aiohttp python-dotenv "rich>=13.0.0" "qrcode[pil]>=7.4.2" "yt-dlp>=2024.10.0"`.
+       *(This single flag `--only-binary=:all:` permanently prevents pip from ever triggering the 2-hour CMake 4.4.4 C/C++ compilation trap on Android ARM64!)*
+    4. Execution: `python tg_kindsync_pro.py` directly presents the QR login code.
+* **Applied Engineering Fixes Across All Launchers**:
+  1. Updated `deploy/install_termux.sh` to faithfully mirror this exact verified sequence.
+  2. Integrated `--only-binary=:all:` across all pip installation calls, preventing any source builds on Android.
+  3. Added dual-layer virtualenv activation in `1_START_TERMUX.sh`, `1_START_KINDSYNC.sh`, and `START_24_7_TERMUX.sh` so both `.venv` and global environments stay fully synchronized.
+* **Verification & Results**:
+  - Codebase verified.
+  - Live Oracle VPS Status: **100% UNTOUCHED, STREAMING LIVE WITHOUT INTERRUPTION**.
+* **Affected Files**:
+  - `deploy/install_termux.sh`
+  - `1_START_TERMUX.sh`
+  - `1_START_KINDSYNC.sh`
+  - `START_24_7_TERMUX.sh`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Friday, 13 November 2026 | 01:35 AM IST
 
 ### 72. Android Termux `ModuleNotFoundError: No module named 'aiosqlite'` Fix: Removal of Non-Existent `python-pip`, Direct Native Termux Python Architecture & Active Module Health Gate

@@ -70,14 +70,20 @@ yes '' | apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Option
 yes '' | pkg install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" ffmpeg 2>/dev/null || true
 dpkg --configure -a 2>/dev/null || true
 
-# Step 6: Install Lightweight Python Dependencies
-echo "[6/7] ⚡ Installing Python packages (aiosqlite, telethon, rich, yt-dlp)..."
-# Clean up any stale or broken virtualenv to use Termux native Python
-rm -rf .venv 2>/dev/null || true
+# Step 6: Setup Virtual Environment & Install Python Dependencies
+echo "[6/7] ⚡ Setting up Python environment & lightweight dependencies..."
+if [ ! -d ".venv" ]; then
+    python -m venv --system-site-packages .venv 2>/dev/null || true
+fi
+if [ -d ".venv" ]; then
+    source .venv/bin/activate 2>/dev/null || true
+fi
 
-pip install --break-system-packages --no-build-isolation -r requirements-termux.txt 2>/dev/null || \
-pip install --no-build-isolation -r requirements-termux.txt 2>/dev/null || \
-pip install --break-system-packages telethon aiosqlite aiohttp python-dotenv rich qrcode yt-dlp
+# Install dependencies using pre-compiled wheels only (Eliminates CMake compilation)
+echo "[+] 📦 Installing aiosqlite, telethon, rich, yt-dlp..."
+python -m pip install --only-binary=:all: aiosqlite telethon aiohttp python-dotenv "rich>=13.0.0" "qrcode[pil]>=7.4.2" "yt-dlp>=2024.10.0" 2>/dev/null || \
+pip install --break-system-packages --only-binary=:all: aiosqlite telethon aiohttp python-dotenv "rich>=13.0.0" "qrcode[pil]>=7.4.2" "yt-dlp>=2024.10.0" 2>/dev/null || \
+pip install --no-build-isolation -r requirements-termux.txt
 
 # Step 7: Integrity Diagnostics
 echo "[7/7] 🔍 Running integrity diagnostics on Android dependencies..."

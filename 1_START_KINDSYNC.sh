@@ -11,9 +11,16 @@ if command -v termux-wake-lock &> /dev/null; then
     termux-wake-lock || true
 fi
 
+if [ -d ".venv" ]; then
+    source .venv/bin/activate 2>/dev/null || true
+fi
+
 if ! python -c "import aiosqlite, telethon, rich" 2>/dev/null || [ ! -f ".env" ]; then
     echo "[*] Setting up dependencies..."
     bash deploy/install_termux.sh
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate 2>/dev/null || true
+    fi
 fi
 
 python tg_kindsync_pro.py "$@"
