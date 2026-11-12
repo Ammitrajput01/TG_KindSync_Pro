@@ -14,17 +14,12 @@ if command -v termux-wake-lock &> /dev/null; then
     termux-wake-lock || true
 fi
 
-# 2. First-time auto-setup check
-if [ ! -d ".venv" ] || [ ! -f ".env" ]; then
+# 2. Dependency Health & Self-Healing Check
+if ! python -c "import aiosqlite, telethon, rich" 2>/dev/null || [ ! -f ".env" ]; then
     echo "============================================================"
-    echo "  🚀 First-time run detected! Starting 1-Click Termux Setup..."
+    echo "  🚀 Verifying & installing dependencies..."
     echo "============================================================"
     bash deploy/install_termux.sh
-fi
-
-# 3. Activate virtual environment with native Android bridge
-if [ -d ".venv" ]; then
-    source .venv/bin/activate
 fi
 
 # 4. Interactive Master Menu Loop

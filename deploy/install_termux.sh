@@ -58,10 +58,10 @@ yes '' | apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--f
 # Step 5: Install Native Android Packages via pkg (Zero-Compilation)
 echo "[5/7] 📦 Installing core Android tools & pre-compiled packages..."
 yes '' | apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-    python python-pip git openssl termux-api \
+    python git openssl termux-api \
     python-cryptography python-psutil python-pillow 2>/dev/null || \
 yes '' | pkg install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-    python python-pip git openssl termux-api \
+    python git openssl termux-api \
     python-cryptography python-psutil python-pillow
 
 # Optional media engine (ffmpeg) with resilient fallback
@@ -70,16 +70,14 @@ yes '' | apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Option
 yes '' | pkg install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" ffmpeg 2>/dev/null || true
 dpkg --configure -a 2>/dev/null || true
 
-# Step 6: Create Python Virtual Environment with System Site Packages
-echo "[6/7] 🧠 Setting up Python virtual environment..."
-if [ ! -d ".venv" ]; then
-    python -m venv --system-site-packages .venv
-fi
-source .venv/bin/activate
+# Step 6: Install Lightweight Python Dependencies
+echo "[6/7] ⚡ Installing Python packages (aiosqlite, telethon, rich, yt-dlp)..."
+# Clean up any stale or broken virtualenv to use Termux native Python
+rm -rf .venv 2>/dev/null || true
 
-# Install pure-Python wheels (Zero CMake / Zero compilation)
-echo "[+] ⚡ Installing lightweight Python dependencies..."
-pip install --no-build-isolation -r requirements-termux.txt
+pip install --break-system-packages --no-build-isolation -r requirements-termux.txt 2>/dev/null || \
+pip install --no-build-isolation -r requirements-termux.txt 2>/dev/null || \
+pip install --break-system-packages telethon aiosqlite aiohttp python-dotenv rich qrcode yt-dlp
 
 # Step 7: Integrity Diagnostics
 echo "[7/7] 🔍 Running integrity diagnostics on Android dependencies..."

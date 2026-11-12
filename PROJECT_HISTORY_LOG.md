@@ -2,6 +2,43 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Friday, 13 November 2026 | 01:35 AM IST
+
+### 72. Android Termux `ModuleNotFoundError: No module named 'aiosqlite'` Fix: Removal of Non-Existent `python-pip`, Direct Native Termux Python Architecture & Active Module Health Gate
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. User ran `1_START_TERMUX.sh` and selected Option `[1] Launch Interactive Engine`.
+    2. *Terminal Trace Analyzed*:
+       ```text
+       [*] Launching TG KindSync Pro Interactive Engine...
+       Traceback (most recent call last):
+         File "/data/data/com.termux/files/home/TG_KindSync_Pro/tg_kindsync_pro.py", line 81, in <module>
+           import aiosqlite
+       ModuleNotFoundError: No module named 'aiosqlite'
+       Press Enter to return to menu...
+       ```
+* **Root Cause & Technical Remediation**:
+  1. **Non-Existent Package Trap (`python-pip`)**:
+     - *Cause*: In Termux, pip is directly included in the `python` package; there is no standalone `python-pip` package. Attempting `apt-get install python-pip` or `pkg install python-pip` failed the entire package installation command.
+  2. **Fragile `.venv` Virtual Environment on Android Termux**:
+     - *Cause*: Termux's python build does not bundle `ensurepip` wheels. When `python -m venv` was executed, it created an empty `.venv` folder without a functioning `pip`, causing downstream `pip install` to silently fail.
+     - *Cause 2*: Launchers checked `[ ! -d ".venv" ]`, so because the empty `.venv` folder existed, the script mistakenly believed setup was finished and displayed the menu.
+  3. **Applied Fixes**:
+     - Removed `python-pip` from `deploy/install_termux.sh`.
+     - Purged fragile `.venv` (`rm -rf .venv`) in favor of native Termux Python using `pip install --break-system-packages`, with guaranteed direct wheel fallback (`telethon`, `aiosqlite`, `rich`, etc.).
+     - Upgraded launcher health checks in `1_START_TERMUX.sh`, `1_START_KINDSYNC.sh`, and `START_24_7_TERMUX.sh` to dynamically probe `python -c "import aiosqlite, telethon, rich"`. If any module is missing, the script automatically triggers self-healing rather than failing in the menu.
+* **Verification & Results**:
+  - Script logic verified.
+  - Live Oracle VPS Status: **100% UNTOUCHED, CONTINUOUSLY STREAMING**.
+* **Affected Files**:
+  - `deploy/install_termux.sh`
+  - `1_START_TERMUX.sh`
+  - `1_START_KINDSYNC.sh`
+  - `START_24_7_TERMUX.sh`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Friday, 13 November 2026 | 01:25 AM IST
 
 ### 71. Android Termux Mirror Auto-Heal: Bypassing `429 Too Many Requests` (`mirror.textcord.xyz`) via Cloudflare CDN Reset & Resilient Git Bootstrapping
