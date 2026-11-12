@@ -11,5 +11,9 @@ echo.
 echo [*] Starting Local Web Dashboard on http://localhost:8080 ...
 echo [*] Local LAN Access: http://192.168.1.90:8080 (or your Wi-Fi IP)
 echo.
-python web_dashboard.py
+if exist ".venv\Scripts\python.exe" (
+    .venv\Scripts\python.exe web_dashboard.py
+) else (
+    python web_dashboard.py
+)
 pause

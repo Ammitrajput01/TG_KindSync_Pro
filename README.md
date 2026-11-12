@@ -436,10 +436,10 @@ bash deploy/install_termux.sh
 
 TG KindSync Pro incorporates smart autonomous modules engineered for uninterrupted production streaming:
 
-### 1. Unified Single-Program Architecture (Master vs. Friend/Personal Mode)
+### 1. Unified Autonomous Single-Program Architecture
 Eliminating fragile multi-codebase divergence, TG KindSync Pro operates as a single canonical codebase.
-- **Master Profile (`MODE=master`)**: Full administrative control, DEVI Sentinel AI Watchdog, TMA 2.0 WebApp, and Oracle VPS synchronization.
-- **Friend / Student Mode (`MODE=friend`)**: Lightweight self-contained personal cloner for students and study partners. Strictly isolates Telegram sessions, ensuring private admin sessions (`session_forwarder.session`) and keys are never exposed.
+- **Enterprise Core Profile**: Full administrative control, DEVI Sentinel AI Watchdog, TMA 2.0 WebApp, and high-speed Oracle VPS synchronization.
+- **Strict Sovereign Isolation**: Master Telegram sessions (`session_forwarder.session`), SSH keys, and cryptographic tokens remain strictly locked and isolated behind sovereign boundaries, never exposed to external or guest environments.
 
 ### 2. Predictive Leaky Token-Bucket Flood Pacer (`PredictiveFloodPacer`)
 Tracks outgoing Telegram MTProto RPC invocations across a rolling 30-second window. If transmission velocity approaches Telegram's DC rate limits, it dynamically injects microsecond pauses ($20\text{–}80\text{ ms}$) *before* Telegram triggers a `FloodWaitError`.

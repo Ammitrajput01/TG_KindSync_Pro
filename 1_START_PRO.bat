@@ -18,7 +18,7 @@ echo   [1] Launch Local Engine (Forwarder, Cloner, Indexer, Splitter)
 echo   [2] Connect to Oracle Cloud VPS Terminal (Interactive Cloner Shell)
 echo   [3] Sync Single Session to Oracle VPS ^& Restart 24/7 Autopilot
 echo   [4] Open DEVI Sentinel Web Dashboard (Port 8080 Live Monitor)
-echo   [5] Open Friend Edition Folder
+echo   [5] Run Full System Verification ^& Health Check
 echo   [6] Quick Setup ^& Virtual Environment Self-Heal
 echo.
 echo   [0] Exit
@@ -30,7 +30,7 @@ if "%CHOICE%"=="1" goto RUN_LOCAL
 if "%CHOICE%"=="2" goto RUN_ORACLE_SHELL
 if "%CHOICE%"=="3" goto RUN_ORACLE_SYNC
 if "%CHOICE%"=="4" goto RUN_DASHBOARD
-if "%CHOICE%"=="5" goto OPEN_FRIEND_FOLDER
+if "%CHOICE%"=="5" goto RUN_TESTS
 if "%CHOICE%"=="6" goto RUN_SETUP
 if "%CHOICE%"=="0" exit /b 0
 
@@ -105,8 +105,15 @@ ssh -N -L 8080:127.0.0.1:8080 -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu
 pause
 goto MAIN_MENU
 
-:OPEN_FRIEND_FOLDER
-start "" "%~dp0Friend_Edition"
+:RUN_TESTS
+cls
+echo [*] Running full system health verification...
+if exist ".venv\Scripts\python.exe" (
+    .venv\Scripts\python.exe tests\run_all_tests.py
+) else (
+    python tests\run_all_tests.py
+)
+pause
 goto MAIN_MENU
 
 :RUN_SETUP
