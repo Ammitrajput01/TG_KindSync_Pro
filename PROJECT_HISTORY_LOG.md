@@ -2,6 +2,28 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Friday, 13 November 2026 | 01:45 AM IST
+
+### 74. Universal 1-Click All-in-One Auto-Install & Immediate QR Launch (`install.sh` & Universal Termux Bootstrap)
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"mai chahta hu sb ke liye easy ho na one click copy paste autoinstall sb kuch or run ho jaaye"*
+    2. Zero manual configuration, zero menu navigation required on first run: single copy-paste command must automatically handle fresh/existing state, install everything, and boot straight into the QR Login screen.
+* **Applied Engineering Upgrades**:
+  1. **Universal 1-Click Root Installer (`install.sh`)**:
+     - Created root entrypoint `install.sh` chaining `deploy/install_termux.sh` directly into `1_START_KINDSYNC.sh`.
+  2. **Idempotent Single Copy-Paste Bootstrap**:
+     - Updated `README.md` with a unified command that detects if `TG_KindSync_Pro` is already cloned (pulls updates) or fresh (shallow clones), fixes mirrors to Cloudflare CDN, installs all native & Python wheels without prompts, and launches `1_START_KINDSYNC.sh` directly.
+* **Verification & Results**:
+  - Codebase verified.
+  - Live Oracle VPS Status: **100% UNTOUCHED, STREAMING LIVE WITHOUT INTERRUPTION**.
+* **Affected Files**:
+  - `install.sh`
+  - `README.md`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Friday, 13 November 2026 | 01:40 AM IST
 
 ### 73. Android Termux Exact PDF Sequence Alignment (`fix-termux-setup.pdf` Pages 17-19): Pre-Compiled Wheel Enforcement (`--only-binary=:all:`) & Dual-Layer Venv/Global Bridge

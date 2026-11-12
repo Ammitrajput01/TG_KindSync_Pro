@@ -393,26 +393,26 @@ Our dedicated Android engine completely solves this:
 3. **Git Mobile Stability**: Enforces HTTP/1.1 and 512MB post-buffers to permanently prevent `curl 92 HTTP/2 stream 5 reset` aborts on mobile networks.
 4. **24/7 Background Wake Lock**: Acquires `termux-wake-lock` to keep the Android CPU active when the screen is turned off.
 
-#### 🚀 Fast Installation (Single Copy & Paste in Termux)
+#### 🚀 1-Click All-In-One Copy-Paste (Auto-Install & Immediate Launch)
 
-Open Termux and run this single command (100% automated, zero Y/N prompts):
+Open Termux and paste this single command. It will automatically resolve mirrors, install all native and Python dependencies without any prompts, configure background wake-locks, and **immediately launch the QR Login screen**:
 
 ```bash
-# 1. Auto-fix Termux mirror (bypasses 429 Too Many Requests) & install Git
+# ==============================================================================
+# 📱 TG KINDSYNC PRO — 1-CLICK AUTO-INSTALL & IMMEDIATE LAUNCH
+# ==============================================================================
 PREFIX_DIR="${PREFIX:-/data/data/com.termux/files/usr}"
 echo "deb https://packages-cf.termux.dev/apt/termux-main stable main" > "$PREFIX_DIR/etc/apt/sources.list"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y && (yes '' | apt-get install -y git -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" || pkg install -y git)
 git config --global http.version HTTP/1.1
 git config --global http.postBuffer 524288000
-
-# 2. Fast shallow clone of repository
-git clone --depth 1 https://github.com/Ammitrajput01/TG_KindSync_Pro.git
-cd TG_KindSync_Pro
-
-# 3. Launch 1-Click Master Terminal (Auto-installs all dependencies on first run!)
-bash 1_START_TERMUX.sh
+[ -d "TG_KindSync_Pro" ] && (cd TG_KindSync_Pro && git pull origin main) || (git clone --depth 1 https://github.com/Ammitrajput01/TG_KindSync_Pro.git && cd TG_KindSync_Pro)
+bash 1_START_KINDSYNC.sh
 ```
+
+> [!NOTE]
+> **Works Everywhere**: The command above works on both brand-new fresh Termux installs and existing installations (it automatically pulls the latest updates if already downloaded).
 
 #### 🎮 Android Launchers & Direct Execution Scripts:
 
