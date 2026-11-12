@@ -10,3 +10,4 @@ if [ -d ".venv" ]; then
 fi
 
 python -m devi.operator.telegram_bot "$@"
+

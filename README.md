@@ -398,9 +398,11 @@ Our dedicated Android engine completely solves this:
 Open Termux and run this single command (100% automated, zero Y/N prompts):
 
 ```bash
-# 1. 100% Non-interactive auto-setup (Zero prompts guaranteed)
+# 1. Auto-fix Termux mirror (bypasses 429 Too Many Requests) & install Git
+PREFIX_DIR="${PREFIX:-/data/data/com.termux/files/usr}"
+echo "deb https://packages-cf.termux.dev/apt/termux-main stable main" > "$PREFIX_DIR/etc/apt/sources.list"
 export DEBIAN_FRONTEND=noninteractive
-yes '' | apt-get update -y && yes '' | apt-get install -y git -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+apt-get update -y && (yes '' | apt-get install -y git -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" || pkg install -y git)
 git config --global http.version HTTP/1.1
 git config --global http.postBuffer 524288000
 

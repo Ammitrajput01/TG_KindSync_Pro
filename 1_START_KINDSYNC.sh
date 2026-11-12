@@ -21,3 +21,4 @@ if [ -d ".venv" ]; then
 fi
 
 python tg_kindsync_pro.py "$@"
+

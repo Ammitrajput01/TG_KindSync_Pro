@@ -37,9 +37,22 @@ git config --global http.postBuffer 524288000 || true
 echo "[3/7] 🔧 Checking and repairing package database..."
 dpkg --configure -a 2>/dev/null || true
 
-# Step 4: Update & Upgrade Packages (Non-Interactive, No Y/N prompts)
-echo "[4/7] 🔄 Upgrading system packages to resolve library dependencies..."
-yes '' | apt-get update -y 2>/dev/null || yes '' | pkg update -y 2>/dev/null || true
+# Step 4: Auto-Heal Termux Mirrors & Upgrade (Fixes 429 Too Many Requests & Y/N prompts)
+echo "[4/7] 🔄 Auto-healing APT mirrors and upgrading packages..."
+PREFIX_DIR="${PREFIX:-/data/data/com.termux/files/usr}"
+if [ -f "$PREFIX_DIR/etc/apt/sources.list" ]; then
+    if grep -q -E "textcord\.xyz|mirror\.bardia\.tech|niranjan\.co|cfe\.re" "$PREFIX_DIR/etc/apt/sources.list" 2>/dev/null; then
+        echo "deb https://packages-cf.termux.dev/apt/termux-main stable main" > "$PREFIX_DIR/etc/apt/sources.list"
+    fi
+fi
+
+if ! (yes '' | apt-get update -y 2>/dev/null); then
+    echo "deb https://packages-cf.termux.dev/apt/termux-main stable main" > "$PREFIX_DIR/etc/apt/sources.list"
+    if ! (yes '' | apt-get update -y 2>/dev/null); then
+        echo "deb https://grimler.se/termux/termux-main stable main" > "$PREFIX_DIR/etc/apt/sources.list"
+        yes '' | apt-get update -y 2>/dev/null || true
+    fi
+fi
 yes '' | apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade 2>/dev/null || yes '' | pkg upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" 2>/dev/null || true
 
 # Step 5: Install Native Android Packages via pkg (Zero-Compilation)

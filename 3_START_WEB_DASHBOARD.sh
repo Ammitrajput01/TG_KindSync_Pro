@@ -11,3 +11,4 @@ fi
 
 echo "[*] Launching DEVI Web Cockpit on http://127.0.0.1:8080 ..."
 python web_dashboard.py "$@"
+

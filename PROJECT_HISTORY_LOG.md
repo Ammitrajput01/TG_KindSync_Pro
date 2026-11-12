@@ -2,6 +2,33 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Friday, 13 November 2026 | 01:25 AM IST
+
+### 71. Android Termux Mirror Auto-Heal: Bypassing `429 Too Many Requests` (`mirror.textcord.xyz`) via Cloudflare CDN Reset & Resilient Git Bootstrapping
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. User executed the 1-click bootstrap command in fresh Termux.
+    2. *Terminal Trace Analyzed*:
+       - `Err:1 https://mirror.textcord.xyz/termux/termux-main stable InRelease 429 Too Many Requests [IP: 46.8.8.222 443]`
+       - `E: Failed to fetch https://mirror.textcord.xyz/termux/termux-main/dists/stable/InRelease 429 Too Many Requests`
+       - `E: The repository 'https://mirror.textcord.xyz/termux/termux-main stable InRelease' is not signed.`
+       - `The program git is not installed. Install it by executing: pkg install git`
+       - `bash: cd: TG_KindSync_Pro: No such file or directory`
+* **Root Cause & Technical Remediation**:
+  1. **Mirror 429 Rate-Limiting**:
+     - *Cause*: Termux previously selected a third-party community mirror (`mirror.textcord.xyz`), which enforced a strict rate limit returning HTTP 429. As a result, `apt-get update` failed, aborting the command chain before `git` could be installed.
+     - *Fix*: Injected proactive mirror override in both the 1-line root installation command and `deploy/install_termux.sh`. Before running `apt-get`, the script immediately overwrites `$PREFIX/etc/apt/sources.list` with the official high-capacity Cloudflare CDN (`https://packages-cf.termux.dev/apt/termux-main`), with automatic fallback to `https://grimler.se/termux/termux-main`.
+  2. **Multi-Fallback Git Installer**:
+     - *Fix*: Added fallback from `apt-get` to `pkg install -y git` so package installation succeeds even if an individual mirror has transient network jitter.
+* **Verification & Results**:
+  - Live Oracle VPS Status: **100% UNTOUCHED & STREAMING CONTINUOUSLY**.
+* **Affected Files**:
+  - `README.md`
+  - `deploy/install_termux.sh`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Friday, 13 November 2026 | 01:00 AM IST
 
 ### 70. Android Termux 5-Launcher Suite Parity (`1_START_KINDSYNC.sh`, `2_START_BOT.sh`, `3_START_WEB_DASHBOARD.sh`, `4_START_24_7_AUTOPILOT.sh`, `5_UPDATE_KINDSYNC.sh`)
