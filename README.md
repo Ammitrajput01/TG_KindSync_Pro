@@ -393,7 +393,7 @@ Our dedicated Android engine completely solves this:
 3. **Git Mobile Stability**: Enforces HTTP/1.1 and 512MB post-buffers to permanently prevent `curl 92 HTTP/2 stream 5 reset` aborts on mobile networks.
 4. **24/7 Background Wake Lock**: Acquires `termux-wake-lock` to keep the Android CPU active when the screen is turned off.
 
-#### 🚀 Fast Installation (Copy & Paste in Termux)
+#### 🚀 Fast Installation (Single Copy & Paste in Termux)
 
 Open Termux and run this single command:
 
@@ -407,24 +407,30 @@ git config --global http.postBuffer 524288000
 git clone --depth 1 https://github.com/Ammitrajput01/TG_KindSync_Pro.git
 cd TG_KindSync_Pro
 
-# 3. Run the 1-Click Android Installer
-bash deploy/install_termux.sh
+# 3. Launch the 1-Click Master Terminal (Auto-installs dependencies on first run!)
+bash 1_START_TERMUX.sh
 ```
 
-#### 🎮 Running the Platform on Android:
+#### 🎮 Android Launchers & Operational Modes:
 
-- **Option A: Interactive Menu & QR Code Login (Recommended First Run)**:
+| Launcher File | Role | Operational Description |
+|:---|:---:|:---|
+| **[`1_START_TERMUX.sh`](1_START_TERMUX.sh)** | 📱 **Mobile Master HUD** | 1-Click interactive terminal for Android. Detects first-time runs, self-heals dependencies, and presents the 8-option mobile control tower. |
+| **[`deploy/install_termux.sh`](deploy/install_termux.sh)** | ⚡ **1-Click Installer** | Installs pre-compiled native packages (`python-psutil`, `python-pillow`, `python-cryptography`) with zero compilation and zero CMake delays. |
+| **[`deploy/RUN_24_7_TERMUX.sh`](deploy/RUN_24_7_TERMUX.sh)** | 🔋 **24/7 Autopilot** | Detached background daemon running forwarder, bot, and dashboard with screen-off CPU wake-lock. |
+
+- **Method 1: Interactive Mobile Control Tower (Recommended)**:
   ```bash
-  python tg_kindsync_pro.py
+  bash 1_START_TERMUX.sh
   ```
-  *(Displays the full 19-quadrant terminal interface and renders ASCII QR code for 1-tap mobile linking).*
+  *(Launches the full interactive menu: QR scan login, 24/7 autopilot, live logs, diagnostic checks, and bot management).*
 
-- **Option B: 24/7 Background Autopilot**:
+- **Method 2: Direct 24/7 Background Runner**:
   ```bash
   bash deploy/RUN_24_7_TERMUX.sh
   ```
-  *(Launches the Forwarder Engine, Kind Doctor Bot Daemon, and Web Dashboard in the background with automatic log rotation. You can safely turn off your screen!)*
-  - View Live Logs: `tail -f logs/forwarder_service.log`
+  *(Launches the Forwarder Engine, Kind Doctor Bot Daemon, and Web Dashboard in the background. You can turn off your screen and put your phone in your pocket!)*
+  - View Live Streaming Logs: `tail -f logs/forwarder_service.log`
   - Stop All Background Processes: `pkill -f python`
 
 > [!TIP]

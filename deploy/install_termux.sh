@@ -56,8 +56,11 @@ pip install --no-build-isolation -r requirements-termux.txt
 # Step 7: Integrity Diagnostics
 echo "[+] 🔍 Verifying all core dependencies..."
 python -c "
-import telethon, psutil, PIL, cryptography, aiosqlite, aiohttp, rich, qrcode
-print('  ✅ All Core Android Dependencies Verified 100% Healthy!')
+import aiosqlite, telethon, aiohttp, psutil, PIL, cryptography
+print('  [+] Core Modules (Telethon, SQLite, AsyncIO, PSUtil, Pillow, Crypto): OK')
+import rich, qrcode, yt_dlp
+print('  [+] Streaming & Media Modules (Rich CLI, QR Generator, YT-DLP): OK')
+print('  ✅ All Android Termux Dependencies Verified 100% Healthy!')
 "
 
 # Step 8: Initialize Directories and Config
