@@ -62,3 +62,4 @@ echo "  📱 You can now safely TURN OFF your phone screen or close Termux."
 echo "  📜 View live streaming:  tail -f logs/forwarder_service.log"
 echo "  ⏹️  Stop everything:      pkill -f python"
 echo "============================================================"
+

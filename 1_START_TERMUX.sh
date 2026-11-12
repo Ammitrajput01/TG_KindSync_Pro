@@ -59,7 +59,7 @@ while true; do
             ;;
         2)
             clear
-            bash deploy/RUN_24_7_TERMUX.sh
+            bash START_24_7_TERMUX.sh
             echo ""
             read -p "Press Enter to return to menu..."
             ;;

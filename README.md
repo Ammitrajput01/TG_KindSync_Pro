@@ -398,9 +398,9 @@ Our dedicated Android engine completely solves this:
 Open Termux and run this single command (100% automated, zero Y/N prompts):
 
 ```bash
-# 1. Non-interactive setup & Git network buffer optimization
+# 1. 100% Non-interactive auto-setup (Zero prompts guaranteed)
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y && apt-get install -y git -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+yes '' | apt-get update -y && yes '' | apt-get install -y git -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 git config --global http.version HTTP/1.1
 git config --global http.postBuffer 524288000
 
@@ -412,27 +412,36 @@ cd TG_KindSync_Pro
 bash 1_START_TERMUX.sh
 ```
 
-#### 🎮 Android Launchers & Operational Modes:
+#### 🎮 Android Launchers & Direct Execution Scripts:
+
+Just like Windows `.bat` launchers, TG KindSync Pro provides dedicated 1-click bash launchers in your root workspace:
 
 | Launcher File | Role | Operational Description |
 |:---|:---:|:---|
-| **[`1_START_TERMUX.sh`](1_START_TERMUX.sh)** | 📱 **Mobile Master HUD** | 1-Click interactive terminal for Android. Detects first-time runs, self-heals dependencies, and presents the 8-option mobile control tower. |
-| **[`START_24_7_TERMUX.sh`](START_24_7_TERMUX.sh)** | 🔋 **24/7 Autopilot** | 1-Click detached background daemon running forwarder, bot, and dashboard with screen-off CPU wake-lock. |
-| **[`deploy/install_termux.sh`](deploy/install_termux.sh)** | ⚡ **1-Click Installer** | 100% automated non-interactive installer for pre-compiled native packages (`python-psutil`, `python-pillow`, `python-cryptography`). |
+| **[`1_START_KINDSYNC.sh`](1_START_KINDSYNC.sh)** | ⚡ **Direct Engine** | **Directly starts TG KindSync Pro**: QR scan login, video cloner, table of contents indexer, and multipart forwarder. |
+| **[`2_START_BOT.sh`](2_START_BOT.sh)** | 🤖 **Operator Bot** | **Directly starts Kind Doctor Bot**: 24/7 daemon for `@KindDoc_bot`. |
+| **[`3_START_WEB_DASHBOARD.sh`](3_START_WEB_DASHBOARD.sh)** | 📊 **Web Cockpit** | **Directly starts Web Dashboard** on `http://localhost:8080`. |
+| **[`4_START_24_7_AUTOPILOT.sh`](4_START_24_7_AUTOPILOT.sh)** | 🔋 **24/7 Autopilot** | **Screen-Off Background Runner**: Runs Forwarder, Bot, and Dashboard with Android CPU wake-lock. |
+| **[`5_UPDATE_KINDSYNC.sh`](5_UPDATE_KINDSYNC.sh)** | 🚀 **1-Click Updater** | **Pulls latest GitHub code** (`git pull origin main`) and self-heals dependencies. |
+| **[`1_START_TERMUX.sh`](1_START_TERMUX.sh)** | 📱 **Mobile Master HUD** | **Master Interactive Control Center**: 8-option terminal menu for Android Termux. |
 
-- **Method 1: Interactive Mobile Control Tower (Recommended)**:
+#### 🏃 How to Run on Android:
+
+- **Option A: Direct Start TG KindSync Pro (Interactive Terminal)**:
+  ```bash
+  bash 1_START_KINDSYNC.sh
+  ```
+
+- **Option B: 24/7 Always-Online Background Autopilot (Screen Off)**:
+  ```bash
+  bash 4_START_24_7_AUTOPILOT.sh
+  ```
+  *(View live streaming logs anytime: `tail -f logs/forwarder_service.log`)*
+
+- **Option C: Master Mobile Control Center**:
   ```bash
   bash 1_START_TERMUX.sh
   ```
-  *(Launches the full interactive menu: QR scan login, 24/7 autopilot, live logs, diagnostic checks, and bot management).*
-
-- **Method 2: Direct 24/7 Always-Online Background Autopilot**:
-  ```bash
-  bash START_24_7_TERMUX.sh
-  ```
-  *(Launches the Forwarder Engine, Kind Doctor Bot Daemon, and Web Dashboard in the background. You can turn off your screen and put your phone in your pocket!)*
-  - View Live Streaming Logs: `tail -f logs/forwarder_service.log`
-  - Stop All Background Processes: `pkill -f python`
 
 > [!TIP]
 > **Battery Optimization**: To prevent Android OS from putting Termux to sleep, navigate to `Android Settings ➔ Apps ➔ Termux ➔ Battery ➔ Set to "Unrestricted"`.

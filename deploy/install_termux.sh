@@ -39,22 +39,22 @@ dpkg --configure -a 2>/dev/null || true
 
 # Step 4: Update & Upgrade Packages (Non-Interactive, No Y/N prompts)
 echo "[4/7] 🔄 Upgrading system packages to resolve library dependencies..."
-apt-get update -y 2>/dev/null || pkg update -y
-apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade 2>/dev/null || pkg upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" 2>/dev/null || true
+yes '' | apt-get update -y 2>/dev/null || yes '' | pkg update -y 2>/dev/null || true
+yes '' | apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade 2>/dev/null || yes '' | pkg upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" 2>/dev/null || true
 
 # Step 5: Install Native Android Packages via pkg (Zero-Compilation)
 echo "[5/7] 📦 Installing core Android tools & pre-compiled packages..."
-apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+yes '' | apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
     python python-pip git openssl termux-api \
     python-cryptography python-psutil python-pillow 2>/dev/null || \
-pkg install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+yes '' | pkg install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
     python python-pip git openssl termux-api \
     python-cryptography python-psutil python-pillow
 
 # Optional media engine (ffmpeg) with resilient fallback
 echo "[+] 🎥 Setting up media libraries..."
-apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" ffmpeg 2>/dev/null || \
-pkg install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" ffmpeg 2>/dev/null || true
+yes '' | apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" ffmpeg 2>/dev/null || \
+yes '' | pkg install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" ffmpeg 2>/dev/null || true
 dpkg --configure -a 2>/dev/null || true
 
 # Step 6: Create Python Virtual Environment with System Site Packages
