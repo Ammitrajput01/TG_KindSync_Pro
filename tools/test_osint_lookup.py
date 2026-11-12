@@ -9,7 +9,10 @@ from telethon.tl.functions.users import GetFullUserRequest
 load_dotenv()
 
 async def resolve_username(username: str):
-    api_id = int(os.getenv("API_ID", "0"))
+    try:
+        api_id = int(str(os.getenv("API_ID", "0")).strip().strip("'").strip('"'))
+    except (ValueError, TypeError):
+        api_id = 0
     api_hash = os.getenv("API_HASH", "")
     session_file = "session_scanner"
     

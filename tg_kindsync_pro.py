@@ -2666,7 +2666,10 @@ async def get_account_channels_list(client):
             "session_forwarder", "session_user", "session_scanner", "session_primary",
             "session_account2", "session_account3", "session_account_9081"
         ]
-        api_id = int(os.getenv("API_ID", 0) or 0)
+        try:
+            api_id = int(str(os.getenv("API_ID", "0")).strip().strip("'").strip('"'))
+        except (ValueError, TypeError):
+            api_id = 0
         api_hash = (os.getenv("API_HASH", "")).strip().strip("'").strip('"')
         if not api_id or not api_hash:
             api_id = 36193727
@@ -9970,7 +9973,10 @@ async def start_platform(auto_start: bool = False):
     optimize_runtime()
     
     load_dotenv(override=True)
-    api_id = int(os.getenv("API_ID", 0) or 0)
+    try:
+        api_id = int(str(os.getenv("API_ID", "0")).strip().strip("'").strip('"'))
+    except (ValueError, TypeError):
+        api_id = 0
     api_hash = os.getenv("API_HASH", "").strip().strip("'").strip('"')
 
     # Fallback to verified official MTProto credentials if unconfigured

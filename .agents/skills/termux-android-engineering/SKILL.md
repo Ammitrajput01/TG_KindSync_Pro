@@ -102,3 +102,4 @@ source .venv/bin/activate
 python -m pip install --only-binary=:all: -r requirements-termux.txt
 python -c "import telethon, aiohttp, aiosqlite, dotenv, rich, psutil, PIL, cryptography, qrcode, yt_dlp; print('ALL DEPENDENCIES VERIFIED')"
 ```
+

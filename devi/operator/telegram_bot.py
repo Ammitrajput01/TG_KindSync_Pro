@@ -97,8 +97,13 @@ DB_PATH = BASE_PROJECT_DIR / "history_core.sqlite"
 ENV_PATH = BASE_PROJECT_DIR / ".env"
 load_dotenv(ENV_PATH)
 
-API_ID = int(os.getenv("API_ID", "36193727") or 36193727)
+try:
+    API_ID = int(str(os.getenv("API_ID", "36193727")).strip().strip("'").strip('"'))
+except (ValueError, TypeError):
+    API_ID = 36193727
 API_HASH = os.getenv("API_HASH", "fef19b9b1434a3e66b009fd31053200b").strip()
+if not API_HASH or "hash" in API_HASH.lower():
+    API_HASH = "fef19b9b1434a3e66b009fd31053200b"
 
 def get_db_conn() -> sqlite3.Connection:
     """Thread-safe, locked-resistant SQLite connection with 60s timeout, memory cache, and WAL pragma."""

@@ -163,7 +163,10 @@ def compare_dhash(hash1: str, hash2: str) -> int:
 
 class GlobalOSINTResolver:
     def __init__(self):
-        self.api_id = int(os.getenv("API_ID", "0"))
+        try:
+            self.api_id = int(str(os.getenv("API_ID", "0")).strip().strip("'").strip('"'))
+        except (ValueError, TypeError):
+            self.api_id = 0
         self.api_hash = os.getenv("API_HASH", "")
         self._client: Optional[TelegramClient] = None
         self._lock = asyncio.Lock()

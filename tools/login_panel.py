@@ -1093,7 +1093,10 @@ async def launch_dual_login_wizard(client: TelegramClient, port: int = 5005, for
 
 if __name__ == "__main__":
     load_dotenv()
-    api_id = int(os.getenv("API_ID", 0) or 0)
+    try:
+        api_id = int(str(os.getenv("API_ID", "0")).strip().strip("'").strip('"'))
+    except (ValueError, TypeError):
+        api_id = 0
     api_hash = os.getenv("API_HASH", "").strip()
     if not api_id or not api_hash:
         api_id = 36193727

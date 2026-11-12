@@ -966,7 +966,10 @@ def cleanup_stale_temp_sessions(max_age_sec: int = 7200) -> int:
 
 async def main():
     load_dotenv(ENV_FILE, override=True)
-    api_id = int(os.getenv("API_ID", 0) or 0)
+    try:
+        api_id = int(str(os.getenv("API_ID", "0")).strip().strip("'").strip('"'))
+    except (ValueError, TypeError):
+        api_id = 0
     api_hash = os.getenv("API_HASH", "").strip()
 
     # Initial cleanup of stale temporary sessions

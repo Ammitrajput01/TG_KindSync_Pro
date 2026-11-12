@@ -33,8 +33,13 @@ logger = logging.getLogger("SessionVault")
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(ROOT_DIR / ".env")
 
-API_ID = int(os.getenv("API_ID", "36193727") or 36193727)
+try:
+    API_ID = int(str(os.getenv("API_ID", "36193727")).strip().strip("'").strip('"'))
+except (ValueError, TypeError):
+    API_ID = 36193727
 API_HASH = os.getenv("API_HASH", "fef19b9b1434a3e66b009fd31053200b").strip()
+if not API_HASH or "hash" in API_HASH.lower():
+    API_HASH = "fef19b9b1434a3e66b009fd31053200b"
 BOT_TOKEN = os.getenv("DEVI_TELEGRAM_BOT_TOKEN", "").strip().strip("'").strip('"')
 
 SESSION_STRING_FILE = ROOT_DIR / "data" / "session_string.txt"
