@@ -1,0 +1,58 @@
+name: "🐛 Bug Report"
+description: "Report an issue, error, or unexpected behavior in TG KindSync Pro or Kind Doctor Bot"
+title: "[BUG]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this issue! Please provide as much detail as possible.
+        **Do NOT include phone numbers, bot tokens, API hashes, or session files.**
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of the system is encountering the issue?
+      options:
+        - "Kind Doctor Telegram Bot (@KindDoc_bot)"
+        - "TG KindSync Pro In-Memory Cloner / Streamer"
+        - "Android Termux Environment"
+        - "Web Evolution Cockpit (dashboard.js / web_dashboard.py)"
+        - "Telegram Mini App (TMA 8.0)"
+        - "Clinical Decision Support System (CDSS)"
+        - "Other / Build Tools"
+    validations:
+      required: true
+  - type: input
+    id: os_env
+    attributes:
+      label: Operating System & Environment
+      description: e.g. Ubuntu 24.04 (Oracle Cloud VPS), Windows 11, Android 14 (Termux)
+      placeholder: "e.g. Windows 11 / Python 3.12 / Termux arm64"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: "When I execute /connect, the bot returns..."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the behavior.
+      placeholder: |
+        1. Run `python tg_kindsync_pro.py`
+        2. Select Option [0]
+        3. See error...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output (Sanitized)
+      description: Paste any relevant error traceback or terminal logs. Remember to scrub all tokens!
+      render: shell

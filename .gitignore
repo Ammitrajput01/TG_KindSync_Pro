@@ -193,3 +193,7 @@ cookies.txt
 archives/strip_words_backups/*.txt
 !archives/strip_words_backups/.gitkeep
 
+# Internal Autonomous AI Agent Arsenal (Personal Workspace)
+.agents/
+
+

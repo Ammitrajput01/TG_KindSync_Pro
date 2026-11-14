@@ -2,6 +2,45 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 14 November 2026 | 08:20 PM IST
+
+### 83. Enterprise GitHub Standardization & Proprietary Agent Isolation: Full Community Compliance (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`), Issue Workflows & `.agents/` Privacy
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"bhaai .agents or .github wali files jrrori hai kya hmaare project ke liye doosre logo ke liye bhaai humne logo ko unke liye he dena hai progra hmaara kuch nahi dena hai koi bhi na koi key na he koi api id AI ka ya kisi agent ka bcs ye hmaara personal hai and haan hum personally use krenge bcs ye hmaara hai prsonal and haan ye jo maine upr screenshots bheje hai jha jha info fill krne wali hai wha wha jrooi or nesessary info fill kr do na accha ni lg rha hai blank blank and pehle mujhe bta dena fir uske baad jb bolu tb krna"*
+    2. *"hnji kr do"*
+* **Engineering & Standardization Implementations**:
+  1. **Proprietary Agent Workspace Isolation (`.agents/`)**:
+     - Untracked `.agents/` (110+ personal agent skills, council rules, and model routing scripts) from Git tracking using `git rm -r --cached .agents`.
+     - Appended `.agents/` to `.gitignore`.
+     - *Result*: All personal AI capabilities, keys, and agent configurations remain 100% active and intact locally on Dr. Amit's PC and Oracle VPS, while remaining completely private and invisible to the public on GitHub.
+  2. **Official Security Policy (`SECURITY.md`)**:
+     - Published comprehensive vulnerability reporting guidelines, designating Master Admins Dr. Amit Singh (`@Kinddoctor4u`, `@Ammitrajput1`, `Ammitrajput1@gmail.com`).
+     - Documented supported versions (v16.0.x Active, v15.x Maintenance) and cryptographic invariants (Fernet 256-bit AES session encryption, HMAC-SHA256 TMA auth, zero plaintext logging).
+     - Resolves the "No security policy detected" warning on GitHub's Security tab with an official active policy shield.
+  3. **Community & Contribution Standards (`CONTRIBUTING.md` & `CODE_OF_CONDUCT.md`)**:
+     - Authored `CONTRIBUTING.md` providing development workflows, virtualenv setup, $O(1)$ command router conventions, and verification steps (`tests/run_all_tests.py`).
+     - Implemented `CODE_OF_CONDUCT.md` adhering to Contributor Covenant v2.1.
+     - Resolves the GitHub Insights / Community Standards checklist to 100% compliance.
+  4. **Structured GitHub Issue & Pull Request Workflows (`.github/`)**:
+     - `.github/ISSUE_TEMPLATE/bug_report.yml`: Interactive form for sanitized error reporting with component dropdowns and OS environment tags.
+     - `.github/ISSUE_TEMPLATE/feature_request.yml`: Interactive form for CDSS clinical formulas and MTProto streaming enhancements.
+     - `.github/ISSUE_TEMPLATE/config.yml`: Direct links to Telegram community support and security reporting.
+     - `.github/PULL_REQUEST_TEMPLATE.md`: Mandatory test verification checklist (17/17 test suites passing).
+* **Verification & Results**:
+  - `python tests/run_all_tests.py`: **17 of 17 test suites passed (100% PASS, 0 FAIL)**.
+  - Local `.agents/` directory verified present on disk.
+* **Affected Systems**:
+  - `SECURITY.md` (New)
+  - `CONTRIBUTING.md` (New)
+  - `CODE_OF_CONDUCT.md` (New)
+  - `.github/ISSUE_TEMPLATE/` (`bug_report.yml`, `feature_request.yml`, `config.yml`) (New)
+  - `.github/PULL_REQUEST_TEMPLATE.md` (New)
+  - `.gitignore` (Updated)
+  - `PROJECT_HISTORY_LOG.md` (Updated)
+
+---
+
 ## 📅 Log Entry: Saturday, 14 November 2026 | 08:05 PM IST
 
 ### 82. Repository Hygiene & Security Audit: Decommissioning Friend Edition Legacy, Purging Antigravity Meta-Files, and Verifying Zero Credential Leakage

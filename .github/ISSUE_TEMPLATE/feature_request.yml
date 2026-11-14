@@ -1,0 +1,44 @@
+name: "✨ Feature Request"
+description: "Suggest an idea, clinical formula, or enhancement for TG KindSync Pro"
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We love hearing new ideas to make TG KindSync Pro and Kind Doctor Bot faster and more helpful for the medical and Telegram communities!
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: What domain does this feature belong to?
+      options:
+        - "Clinical Decision Support (CDSS / Calculators)"
+        - "High-Throughput MTProto Streaming & Cloner"
+        - "Telegram Mini App (TMA 8.0) UI / Studio"
+        - "Android Termux Optimization"
+        - "Web Dashboard & Real-Time Telemetry"
+        - "Security & Session Vault"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a specific problem or limitation?
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / Workflow
+      description: Describe what you want to happen, formulas to use, or mockups.
+      placeholder: "Add an interactive /meld score calculator in devi/operator/handlers/clinical.py..."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or features you have considered.

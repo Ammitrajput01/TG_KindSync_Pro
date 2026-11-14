@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Direct Telegram Support
+    url: https://t.me/Kinddoctor4u
+    about: Ask questions, get help, or join our community on Telegram.
+  - name: 🛡️ Security Vulnerability Reporting
+    url: https://github.com/Ammitrajput01/TG_KindSync_Pro/security/policy
+    about: Please review our security policy for reporting security vulnerabilities.
