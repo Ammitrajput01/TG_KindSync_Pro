@@ -27,6 +27,19 @@
     },
     "insights": [
         {
+            "id": "RES-ORCL-012",
+            "title": "Autonomous Storage Sentinel & Twice-Daily Telemetry Radar Engine",
+            "category": "Cloud Infrastructure & Autonomous Maintenance",
+            "why_it_matters": "High-throughput channel streaming generates heavy service logs and system journals, accumulating 30+ GB of storage. An autonomous in-app sentinel keeps disk space 85-90% free via in-place log truncation, journal vacuuming, and SQLite WAL checkpointing, accompanied by twice-daily (09:00 AM / 09:00 PM) Telegram health digests.",
+            "affects_part": "devi/sentinel/storage_sentinel.py, sentinel_observer.py, DeviTelegramBot",
+            "potential_benefits": "Perpetual 85-90% free storage on Oracle VPS; zero manual terminal maintenance; rich twice-daily diagnostic briefings delivered directly to Dr. Amit (@Kinddoctor4u).",
+            "potential_risks": "None. Uses non-blocking in-place file truncation and SQLite WAL truncate without table locks.",
+            "priority": "HIGH (Queued for Post-Clone Deployment)",
+            "priority_level": 1,
+            "suggested_implementation_approach": "Deploy once active 150-topic clone finishes. Implement LogGuardian, SQLiteZeroBloat, SystemReaper, and TelemetryDispatcher.",
+            "status": "QUEUED - PENDING CLONE COMPLETION (REMINDER ACTIVE)"
+        },
+        {
             "id": "RES-BAN-001",
             "title": "Poisson-Distributed Human Jitter & Adaptive Throttle Matrix",
             "category": "Account Safety & Anti-Ban",

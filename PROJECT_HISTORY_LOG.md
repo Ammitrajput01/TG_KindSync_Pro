@@ -2,6 +2,30 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 14 November 2026 | 09:25 PM IST
+
+### 85. Architecture Blueprint & Roadmap Queue: Autonomous Storage Sentinel & Twice-Daily Telemetry Radar Engine (Morning & Evening Health Briefings)
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"ok to ye sb aap abhi local system and github pe update kr lo baaki sb process complete ho jayega to hum do cheeje update krenge program me ek to ye ki wo automatically keep itself healty and clean like you said it and second thing that it should send me with daily report as Devi Ai do to me daily same as that all fully details of the system each and everything all possible send to me every day twice morning and in evening daily ok for now do it on github and on local pc and also feed in for next update reminder when i ask is there any resrch or idea or any update or upgrade u shld tell me this for oracle bcs if i forget u shld remind me once please"*
+    2. Commit and push the complete architecture and roadmap to GitHub and local workstation now.
+    3. Register persistent reminder to proactively advise Dr. Amit to implement and deploy this dual feature to Oracle VPS as soon as the current 150-topic cloning sequence concludes.
+* **Codified Architecture & Components**:
+  1. **Autonomous Storage Sentinel Engine**:
+     - *LogGuardian*: Enforces 20 MB ceiling per log file with in-place tail-preserving truncation (`truncate(0)`), preventing unbounded disk growth.
+     - *SQLiteZeroBloat*: Periodic non-blocking `PRAGMA wal_checkpoint(TRUNCATE)` and `PRAGMA optimize` keeping database footprints minimal without locking tables.
+     - *SystemReaper*: Automatic systemd journal vacuuming (`--vacuum-time=2d`), `/tmp` orphan slice reaper, and APT package cache cleanup.
+  2. **Twice-Daily Full System & Health Telemetry Radar**:
+     - Scheduled cron tasks at **09:00 AM IST** (Morning Briefing) and **09:00 PM IST** (Evening Summary).
+     - Direct encrypted delivery to Master Admins Dr. Amit Singh (`@Kinddoctor4u` / `@Ammitrajput1`).
+     - Rich telemetry metrics: Disk Free % and GB, RAM usage, CPU load average, active cloner PID status, messages mapped count, flood-wait metrics, and database integrity.
+* **Queued Deliverables**:
+  - `research_reports/Oracle_Autonomous_Storage_Sentinel_and_Twice_Daily_Health_Radar_Blueprint_Saturday_14-November-2026_09-25PM.md` (Created)
+  - `research_reports/improvement_queue.json` (Queued as `RES-ORCL-012`, Priority: High, Status: Queued for Post-Clone)
+* **Status**: Codified on local workspace and synchronized to GitHub `origin main`. Deployment pending completion of live 150-topic clone.
+
+---
+
 ## 📅 Log Entry: Saturday, 14 November 2026 | 09:12 PM IST
 
 ### 84. Live Cloud Storage Optimization: Reclaiming 31.8 GB on Oracle VPS (`130.210.1.32`) with Zero Disruption to Active 150-Topic In-Memory Cloner
