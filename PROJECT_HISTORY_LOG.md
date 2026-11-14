@@ -2,6 +2,47 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 14 November 2026 | 07:50 PM IST
+
+### 81. Architecture Modernization: $O(1)$ Command Router & Domain-Driven Modular Architecture for Kind Doctor Bot (`devi/operator`)
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"⚡ O(1) Command Routing & Modular Architecture: telegram_bot.py ke 12,500 lines ko Domain-Driven modular folders (handlers/, services/, tma/) mein organize karna taaki maintenance aur speed supersonic ho jaye. bss ye wala accha haiii isko hr jgh kr do aap update sb kuch chq kr ke and haan baaki ke ideas ko disscard kr do"*
+    2. Focus solely on modular architecture, zero regressions, and supersonic maintenance. All other conceptual ideas discarded.
+* **Architectural Modernization & Engineering Implementations**:
+  1. **$O(1)$ Hash Map Command Router (`devi/operator/router.py`)**:
+     - Engineered `CommandRouter` featuring $O(1)$ dispatch using an in-memory dictionary instead of sequential linear `if-elif-else` chains.
+     - Built case-insensitive and slash-tolerant command normalization (e.g. `/start@bot`, `/START`, `start`).
+     - Added multi-alias command registration, handler categories, and metadata inspection.
+  2. **Domain-Driven Handler Decomposition (`devi/operator/handlers/`)**:
+     - `devi/operator/handlers/__init__.py`: Aggregator exposing `build_master_router()` that binds all domain handlers to the bot instance.
+     - `devi/operator/handlers/navigation.py`: Encapsulates `/start`, `/help`, `/menu`, `/mode`, `/support`, `/id`, `/myid`, `/about`, `/botinfo`.
+     - `devi/operator/handlers/clinical.py`: Encapsulates Clinical Decision Support System (CDSS) calculators: `/calc`, `/burns`, `/gcs`, `/egfr`, `/bmi`, `/bsa`, `/pedia`, `/abg`, `/meld`.
+     - `devi/operator/handlers/indexer.py`: Encapsulates topic and forum indexing commands: `/mainindex`, `/topics`, `/topicindex`, `/scan`, `/autoindex`.
+     - `devi/operator/handlers/account.py`: Encapsulates Fernet-encrypted multi-tenant user session commands: `/connect`, `/myaccount`, `/disconnect`.
+     - `devi/operator/handlers/admin.py`: Encapsulates administrative commands: `/strip`, `/pacing`, `/polyglot`.
+  3. **Domain Services & TMA Decomposition**:
+     - `devi/operator/services/dossier_service.py`: Encapsulates biometric tracking (SangMata engine) and user dossier rendering.
+     - `devi/operator/tma/tma_auth.py`: Encapsulates official Telegram WebApp HMAC-SHA256 signature verification with dual Master Admin permission validation (`@Kinddoctor4u` & `@Ammitrajput1`).
+  4. **Façade Integration & 100% Backward Compatibility**:
+     - `DeviTelegramBot` (`devi/operator/telegram_bot.py`) initializes `self.command_router = build_master_router()` and delegates command parsing via an $O(1)$ fast-path in `_handle_admin_command`.
+     - Retains all existing internal instance methods for backward compatibility with 15 external test suites, the Web Dashboard, and background daemons.
+  5. **Regression Guard & Bug Fix**:
+     - *Bug*: `devi/operator/handlers/account.py` initially imported non-existent symbol `delete_user_session` from `devi.operator.session_vault`.
+     - *Fix*: Corrected to `delete_linked_user_session` across imports and caller sites.
+* **Verification & Results**:
+  - `python -m compileall -q devi/operator`: Clean compilation with 0 syntax or bytecode errors.
+  - `python tests/run_all_tests.py`: **17 of 17 test suites passed (100% PASS, 0 FAIL)**.
+* **Affected Systems**:
+  - `devi/operator/router.py` (New)
+  - `devi/operator/handlers/` (`__init__.py`, `navigation.py`, `clinical.py`, `indexer.py`, `account.py`, `admin.py`) (New)
+  - `devi/operator/services/dossier_service.py` (New)
+  - `devi/operator/tma/tma_auth.py` (New)
+  - `devi/operator/telegram_bot.py` (Modified)
+  - `PROJECT_HISTORY_LOG.md` (Updated)
+
+---
+
 ## 📅 Log Entry: Saturday, 14 November 2026 | 07:15 PM IST
 
 ### 80. Explicit Cloud Deployment: Live Oracle VPS (`130.210.1.32`) Full Codebase Synchronization & Zero-Downtime Daemon Refresh

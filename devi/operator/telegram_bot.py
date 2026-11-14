@@ -202,6 +202,8 @@ class DeviTelegramBot:
         self.memory = MemoryStore()
         self.evaluator = Evaluator(self.memory)
         self.router = ModelRouter()
+        from devi.operator.handlers import build_master_router
+        self.command_router = build_master_router()
         self.offset = 0
         self.is_running = False
         self.active_tasks: Set[asyncio.Task] = set()
@@ -6609,6 +6611,14 @@ class DeviTelegramBot:
         thread_id = message.get("message_thread_id") if message else None
         reply_to = message.get("reply_to_message") if message else None
         clean_chat_id = str(chat_id).replace("-100", "").replace("-", "").lstrip("@")
+
+        # ⚡ O(1) Command Router Fast-Path Dispatch
+        if hasattr(self, "command_router") and self.command_router.has_command(cmd):
+            handler = self.command_router.dispatch(cmd)
+            if handler:
+                res = await handler(self, session, chat_id, admin_id, text, message, parts)
+                if res is not None or cmd not in ("/calc", "/dose", "/formula", "/score"):
+                    return
 
         if cmd == "/help" and len(parts) > 1:
             subcat = parts[1].lower().strip()

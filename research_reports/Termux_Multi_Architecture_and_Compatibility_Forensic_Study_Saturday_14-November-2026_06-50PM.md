@@ -94,3 +94,4 @@ bash 1_START_KINDSYNC.sh
 ```bash
 cd ~/TG_KindSync_Pro && bash 5_UPDATE_KINDSYNC.sh
 ```
+
