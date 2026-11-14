@@ -395,11 +395,17 @@ Our dedicated Android engine completely solves this:
 
 #### 🚀 1-Click All-In-One Master Installer (Single Copy & Paste in Termux)
 
-Open Termux and paste this single command. It automatically resolves mirrors, repairs interrupted packages, installs all pre-compiled native and Python dependencies without any prompts, configures 24/7 wake-locks, and opens the master launch menu:
+Choose either of the two commands below and paste it into Termux:
 
+**Option 1: Fastest 1-Line Direct Cloud Bootstrap**
+```bash
+pkg update -y && pkg install -y git curl && curl -sSL https://raw.githubusercontent.com/Ammitrajput01/TG_KindSync_Pro/main/KINDSYNC_MASTER.sh | bash
+```
+
+**Option 2: Resilient Git Repository Bootstrap (Auto-Mirror Healing)**
 ```bash
 # ==============================================================================
-# 📱 TG KINDSYNC PRO — 1-CLICK ALL-IN-ONE MASTER INSTALLER (ANDROID TERMUX)
+# 📱 TG KINDSYNC PRO — RESILIENT GIT REPOSITORY BOOTSTRAP (ANDROID TERMUX)
 # ==============================================================================
 PREFIX_DIR="${PREFIX:-/data/data/com.termux/files/usr}"
 echo "deb https://packages-cf.termux.dev/apt/termux-main stable main" > "$PREFIX_DIR/etc/apt/sources.list"
@@ -412,7 +418,7 @@ bash KINDSYNC_MASTER.sh
 ```
 
 > [!NOTE]
-> **Works Everywhere**: The command above works on both brand-new fresh Termux installs and existing installations (it automatically pulls the latest updates if already downloaded).
+> **Works Everywhere**: Both commands work on both brand-new fresh Termux installs and existing installations (it automatically pulls the latest updates if already downloaded). All package installations use pre-compiled binaries (`--only-binary=:all:`) with zero CMake native compilation.
 
 #### 🎮 Android Launchers & Direct Execution Scripts:
 

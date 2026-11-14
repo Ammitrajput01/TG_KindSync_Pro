@@ -32,7 +32,7 @@ echo [*] Connecting to Oracle VPS (130.210.1.32)...
 echo [*] Pulling latest updates from GitHub (main branch)...
 echo.
 
-ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i "!KEY_PATH!" ubuntu@130.210.1.32 "cd /home/ubuntu/TG_KindSync_Pro && git pull origin main && sudo systemctl restart tg-kinddoc-bot && echo '============================================' && echo '✅ Oracle Bot Daemon Updated & Restarted Successfully!' && echo '============================================'"
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i "!KEY_PATH!" ubuntu@130.210.1.32 "cd /home/ubuntu/TG_KindSync_Pro && git pull origin main && sudo systemctl daemon-reload && sudo systemctl restart tg-kinddoc-bot && echo '============================================' && echo '✅ Oracle Bot Daemon Updated & Restarted Successfully!' && echo '============================================' && sudo systemctl status tg-kinddoc-bot --no-pager -n 3"
 
 if errorlevel 1 (
     echo.

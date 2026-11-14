@@ -1,4 +1,4 @@
-param (
+﻿param (
     [string]$TargetWorkspace = "c:\TG_KindSync_Pro"
 )
 
@@ -42,11 +42,26 @@ $Tier1Skills = @(
     "agent-memory-systems",
     "browser-automation",
     "graphify",
-    "universal-free-ai"
+    "universal-free-ai",
+    "termux-android-engineering",
+    "telethon-async-concurrency",
+    "stealth-harvester",
+    "systematic-debugging",
+    "test-driven-development",
+    "verification-before-completion",
+    "rea-reverse-engineering",
+    "self-extending-engine",
+    "vulnerability-scanner",
+    "async-python-patterns",
+    "python-performance-optimization",
+    "sql-optimization-patterns",
+    "backend-patterns",
+    "frontend-design",
+    "baseline-ui"
 )
 
 Write-Host ""
-Write-Host "[*] Syncing 23 High-Priority Tier-1 Skills into Workspace..." -ForegroundColor Magenta
+Write-Host "[*] Syncing $($Tier1Skills.Count) High-Priority Tier-1 Skills into Workspace..." -ForegroundColor Magenta
 
 $InstalledCount = 0
 foreach ($skill in $Tier1Skills) {
@@ -73,7 +88,7 @@ foreach ($skill in $Tier1Skills) {
 Write-Host ""
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host " 🎉 INSTALLATION SUMMARY:" -ForegroundColor Yellow
-Write-Host "  • Tier-1 Active Skills Configured: $InstalledCount / 23" -ForegroundColor Green
+Write-Host "  • Tier-1 Active Skills Configured: $InstalledCount / $($Tier1Skills.Count)" -ForegroundColor Green
 Write-Host "  • Tier-2 Vault Skills Available:  1,600+ (On-Demand)" -ForegroundColor Cyan
 Write-Host "  • Workspace Location:              $TargetSkillsDir" -ForegroundColor White
 Write-Host "==================================================================" -ForegroundColor Cyan
