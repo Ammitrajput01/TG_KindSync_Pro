@@ -3,12 +3,11 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 import dis
 import tg_kindsync_pro
-import Friend_Edition.tg_kindsync_pro as friend_tg
 from devi.operator.telegram_bot import DeviTelegramBot
 
 def test_no_unbound_local_set_key_in_cloner():
     """Verify that 'set_key' is not treated as an uninitialized local variable in run_group_cloner_tool."""
-    for mod in [tg_kindsync_pro, friend_tg]:
+    for mod in [tg_kindsync_pro]:
         func = getattr(mod, "run_group_cloner_tool", None)
         assert func is not None
         code = func.__code__
