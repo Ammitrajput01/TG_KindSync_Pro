@@ -1,4 +1,4 @@
-﻿param (
+param (
     [string]$TargetWorkspace = "c:\TG_KindSync_Pro"
 )
 

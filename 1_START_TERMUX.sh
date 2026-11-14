@@ -19,8 +19,17 @@ if [ -d ".venv" ]; then
     source .venv/bin/activate 2>/dev/null || true
 fi
 
-# 3. Dependency Health & Self-Healing Check
-if ! python -c "import aiosqlite, telethon, rich" 2>/dev/null || [ ! -f ".env" ]; then
+# 3. Auto-initialize .env if missing (Safe MTProto fallback active)
+if [ ! -f ".env" ]; then
+    if [ -f ".env.example" ]; then
+        cp .env.example .env 2>/dev/null || touch .env
+    else
+        touch .env
+    fi
+fi
+
+# 4. Dependency Health & Self-Healing Check
+if ! python -c "import aiosqlite, telethon, rich, dotenv" 2>/dev/null; then
     echo "============================================================"
     echo "  🚀 Verifying & installing dependencies..."
     echo "============================================================"

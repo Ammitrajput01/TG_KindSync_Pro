@@ -15,7 +15,16 @@ if [ -d ".venv" ]; then
     source .venv/bin/activate 2>/dev/null || true
 fi
 
-if ! python -c "import aiosqlite, telethon, rich" 2>/dev/null || [ ! -f ".env" ]; then
+# Auto-initialize .env if missing (Safe MTProto fallback active)
+if [ ! -f ".env" ]; then
+    if [ -f ".env.example" ]; then
+        cp .env.example .env 2>/dev/null || touch .env
+    else
+        touch .env
+    fi
+fi
+
+if ! python -c "import aiosqlite, telethon, rich, dotenv" 2>/dev/null; then
     echo "[*] Setting up dependencies..."
     bash deploy/install_termux.sh
     if [ -d ".venv" ]; then

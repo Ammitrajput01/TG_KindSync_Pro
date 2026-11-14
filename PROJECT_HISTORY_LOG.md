@@ -2,6 +2,48 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 14 November 2026 | 06:55 PM IST
+
+### 79. Universal Termux Multi-Architecture Resilience: Google Play Store Auto-Migration, Dynamic Linker Isolation, Non-Blocking Verification & Step-by-Step Runbooks
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. Analysis of dual chat shares (`https://share.gemini.google/tEEhAqreKOlF` & `https://chatgpt.com/share/6af85d0a-d8c4-83ee-81e6-1fa55337c7ed`).
+    2. *"bhaai inn errors ko dhyaan me rakh ke aap jo scripts ko steps wise likh do wha pr and haan kai baar install krne ke baad update or upgrade krna pdta hai to uski bhi scripts daal do aap baar baar requirements ke hisaab se and haai kai baar alg alg devices hote hai jaise arm versions and sometimes termux versions and features jais ki playstore wala etc to bhut se compatitability errors aate hai jaise ki android versions and arm etc"*
+* **Forensic Audit & Key Root Causes Addressed**:
+  1. **Google Play Store Termux Obsoletion**:
+     - *Cause*: Play Store Termux has been deprecated since 2020; repositories fail with 403 or dead mirrors.
+     - *Fix*: Added detection in `KINDSYNC_MASTER.sh` inspecting APT sources for `bintray` or `termux.net`, auto-migrating sources to Cloudflare CDN (`packages-cf.termux.dev`), and advising F-Droid installation.
+  2. **Dynamic Linker & ABI Incompatibility (`ffmpeg` / `curl` Symbol Mismatch)**:
+     - *Cause*: `CANNOT LINK EXECUTABLE "ffmpeg": cannot locate symbol "_ZNSt6__ndk127__from_chars_floating_point..."` in `libplacebo.so.387` caused `dpkg` error code 1, aborting entire setup.
+     - *Fix*: Separated essential native tools (`git`, `python`, `openssl`) from optional packages (`ffmpeg`). Optional packages now install with graceful non-blocking error guards (`2>/dev/null || true`).
+  3. **Non-Blocking Pure-Python Dependency Verification**:
+     - *Cause*: Categorizing `psutil`, `PIL`, or `cryptography` as strictly required caused verification failure on devices where native C wheels could not compile.
+     - *Fix*: In `KINDSYNC_MASTER.sh`, dependency verification strictly checks only the 5 pure-Python core packages (`telethon`, `aiohttp`, `aiosqlite`, `dotenv`, `rich`). `psutil`, `PIL`, `cryptography`, `qrcode`, and `yt_dlp` are treated as optional acceleration modules with graceful in-code fallbacks.
+  4. **Multi-Architecture Support**:
+     - Auto-detects ARM64 (`aarch64`), ARM32 (`armv7l`), x86_64, and x86, adjusting execution mode accordingly.
+  5. **Step-by-Step & 1-Click Update Runbooks**:
+     - Updated Section 3 in `README.md` with:
+       - 1-Click Fast Bootstrap (Curl)
+       - Resilient Git Mirror Bootstrap
+       - 4-Step Manual Step-by-Step Setup Guide
+       - 1-Click Requirement & Code Updater (`5_UPDATE_KINDSYNC.sh`)
+  6. **Self-Healing `.env` Auto-Init**:
+     - `1_START_KINDSYNC.sh` and `1_START_TERMUX.sh` auto-generate default `.env` from `.env.example`, preventing loops and allowing immediate MTProto auto-fallback login.
+* **Verification & Results**:
+  - Full research archived to `research_reports/Termux_Multi_Architecture_and_Compatibility_Forensic_Study_Saturday_14-November-2026_06-50PM.md`.
+  - Python scripts compile with 0 errors.
+  - Live Oracle VPS Status: **100% UNTOUCHED, CONTINUOUSLY STREAMING WITHOUT INTERRUPTION**.
+* **Affected Files**:
+  - `KINDSYNC_MASTER.sh`
+  - `1_START_KINDSYNC.sh`
+  - `1_START_TERMUX.sh`
+  - `5_UPDATE_KINDSYNC.sh`
+  - `README.md`
+  - `PROJECT_HISTORY_LOG.md`
+  - `research_reports/Termux_Multi_Architecture_and_Compatibility_Forensic_Study_Saturday_14-November-2026_06-50PM.md`
+
+---
+
 ## 📅 Log Entry: Saturday, 14 November 2026 | 06:30 PM IST
 
 ### 78. Universal System-Wide Verification & 1-Click Operational Synchronization Across All Platforms

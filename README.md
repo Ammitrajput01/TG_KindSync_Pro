@@ -420,6 +420,50 @@ bash KINDSYNC_MASTER.sh
 > [!NOTE]
 > **Works Everywhere**: Both commands work on both brand-new fresh Termux installs and existing installations (it automatically pulls the latest updates if already downloaded). All package installations use pre-compiled binaries (`--only-binary=:all:`) with zero CMake native compilation.
 
+---
+
+#### 📋 Step-by-Step Manual Setup (For Any Android Device & Architecture):
+
+If you prefer to run commands step-by-step or want to verify each phase on older or specialized Android devices (ARM64, ARMv7 32-bit, x86_64):
+
+**Step 1: Install Termux & Set Up Base Packages**
+> Ensure you are using [F-Droid Termux](https://f-droid.org/packages/com.termux/). Do NOT use Google Play Store Termux.
+```bash
+pkg update -y
+pkg install -y git python openssl
+```
+
+**Step 2: Clone or Update TG KindSync Pro**
+```bash
+git config --global http.version HTTP/1.1
+git config --global http.postBuffer 524288000
+[ -d "TG_KindSync_Pro" ] && (cd TG_KindSync_Pro && git pull origin main) || git clone --depth 1 https://github.com/Ammitrajput01/TG_KindSync_Pro.git
+cd TG_KindSync_Pro
+```
+
+**Step 3: Install Pure-Python Pre-Compiled Requirements (Zero-Compilation)**
+```bash
+# 3A. Core pure-Python modules (Installs in seconds on ANY CPU architecture)
+python -m pip install --only-binary=:all: telethon aiohttp aiosqlite python-dotenv rich "qrcode[pil]" yt-dlp
+
+# 3B. Pre-compiled native accelerators (Skips cleanly if unavailable on device)
+pkg install -y python-psutil python-pillow python-cryptography 2>/dev/null || true
+```
+
+**Step 4: Launch Interactive Engine & QR Code Login**
+```bash
+bash 1_START_KINDSYNC.sh
+```
+
+---
+
+#### 🔄 How to 1-Click Update & Upgrade Requirements:
+Whenever new features or dependencies are released on GitHub, update your setup anytime with one command:
+```bash
+cd ~/TG_KindSync_Pro && bash 5_UPDATE_KINDSYNC.sh
+```
+*(This automatically pulls the latest GitHub commits, updates any modified Python requirements with pre-built binary wheels, and verifies all streaming modules without touching your logged-in Telegram session!)*
+
 #### 🎮 Android Launchers & Direct Execution Scripts:
 
 Just like Windows `.bat` launchers, TG KindSync Pro provides dedicated 1-click bash launchers in your root workspace:

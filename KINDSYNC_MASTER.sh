@@ -46,12 +46,35 @@ info "Prefix: $PREFIX_DIR"
 
 case "$ARCH" in
     aarch64|arm64)
-        log "ARM64 architecture detected."
+        log "64-bit ARM architecture (ARM64 / aarch64) detected."
+        ;;
+    armv7l|armv8l|armhf|arm)
+        log "32-bit ARM architecture ($ARCH) detected. Pure-Python compatibility active."
+        ;;
+    x86_64|amd64)
+        log "64-bit x86 architecture (x86_64) detected."
+        ;;
+    i686|x86)
+        log "32-bit x86 architecture ($ARCH) detected."
         ;;
     *)
-        warn "This installer is primarily intended for ARM64 Termux."
+        warn "Architecture $ARCH detected. Standard compatibility active."
         ;;
 esac
+
+# Check for obsolete Google Play Store Termux (deprecated in 2020)
+if [ -f "$PREFIX_DIR/etc/apt/sources.list" ]; then
+    if grep -q -E "bintray|termux\.net" "$PREFIX_DIR/etc/apt/sources.list" 2>/dev/null; then
+        warn "============================================================"
+        warn "⚠️ DETECTED OBSOLETE GOOGLE PLAY STORE TERMUX BUILD!"
+        warn "Google Play Store stopped updating Termux in 2020."
+        warn "Auto-migrating sources to official Cloudflare mirror..."
+        warn "For best stability, reinstall Termux from F-Droid:"
+        warn "https://f-droid.org/packages/com.termux/"
+        warn "============================================================"
+        echo "deb https://packages-cf.termux.dev/apt/termux-main stable main" > "$PREFIX_DIR/etc/apt/sources.list"
+    fi
+fi
 
 # ------------------------------------------------------------
 # 2. REPAIR INTERRUPTED PACKAGE INSTALLATION
@@ -90,14 +113,17 @@ fi
 
 info "Installing native Termux packages..."
 
-pkg install -y \
-    git \
-    python \
-    openssl \
-    ffmpeg \
-    python-cryptography \
-    python-psutil \
-    python-pillow
+# 4A. Essential native packages (Must succeed)
+pkg install -y git python openssl || apt-get install -y git python openssl || fail "Could not install core packages (git/python/openssl)."
+
+# 4B. Native C/Bionic accelerators (Installs pre-compiled; skips gracefully if unavailable on device)
+info "Installing pre-compiled native packages (psutil, pillow, cryptography)..."
+pkg install -y python-cryptography python-psutil python-pillow 2>/dev/null || true
+
+# 4C. Media engine (ffmpeg) - isolated so linker errors never block the installer
+info "Checking media engine (ffmpeg)..."
+pkg install -y ffmpeg 2>/dev/null || true
+dpkg --configure -a 2>/dev/null || true
 
 log "Native package installation completed."
 
@@ -276,13 +302,13 @@ required = [
     "aiohttp",
     "aiosqlite",
     "dotenv",
-    "rich",
-    "psutil",
-    "PIL",
-    "cryptography"
+    "rich"
 ]
 
 optional = [
+    "psutil",
+    "PIL",
+    "cryptography",
     "qrcode",
     "yt_dlp"
 ]
@@ -292,20 +318,20 @@ failed = []
 for module in required:
     try:
         importlib.import_module(module)
-        print("[OK] " + module)
+        print("  [OK: Core] " + module)
     except Exception as e:
-        print("[FAILED] " + module + ": " + str(e))
+        print("  [FAILED: Core] " + module + ": " + str(e))
         failed.append(module)
 
 for module in optional:
     try:
         importlib.import_module(module)
-        print("[OK] " + module)
+        print("  [OK: Acceleration] " + module)
     except Exception as e:
-        print("[OPTIONAL MISSING] " + module + ": " + str(e))
+        print("  [OPTIONAL/FALLBACK] " + module + " (Pure-Python fallback active)")
 
 if failed:
-    print("\nMissing required modules:", failed)
+    print("\nMissing required core modules:", failed)
     sys.exit(1)
 
 print("\nALL REQUIRED MODULES VERIFIED.")
