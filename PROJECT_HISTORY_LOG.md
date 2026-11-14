@@ -2,6 +2,44 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 14 November 2026 | 09:12 PM IST
+
+### 84. Live Cloud Storage Optimization: Reclaiming 31.8 GB on Oracle VPS (`130.210.1.32`) with Zero Disruption to Active 150-Topic In-Memory Cloner
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *Directives*:
+    1. *"Bro do you remember we discussed before to clean the space of Oracle database because it was taking too much space consuming too much space... I just put another files to clone another group full group its round 150 topics having So I have just seen now disc disc space it's consuming 36.1 GB Auto of 44.1 GB So now just suggest me what to do I dont want to trouble my processing because its too many files I have started So I don't want to interrupt it or interrupt the process in between... So just let me know after deep research ok We can do it or not While its working"*
+    2. *"Okay bro Go If you can do it without effecting your process just do it"*
+* **Forensic Findings & Root Cause**:
+  1. **Abandoned Residual Log Growth**:
+     - `tg-forwarder-friend.service` (legacy service from friend edition) was left running in the background, repeatedly prompting on stdin and appending unrotated logs to `/home/ubuntu/TG_KindSync_Friend/logs/forwarder_service.log`.
+     - This single log file grew to **30.3 GB**, consuming over 80% of the VPS root filesystem (`/dev/sda1`).
+  2. **Secondary Dormant Logs & System Artifacts**:
+     - `/home/ubuntu/TG_KindSync_Pro/logs/forwarder_service.log` had an idle 1.7 GB unrotated log from Nov 4.
+     - Systemd journal archives consumed 654 MB.
+* **Non-Disruptive Engineering Actions**:
+  1. **Deactivated Residual Service**: Safely stopped and disabled `tg-forwarder-friend.service`.
+  2. **In-Place File Truncation (`truncate -s 0`)**:
+     - Truncated `TG_KindSync_Friend/logs/forwarder_service.log` (30.3 GB -> 0 B) instantly at the ext4 filesystem level.
+     - Truncated `TG_KindSync_Pro/logs/forwarder_service.log` (1.7 GB -> 0 B).
+  3. **Journal & Cache Vacuuming**:
+     - Executed `journalctl --vacuum-time=2d` (reclaimed 638.2 MB of archived journals).
+     - Executed `apt-get clean` to clear stale package archives.
+     - Removed obsolete directory `/home/ubuntu/TG_KindSync_Pro_old` (137 MB) and `deploy_pack.tar.gz`.
+* **Verification & Results**:
+  - **Storage Metrics**:
+    - *Before*: 37 GB Used / 8.0 GB Available (83% disk full).
+    - *After*: **5.2 GB Used / 39 GB Available (only 12% disk used — 88% FREE)**!
+    - **Total Storage Reclaimed**: **31.8 GB**.
+  - **Live Cloner Invariant**:
+    - tmux session `kindsync` (PID 7523) was **100% untouched and continuously streaming**:
+      `[15:40:54] ✔ Sent Video: Title_DAY_2_STERLIZATION_DISINFECTION_PART_2_mkv_BATCH_E.mp4 (366.0 MB) | ID: #80441`
+    - 0 flood waits, 0 errors, and cloner now has 39 GB of free breathing room.
+* **Affected Systems**:
+  - Oracle Cloud VPS `130.210.1.32` (`/dev/sda1` filesystem, systemd units)
+  - `PROJECT_HISTORY_LOG.md` (Updated)
+
+---
+
 ## 📅 Log Entry: Saturday, 14 November 2026 | 08:20 PM IST
 
 ### 83. Enterprise GitHub Standardization & Proprietary Agent Isolation: Full Community Compliance (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`), Issue Workflows & `.agents/` Privacy
