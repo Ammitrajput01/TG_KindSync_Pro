@@ -631,9 +631,8 @@ class DeepClonerEngine:
                             topic_title=topic_title,
                             is_media=bool(msg.media)
                         )
-                        dest_thread = target_topic_id if target_topic_id > 1 else None
-                        from telethon.tl.types import InputReplyToMessage
-                        reply_hdr = InputReplyToMessage(reply_to_msg_id=dest_thread, top_msg_id=dest_thread) if dest_thread else None
+                        dest_thread = target_topic_id if target_topic_id and target_topic_id > 1 else None
+                        reply_hdr = dest_thread
 
                         if msg.media:
                             thumb_to_attach = None

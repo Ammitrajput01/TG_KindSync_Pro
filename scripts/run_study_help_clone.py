@@ -116,8 +116,7 @@ async def send_telemetry_card(user_client: TelegramClient, text: str):
     # 1. Mission Control Forum (Topic 9)
     try:
         mc_peer = await _safe_resolve_entity(user_client, MISSION_CONTROL_CHAT)
-        reply_hdr = InputReplyToMessage(reply_to_msg_id=CLONER_TOPIC_ID, top_msg_id=CLONER_TOPIC_ID)
-        await user_client.send_message(mc_peer, text, parse_mode="html", reply_to=reply_hdr)
+        await user_client.send_message(mc_peer, text, parse_mode="html", reply_to=CLONER_TOPIC_ID)
     except Exception as e:
         logger.debug(f"MC telemetry dispatch failed: {e}")
 
@@ -242,8 +241,8 @@ async def main():
         min_msg_id = wm["max_id"]
         logger.info(f"▶️ Streaming '{src_top_title}' (Resuming from msg #{min_msg_id})...")
 
-        dest_thread = target_topic_id if target_topic_id > 1 else None
-        reply_hdr = InputReplyToMessage(reply_to_msg_id=dest_thread, top_msg_id=dest_thread) if dest_thread else None
+        dest_thread = target_topic_id if target_topic_id and target_topic_id > 1 else None
+        reply_hdr = dest_thread
 
         topic_cloned = 0
         current_max_id = min_msg_id
