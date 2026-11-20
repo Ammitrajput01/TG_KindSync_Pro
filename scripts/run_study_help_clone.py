@@ -130,17 +130,27 @@ async def send_telemetry_card(user_client: TelegramClient, text: str):
         logger.debug(f"Admin PM dispatch failed: {e}")
 
 
+def format_caption_to_safe_html(caption: str) -> str:
+    """Converts cleaned markdown caption to 100% compliant Telegram HTML."""
+    if not caption:
+        return ""
+    escaped = html.escape(caption, quote=False)
+    escaped = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', escaped)
+    escaped = re.sub(r'(?<!\w)_(.*?)_(?!\w)', r'<i>\1</i>', escaped)
+    if len(escaped) > 1024:
+        escaped = escaped[:1020] + "..."
+    return escaped
+
+
 async def bot_copy_message(http_session: aiohttp.ClientSession, bot_token: str, src_chat: int, tgt_chat: int, tgt_topic: int, msg_id: int, caption: str):
     """Copies a message directly via Bot API (Immune to MTProto user SendMedia FloodWait)."""
     url = f"https://api.telegram.org/bot{bot_token}/copyMessage"
-    html_cap = caption.replace("**Kind Doctor & Team**", "<b>Kind Doctor & Team</b>") if caption else ""
-    if len(html_cap) > 1024:
-        html_cap = html_cap[:1020] + "..."
+    safe_cap = format_caption_to_safe_html(caption)
     payload = {
         "chat_id": tgt_chat,
         "from_chat_id": src_chat,
         "message_id": msg_id,
-        "caption": html_cap,
+        "caption": safe_cap,
         "parse_mode": "HTML"
     }
     if tgt_topic and tgt_topic > 1:
@@ -153,6 +163,15 @@ async def bot_copy_message(http_session: aiohttp.ClientSession, bot_token: str, 
                 return True, (None, 0)
             err = res.get("description", "Unknown error")
             retry_after = res.get("parameters", {}).get("retry_after", 0)
+            
+            # If entity parse error, retry immediately without parse_mode as plain text
+            if "can't parse entities" in err.lower() or "entity" in err.lower():
+                payload.pop("parse_mode", None)
+                payload["caption"] = caption[:1024] if caption else ""
+                async with http_session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=25)) as retry_resp:
+                    r_res = await retry_resp.json()
+                    if r_res.get("ok"):
+                        return True, (None, 0)
             return False, (err, retry_after)
     except Exception as e:
         return False, (str(e), 0)
@@ -294,6 +313,7 @@ async def main():
                 )
 
                 sent = False
+                logger.info(f"📨 [{topic_cloned+1}] Topic '{src_top_title}' copying msg #{msg.id}...")
                 for retry in range(3):
                     ok, (err, retry_after) = await bot_copy_message(
                         http_session, BOT_TOKEN, SOURCE_CHAT_ID, TARGET_CHAT_ID, target_topic_id, msg.id, cleaned_caption
@@ -302,8 +322,8 @@ async def main():
                         sent = True
                         break
                     elif retry_after and retry_after > 0:
-                        logger.warning(f"⏳ Bot API Rate Limit: Sleeping {retry_after + 1}s")
-                        await asyncio.sleep(retry_after + 1)
+                        logger.warning(f"⏳ Bot API Rate Limit: Sleeping {retry_after + 2}s")
+                        await asyncio.sleep(retry_after + 2)
                     else:
                         logger.info(f"Bot copy notice on msg #{msg.id} ({err}) -> Trying MTProto pointer fallback...")
                         try:
@@ -334,7 +354,7 @@ async def main():
                     grand_total_cloned += 1
                     current_max_id = max(current_max_id, msg.id)
                     update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, inc=1)
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(2.5)
 
             # Mark topic finished
             update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, is_finished=True)
