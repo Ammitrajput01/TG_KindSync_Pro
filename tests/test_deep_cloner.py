@@ -90,10 +90,20 @@ def test_clean_cloned_caption_rich_formatting():
     assert "📚 **Kind Doctor & Team**" in cap1
     assert "Group Study Help 😉" in cap1
 
-    # Case 2: Empty text with filename
+    # Case 2: Empty text with filename (verifies Anti-DMCA Leet-Speak on Marrow -> M@rr0w)
     cap2 = clean_cloned_caption("", orig_filename="1._How_to_study_OBG_using_Marrow_Edition_6.mp4", is_media=True)
-    assert "Title: 1. How to study OBG using Marrow Edition 6" in cap2
+    assert "Title: 1. How to study OBG using M@rr0w Edition 6" in cap2
     assert "📚 **Kind Doctor & Team**" in cap2
+
+    # Case 2b: Direct Anti-DMCA Obfuscation Matrix test across top brands
+    cap_dmca = clean_cloned_caption(
+        "PrepLadder Pediatrics and DAMS Surgery by Marrow Cerebellum Academy",
+        is_media=True
+    )
+    assert "Prep L@dder" in cap_dmca
+    assert "D@MS" in cap_dmca
+    assert "M@rr0w" in cap_dmca
+    assert "Cer@bellum" in cap_dmca
 
     # Case 3: Section banner preserved
     cap3 = clean_cloned_caption("✨ 🩺 OBSTETRICS & GYNAECOLOGY ✨")

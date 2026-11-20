@@ -381,6 +381,7 @@ async def get_vault_client_for_target(preferred_user_id: Optional[int] = None) -
 
     # 4. For Master Admin: Extract from candidate system session files on disk
     candidate_sessions = [
+        "session_account_9403",
         "session_forwarder",
         "session_scanner",
         "session_account_9081",

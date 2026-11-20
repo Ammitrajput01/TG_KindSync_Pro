@@ -619,6 +619,13 @@ def apply_clean_rules(text: str) -> str:
         else:
             pat = re.escape(old_w)
         t = re.sub(pat, new_w, t, flags=re.IGNORECASE)
+
+    # 2b. Apply Permanent Anti-DMCA Brand Obfuscation (Leet-Speak Matrix)
+    try:
+        from devi.operator.deep_cloner import apply_anti_dmca_obfuscation
+        t = apply_anti_dmca_obfuscation(t)
+    except Exception:
+        pass
         
     # 3. Apply strip words (case-insensitive, flexible whitespace around @, and automatic hashtag variants)
     # Sort by length descending to ensure longer phrases are stripped before sub-tokens
@@ -741,9 +748,9 @@ def sanitize_filename(filename: str, fallback_ext: str = "", mime_type: str = ""
     # 1. Apply Permanent Clean Rules (strip_words.txt + .env)
     stem = apply_clean_rules(stem)
 
-    # 2. Clean promotional links, @mentions, brackets
+    # 2. Clean promotional links, @mentions, brackets (using lookbehind to preserve embedded leet-speak)
     stem = re.sub(r"\[.*?\]|\(.*?\)", "", stem)
-    stem = re.sub(r"@[\w_]+", "", stem)
+    stem = re.sub(r"(?<![a-zA-Z0-9])@[\w_]+", "", stem)
     stem = re.sub(r"https?://\S+|www\.\S+", "", stem)
     stem = re.sub(r"\s+", " ", stem).strip(" .-_")
 
@@ -810,8 +817,8 @@ def clean_index_title(raw_text: str, max_len: int = 55) -> str:
     # Replace underscores with spaces
     t = t.replace("_", " ")
     
-    # Clean bracketed tags like (720p), (1080p), @username
-    t = re.sub(r"(?i)@\w+", "", t)
+    # Clean bracketed tags like (720p), (1080p), @username (using lookbehind to preserve embedded leet-speak)
+    t = re.sub(r"(?i)(?<![a-zA-Z0-9])@\w+", "", t)
     t = re.sub(r"(?i)\b(720p|1080p|480p|360p|x264|hevc|h264|aac|webrip)\b", "", t)
     t = re.sub(r"[\(\[\{]\s*[\)\]\}]", "", t)
     t = re.sub(r"\s+", " ", t).strip(" .-_")
@@ -3487,9 +3494,9 @@ def customize_caption(caption, for_media=False, batch_name=""):
     replace_username = os.getenv("REPLACE_USERNAME", "").strip()
     remove_usernames = os.getenv("REMOVE_USERNAMES", "false").strip().lower() in ("true", "1", "yes")
     if replace_username:
-        text = re.sub(r"@[a-zA-Z0-9_]+", replace_username, text)
+        text = re.sub(r"(?<![a-zA-Z0-9])@[a-zA-Z0-9_]+", replace_username, text)
     elif remove_usernames:
-        text = re.sub(r"@[a-zA-Z0-9_]+", "", text)
+        text = re.sub(r"(?<![a-zA-Z0-9])@[a-zA-Z0-9_]+", "", text)
 
     # 6. Clean promotional join/subscribe patterns and admin/uploader tags
     text = re.sub(r"(?i)(join|subscribe to|shared by|uploaded by|posted by|managed by|provided by|credit|credits?|admin|owner|forwarded from) (our |by |to )?(channel|group|here|admin|owner|desk|bot).*", "", text)

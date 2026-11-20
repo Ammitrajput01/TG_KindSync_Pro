@@ -161,8 +161,39 @@ _job_cancel_flags: Dict[int, bool] = {}
 _job_pause_flags: Dict[int, bool] = {}
 
 # ---------------------------------------------------------------------------
-# Caption & Watermark Sanitizer
+# Caption & Watermark Sanitizer & Anti-DMCA Obfuscation Matrix
 # ---------------------------------------------------------------------------
+
+ANTI_DMCA_BRAND_MATRIX: List[Tuple[str, str]] = [
+    # Primary Targets (Dr. Amit Mandate)
+    (r'(?i)(?<![a-zA-Z0-9])prep[ \t_\-\.]*ladder(?![a-zA-Z0-9])', 'Prep L@dder'),
+    (r'(?i)(?<![a-zA-Z0-9])dams(?![a-zA-Z0-9])', 'D@MS'),
+    (r'(?i)(?<![a-zA-Z0-9])marrow(?![a-zA-Z0-9])', 'M@rr0w'),
+    (r'(?i)(?<![a-zA-Z0-9])cerebellum(?![a-zA-Z0-9])', 'Cer@bellum'),
+    
+    # Secondary Top Medical Platforms
+    (r'(?i)(?<![a-zA-Z0-9])bhatia(?![a-zA-Z0-9])', 'Bh@ti@'),
+    (r'(?i)(?<![a-zA-Z0-9])dbmci(?![a-zA-Z0-9])', 'D.B.M.C.I'),
+    (r'(?i)(?<![a-zA-Z0-9])first[ \t_\-\.]*aid(?![a-zA-Z0-9])', '1st A!d'),
+    (r'(?i)(?<![a-zA-Z0-9])pathoma(?![a-zA-Z0-9])', 'P@thoma'),
+    (r'(?i)(?<![a-zA-Z0-9])sketchy(?![a-zA-Z0-9])', 'Sk3tchy'),
+    (r'(?i)(?<![a-zA-Z0-9])ninja[ \t_\-\.]*nerd(?![a-zA-Z0-9])', 'N!nja N3rd'),
+    (r'(?i)(?<![a-zA-Z0-9])dr[ \t_\-\.]*najeeb(?![a-zA-Z0-9])', 'Dr N@jeeb'),
+    (r'(?i)(?<![a-zA-Z0-9])e[ \t_\-\.]*gurukul(?![a-zA-Z0-9])', 'E-Guruk@l'),
+]
+
+def apply_anti_dmca_obfuscation(text: Optional[str]) -> str:
+    """
+    Applies leet-speak obfuscation to sensitive medical brand names
+    across captions, titles, filenames, and forum topic names
+    to prevent automated copyright bot/crawler keyword detection.
+    """
+    if not text:
+        return ""
+    res = str(text)
+    for pattern, repl in ANTI_DMCA_BRAND_MATRIX:
+        res = re.sub(pattern, repl, res)
+    return res
 
 def clean_cloned_caption(
     raw_text: Optional[str],
@@ -173,14 +204,31 @@ def clean_cloned_caption(
     """
     Cleans promotional watermarks, third-party handles, promo links,
     strip_words.txt rules, formats proper 'Title: ...' and adds the
-    Kind Doctor study signature.
+    Kind Doctor study signature, with built-in Anti-DMCA Leet-Speak protection.
     """
     if not raw_text:
         text = ""
     else:
         text = raw_text.strip()
     
-    # 1. Load dynamic strip_words.txt rules
+    # 1. Remove promotional markdown links first: Join [Text](URL) For more / [Text](URL)
+    text = re.sub(r'(?i)(?:join\s+)?\[[^\]]*\]\([^\)]*\)(?:\s*(?:for\s+more|for\s+all|now))?', '', text)
+
+    # 2. Remove Google search redirects, protocol-relative URLs, and malformed url chaining
+    text = re.sub(r'(?i)(?:https?:)?//(?:www\.)?google\.[a-z.]+/url\?[^\s\"\'<>]+', '', text)
+    text = re.sub(r'(?i)(?:\)+|\]+)\s*:?//[^\s\"\'<>]+', '', text)
+    text = re.sub(r'(?i)(?:https?:)?//(?:www\.)?(?:google\.[a-z.]+|bit\.ly|tinyurl\.com|t\.co|medicalverse\.in)[^\s\"\'<>]*', '', text)
+    text = re.sub(r'(?i)(?:https?:)?//[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s\"\'<>]*)?', '', text)
+
+    # 3. Remove third-party invite/telegram links
+    text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?:joinchat/|\+)[a-zA-Z0-9_-]+', '', text)
+    text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?!c/|KindDoc)[a-zA-Z0-9_]{4,32}(?:/\d+)?', '', text)
+
+    # 4. Remove third-party @bot and @channel handles (except bot's own brand)
+    # Using negative lookbehind (?<![a-zA-Z0-9]) to ensure we never touch embedded leet-speak like M@rr0w or D@MS
+    text = re.sub(r'(?i)(?<![a-zA-Z0-9])@(?!Kinddoctor4u|KindDoc_bot|Ammitrajput1)[a-zA-Z0-9_]{4,32}\b', '', text)
+
+    # 5. Load dynamic strip_words.txt rules
     strip_file = ROOT_DIR / "strip_words.txt"
     if strip_file.exists():
         try:
@@ -198,22 +246,6 @@ def clean_cloned_caption(
                     text = re.sub(re.escape(rule), "", text, flags=re.IGNORECASE)
         except Exception as ex_strip:
             logger.debug(f"Strip words load skipped: {ex_strip}")
-
-    # 2. Remove third-party @bot and @channel handles (except bot's own brand)
-    text = re.sub(r'(?i)@(?!Kinddoctor4u|KindDoc_bot|Ammitrajput1)[a-zA-Z0-9_]{4,32}\b', '', text)
-    
-    # 3. Remove promotional markdown links: Join [Text](URL) For more / [Text](URL)
-    text = re.sub(r'(?i)(?:join\s+)?\[[^\]]*\]\([^\)]*\)(?:\s*(?:for\s+more|for\s+all|now))?', '', text)
-
-    # 4. Remove Google search redirects, protocol-relative URLs, and malformed url chaining
-    text = re.sub(r'(?i)(?:https?:)?//(?:www\.)?google\.[a-z.]+/url\?[^\s\)\"\'>]+', '', text)
-    text = re.sub(r'(?i)(?:\)+|\]+)\s*:?//[^\s\)\"\'>]+', '', text)
-    text = re.sub(r'(?i)(?:https?:)?//(?:www\.)?(?:google\.[a-z.]+|bit\.ly|tinyurl\.com|t\.co|medicalverse\.in)[^\s\)\"\'>]*', '', text)
-    text = re.sub(r'(?i)(?:https?:)?//[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s\)\"\'>]*)?', '', text)
-
-    # 5. Remove third-party invite/telegram links
-    text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?:joinchat/|\+)[a-zA-Z0-9_-]+', '', text)
-    text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?!c/|KindDoc)[a-zA-Z0-9_]{4,32}(?:/\d+)?', '', text)
     
     # 6. Remove common watermark brackets & stamps: (SS 6 @AnandxBotss), (_wm), [By @xyz]
     text = re.sub(r'(?i)\([^\)]*(?:@|bot|share|join|_wm|watermark|medical)[^\)]*\)', '', text)
@@ -221,7 +253,17 @@ def clean_cloned_caption(
     text = re.sub(r'(?i)\b(?:Uploaded by|Shared by|Join channel|For more lectures|Official channel|Join now|Join Medical Verse|Medical Verse)[:\s]+[^\n]*', '', text)
     text = re.sub(r'(?i)\b(?:Medical Verse|Medicalverse)\b', '', text)
     
-    # 5. Clean up multiple empty lines & whitespace
+    # 7. Apply Permanent Anti-DMCA Brand Obfuscation (Leet-Speak Matrix) on clean educational content
+    text = apply_anti_dmca_obfuscation(text)
+    
+    # 8. Clean up stray punctuation lines, stray brackets & whitespace
+    valid_lines = []
+    for line in text.splitlines():
+        s = line.strip()
+        if re.match(r"^[\s\.\-_*~•:;|💎📇✦★#\(\)\[\]\{\}\\\/]+$", s):
+            continue
+        valid_lines.append(line)
+    text = "\n".join(valid_lines)
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r'[ \t]{2,}', ' ', text).strip()
 
@@ -231,7 +273,7 @@ def clean_cloned_caption(
         (text.isupper() and len(text) < 60 and "\n" not in text)
     )
     if is_header_banner:
-        return text
+        return apply_anti_dmca_obfuscation(text)
 
     # Extract or build Title
     title_val = ""
@@ -257,6 +299,7 @@ def clean_cloned_caption(
     if title_val:
         title_val = re.sub(r'(?i)^[🎬📄📁🎥\s]*(?:title\s*[:\-\s]*)+', '', title_val).strip()
         title_val = re.sub(r'(?i)(\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk|webm|flv|m4v|opus|wav|ogg|iso|7z))+\s*$', '', title_val).strip()
+        title_val = apply_anti_dmca_obfuscation(title_val)
 
     formatted_parts = []
     if title_val:
@@ -268,6 +311,7 @@ def clean_cloned_caption(
         body_clean = re.sub(r'(?i)^[🎬📄📁🎥\s]*(?:title\s*[:\-\s]*)+', '', body_clean).strip()
         # Clean any accidental duplicate extensions inside body
         body_clean = re.sub(r'(?i)(\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk|webm|flv|m4v|opus|wav|ogg|iso|7z)){2,}', r'\1', body_clean)
+        body_clean = apply_anti_dmca_obfuscation(body_clean)
         if body_clean:
             formatted_parts.append(body_clean)
 
@@ -277,6 +321,7 @@ def clean_cloned_caption(
         formatted_parts.append("📚 **Kind Doctor & Team**\n💬 Group Study Help 😉")
 
     res_cap = "\n\n".join(p for p in formatted_parts if p).strip()
+    res_cap = apply_anti_dmca_obfuscation(res_cap)
     # Markdown AST Balancer & Artifact Cleaner (10/10 Gold Standard Polish)
     res_cap = re.sub(r"\*\*\s*\*\*", "", res_cap)
     res_cap = re.sub(r"`\s*`", "", res_cap)
@@ -302,7 +347,7 @@ async def get_or_create_target_topic(
     Handles Telegram Bot API rate limits (HTTP 429) & MTProto FloodWait with exponential backoff.
     Returns target message_thread_id (topic_id).
     """
-    clean_title = (topic_name or "General Topic").strip()
+    clean_title = apply_anti_dmca_obfuscation((topic_name or "General Topic").strip())
     if len(clean_title) > 120:
         clean_title = clean_title[:117] + "..."
 
@@ -711,7 +756,15 @@ class DeepClonerEngine:
                                 ext = ""
                                 if orig_filename and "." in orig_filename:
                                     ext = "." + orig_filename.rsplit(".", 1)[-1]
-                                safe_name = orig_filename or f"study_material_{msg.id}{ext or '.bin'}"
+                                safe_name = apply_anti_dmca_obfuscation(orig_filename or f"study_material_{msg.id}{ext or '.bin'}")
+                                clean_doc_attrs = []
+                                if doc_attrs:
+                                    for attr in doc_attrs:
+                                        if hasattr(attr, 'file_name') and attr.file_name:
+                                            attr.file_name = apply_anti_dmca_obfuscation(attr.file_name)
+                                        clean_doc_attrs.append(attr)
+                                else:
+                                    clean_doc_attrs = None
                                 temp_dir = Path(tempfile.gettempdir()) / "kindsync_clone_cache"
                                 temp_dir.mkdir(parents=True, exist_ok=True)
                                 tmp_path = temp_dir / safe_name
@@ -777,7 +830,7 @@ class DeepClonerEngine:
                                                 file=uploaded_handle,
                                                 caption=cleaned_caption,
                                                 thumb=thumb_to_attach,
-                                                attributes=doc_attrs,
+                                                attributes=clean_doc_attrs,
                                                 reply_to=reply_hdr,
                                             )
                                         except Exception as fe_up:
@@ -787,7 +840,7 @@ class DeepClonerEngine:
                                                 file=str(dl_res),
                                                 caption=cleaned_caption,
                                                 thumb=thumb_to_attach,
-                                                attributes=doc_attrs,
+                                                attributes=clean_doc_attrs,
                                                 reply_to=reply_hdr,
                                                 part_size_kb=512,
                                                 progress_callback=_make_stream_cb("⬆️ Uploading")

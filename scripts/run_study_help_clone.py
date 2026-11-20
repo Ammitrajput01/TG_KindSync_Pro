@@ -45,6 +45,7 @@ from devi.operator.deep_cloner import (
     async_update_clone_job_progress,
     get_or_create_target_topic,
     clean_cloned_caption,
+    apply_anti_dmca_obfuscation,
     _safe_resolve_entity,
     _job_cancel_flags,
     _job_pause_flags,
@@ -66,8 +67,8 @@ logging.basicConfig(
 logger = logging.getLogger("StudyHelpCloner")
 
 # Configuration
-SOURCE_CHAT_ID = -1003912970546
-TARGET_CHAT_ID = -1004467980132
+SOURCE_CHAT_ID = -1004313086843  # Mickey Bhaai Backup ❤️
+TARGET_CHAT_ID = -1004467980132  # Study Help 2.0 😉
 ADMIN_USER_ID = 1553619403
 MISSION_CONTROL_CHAT = -1003942399840
 CLONER_TOPIC_ID = 9
@@ -220,19 +221,21 @@ async def main():
     # Natural curriculum sort by topic id
     discovered_topics.sort(key=lambda x: x[0])
     total_topics = len(discovered_topics)
-    logger.info(f"✅ Discovered {total_topics} topics in Study Help.")
+    logger.info(f"✅ Discovered {total_topics} topics in Mickey Bhaai Backup.")
 
     init_card = (
-        f"🚀 <b>STUDY HELP ➔ STUDY HELP 2.0 DIRECT CLONE LAUNCHED</b> 🩺\n"
+        f"🚀 <b>MICKEY BHAAI BACKUP ➔ STUDY HELP 2.0 CLONE LAUNCHED</b> 🩺\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📂 <b>Source Group:</b> <code>Study Help 😉</code> ({SOURCE_CHAT_ID})\n"
+        f"📂 <b>Source Group:</b> <code>Mickey Bhaai Backup ❤️</code> ({SOURCE_CHAT_ID})\n"
         f"🎯 <b>Target Group:</b> <code>Study Help 2.0 😉</code> ({TARGET_CHAT_ID})\n"
         f"📑 <b>Total Discovered Topics:</b> <b>{total_topics}</b>\n"
-        f"⚡ <b>Mode:</b> Direct Tier-1 Fast Forward (0.15s / msg)\n"
+        f"⚡ <b>Mode:</b> Bot API copyMessage + Anti-DMCA Leet-Speak\n"
         f"🖼️ <b>Thumbnails:</b> 100% Original Preserved\n"
-        f"✨ <b>Captions:</b> Cleaned of Third-Party Promo & Links\n"
+        f"✨ <b>Captions:</b> Cleaned of Medical Verse & Third-Party Promo\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👑 <b>Admin:</b> @Kinddoctor4u | @Ammitrajput1\n"
+        f"🕒 <b>Started:</b> <code>{datetime.now().strftime('%A, %d %B %Y | %I:%M %p')}</code>"
+    )
         f"🕒 <b>Started:</b> <code>{datetime.now().strftime('%A, %d %B %Y | %I:%M %p')}</code>"
     )
     await send_telemetry_card(user_client, init_card)

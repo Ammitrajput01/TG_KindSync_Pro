@@ -17,3 +17,20 @@ def test_clean_google_redirects_and_promo_links():
     assert "Title: 01. General Anatomy Introduction" in cleaned
     assert "Kind Doctor & Team" in cleaned
 
+
+def test_clean_medical_verse_exact_user_sample():
+    raw = (
+        "Join [Medical Verse](https://t.me/verse_medical) For more\n"
+        "[medicalverse.in](https://www.google.com/url?sa=t&source=web&rct=j&opi=97423376&url=https://medicalverse.in/&ved=2ahUKEwiclv3k06iRAxUTlJUCHczQM0UQFnoECA4QAQ&usg=AOvVaw1mgHhHFpHrOVr-HIFqBTgP)\n\n"
+        "Title: Pharmacology CVS Lecture 01\n"
+        "Essential concepts in beta blockers."
+    )
+    cleaned = clean_cloned_caption(raw, is_media=True)
+    assert "Medical Verse" not in cleaned
+    assert "verse_medical" not in cleaned
+    assert "medicalverse" not in cleaned
+    assert "google.com" not in cleaned
+    assert "Title: Pharmacology CVS Lecture 01" in cleaned
+    assert "Essential concepts in beta blockers." in cleaned
+    assert "Kind Doctor & Team" in cleaned
+
