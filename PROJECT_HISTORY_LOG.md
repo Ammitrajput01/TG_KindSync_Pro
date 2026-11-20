@@ -2,6 +2,38 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Friday, 20 November 2026 | 11:35 PM IST
+
+### 89. Autonomous High-Speed Direct Group Cloner: Study Help to Study Help 2.0 Migration
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"from old banned study help to new study help 2.0 krna hai"*
+  - *"and kya aap sb kuch sudy help ke poorane group se cone kr skte ho kya clen kr ke direct forward not thumbnal change fast wala seedha clone kinddoc bot ko use kr ke please ?"*
+  - *"hnji forwardable content hai bss start kr do"*
+* **Architectural Execution & Verified Pipeline**:
+  1. **Source & Destination Target Mapping**:
+     - Source Supergroup: `Study Help 😉` (ID: `-1003912970546`). Discovered **101 forum topics**.
+     - Target Supergroup: `Study Help 2.0 😉` (ID: `-1004467980132`).
+     - Session Auth: Dr. Amit Singh's MTProto Session (`1553619403`) & `@KindDoc_bot` admin rights.
+  2. **High-Speed Direct Tier-1 Cloud Pointer Engine**:
+     - Preserves 100% original video/PDF thumbnails and metadata (`THUMB_MODE='original'`).
+     - Zero download/re-upload: Leverages server-side cloud pointer copying (~0.15s latency per message).
+     - Auto-sanitizes captions: Strips old third-party handles, external invite links, and watermarks, standardizing onto `Kind Doctor & Team` + `Study Help 2.0` formatting.
+     - Automatically skips student chatterbox / spam topics (e.g. `Chit Chat Chatter Box 🎤`, `Add Member`).
+  3. **Telethon Forum Topic Message Dispatch Bug Fix (`devi/operator/deep_cloner.py`)**:
+     - *Issue*: Telethon's `send_file` and `send_message` methods threw `Invalid message type: <class 'telethon.tl.types.InputReplyToMessage'>` when passing a raw MTProto `InputReplyToMessage` object.
+     - *Fix*: Standardized `reply_to = dest_thread` where `dest_thread` is an integer topic ID. Telethon internally handles forum topic routing seamlessly.
+  4. **Active Deployment & Telemetry**:
+     - Authored and deployed `scripts/run_study_help_clone.py`.
+     - Launched 24/7 background worker inside Oracle VPS tmux session `cloner_studyhelp`.
+     - Real-time milestone dispatches routed to Mission Control Supergroup (`Kind Doctor HQ`, Topic 9: `🚀 Cloner & System Telemetry`) and Dr. Amit's PM.
+* **Affected Files**:
+  - `scripts/run_study_help_clone.py`
+  - `devi/operator/deep_cloner.py`
+  - `.env`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Friday, 20 November 2026 | 11:10 PM IST
 
 ### 88. Comprehensive Bug Fixes & Architectural Hardening: Topic Reply Routing, Cloner Topic Creation, and Automated Daily Joins Reporter
