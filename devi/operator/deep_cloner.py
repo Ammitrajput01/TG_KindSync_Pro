@@ -9,6 +9,7 @@ watermark/promo stripping, and SQLite WAL checkpoint resilience.
 """
 
 import os
+import sys
 import re
 import html
 import json
@@ -395,10 +396,13 @@ async def get_or_create_target_topic(
                     random_id=generate_random_long()
                 ))
                 # Extract topic_id from created action message
-                created_msg_id = getattr(res, 'id', None) or getattr(res, 'pts', None) or 1
+                created_msg_id = 1
                 for update in getattr(res, 'updates', []):
-                    if hasattr(update, 'message') and hasattr(update.message, 'id'):
+                    if hasattr(update, 'message') and hasattr(update.message, 'id') and getattr(update.message, 'id', 0) > 1:
                         created_msg_id = update.message.id
+                        break
+                    elif hasattr(update, 'id') and getattr(update, 'id', 0) > 1:
+                        created_msg_id = update.id
                         break
                 if created_msg_id > 1:
                     with sqlite3.connect(DB_PATH, timeout=20.0) as conn:
@@ -624,6 +628,8 @@ class DeepClonerEngine:
                             is_media=bool(msg.media)
                         )
                         dest_thread = target_topic_id if target_topic_id > 1 else None
+                        from telethon.tl.types import InputReplyToMessage
+                        reply_hdr = InputReplyToMessage(reply_to_msg_id=dest_thread, top_msg_id=dest_thread) if dest_thread else None
 
                         if msg.media:
                             thumb_to_attach = None
@@ -640,7 +646,7 @@ class DeepClonerEngine:
                                     tgt_peer,
                                     file=msg.media,
                                     caption=cleaned_caption,
-                                    reply_to=dest_thread
+                                    reply_to=reply_hdr
                                 )
                                 tier1_success = True
                             except Exception as ex_fwd:
@@ -700,24 +706,24 @@ class DeepClonerEngine:
                                 dl_start_t = asyncio.get_event_loop().time()
                                 last_cb_t = [0.0]
 
-                                def _make_stream_cb(phase_name: str):
+                                def _make_stream_cb(phase_name: str, _start_t=dl_start_t, _last_cb=last_cb_t, _cloned=cloned_count, _total=total_count, _fname=safe_name, _top=topic_title):
                                     def _inner_cb(cur_b, tot_b):
                                         n_t = asyncio.get_event_loop().time()
-                                        if n_t - last_cb_t[0] < 2.5 and cur_b < tot_b:
+                                        if n_t - _last_cb[0] < 2.5 and cur_b < tot_b:
                                             return
-                                        last_cb_t[0] = n_t
+                                        _last_cb[0] = n_t
                                         if progress_callback:
                                             with suppress(Exception):
                                                 asyncio.create_task(progress_callback(
-                                                    top_name=topic_title,
-                                                    cur_m=cloned_count + 1,
-                                                    tot_m=total_count,
-                                                    top_cloned=cloned_count,
-                                                    file_name=safe_name,
+                                                    top_name=_top,
+                                                    cur_m=_cloned + 1,
+                                                    tot_m=_total,
+                                                    top_cloned=_cloned,
+                                                    file_name=_fname,
                                                     cur_bytes=cur_b,
                                                     tot_bytes=tot_b,
                                                     phase=phase_name,
-                                                    start_t=dl_start_t
+                                                    start_t=_start_t
                                                 ))
                                     return _inner_cb
 
@@ -759,7 +765,7 @@ class DeepClonerEngine:
                                                 caption=cleaned_caption,
                                                 thumb=thumb_to_attach,
                                                 attributes=doc_attrs,
-                                                reply_to=dest_thread,
+                                                reply_to=reply_hdr,
                                             )
                                         except Exception as fe_up:
                                             logger.warning("Fast upload encountered %s, falling back to standard send_file", fe_up)
@@ -769,7 +775,7 @@ class DeepClonerEngine:
                                                 caption=cleaned_caption,
                                                 thumb=thumb_to_attach,
                                                 attributes=doc_attrs,
-                                                reply_to=dest_thread,
+                                                reply_to=reply_hdr,
                                                 part_size_kb=512,
                                                 progress_callback=_make_stream_cb("⬆️ Uploading")
                                             )
@@ -789,7 +795,7 @@ class DeepClonerEngine:
                             await user_client.send_message(
                                 tgt_peer,
                                 cleaned_caption,
-                                reply_to=dest_thread
+                                reply_to=reply_hdr
                             )
                         
                         cloned_count += 1
@@ -926,7 +932,8 @@ class DeepClonerEngine:
             )
 
             # Define topic-level live progress callback
-            async def _topic_prog_cb(top_name, cur_m, tot_m, top_cloned, file_name=None, cur_bytes=0, tot_bytes=0, phase="⚡ Processing", start_t=None):
+            async def _topic_prog_cb(top_name, cur_m, tot_m, top_cloned, file_name=None, cur_bytes=0, tot_bytes=0, phase="⚡ Processing", start_t=None,
+                                     _t_idx=topic_idx, _src_title=src_top_title, _grand_cloned=grand_total_cloned):
                 if progress_updater:
                     pct = round((cur_m / max(1, tot_m)) * 100, 1)
                     file_extra = ""
@@ -949,10 +956,10 @@ class DeepClonerEngine:
                     await progress_updater(
                         f"🚀 <b>Deep Cloner in Progress (Job #{job_id})</b> 🩺\n"
                         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"📂 <b>Topic ({topic_idx}/{total_topics}):</b> <b>{html.escape(src_top_title)}</b>\n"
+                        f"📂 <b>Topic ({_t_idx}/{total_topics}):</b> <b>{html.escape(_src_title)}</b>\n"
                         f"{file_extra}"
                         f"📊 <b>Topic Messages:</b> <code>{cur_m}</code> / <code>{tot_m}</code> ({pct}%)\n"
-                        f"💎 <b>Total Cloned:</b> <code>{grand_total_cloned + top_cloned}</code> items 🚀\n"
+                        f"💎 <b>Total Cloned:</b> <code>{_grand_cloned + top_cloned}</code> items 🚀\n"
                         f"🛡️ <b>Clean Status:</b> ❌ Zero Tags | ✨ Stripped Watermarks\n\n"
                         f"<i>(Aap jab chahe <code>/stopclone {job_id}</code> bhej kar pause/stop kar sakte hain).</i>"
                     )

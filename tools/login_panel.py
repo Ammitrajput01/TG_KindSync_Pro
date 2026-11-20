@@ -20,6 +20,7 @@ import base64
 import asyncio
 import logging
 import webbrowser
+from contextlib import suppress
 from pathlib import Path
 from typing import Optional
 

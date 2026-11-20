@@ -29,6 +29,7 @@ import time
 from pathlib import Path
 from typing import Optional, List, AsyncGenerator, Union, BinaryIO, Tuple
 
+import telethon
 from telethon import utils, helpers, TelegramClient
 from telethon.crypto import AuthKey
 from telethon.network import MTProtoSender

@@ -22,6 +22,7 @@ import re
 import time
 import json
 import sqlite3
+import platform
 import asyncio
 from pathlib import Path
 from datetime import datetime, timezone
@@ -819,7 +820,6 @@ class TelegramReporter:
                 snap_path.unlink()
 
             # 2. Safely wipe forwarding tables in history_core.sqlite
-            import sqlite3
             with sqlite3.connect(str(DB_FILE), timeout=15) as conn:
                 conn.execute("DELETE FROM forwarded")
                 conn.execute("DELETE FROM source_watermarks")
@@ -1039,12 +1039,12 @@ async def main():
             today_str = now_dt.strftime("%Y-%m-%d")
             if now_dt.hour == 9 and 0 <= now_dt.minute < 15 and last_morning_date != today_str:
                 last_morning_date = today_str
-                async def _dispatch_morning():
+                async def _dispatch_morning(_stats=db_stats):
                     try:
                         res = await RESEARCHER.research_topic("Clinical Medicine Pearls, High-Yield Cardiology & High-Speed Telegram Streaming")
                         topic = res.get("topic") or "Universal MTProto 512KB Parallel Acceleration & Multi-Model Sovereign Intelligence"
                         summary = res.get("summary") or "• Integrated unconstrained universal AI vitality across 12 free providers.\n• Zero forward tags, pristine study captions, and automatic 16:9 thumbnail attachments active."
-                        card = ADVISOR.build_good_morning_digest(STATE, db_stats, topic, summary)
+                        card = ADVISOR.build_good_morning_digest(STATE, _stats, topic, summary)
                         await reporter.send_report(card)
                         await reporter.send_database_backup()
                         STATE.add_event("[bold green]🌅 9:00 AM Good Morning Digest & DB Backup dispatched![/]")
@@ -1055,12 +1055,12 @@ async def main():
             # Check 9:00 PM Night Briefing & DB Backup
             if now_dt.hour == 21 and 0 <= now_dt.minute < 15 and last_night_date != today_str:
                 last_night_date = today_str
-                async def _dispatch_night():
+                async def _dispatch_night(_stats=db_stats):
                     try:
                         res = await RESEARCHER.research_topic("Autonomous AI Evolution, SaMD Compliance & Overnight Pipeline Maintenance")
                         topic = res.get("topic") or "Advanced Clinical Medicine Insights, SaMD Compliance & Autonomous Resilience"
                         summary = res.get("summary") or "• Exploring multi-agent supervisor protocols & sub-second streaming buffers.\n• Full database snapshot attached below for complete peace of mind."
-                        card = ADVISOR.build_good_night_digest(STATE, db_stats, topic, summary)
+                        card = ADVISOR.build_good_night_digest(STATE, _stats, topic, summary)
                         await reporter.send_report(card)
                         await reporter.send_database_backup()
                         STATE.add_event("[bold green]🌙 9:00 PM Good Night Digest & DB Backup dispatched![/]")
@@ -1073,13 +1073,13 @@ async def main():
             if now - STATE.last_daily_report >= TWELVE_HOURS_SEC:
                 STATE.last_daily_report = now
                 
-                async def _dispatch_12h_cycle():
+                async def _dispatch_12h_cycle(_stats=db_stats):
                     try:
                         study_res = await RESEARCHER.research_topic("Clinical Medicine Pearls, High-Yield Pharmacology & Streaming Optimization")
                         study_topic = study_res.get("topic") or "Clinical Pharmacology: SGLT2i Cardioprotective Mechanisms in Heart Failure"
                         study_summary = study_res.get("summary") or "• SGLT2i enhances myocardial energetics and reduces preload/afterload.\n• GDMT 4-pillar foundational therapy."
                         
-                        digest_card = ADVISOR.build_12h_evolution_digest(STATE, db_stats, study_topic, study_summary)
+                        digest_card = ADVISOR.build_12h_evolution_digest(STATE, _stats, study_topic, study_summary)
                         await reporter.send_report(digest_card)
                         await reporter.send_database_backup()
                         STATE.add_event("[bold green]📢 12h Autonomous Evolution Digest & Cloud DB Backup dispatched![/]")

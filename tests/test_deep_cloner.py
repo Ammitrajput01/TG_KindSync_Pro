@@ -110,7 +110,7 @@ def test_clone_status_card_and_reset_flow():
         conn.commit()
 
     text_empty, kb_empty = bot._build_clone_status_card_data(admin_id=999888)
-    assert "No active clone jobs running currently" in text_empty
+    assert "No active in-bot clone jobs running currently" in text_empty
     assert any("act_cloner_reset" in btn["callback_data"] for row in kb_empty["inline_keyboard"] for btn in row)
 
     # 2. Status with active jobs
@@ -153,7 +153,7 @@ def test_user_isolation_status_card():
     # User B checks status -> MUST NOT see Job A!
     text_b, _ = bot._build_clone_status_card_data(admin_id=user_b)
     assert f"Job #{job_a}" not in text_b
-    assert "No active clone jobs running currently" in text_b
+    assert "No active in-bot clone jobs running currently" in text_b
 
     # Clean up
     with sqlite3.connect(DB_PATH) as conn:

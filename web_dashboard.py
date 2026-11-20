@@ -22,6 +22,7 @@ import os
 import sys
 import json
 import time
+import logging
 import socket
 import asyncio
 try:
@@ -56,6 +57,7 @@ except ImportError:
     web = None
     HAS_AIOHTTP = False
 
+logger = logging.getLogger("web_dashboard")
 BASE_DIR = Path(__file__).resolve().parent
 DLQ_FILE = BASE_DIR / "dead_letter.jsonl"
 DISMISSED_INSIGHTS_FILE = BASE_DIR / "research_reports" / "dismissed_insights.json"

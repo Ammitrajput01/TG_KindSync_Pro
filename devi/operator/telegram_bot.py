@@ -491,7 +491,7 @@ class DeviTelegramBot:
                         welcome_enabled INTEGER DEFAULT 1,
                         join_track_enabled INTEGER DEFAULT 1,
                         rules_text TEXT,
-                        welcome_timeout INTEGER DEFAULT 90,
+                        welcome_timeout INTEGER DEFAULT 86400,
                         language TEXT DEFAULT 'en'
                     )
                 """)
@@ -1002,7 +1002,7 @@ class DeviTelegramBot:
             "join_track_enabled": 1,
             "join_track_dest": "pm",
             "rules_text": None,
-            "welcome_timeout": 60,
+            "welcome_timeout": 86400,  # 24 Hours / 1 Day Default TTL
             "language": "en"
         }
         try:
@@ -1775,6 +1775,9 @@ class DeviTelegramBot:
                 except Exception:
                     pass
 
+            # Auto-purge sweep: ensures expired welcome cards (>24h) are cleaned even across bot restarts
+            self.create_tracked_task(self._periodic_welcome_purge_loop(session))
+
             while self.is_running:
                 try:
                     url = f"https://api.telegram.org/bot{self.token}/getUpdates"
@@ -2262,10 +2265,45 @@ class DeviTelegramBot:
         except Exception as e:
             logger.warning(f"Error in _handle_my_chat_member: {e}")
 
+    def _get_highlight_watchlist(self) -> dict:
+        """Loads chronological 50 highlight members who joined immediately before the copyright strike."""
+        if hasattr(self, "_watchlist_cache") and self._watchlist_cache:
+            return self._watchlist_cache
+
+        wl = {}
+        try:
+            cand_files = [
+                BASE_PROJECT_DIR / "exports" / "study_help_blacklisted_last50_ACCURATE_Friday_20-November-2026_12-10PM.json",
+            ]
+            for f in (BASE_PROJECT_DIR / "exports").glob("study_help_blacklisted_last50_ACCURATE_*.json"):
+                if f not in cand_files:
+                    cand_files.append(f)
+
+            for cand in cand_files:
+                if cand.exists():
+                    with open(cand, "r", encoding="utf-8") as jf:
+                        data = json.load(jf)
+                        for m in data.get("members", []):
+                            uid = m.get("id")
+                            if uid:
+                                wl[int(uid)] = {
+                                    "id": int(uid),
+                                    "username": m.get("username", ""),
+                                    "name": f"{m.get('first_name', '')} {m.get('last_name', '')}".strip(),
+                                    "join_date": m.get("join_date", "")
+                                }
+                    if wl:
+                        break
+        except Exception as e:
+            logger.debug(f"Watchlist load skipped: {e}")
+
+        self._watchlist_cache = wl
+        return wl
+
     async def _handle_chat_join_request(self, session: aiohttp.ClientSession, join_req: dict):
         """
         Auto-intercepts pending chat join requests, immediately runs SangMata + 30-platform OSINT radar,
-        and dispatches an actionable 1-click Approval/Decline alert to Master Admins.
+        checks the 50 Highlight Watchlist, and dispatches an actionable 1-click Approval/Decline/Screening alert.
         """
         try:
             chat = join_req.get("chat", {})
@@ -2281,6 +2319,11 @@ class DeviTelegramBot:
             bio = join_req.get("bio") or ""
 
             logger.info(f"🚨 [JOIN-REQUEST] User {full_name} (@{username}, ID: {user_id}) requested to join {chat_title} ({chat_id})")
+
+            # Check 50 Highlight Watchlist
+            wl = self._get_highlight_watchlist()
+            is_watchlist = user_id in wl
+            wl_info = wl.get(user_id, {})
 
             # 1. Track dossier & run OSINT scan
             dossier = self._track_user_dossier(user)
@@ -2317,7 +2360,18 @@ class DeviTelegramBot:
 
             bio_section = f"\n📝 <b>Applicant Bio:</b> <i>{html.escape(bio)}</i>" if bio else ""
 
+            watchlist_banner = ""
+            if is_watchlist:
+                j_date = wl_info.get("join_date", "19-Nov-2026")
+                watchlist_banner = (
+                    f"⚠️⚠️ <b>WATCHLIST RADAR: HIGHLIGHT SUSPECT DETECTED!</b> ⚠️⚠️\n"
+                    f"• <b>Flag:</b> Joined former Study Help right before copyright struck!\n"
+                    f"• <b>Prior Join Timestamp:</b> <code>{html.escape(str(j_date))}</code>\n"
+                    f"• <b>Status:</b> <b>ON HOLD FOR SCREENING</b> (Verify before approval)\n\n"
+                )
+
             admin_text = (
+                f"{watchlist_banner}"
                 f"🚨 <b>NEW PENDING JOIN REQUEST DETECTED</b>\n"
                 f"👥 <b>Target Group:</b> <code>{safe_grp_title}</code> (<code>{chat_id}</code>)\n"
                 f"👤 <b>Applicant:</b> {user_tag} (<code>{user_id}</code>){bio_section}\n\n"
@@ -2329,6 +2383,9 @@ class DeviTelegramBot:
                     [
                         {"text": "✅ Approve Request", "callback_data": f"act_appr_join_{chat_id}_{user_id}"},
                         {"text": "❌ Decline Request", "callback_data": f"act_decl_join_{chat_id}_{user_id}"}
+                    ],
+                    [
+                        {"text": "❓ Send Screening Verification DM", "callback_data": f"ask_screen_{chat_id}_{user_id}"}
                     ],
                     [
                         {"text": "🔍 Deep OSINT Scan", "callback_data": f"osint_user_{user_id}"},
@@ -2424,7 +2481,7 @@ class DeviTelegramBot:
                     if sent_welcome_id:
                         self._log_welcome_message(chat_id, sent_welcome_id)
                         # Auto-delete Welcome Card after TTL seconds if configured
-                        w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
+                        w_timeout = int(g_settings.get("welcome_timeout", 86400) or 0)
                         if w_timeout > 0:
                             self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_welcome_id, w_timeout))
                 
@@ -2451,7 +2508,7 @@ class DeviTelegramBot:
                         sent_sm_id = await self._send_message(
                             session, chat_id, sangmata_card, reply_markup=admin_markup, parse_mode="HTML"
                         )
-                        w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
+                        w_timeout = int(g_settings.get("welcome_timeout", 86400) or 0)
                         if sent_sm_id and w_timeout > 0:
                             self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_sm_id, w_timeout * 2))
 
@@ -2512,7 +2569,7 @@ class DeviTelegramBot:
         g_settings = self._get_group_settings(target_chat_id)
         grp_title = self._get_group_title(target_chat_id)
         w_enabled = bool(g_settings.get("welcome_enabled", 1))
-        w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
+        w_timeout = int(g_settings.get("welcome_timeout", 86400) or 0)
         w_ttl_str = self._format_ttl_display(w_timeout)
 
         j_enabled = bool(g_settings.get("join_track_enabled", 1))
@@ -2605,7 +2662,7 @@ class DeviTelegramBot:
         grp_title = self._get_group_title(target_chat_id)
 
         w_enabled = bool(g_settings.get("welcome_enabled", 1))
-        w_timeout = int(g_settings.get("welcome_timeout", 60) or 0)
+        w_timeout = int(g_settings.get("welcome_timeout", 86400) or 0)
         w_ttl_str = self._format_ttl_display(w_timeout)
 
         j_enabled = bool(g_settings.get("join_track_enabled", 1))
@@ -2694,6 +2751,34 @@ class DeviTelegramBot:
         """Asynchronously waits for delay_seconds and deletes the message to keep group clean."""
         await asyncio.sleep(delay_seconds)
         await self._delete_message(session, chat_id, message_id)
+
+    async def _periodic_welcome_purge_loop(self, session: aiohttp.ClientSession):
+        """
+        Background maintenance loop:
+        Sweeps every 30 minutes to auto-delete tracked welcome messages older than 24 hours (86400s),
+        ensuring guaranteed cleanup even across bot/server restarts.
+        """
+        while self.is_running:
+            try:
+                with get_db_conn() as conn:
+                    rows = conn.execute(
+                        "SELECT id, chat_id, message_id FROM group_welcome_messages WHERE created_at <= datetime('now', '-86400 seconds')"
+                    ).fetchall()
+
+                if rows:
+                    for row_id, c_id, m_id in rows:
+                        try:
+                            await self._delete_message(session, c_id, m_id)
+                        except Exception:
+                            pass
+                        try:
+                            with get_db_conn() as conn:
+                                conn.execute("DELETE FROM group_welcome_messages WHERE id = ?", (row_id,))
+                        except Exception:
+                            pass
+            except Exception as e:
+                logger.debug(f"Periodic welcome sweep notice: {e}")
+            await asyncio.sleep(1800)
 
     async def _copy_message(
         self,
@@ -3855,7 +3940,9 @@ class DeviTelegramBot:
         data = cb.get("data", "")
         from_user = cb.get("from", {})
         admin_id = from_user.get("id")
-        chat_id = cb.get("message", {}).get("chat", {}).get("id")
+        cb_msg = cb.get("message", {})
+        cb_from = from_user
+        chat_id = cb_msg.get("chat", {}).get("id")
 
         # 4-Tab Navigation Header Interceptor (Zero-Scroll UI)
         if data.startswith("menu_tab_"):
@@ -4992,6 +5079,40 @@ class DeviTelegramBot:
                         else:
                             err_resp = await resp.text()
                             await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {err_resp[:40]}", "show_alert": True})
+                except Exception as e:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}", "show_alert": True})
+
+        # 3c. Send Screening Verification DM to High-Risk/Watchlist Applicant
+        elif data.startswith("ask_screen_"):
+            raw_target = data[len("ask_screen_"):]
+            if "_" in raw_target:
+                p_chat_id, p_user_id = raw_target.rsplit("_", 1)
+                target_chat_id = int(p_chat_id)
+                target_user_id = int(p_user_id)
+                grp_title = self._get_group_title(target_chat_id) or "Study Help 2.0"
+                screen_msg = (
+                    f"🩺 <b>Study Community Verification Challenge</b>\n\n"
+                    f"Hello! We received your request to join <b>{html.escape(grp_title)}</b>.\n"
+                    f"To protect our study environment from automated copyright scrapers, please reply directly to this message with:\n\n"
+                    f"1. <b>Your Medical College / University Name</b>\n"
+                    f"2. <b>Your Current Academic Year / Batch</b> (e.g. 1st Year, Final Year, Intern, Post-Grad)\n\n"
+                    f"Our admin team will review your reply and approve your access shortly. Thank you for your cooperation! 👨‍⚕️"
+                )
+                try:
+                    async with session.post(
+                        f"https://api.telegram.org/bot{self.token}/sendMessage",
+                        json={"chat_id": target_user_id, "text": screen_msg, "parse_mode": "HTML"},
+                        timeout=10
+                    ) as resp:
+                        if resp.status == 200:
+                            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "✅ Screening question sent to user's DM!", "show_alert": True})
+                            cb_m_id = cb_msg.get("message_id")
+                            if cb_m_id:
+                                cur_t = cb_msg.get("text", "")
+                                notice = f"❓ <b>[SCREENING DM SENT]</b> to User {target_user_id} by Admin @{cb_from.get('username') or cb_from.get('first_name', 'Admin')}\n\n"
+                                await self._edit_message(session, chat_id, cb_m_id, notice + cur_t)
+                        else:
+                            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⚠️ Cannot send DM (User has not started bot or has privacy blocks)", "show_alert": True})
                 except Exception as e:
                     await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}", "show_alert": True})
 
@@ -6610,6 +6731,7 @@ class DeviTelegramBot:
         cmd = parts[0].lower().split("@")[0]
         thread_id = message.get("message_thread_id") if message else None
         reply_to = message.get("reply_to_message") if message else None
+        msg_id = message.get("message_id", 0) if message else 0
         clean_chat_id = str(chat_id).replace("-100", "").replace("-", "").lstrip("@")
 
         # ⚡ O(1) Command Router Fast-Path Dispatch
@@ -8283,13 +8405,14 @@ class DeviTelegramBot:
 
             if len(parts) < 2:
                 curr_s = self._get_group_settings(target_chat_id)
-                curr_ttl = curr_s.get("welcome_timeout", 60)
+                curr_ttl = curr_s.get("welcome_timeout", 86400)
                 txt = (
                     "⏱️ **Welcome Message Auto-Delete (TTL):**\n\n"
-                    f"Current setting: `{curr_ttl} seconds` " + ("(Permanent / No Delete)" if curr_ttl <= 0 else "") + "\n\n"
-                    "Usage: `/welcometimeout <seconds>`\n"
+                    f"Current setting: `{self._format_ttl_display(curr_ttl)}` " + ("(Permanent / No Delete)" if curr_ttl <= 0 else "") + "\n\n"
+                    "Usage: `/welcometimeout <time>`\n"
+                    "• `/welcometimeout 1d` — Auto-delete after 24 hours / 1 day (Default)\n"
+                    "• `/welcometimeout 12h` — Auto-delete after 12 hours\n"
                     "• `/welcometimeout 60` — Auto-delete after 60 seconds (Clean chat)\n"
-                    "• `/welcometimeout 120` — Auto-delete after 2 minutes\n"
                     "• `/welcometimeout 0` — Keep forever (Never delete)"
                 )
                 await self._send_message(session, chat_id, txt, message_thread_id=thread_id)

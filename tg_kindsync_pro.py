@@ -27,6 +27,8 @@ import asyncio
 import logging
 from logging.handlers import RotatingFileHandler
 import sqlite3
+import shutil
+import csv
 import traceback
 import platform
 import socket
@@ -94,7 +96,7 @@ from rich.text import Text
 from rich.align import Align
 from rich.rule import Rule
 from rich import box
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, utils
 from telethon.errors import (
     FloodWaitError, RPCError, ChatForwardsRestrictedError,
     FileReferenceExpiredError, ChatAdminRequiredError, ChannelPrivateError, SessionPasswordNeededError,
@@ -126,6 +128,9 @@ DL_CHUNK_SIZE = 512 * 1024
 UP_CHUNK_SIZE = 512 * 1024
 BIG_FILE_THRESHOLD = 10 * MB
 DB_FILE = "history_core.sqlite"
+
+def get_db_conn(timeout: float = 15.0):
+    return sqlite3.connect(DB_FILE, timeout=timeout)
 LOCK_FILE = "engine.lock"
 DB_BACKUP_DIR = Path("db_backups")
 
@@ -592,6 +597,8 @@ def apply_clean_rules(text: str) -> str:
         if "@" in old_w:
             parts = [re.escape(p.strip()) for p in old_w.split("@")]
             pat = r"\s*@\s*".join(parts)
+        elif old_w.replace(" ", "").isalnum():
+            pat = r"\b" + re.escape(old_w) + r"\b"
         else:
             pat = re.escape(old_w)
         t = re.sub(pat, new_w, t, flags=re.IGNORECASE)
@@ -825,13 +832,26 @@ def make_telegram_link(chat_id, msg_id: int, topic_id = None, username = None) -
 # ============================================================
 # 3.5 SAFE INPUT WRAPPER (NAVIGATION & CRASH PREVENTION)
 # ============================================================
-async def safe_input(prompt_text: str, valid_options: list = None, allow_cancel=True, default_val=None):
+async def safe_input(prompt_text: str, valid_options: list = None, allow_cancel=True, default_val=None, timeout_sec: int = None):
     cancel_hint = " [dim](0 to Cancel/Back)[/]" if allow_cancel else ""
     def_hint = f" [dim](Default: {default_val})[/]" if default_val else ""
-    full_prompt = f"{prompt_text}{def_hint}{cancel_hint}: "
+    timeout_hint = f" [dim](Auto in {timeout_sec}s)[/]" if timeout_sec else ""
+    full_prompt = f"{prompt_text}{def_hint}{timeout_hint}{cancel_hint}: "
     while True:
         try:
-            val = (await asyncio.to_thread(input, Text.from_markup(full_prompt).plain)).strip()
+            if timeout_sec and default_val is not None:
+                try:
+                    val = await asyncio.wait_for(
+                        asyncio.to_thread(input, Text.from_markup(full_prompt).plain),
+                        timeout=timeout_sec
+                    )
+                    val = val.strip()
+                except asyncio.TimeoutError:
+                    console.print(f"\n[bold yellow]⚡ Headless VPS / Auto-Resume Timeout ({timeout_sec}s reached) ➔ Proceeding with default [{default_val}][/]")
+                    return default_val
+            else:
+                val = (await asyncio.to_thread(input, Text.from_markup(full_prompt).plain)).strip()
+
             if not val and default_val is not None:
                 return default_val
             if allow_cancel and val == "0":
@@ -3134,18 +3154,18 @@ class MemoryStreamer:
             uploader = None
             try:
                 # ⚡ FAST MTPROTO MULTI-SOCKET PARALLEL ACCELERATOR (25+ MB/s Wire Speed)
-                async def _get_download_stream():
-                    if size >= 2 * 1024 * 1024:
+                async def _get_download_stream(_m=msg, _s=size):
+                    if _s >= 2 * 1024 * 1024:
                         try:
                             from fast_transfer import ParallelTransferrer
-                            dc_id, input_loc = utils.get_input_location(msg.media)
+                            dc_id, input_loc = utils.get_input_location(_m.media)
                             downloader = ParallelTransferrer(dl_client, dc_id=dc_id)
-                            async for chk in downloader.download(input_loc, file_size=size, part_size_kb=512, connection_count=8):
+                            async for chk in downloader.download(input_loc, file_size=_s, part_size_kb=512, connection_count=8):
                                 yield chk
                             return
                         except Exception as fe:
                             logger.info(f"Fast parallel downloader fallback to iter_download: {fe}")
-                    async for chk in dl_client.iter_download(msg.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=size):
+                    async for chk in dl_client.iter_download(_m.media, request_size=DL_CHUNK_SIZE, chunk_size=DL_CHUNK_SIZE, file_size=_s):
                         yield chk
 
                 stream = _get_download_stream()
@@ -7105,12 +7125,12 @@ async def run_batch_folder_uploader_tool(session_mgr):
                     last_printed_pct = -10
                     upload_start = time.monotonic()
 
-                    def progress_bar(current, total):
+                    def progress_bar(current, total, _start=upload_start):
                         nonlocal last_printed_pct
                         pct = int((current / max(1, total)) * 100)
                         if pct >= last_printed_pct + 25 or pct == 100:
                             last_printed_pct = pct
-                            elapsed = max(0.1, time.monotonic() - upload_start)
+                            elapsed = max(0.1, time.monotonic() - _start)
                             speed_mb = (current / MB) / elapsed
                             spd_obj = format_network_speed(speed_mb)
                             cur_str = f"{current/MB:.1f} MB" if current < GB else f"{current/GB:.2f} GB"
@@ -9773,7 +9793,7 @@ async def run_menu(session_mgr):
                 " [bold cyan][0][/] ⬅️ Return to Main Menu",
                 border_style="green", box=box.ROUNDED
             ))
-            res_c = await safe_input("👉 Press Enter to Resume (or 2 to change speed / 0 to cancel)", default_val="1", allow_cancel=True)
+            res_c = await safe_input("👉 Press Enter to Resume (or 2 to change speed / 0 to cancel)", default_val="1", allow_cancel=True, timeout_sec=10)
             if not res_c or res_c == "0":
                 continue
             elif res_c == "2":
