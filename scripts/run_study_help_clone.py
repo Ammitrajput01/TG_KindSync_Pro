@@ -236,8 +236,6 @@ async def main():
         f"👑 <b>Admin:</b> @Kinddoctor4u | @Ammitrajput1\n"
         f"🕒 <b>Started:</b> <code>{datetime.now().strftime('%A, %d %B %Y | %I:%M %p')}</code>"
     )
-        f"🕒 <b>Started:</b> <code>{datetime.now().strftime('%A, %d %B %Y | %I:%M %p')}</code>"
-    )
     await send_telemetry_card(user_client, init_card)
 
     grand_total_cloned = 0
