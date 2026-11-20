@@ -603,8 +603,10 @@ def apply_clean_rules(text: str) -> str:
     t = str(text)
     
     # 1. Clean markdown promotional links first: e.g. [Text](URL) and Join [Text](URL) For more
-    t = re.sub(r"(?i)(?:join\s+)?\[.*?\]\((?:https?://|www\.|t\.me/)[^\s\)]+\)(?:\s+for\s+more)?", "", t)
-    t = re.sub(r"(?i)(https?://\S+|www\.\S+|t\.me/\S+)", "", t)
+    t = re.sub(r"(?i)(?:join\s+)?\[.*?\]\([^\)]*\)(?:\s+for\s+more)?", "", t)
+    t = re.sub(r"(?i)(?:https?:)?//(?:www\.)?google\.[a-z.]+/url\?[^\s\)\"\'>]+", "", t)
+    t = re.sub(r"(?i)(?:\)+|\]+)\s*:?//[^\s\)\"\'>]+", "", t)
+    t = re.sub(r"(?i)(https?://\S+|www\.\S+|t\.me/\S+|//\S+)", "", t)
     
     # 2. Apply replacements
     for old_w, new_w in replace_words.items():

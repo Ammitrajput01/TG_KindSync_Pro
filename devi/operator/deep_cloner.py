@@ -202,14 +202,24 @@ def clean_cloned_caption(
     # 2. Remove third-party @bot and @channel handles (except bot's own brand)
     text = re.sub(r'(?i)@(?!Kinddoctor4u|KindDoc_bot|Ammitrajput1)[a-zA-Z0-9_]{4,32}\b', '', text)
     
-    # 3. Remove third-party invite/telegram links
+    # 3. Remove promotional markdown links: Join [Text](URL) For more / [Text](URL)
+    text = re.sub(r'(?i)(?:join\s+)?\[[^\]]*\]\([^\)]*\)(?:\s*(?:for\s+more|for\s+all|now))?', '', text)
+
+    # 4. Remove Google search redirects, protocol-relative URLs, and malformed url chaining
+    text = re.sub(r'(?i)(?:https?:)?//(?:www\.)?google\.[a-z.]+/url\?[^\s\)\"\'>]+', '', text)
+    text = re.sub(r'(?i)(?:\)+|\]+)\s*:?//[^\s\)\"\'>]+', '', text)
+    text = re.sub(r'(?i)(?:https?:)?//(?:www\.)?(?:google\.[a-z.]+|bit\.ly|tinyurl\.com|t\.co|medicalverse\.in)[^\s\)\"\'>]*', '', text)
+    text = re.sub(r'(?i)(?:https?:)?//[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:/[^\s\)\"\'>]*)?', '', text)
+
+    # 5. Remove third-party invite/telegram links
     text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?:joinchat/|\+)[a-zA-Z0-9_-]+', '', text)
     text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?!c/|KindDoc)[a-zA-Z0-9_]{4,32}(?:/\d+)?', '', text)
     
-    # 4. Remove common watermark brackets & stamps: (SS 6 @AnandxBotss), (_wm), [By @xyz]
-    text = re.sub(r'(?i)\([^\)]*(?:@|bot|share|join|_wm|watermark)[^\)]*\)', '', text)
-    text = re.sub(r'(?i)\[[^\]]*(?:@|bot|share|join|_wm|watermark)[^\]]*\]', '', text)
-    text = re.sub(r'(?i)\b(?:Uploaded by|Shared by|Join channel|For more lectures|Official channel|Join now)[:\s]+[^\n]*', '', text)
+    # 6. Remove common watermark brackets & stamps: (SS 6 @AnandxBotss), (_wm), [By @xyz]
+    text = re.sub(r'(?i)\([^\)]*(?:@|bot|share|join|_wm|watermark|medical)[^\)]*\)', '', text)
+    text = re.sub(r'(?i)\[[^\]]*(?:@|bot|share|join|_wm|watermark|medical)[^\]]*\]', '', text)
+    text = re.sub(r'(?i)\b(?:Uploaded by|Shared by|Join channel|For more lectures|Official channel|Join now|Join Medical Verse|Medical Verse)[:\s]+[^\n]*', '', text)
+    text = re.sub(r'(?i)\b(?:Medical Verse|Medicalverse)\b', '', text)
     
     # 5. Clean up multiple empty lines & whitespace
     text = re.sub(r'\n{3,}', '\n\n', text)
