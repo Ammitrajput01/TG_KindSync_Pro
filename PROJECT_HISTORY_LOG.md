@@ -2,6 +2,35 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Friday, 20 November 2026 | 11:42 PM IST
+
+### 90. Google Tracking Redirect URL Sanitizer & Medical Verse Promotional Link Stripping
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"addd kr do aap striping wrds me please Join [Medical Verse](https://t.me/) For more //www.google.com/url?sa=t&source=web&rct=j&opi=85673748... esi links wgeraah sb"*
+* **Root Causes & System Hardening**:
+  1. *Protocol-Relative & Malformed Google URLs*:
+     - Tracked Google URLs often appear as protocol-relative `//www.google.com/url?...` or chained `)://www.google.com...` after malformed markdown links. Standard `https?://` matchers missed them.
+     - Added regexes:
+       - `(?i)(?:join\s+)?\[[^\]]*\]\([^\)]*\)(?:\s*(?:for\s+more|for\s+all|now))?`
+       - `(?i)(?:https?:)?//(?:www\.)?google\.[a-z.]+/url\?[^\s\)\"\'>]+`
+       - `(?i)(?:\)+|\]+)\s*:?//[^\s\)\"\'>]+`
+       - `(?i)(?:https?:)?//(?:www\.)?(?:google\.[a-z.]+|bit\.ly|tinyurl\.com|t\.co|medicalverse\.in)[^\s\)\"\'>]*`
+       - `(?i)\b(?:Medical Verse|Medicalverse)\b`
+  2. *Cross-Engine Synchronization*:
+     - Updated `strip_words.txt` with all Medical Verse variations.
+     - Hardened caption sanitizers across both `devi/operator/deep_cloner.py` and `tg_kindsync_pro.py`.
+  3. *Zero-Downtime Hot-Reload on VPS*:
+     - Verified with `tests/test_strip_google_url.py` (100% Passed).
+     - Deployed to Oracle VPS and restarted `cloner_studyhelp` worker. Watermark checkpoint instantly resumed at Topic #7 (`pwMed`) without duplicate messages.
+* **Affected Files**:
+  - `strip_words.txt`
+  - `devi/operator/deep_cloner.py`
+  - `tg_kindsync_pro.py`
+  - `tests/test_strip_google_url.py`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Friday, 20 November 2026 | 11:35 PM IST
 
 ### 89. Autonomous High-Speed Direct Group Cloner: Study Help to Study Help 2.0 Migration
