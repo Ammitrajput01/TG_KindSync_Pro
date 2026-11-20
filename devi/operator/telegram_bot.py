@@ -560,6 +560,49 @@ class DeviTelegramBot:
                 """)
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_sangmata_uname ON sangmata_osint_cache(username);")
 
+                # 1. Telegram Admin Forum Mission Control Config Table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS telegram_admin_forum_config (
+                        chat_id BIGINT PRIMARY KEY,
+                        topic_joins_id INTEGER,
+                        topic_radar_id INTEGER,
+                        topic_cloner_id INTEGER,
+                        topic_briefings_id INTEGER,
+                        is_active INTEGER DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                # 2. Telegram Support Tickets Table (1-to-1 Mapping: Student -> Topic)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS telegram_support_tickets (
+                        user_id BIGINT PRIMARY KEY,
+                        topic_id INTEGER NOT NULL,
+                        topic_title TEXT,
+                        status TEXT DEFAULT 'open',
+                        total_inbound INTEGER DEFAULT 0,
+                        total_outbound INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_support_topic ON telegram_support_tickets(topic_id);")
+
+                # 3. Telegram Support Messages Audit Log
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS telegram_support_messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id BIGINT NOT NULL,
+                        direction TEXT NOT NULL,
+                        sender_admin_id BIGINT,
+                        student_msg_id INTEGER,
+                        forum_msg_id INTEGER,
+                        content_type TEXT DEFAULT 'text',
+                        text_content TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
                 # Explicitly commit all tables to disk
                 conn.commit()
 
@@ -609,6 +652,172 @@ class DeviTelegramBot:
         except Exception as e:
             logger.warning(f"Error fetching relay info from DB: {e}")
         return None
+
+    # =========================================================================
+    # MISSION CONTROL FORUM SUPERGROUP & STUDENT TICKET METHODS
+    # =========================================================================
+
+    def _get_mission_control_config(self) -> Optional[dict]:
+        """Fetch active Mission Control Forum Supergroup config."""
+        try:
+            with get_db_conn() as conn:
+                row = conn.execute(
+                    "SELECT chat_id, topic_joins_id, topic_radar_id, topic_cloner_id, topic_briefings_id FROM telegram_admin_forum_config WHERE is_active = 1 LIMIT 1"
+                ).fetchone()
+                if row:
+                    return {
+                        "chat_id": row[0],
+                        "topic_joins_id": row[1],
+                        "topic_radar_id": row[2],
+                        "topic_cloner_id": row[3],
+                        "topic_briefings_id": row[4]
+                    }
+        except Exception as e:
+            logger.debug(f"Error fetching mission control config: {e}")
+        return None
+
+    def _save_mission_control_config(self, chat_id: int, topic_joins: int, topic_radar: int, topic_cloner: int, topic_briefings: int):
+        """Save or update Mission Control Forum Supergroup config."""
+        try:
+            with get_db_conn() as conn:
+                conn.execute("UPDATE telegram_admin_forum_config SET is_active = 0")
+                conn.execute("""
+                    INSERT OR REPLACE INTO telegram_admin_forum_config 
+                    (chat_id, topic_joins_id, topic_radar_id, topic_cloner_id, topic_briefings_id, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+                """, (chat_id, topic_joins, topic_radar, topic_cloner, topic_briefings))
+        except Exception as e:
+            logger.warning(f"Error saving mission control config: {e}")
+
+    def _get_student_ticket(self, user_id: int) -> Optional[dict]:
+        """Retrieve active or existing forum topic ticket for a student."""
+        try:
+            with get_db_conn() as conn:
+                row = conn.execute(
+                    "SELECT topic_id, topic_title, status, total_inbound, total_outbound FROM telegram_support_tickets WHERE user_id = ?",
+                    (user_id,)
+                ).fetchone()
+                if row:
+                    return {
+                        "topic_id": row[0],
+                        "topic_title": row[1],
+                        "status": row[2],
+                        "total_inbound": row[3],
+                        "total_outbound": row[4]
+                    }
+        except Exception as e:
+            logger.debug(f"Error fetching student ticket: {e}")
+        return None
+
+    def _get_student_by_topic(self, topic_id: int) -> Optional[int]:
+        """Find student user_id mapped to a forum topic."""
+        try:
+            with get_db_conn() as conn:
+                row = conn.execute("SELECT user_id FROM telegram_support_tickets WHERE topic_id = ?", (topic_id,)).fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            logger.debug(f"Error resolving student by topic: {e}")
+        return None
+
+    def _upsert_student_ticket(self, user_id: int, topic_id: int, topic_title: str, status: str = "open"):
+        """Save or update student support ticket topic mapping."""
+        try:
+            with get_db_conn() as conn:
+                conn.execute("""
+                    INSERT INTO telegram_support_tickets (user_id, topic_id, topic_title, status, last_activity)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        topic_id = excluded.topic_id,
+                        topic_title = excluded.topic_title,
+                        status = excluded.status,
+                        last_activity = CURRENT_TIMESTAMP
+                """, (user_id, topic_id, topic_title, status))
+        except Exception as e:
+            logger.warning(f"Error upserting student ticket: {e}")
+
+    def _update_ticket_status(self, user_id: int, status: str):
+        """Update ticket status ('open', 'closed', etc.)."""
+        try:
+            with get_db_conn() as conn:
+                conn.execute(
+                    "UPDATE telegram_support_tickets SET status = ?, last_activity = CURRENT_TIMESTAMP WHERE user_id = ?",
+                    (status, user_id)
+                )
+        except Exception as e:
+            logger.warning(f"Error updating ticket status: {e}")
+
+    def _increment_ticket_count(self, user_id: int, inbound: bool = True):
+        """Increment message counts for ticket telemetry."""
+        col = "total_inbound = total_inbound + 1" if inbound else "total_outbound = total_outbound + 1"
+        try:
+            with get_db_conn() as conn:
+                conn.execute(
+                    f"UPDATE telegram_support_tickets SET {col}, last_activity = CURRENT_TIMESTAMP WHERE user_id = ?",
+                    (user_id,)
+                )
+        except Exception:
+            pass
+
+    def _get_open_tickets(self, limit: int = 15) -> List[dict]:
+        """Fetch list of open student support tickets."""
+        tickets = []
+        try:
+            with get_db_conn() as conn:
+                rows = conn.execute(
+                    "SELECT user_id, topic_id, topic_title, status, total_inbound, total_outbound, last_activity "
+                    "FROM telegram_support_tickets WHERE status = 'open' ORDER BY last_activity DESC LIMIT ?",
+                    (limit,)
+                ).fetchall()
+                for r in rows:
+                    tickets.append({
+                        "user_id": r[0],
+                        "topic_id": r[1],
+                        "topic_title": r[2],
+                        "status": r[3],
+                        "total_inbound": r[4],
+                        "total_outbound": r[5],
+                        "last_activity": r[6]
+                    })
+        except Exception as e:
+            logger.warning(f"Error fetching open tickets: {e}")
+        return tickets
+
+    async def _create_forum_topic(self, session: aiohttp.ClientSession, chat_id: int, name: str, icon_color: int = 0x6FB9F0) -> Optional[int]:
+        """Calls Telegram Bot API createForumTopic and returns message_thread_id."""
+        url = f"https://api.telegram.org/bot{self.token}/createForumTopic"
+        payload = {"chat_id": chat_id, "name": name[:128], "icon_color": icon_color}
+        try:
+            async with session.post(url, json=payload, timeout=12) as resp:
+                data = await resp.json()
+                if data.get("ok"):
+                    return data.get("result", {}).get("message_thread_id")
+                else:
+                    logger.warning(f"createForumTopic error: {data.get('description')}")
+        except Exception as e:
+            logger.warning(f"Exception creating forum topic: {e}")
+        return None
+
+    async def _close_forum_topic(self, session: aiohttp.ClientSession, chat_id: int, topic_id: int) -> bool:
+        """Calls Telegram Bot API closeForumTopic to archive the thread."""
+        url = f"https://api.telegram.org/bot{self.token}/closeForumTopic"
+        try:
+            async with session.post(url, json={"chat_id": chat_id, "message_thread_id": topic_id}, timeout=10) as resp:
+                data = await resp.json()
+                return bool(data.get("ok"))
+        except Exception as e:
+            logger.warning(f"Error closing forum topic: {e}")
+        return False
+
+    async def _reopen_forum_topic(self, session: aiohttp.ClientSession, chat_id: int, topic_id: int) -> bool:
+        """Calls Telegram Bot API reopenForumTopic to bring the thread back to life."""
+        url = f"https://api.telegram.org/bot{self.token}/reopenForumTopic"
+        try:
+            async with session.post(url, json={"chat_id": chat_id, "message_thread_id": topic_id}, timeout=10) as resp:
+                data = await resp.json()
+                return bool(data.get("ok"))
+        except Exception as e:
+            logger.warning(f"Error reopening forum topic: {e}")
+        return False
 
     def _log_analytics_event(self, chat_id: int, event_type: str, user_id: Optional[int] = None, details: str = ""):
         """Logs moderation or engagement event in SQLite analytics table (Combot / TGStat style)."""
@@ -2393,6 +2602,20 @@ class DeviTelegramBot:
                     ]
                 ]
             }
+
+            # Route to Dedicated Mission Control Topic if active
+            mc_conf = self._get_mission_control_config()
+            if mc_conf and mc_conf.get("chat_id"):
+                dest_topic = mc_conf.get("topic_radar_id") if is_watchlist else mc_conf.get("topic_joins_id")
+                if dest_topic:
+                    await self._send_message(
+                        session,
+                        mc_conf["chat_id"],
+                        admin_text,
+                        reply_markup=admin_markup,
+                        message_thread_id=dest_topic,
+                        parse_mode="HTML"
+                    )
 
             for adm_id in self.master_admin_ids:
                 await self._send_message(
@@ -5131,6 +5354,47 @@ class DeviTelegramBot:
             except Exception as e:
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}"})
 
+        # 5. Mission Control Ticket Closure Callback
+        elif data.startswith("close_ticket_"):
+            parts = data.split("_")
+            if len(parts) >= 4:
+                u_id = int(parts[2])
+                top_id = int(parts[3])
+                mc_c = self._get_mission_control_config()
+                if mc_c:
+                    await self._close_forum_topic(session, mc_c["chat_id"], top_id)
+                self._update_ticket_status(u_id, "closed")
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "🔒 Ticket Closed & Archived!"})
+                if cb_msg.get("message_id"):
+                    await self._edit_message(session, chat_id, cb_msg["message_id"], f"🔒 <b>[TICKET CLOSED & RESOLVED]</b> by Admin @{cb_from.get('username') or 'Admin'}", parse_mode="HTML")
+            return
+
+        # 6. Mission Control Inbox Refresh Callback
+        elif data == "inbox_refresh":
+            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Refreshing Inbox..."})
+            await self._handle_admin_command(session, chat_id, admin_id, "/inbox", message=cb_msg)
+            return
+
+        # 7. Mission Control Inbox Open Student Callback
+        elif data.startswith("inbox_open_"):
+            u_id = int(data.replace("inbox_open_", "").strip())
+            tk = self._get_student_ticket(u_id)
+            doss = self._get_user_dossier(u_id)
+            await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Student ID: {u_id}"})
+            st_card = (
+                f"👨‍🎓 <b>Student Ticket Details</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"👤 <b>Name:</b> {html.escape(doss.get('full_name', 'Student'))}\n"
+                f"🆔 <b>User ID:</b> <code>{u_id}</code>\n"
+                f"🔗 <b>Username:</b> @{doss.get('username') or 'None'}\n"
+                f"📱 <b>Phone:</b> <code>{doss.get('phone', 'Hidden')}</code>\n"
+                f"📊 <b>Total Messages:</b> <code>{doss.get('total_messages', 0)}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"👉 <i>To reply, send message directly inside their Mission Control topic #{tk.get('topic_id') if tk else 'N/A'}.</i>"
+            )
+            await self._send_message(session, chat_id, st_card, parse_mode="HTML")
+            return
+
     async def _handle_account_linking_step(self, session: aiohttp.ClientSession, chat_id: int, user_id: int, text: str, message: dict) -> bool:
         """Processes interactive phone number -> OTP -> 2FA login steps for user session linking."""
         auth_state = self.pending_auth.get(user_id)
@@ -6162,6 +6426,48 @@ class DeviTelegramBot:
                     await self._handle_admin_command(session, chat_id, sender_id, clean_text, message=message)
                 return  # Admin commands stay silent
 
+            # Mission Control Topic Admin Direct Reply Interceptor
+            mc_conf = self._get_mission_control_config()
+            if mc_conf and chat_id == mc_conf.get("chat_id") and thread_id:
+                target_student_id = self._get_student_by_topic(thread_id)
+                if target_student_id and self.is_admin(sender_id):
+                    # Admin typed inside a student's topic!
+                    if clean_text.lower() in ("/close", "/resolve", "close", "resolve"):
+                        await self._close_forum_topic(session, chat_id, thread_id)
+                        self._update_ticket_status(target_student_id, "closed")
+                        await self._send_message(
+                            session, chat_id, 
+                            "🔒 <b>Ticket Marked as Resolved & Topic Closed</b> ✨", 
+                            message_thread_id=thread_id, 
+                            parse_mode="HTML"
+                        )
+                        return
+                    elif clean_text.startswith("/"):
+                        pass
+                    else:
+                        # Relay to student directly!
+                        if text:
+                            doctor_card = (
+                                f"👨‍⚕️ <b>Kind Doctor:</b>\n\n"
+                                f"{html.escape(text)}"
+                            )
+                            deliv = await self._send_message(session, target_student_id, doctor_card, parse_mode="HTML")
+                        else:
+                            deliv = await self._copy_message(
+                                session, 
+                                target_student_id, 
+                                chat_id, 
+                                msg_id, 
+                                caption="👨‍⚕️ <b>Kind Doctor</b> (Attachment)"
+                            )
+
+                        if deliv:
+                            self._increment_ticket_count(target_student_id, inbound=False)
+                            await self._send_message(session, chat_id, "✅ <i>Delivered to student</i>", message_thread_id=thread_id, parse_mode="HTML")
+                        else:
+                            await self._send_message(session, chat_id, "⚠️ <i>Delivery failed (User may have stopped the bot).</i>", message_thread_id=thread_id, parse_mode="HTML")
+                        return
+
             if clean_text.startswith("/"):
                 await self._handle_admin_command(session, chat_id, sender_id, clean_text, message=message)
             elif is_tagged:
@@ -6429,7 +6735,75 @@ class DeviTelegramBot:
             ]
         }
 
-        # Relay to ALL Master Admin IDs simultaneously (both Telegram accounts)
+        # 1. Mission Control Topic Dynamic Provisioning & Message Mirroring
+        mc_conf = self._get_mission_control_config()
+        if mc_conf and mc_conf.get("chat_id"):
+            mc_chat_id = mc_conf["chat_id"]
+            ticket = self._get_student_ticket(sender_id)
+            student_topic_id = None
+
+            if ticket:
+                student_topic_id = ticket["topic_id"]
+                if ticket.get("status") == "closed":
+                    await self._reopen_forum_topic(session, mc_chat_id, student_topic_id)
+                    self._update_ticket_status(sender_id, "open")
+            else:
+                first_n = dossier.get("first_name", "") or dossier.get("full_name", f"User {sender_id}")
+                u_name = f"@{dossier.get('username')}" if dossier.get("username") else str(sender_id)
+                top_title = f"👨‍🎓 {first_n[:20]} ({u_name})"[:64]
+                student_topic_id = await self._create_forum_topic(session, mc_chat_id, top_title, icon_color=0x6FB9F0)
+                if student_topic_id:
+                    self._upsert_student_ticket(sender_id, student_topic_id, top_title, status="open")
+                    init_card = (
+                        f"📋 <b>NEW STUDENT DOSSIER INITIALIZED</b> 🩺\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 <b>Name</b>: {html.escape(dossier.get('full_name', 'Student'))}\n"
+                        f"🆔 <b>User ID</b>: <code>{sender_id}</code>\n"
+                        f"🔗 <b>Username</b>: {user_mention}\n"
+                        f"📱 <b>Phone</b>: <code>{dossier.get('phone', 'Hidden')}</code>\n"
+                        f"🌟 <b>Account</b>: {premium_badge} | 🌐 <code>{dossier.get('language', 'en')}</code>\n"
+                        f"{history_warnings}\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"💡 <i>Aap is topic me direct reply type karein, student ko '👨‍⚕️ Kind Doctor' naam se deliver ho jayega. No quoting needed!</i>"
+                    )
+                    await self._send_message(session, mc_chat_id, init_card, message_thread_id=student_topic_id, parse_mode="HTML")
+
+            if student_topic_id:
+                topic_markup = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "🔒 Close Ticket", "callback_data": f"close_ticket_{sender_id}_{student_topic_id}"},
+                            {"text": "🔗 Send 1-Time Link", "callback_data": f"send_link_{sender_id}"}
+                        ]
+                    ]
+                }
+                if text:
+                    student_text_card = (
+                        f"💬 <b>Student Message:</b>\n\n"
+                        f"{html.escape(text)}"
+                    )
+                    await self._send_message(
+                        session,
+                        mc_chat_id,
+                        student_text_card,
+                        message_thread_id=student_topic_id,
+                        reply_markup=topic_markup,
+                        parse_mode="HTML"
+                    )
+                else:
+                    await self._copy_message(
+                        session,
+                        mc_chat_id,
+                        chat_id,
+                        msg_id,
+                        caption=f"📎 <b>Attachment from {html.escape(dossier.get('full_name', 'Student'))}</b>",
+                        message_thread_id=student_topic_id,
+                        reply_markup=topic_markup,
+                        parse_mode="HTML"
+                    )
+                self._increment_ticket_count(sender_id, inbound=True)
+
+        # 2. Relay to ALL Master Admin IDs simultaneously (both Telegram accounts)
         for admin_id in self.master_admin_ids:
             sent_msg_id = None
             if text:
@@ -6784,6 +7158,97 @@ class DeviTelegramBot:
             lines.append(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             lines.append(f"*(Yeh numerical IDs admin controls, forward routes aur live support relay me use hoti hain).*")
             await self._send_message(session, chat_id, "\n".join(lines), message_thread_id=thread_id)
+
+        elif cmd == "/setmissioncontrol":
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+
+            is_forum_grp = str(chat_id).startswith("-100")
+            if is_forum_grp:
+                await self._send_message(session, chat_id, "⏳ <i>Initializing Mission Control Topics... Please hold on...</i>", message_thread_id=thread_id, parse_mode="HTML")
+                
+                # Provision the 4 Category Topics
+                t_joins = await self._create_forum_topic(session, chat_id, "🚪 Join Requests & Screening", icon_color=0x6FB9F0)
+                t_radar = await self._create_forum_topic(session, chat_id, "🚨 High-Risk Quarantine Radar", icon_color=0xFFD67E)
+                t_cloner = await self._create_forum_topic(session, chat_id, "🚀 Cloner & System Telemetry", icon_color=0xCB86DB)
+                t_briefings = await self._create_forum_topic(session, chat_id, "🌅 Daily Briefings & Vitals", icon_color=0x8EEE98)
+
+                if t_joins and t_radar and t_cloner and t_briefings:
+                    self._save_mission_control_config(chat_id, t_joins, t_radar, t_cloner, t_briefings)
+                    conf_card = (
+                        "🏛️ <b>KIND DOCTOR MISSION CONTROL HQ — ONLINE!</b> 🚀\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "Group has been registered as the master operational hub for @KindDoc_bot!\n\n"
+                        f"• 🚪 <b>Join Requests Topic:</b> <code>#{t_joins}</code>\n"
+                        f"• 🚨 <b>Quarantine Radar Topic:</b> <code>#{t_radar}</code>\n"
+                        f"• 🚀 <b>Cloner & Telemetry Topic:</b> <code>#{t_cloner}</code>\n"
+                        f"• 🌅 <b>Daily Briefings Topic:</b> <code>#{t_briefings}</code>\n"
+                        "• 👨‍🎓 <b>Student Support:</b> Every student will receive their own dedicated topic!\n\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "✨ <i>All DM clutter is now permanently segregated. Happy moderating, Doctor! 👨‍⚕️</i>"
+                    )
+                    await self._send_message(session, chat_id, conf_card, parse_mode="HTML")
+                else:
+                    await self._send_message(
+                        session, chat_id, 
+                        "⚠️ <b>Could not create all topics.</b>\nPlease ensure bot is Admin with 'Manage Topics' permission enabled in group settings!",
+                        message_thread_id=thread_id,
+                        parse_mode="HTML"
+                    )
+            else:
+                guide_card = (
+                    "🏛️ <b>How to Setup Mission Control Forum HQ:</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "1. Create a private Supergroup in Telegram (e.g. <code>Kind Doctor HQ</code>).\n"
+                    "2. Enable <b>Topics</b> in Group Settings.\n"
+                    "3. Add @KindDoc_bot as <b>Administrator</b> with 'Manage Topics' permission.\n"
+                    "4. Inside that group, type <code>/setmissioncontrol</code>.\n\n"
+                    "<i>The bot will automatically create and organize all operational topics!</i>"
+                )
+                await self._send_message(session, chat_id, guide_card, message_thread_id=thread_id, parse_mode="HTML")
+            return
+
+        elif cmd in ("/inbox", "/tickets"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+
+            open_tickets = self._get_open_tickets(limit=10)
+            inbox_lines = [
+                "📥 <b>Kind Doctor Mission Control Inbox</b> 🩺",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            ]
+
+            kb_rows = []
+            if open_tickets:
+                inbox_lines.append(f"💬 <b>Active Student Tickets ({len(open_tickets)}):</b>\n")
+                for idx, tk in enumerate(open_tickets, 1):
+                    inbox_lines.append(
+                        f"{idx}. <b>{html.escape(tk['topic_title'] or 'Student')}</b>\n"
+                        f"   ↳ Inbound: <code>{tk['total_inbound']}</code> msgs | Last: <code>{tk['last_activity'][:16]}</code>"
+                    )
+                    kb_rows.append([
+                        {"text": f"💬 Inspect #{idx}", "callback_data": f"inbox_open_{tk['user_id']}"},
+                        {"text": "🔒 Close", "callback_data": f"close_ticket_{tk['user_id']}_{tk['topic_id']}"}
+                    ])
+            else:
+                inbox_lines.append("✨ <b>No open student tickets! All queries resolved.</b> 🤍")
+
+            inbox_lines.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            inbox_lines.append("<i>Tip: You can also manage all tickets directly inside your Mission Control Forum group!</i>")
+
+            kb_rows.append([{"text": "🔄 Refresh Inbox", "callback_data": "inbox_refresh"}])
+
+            await self._send_message(
+                session, 
+                chat_id, 
+                "\n".join(inbox_lines), 
+                reply_markup={"inline_keyboard": kb_rows}, 
+                message_thread_id=thread_id, 
+                parse_mode="HTML"
+            )
+            return
 
         elif cmd in ("/fullhelp", "/manual"):
             subcat = "main"
