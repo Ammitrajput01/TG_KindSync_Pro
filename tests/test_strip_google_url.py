@@ -16,3 +16,4 @@ def test_clean_google_redirects_and_promo_links():
     assert "//www" not in cleaned
     assert "Title: 01. General Anatomy Introduction" in cleaned
     assert "Kind Doctor & Team" in cleaned
+

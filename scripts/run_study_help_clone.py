@@ -13,6 +13,7 @@ Architectural Invariants:
 6. Real-time Telemetry dispatched to Kind Doctor HQ (Topic 9: Cloner Telemetry) & PM.
 """
 import asyncio
+import aiohttp
 import html
 import io
 import logging
@@ -128,6 +129,34 @@ async def send_telemetry_card(user_client: TelegramClient, text: str):
         logger.debug(f"Admin PM dispatch failed: {e}")
 
 
+async def bot_copy_message(http_session: aiohttp.ClientSession, bot_token: str, src_chat: int, tgt_chat: int, tgt_topic: int, msg_id: int, caption: str):
+    """Copies a message directly via Bot API (Immune to MTProto user SendMedia FloodWait)."""
+    url = f"https://api.telegram.org/bot{bot_token}/copyMessage"
+    html_cap = caption.replace("**Kind Doctor & Team**", "<b>Kind Doctor & Team</b>") if caption else ""
+    if len(html_cap) > 1024:
+        html_cap = html_cap[:1020] + "..."
+    payload = {
+        "chat_id": tgt_chat,
+        "from_chat_id": src_chat,
+        "message_id": msg_id,
+        "caption": html_cap,
+        "parse_mode": "HTML"
+    }
+    if tgt_topic and tgt_topic > 1:
+        payload["message_thread_id"] = tgt_topic
+    
+    try:
+        async with http_session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=25)) as resp:
+            res = await resp.json()
+            if res.get("ok"):
+                return True, (None, 0)
+            err = res.get("description", "Unknown error")
+            retry_after = res.get("parameters", {}).get("retry_after", 0)
+            return False, (err, retry_after)
+    except Exception as e:
+        return False, (str(e), 0)
+
+
 async def main():
     logger.info("🚀 INITIALIZING AUTONOMOUS STUDY HELP DIRECT CLONER")
     logger.info(f"• Source Group: {SOURCE_CHAT_ID}")
@@ -136,9 +165,11 @@ async def main():
 
     init_clone_jobs_table()
 
+    http_session = aiohttp.ClientSession()
     user_client, _ = await get_vault_client_for_target(preferred_user_id=ADMIN_USER_ID)
     if not user_client:
         logger.error("❌ Failed to obtain MTProto client for admin account.")
+        await http_session.close()
         return
 
     src_peer = await _safe_resolve_entity(user_client, SOURCE_CHAT_ID)
@@ -263,36 +294,46 @@ async def main():
 
                 sent = False
                 for retry in range(3):
-                    try:
-                        if msg.media:
-                            # Tier 1 Cloud Pointer Copy
-                            await user_client.send_file(
-                                tgt_peer,
-                                file=msg.media,
-                                caption=cleaned_caption,
-                                reply_to=reply_hdr
-                            )
-                        elif msg.text:
-                            await user_client.send_message(
-                                tgt_peer,
-                                cleaned_caption,
-                                reply_to=reply_hdr
-                            )
+                    ok, (err, retry_after) = await bot_copy_message(
+                        http_session, BOT_TOKEN, SOURCE_CHAT_ID, TARGET_CHAT_ID, target_topic_id, msg.id, cleaned_caption
+                    )
+                    if ok:
                         sent = True
                         break
-                    except FloodWaitError as fe:
-                        logger.warning(f"⏳ FloodWait {fe.seconds + 2}s")
-                        await asyncio.sleep(fe.seconds + 2)
-                    except Exception as e_send:
-                        logger.warning(f"Error copying msg #{msg.id} (attempt {retry+1}): {e_send}")
-                        await asyncio.sleep(0.5)
+                    elif retry_after and retry_after > 0:
+                        logger.warning(f"⏳ Bot API Rate Limit: Sleeping {retry_after + 1}s")
+                        await asyncio.sleep(retry_after + 1)
+                    else:
+                        logger.info(f"Bot copy notice on msg #{msg.id} ({err}) -> Trying MTProto pointer fallback...")
+                        try:
+                            if msg.media:
+                                await user_client.send_file(
+                                    tgt_peer,
+                                    file=msg.media,
+                                    caption=cleaned_caption,
+                                    reply_to=reply_hdr
+                                )
+                            elif msg.text:
+                                await user_client.send_message(
+                                    tgt_peer,
+                                    cleaned_caption,
+                                    reply_to=reply_hdr
+                                )
+                            sent = True
+                            break
+                        except FloodWaitError as fe:
+                            logger.warning(f"⏳ MTProto FloodWait {fe.seconds + 2}s")
+                            await asyncio.sleep(min(fe.seconds + 2, 60))
+                        except Exception as e_send:
+                            logger.warning(f"Error copying msg #{msg.id} (attempt {retry+1}): {e_send}")
+                            await asyncio.sleep(0.5)
 
                 if sent:
                     topic_cloned += 1
                     grand_total_cloned += 1
                     current_max_id = max(current_max_id, msg.id)
                     update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, inc=1)
-                    await asyncio.sleep(0.12)
+                    await asyncio.sleep(0.35)
 
             # Mark topic finished
             update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, is_finished=True)
@@ -329,6 +370,7 @@ async def main():
     )
     await send_telemetry_card(user_client, final_card)
     logger.info("🎉 ALL TOPICS CLONED SUCCESSFULLY!")
+    await http_session.close()
 
 
 if __name__ == "__main__":
