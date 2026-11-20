@@ -1986,6 +1986,8 @@ class DeviTelegramBot:
 
             # Auto-purge sweep: ensures expired welcome cards (>24h) are cleaned even across bot restarts
             self.create_tracked_task(self._periodic_welcome_purge_loop(session))
+            # Scheduled Daily Joins Dispatcher (11:55 PM IST)
+            self.create_tracked_task(self._periodic_daily_joins_loop(session))
 
             while self.is_running:
                 try:
@@ -2195,6 +2197,22 @@ class DeviTelegramBot:
                 err_text = await resp.text()
                 if "message is not modified" in err_text.lower():
                     return True
+                if "there is no text in the message" in err_text.lower():
+                    # Fallback to editMessageCaption for media messages
+                    cap_url = f"https://api.telegram.org/bot{self.token}/editMessageCaption"
+                    cap_payload = {
+                        "chat_id": chat_id,
+                        "message_id": message_id,
+                        "caption": formatted_text,
+                        "parse_mode": parse_mode
+                    }
+                    if reply_markup:
+                        cap_payload["reply_markup"] = self._sanitize_reply_markup(reply_markup)
+                    async with session.post(cap_url, json=cap_payload, timeout=10) as r_cap:
+                        if r_cap.status == 200:
+                            return True
+                        err_cap = await r_cap.text()
+                        return "message is not modified" in err_cap.lower()
                 # Fallback to plain text if HTML parsing issues occur
                 clean_plain = re.sub(r'<[^>]+>', '', formatted_text)
                 clean_plain = re.sub(r'[*_`]', '', clean_plain)
@@ -2219,7 +2237,8 @@ class DeviTelegramBot:
         file_bytes: bytes,
         filename: str,
         caption: str = "",
-        message_thread_id: Optional[int] = None
+        message_thread_id: Optional[int] = None,
+        parse_mode: str = "HTML"
     ) -> bool:
         """Sends a document (e.g. CSV member audit report) via Telegram Bot API."""
         url = f"https://api.telegram.org/bot{self.token}/sendDocument"
@@ -2229,7 +2248,7 @@ class DeviTelegramBot:
             data.add_field("message_thread_id", str(message_thread_id))
         if caption:
             data.add_field("caption", caption)
-            data.add_field("parse_mode", "Markdown")
+            data.add_field("parse_mode", parse_mode)
         ctype = "application/x-sqlite3" if filename.endswith(".sqlite") else ("text/csv" if filename.endswith(".csv") else "application/octet-stream")
         data.add_field("document", file_bytes, filename=filename, content_type=ctype)
         try:
@@ -2410,13 +2429,149 @@ class DeviTelegramBot:
                 ])
 
             csv_bytes = csv_buf.getvalue().encode("utf-8")
-            fname = f"members_audit_{abs(group_id)}.csv"
-            caption = f"📊 **Member Audit CSV Export**\nGroup: `{group_id}`\nTotal Records: `{len(rows)}` members"
+            now = datetime.now()
+            day_str = now.strftime("%A")
+            date_str = now.strftime("%d-%B-%Y")
+            time_str = now.strftime("%I-%M%p")
+            display_ts = now.strftime("%A, %d %B %Y | %I:%M %p")
+            fname = f"members_audit_{abs(group_id)}_{day_str}_{date_str}_{time_str}.csv"
+            caption = (
+                f"📊 <b>Member Audit CSV Export</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🕒 <b>Exported:</b> <code>{display_ts}</code>\n"
+                f"👥 <b>Group ID:</b> <code>{group_id}</code>\n"
+                f"📈 <b>Total Tracked:</b> <b>{len(rows)}</b> members"
+            )
             
-            await self._send_document(session, send_to_chat, csv_bytes, fname, caption=caption, message_thread_id=message_thread_id)
+            await self._send_document(session, send_to_chat, csv_bytes, fname, caption=caption, message_thread_id=message_thread_id, parse_mode="HTML")
         except Exception as e:
             logger.warning(f"Error exporting member CSV: {e}")
             await self._send_message(session, send_to_chat, f"❌ Failed to export CSV: {e}", message_thread_id=message_thread_id)
+
+    def _generate_daily_joins_report(self, group_id: Optional[int] = None, target_date: Optional[str] = None):
+        """
+        Generates daily members joined CSV file and summary text.
+        Complies with Dr. Amit's permanent naming rule:
+        [prefix]_[Day]_[Date]-[Month]-[Year]_[Time-12hAM-PM].[ext]
+        """
+        now = datetime.now()
+        day_str = now.strftime("%A")
+        date_str = now.strftime("%d-%B-%Y")
+        time_str = now.strftime("%I-%M%p")
+        display_ts = now.strftime("%A, %d %B %Y | %I:%M %p")
+        
+        filter_date = target_date or now.strftime("%Y-%m-%d")
+
+        with get_db_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            query = """
+                SELECT m.user_id, m.full_name, m.username, m.join_date, m.chat_id,
+                       d.total_messages, d.changes_count, d.phone_number AS phone
+                FROM member_history m
+                LEFT JOIN telegram_users_dossier d ON m.user_id = d.user_id
+                WHERE DATE(m.join_date) = DATE(?)
+            """
+            params = [filter_date]
+            if group_id:
+                query += " AND m.chat_id = ?"
+                params.append(group_id)
+            query += " ORDER BY m.join_date ASC"
+            
+            rows = conn.execute(query, tuple(params)).fetchall()
+
+        # Build CSV in memory
+        csv_buf = io.StringIO()
+        writer = csv.writer(csv_buf)
+        writer.writerow(["Index", "User ID", "Full Name", "Username", "Exact Join Time", "Phone", "Total Messages", "Group ID"])
+        for idx, r in enumerate(rows, 1):
+            writer.writerow([
+                idx,
+                r["user_id"],
+                r["full_name"],
+                f"@{r['username']}" if r["username"] else "None",
+                r["join_date"],
+                r["phone"] or "Hidden",
+                r["total_messages"] or 0,
+                r["chat_id"]
+            ])
+
+        csv_bytes = csv_buf.getvalue().encode("utf-8")
+        filename = f"daily_members_joined_{day_str}_{date_str}_{time_str}.csv"
+        
+        summary_lines = [
+            f"📅 <b>DAILY MEMBER JOINS REPORT</b> 🩺",
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"🕒 <b>Date & Time:</b> <code>{display_ts}</code>",
+            f"👥 <b>New Members Joined Today:</b> <b>{len(rows)}</b>",
+        ]
+        if rows:
+            summary_lines.append("\n<b>Recent Member Joins:</b>")
+            for r in rows[-8:]:
+                u_tag = f"@{r['username']}" if r['username'] else f"User {r['user_id']}"
+                summary_lines.append(f"• <code>{str(r['join_date'])[11:16]}</code> — <b>{html.escape(r['full_name'] or 'User')}</b> ({u_tag})")
+        else:
+            summary_lines.append("\n<i>No new joins recorded for today yet.</i>")
+            
+        summary_lines.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        summary_lines.append("📁 <i>Full member records attached in the CSV spreadsheet above.</i>")
+
+        caption_text = "\n".join(summary_lines)
+        return csv_bytes, filename, caption_text, len(rows)
+
+    async def _dispatch_daily_joins_report(self, session: aiohttp.ClientSession, group_id: Optional[int] = None):
+        """Dispatches the Daily Joins CSV to Master Admins in DM & Mission Control Briefings Topic."""
+        try:
+            csv_bytes, filename, caption, count = self._generate_daily_joins_report(group_id=group_id)
+            
+            # 1. Deliver to both Master Admins in personal DM
+            for adm_id in self.master_admin_ids:
+                try:
+                    await self._send_document(
+                        session, adm_id, csv_bytes, filename, caption=caption, parse_mode="HTML"
+                    )
+                except Exception as e:
+                    logger.warning(f"Error delivering daily joins to admin {adm_id}: {e}")
+
+            # 2. Deliver to Mission Control Supergroup -> Daily Briefings Topic
+            mc_conf = self._get_mission_control_config()
+            if mc_conf and mc_conf.get("chat_id") and mc_conf.get("topic_briefings_id"):
+                try:
+                    await self._send_document(
+                        session,
+                        mc_conf["chat_id"],
+                        csv_bytes,
+                        filename,
+                        caption=caption,
+                        message_thread_id=mc_conf["topic_briefings_id"],
+                        parse_mode="HTML"
+                    )
+                except Exception as e:
+                    logger.warning(f"Error delivering daily joins to Mission Control briefings: {e}")
+
+            logger.info(f"✅ Daily joins report successfully dispatched ({count} joins).")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to dispatch daily joins report: {e}")
+            return 0
+
+    async def _periodic_daily_joins_loop(self, session: aiohttp.ClientSession):
+        """
+        Runs once daily at 23:55 (11:55 PM IST) to dispatch full daily join summary.
+        """
+        last_dispatched_date = None
+        while self.is_running:
+            try:
+                now = datetime.now()
+                today_str = now.strftime("%Y-%m-%d")
+                # Trigger at 23:55 local time once per day
+                if now.hour == 23 and now.minute >= 50 and last_dispatched_date != today_str:
+                    logger.info("⏰ Triggering scheduled daily joins report...")
+                    await self._dispatch_daily_joins_report(session)
+                    last_dispatched_date = today_str
+            except Exception as e:
+                logger.debug(f"Daily joins loop error: {e}")
+            await asyncio.sleep(60)
+
 
     async def _handle_my_chat_member(self, session: aiohttp.ClientSession, my_chat_member: dict):
         """Auto-registers groups where bot is added and sends alert to Master Admins."""
@@ -3012,7 +3167,8 @@ class DeviTelegramBot:
         caption: Optional[str] = None,
         reply_to: Optional[int] = None,
         reply_markup: Optional[dict] = None,
-        message_thread_id: Optional[int] = None
+        message_thread_id: Optional[int] = None,
+        parse_mode: str = "HTML"
     ) -> Optional[int]:
         """Copy any message (text, photo, voice, video, doc) without re-uploading."""
         url = f"https://api.telegram.org/bot{self.token}/copyMessage"
@@ -3025,7 +3181,7 @@ class DeviTelegramBot:
             payload["message_thread_id"] = message_thread_id
         if caption:
             payload["caption"] = caption
-            payload["parse_mode"] = "Markdown"
+            payload["parse_mode"] = parse_mode
         if reply_to:
             payload["reply_to_message_id"] = reply_to
         if reply_markup:
@@ -4166,6 +4322,7 @@ class DeviTelegramBot:
         cb_msg = cb.get("message", {})
         cb_from = from_user
         chat_id = cb_msg.get("chat", {}).get("id")
+        thread_id = cb_msg.get("message_thread_id")
 
         # 4-Tab Navigation Header Interceptor (Zero-Scroll UI)
         if data.startswith("menu_tab_"):
@@ -5244,10 +5401,10 @@ class DeviTelegramBot:
                 )
                 await self._send_message(session, target_user_id, user_msg)
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "✅ Single-Use Link sent to user!"})
-                await self._send_message(session, chat_id, f"✅ **Single-Use Link** delivered to user `{target_user_id}`:\n{link_url}")
+                await self._send_message(session, chat_id, f"✅ **Single-Use Link** delivered to user `{target_user_id}`:\n{link_url}", message_thread_id=thread_id)
             else:
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⚠️ Target group not configured or bot not Admin"})
-                await self._send_message(session, chat_id, "⚠️ Bot ko TARGET_CHAT me Admin (with 'Invite Users' rights) banayein taaki automated link generate ho sake.")
+                await self._send_message(session, chat_id, "⚠️ Bot ko TARGET_CHAT me Admin (with 'Invite Users' rights) banayein taaki automated link generate ho sake.", message_thread_id=thread_id)
 
         # 2. Block User from DM support
         elif data.startswith("block_"):
@@ -5259,21 +5416,23 @@ class DeviTelegramBot:
             except Exception:
                 pass
             await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"🚫 User {target_user_id} Blocked."})
-            await self._send_message(session, chat_id, f"🚫 User `{target_user_id}` has been blocked from support.")
+            await self._send_message(session, chat_id, f"🚫 User `{target_user_id}` has been blocked from support.", message_thread_id=thread_id)
 
         # 3. Kick Member from Group
         elif data.startswith("kick_"):
-            parts = data.split("_")
-            grp_id = int(parts[1])
-            target_user_id = int(parts[2])
-            try:
-                # Ban then unban to kick
-                await session.post(f"https://api.telegram.org/bot{self.token}/banChatMember", json={"chat_id": grp_id, "user_id": target_user_id}, timeout=10)
-                await session.post(f"https://api.telegram.org/bot{self.token}/unbanChatMember", json={"chat_id": grp_id, "user_id": target_user_id}, timeout=10)
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "👢 Member kicked from group."})
-                await self._send_message(session, chat_id, f"👢 Member `{target_user_id}` has been kicked from group `{grp_id}`.")
-            except Exception as e:
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}"})
+            raw = data[len("kick_"):]
+            if "_" in raw:
+                p_grp, p_uid = raw.rsplit("_", 1)
+                grp_id = int(p_grp)
+                target_user_id = int(p_uid)
+                try:
+                    # Ban then unban to kick
+                    await session.post(f"https://api.telegram.org/bot{self.token}/banChatMember", json={"chat_id": grp_id, "user_id": target_user_id}, timeout=10)
+                    await session.post(f"https://api.telegram.org/bot{self.token}/unbanChatMember", json={"chat_id": grp_id, "user_id": target_user_id}, timeout=10)
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "👢 Member kicked from group."})
+                    await self._send_message(session, chat_id, f"👢 Member `{target_user_id}` has been kicked from group `{grp_id}`.", message_thread_id=thread_id)
+                except Exception as e:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}"})
 
         # 3b. Approve or Decline Join Request
         elif data.startswith("act_appr_join_") or data.startswith("act_decl_join_"):
@@ -5341,25 +5500,28 @@ class DeviTelegramBot:
 
         # 4. Ban & Block Member permanently
         elif data.startswith("ban_"):
-            parts = data.split("_")
-            grp_id = int(parts[1])
-            target_user_id = int(parts[2])
-            try:
-                await session.post(f"https://api.telegram.org/bot{self.token}/banChatMember", json={"chat_id": grp_id, "user_id": target_user_id}, timeout=10)
-                self.blocked_users.add(target_user_id)
-                with get_db_conn() as conn:
-                    conn.execute("INSERT OR REPLACE INTO telegram_bot_blocked (user_id) VALUES (?)", (target_user_id,))
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "🚫 Member banned permanently."})
-                await self._send_message(session, chat_id, f"🚫 Member `{target_user_id}` has been permanently banned & blocked.")
-            except Exception as e:
-                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}"})
+            raw = data[len("ban_"):]
+            if "_" in raw:
+                p_grp, p_uid = raw.rsplit("_", 1)
+                grp_id = int(p_grp)
+                target_user_id = int(p_uid)
+                try:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/banChatMember", json={"chat_id": grp_id, "user_id": target_user_id}, timeout=10)
+                    self.blocked_users.add(target_user_id)
+                    with get_db_conn() as conn:
+                        conn.execute("INSERT OR REPLACE INTO telegram_bot_blocked (user_id) VALUES (?)", (target_user_id,))
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "🚫 Member banned permanently."})
+                    await self._send_message(session, chat_id, f"🚫 Member `{target_user_id}` has been permanently banned & blocked.", message_thread_id=thread_id)
+                except Exception as e:
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}"})
 
         # 5. Mission Control Ticket Closure Callback
         elif data.startswith("close_ticket_"):
-            parts = data.split("_")
-            if len(parts) >= 4:
-                u_id = int(parts[2])
-                top_id = int(parts[3])
+            raw = data[len("close_ticket_"):]
+            if "_" in raw:
+                u_id_str, top_id_str = raw.rsplit("_", 1)
+                u_id = int(u_id_str)
+                top_id = int(top_id_str)
                 mc_c = self._get_mission_control_config()
                 if mc_c:
                     await self._close_forum_topic(session, mc_c["chat_id"], top_id)
@@ -5392,7 +5554,7 @@ class DeviTelegramBot:
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"👉 <i>To reply, send message directly inside their Mission Control topic #{tk.get('topic_id') if tk else 'N/A'}.</i>"
             )
-            await self._send_message(session, chat_id, st_card, parse_mode="HTML")
+            await self._send_message(session, chat_id, st_card, message_thread_id=thread_id, parse_mode="HTML")
             return
 
     async def _handle_account_linking_step(self, session: aiohttp.ClientSession, chat_id: int, user_id: int, text: str, message: dict) -> bool:
@@ -5882,6 +6044,7 @@ class DeviTelegramBot:
         sender_id = sender.get("id") or (sender_chat.get("id") if sender_chat else None)
         text = message.get("text", "").strip()
         msg_id = message.get("message_id")
+        thread_id = message.get("message_thread_id") or message.get("reply_to_message", {}).get("message_thread_id")
         is_group = chat_type in ["group", "supergroup"]
 
         if not sender_id:
@@ -5982,7 +6145,6 @@ class DeviTelegramBot:
         # ============================================================
         if is_group:
             # Auto-detect forum topic creation or rename
-            thread_id = message.get("message_thread_id")
             if "forum_topic_created" in message:
                 ftc = message["forum_topic_created"]
                 t_name = ftc.get("name", "Topic")
@@ -5994,6 +6156,122 @@ class DeviTelegramBot:
                 if t_name:
                     t_id = thread_id or msg_id
                     self._save_topic(chat_id, t_id, t_name)
+
+            # =========================================================
+            # MISSION CONTROL FORUM SUPERGROUP: DIRECT ADMIN TOPIC INTERCEPTOR
+            # (Intercepts Admin Replies inside Student Support Topics BEFORE any silent filter)
+            # =========================================================
+            mc_conf = self._get_mission_control_config()
+            if mc_conf and int(chat_id) == int(mc_conf.get("chat_id", 0)) and thread_id:
+                system_topics = {
+                    mc_conf.get("topic_joins_id"),
+                    mc_conf.get("topic_radar_id"),
+                    mc_conf.get("topic_cloner_id"),
+                    mc_conf.get("topic_briefings_id"),
+                }
+                if thread_id not in system_topics:
+                    target_student_id = self._get_student_by_topic(thread_id)
+                    if target_student_id:
+                        is_sender_admin = (
+                            (sender_id in self.master_admin_ids)
+                            or (sender_id in self.co_admins)
+                            or (await self.is_admin_for_chat(session, chat_id, sender_id, message=message))
+                        )
+                        if is_sender_admin:
+                            clean_text = (text or "").strip()
+                            clean_lower = clean_text.lower()
+
+                            # 1. Topic resolution command
+                            if clean_lower in ("/close", "/resolve", "close", "resolve"):
+                                await self._close_forum_topic(session, chat_id, thread_id)
+                                self._update_ticket_status(target_student_id, "closed")
+                                await self._send_message(
+                                    session, chat_id, 
+                                    "🔒 <b>Ticket Marked as Resolved & Topic Closed</b> ✨\n<i>(Topic will automatically reopen if student replies).</i>", 
+                                    message_thread_id=thread_id, 
+                                    parse_mode="HTML"
+                                )
+                                with suppress(Exception):
+                                    await self._send_message(
+                                        session, target_student_id,
+                                        "🙏 <b>Kind Doctor Support Desk:</b>\n\nAapki query resolve mark kar di gayi hai. Agar koi aur sawal ho to aap yahan message bhej sakte hain. All the best for your studies! 🤍"
+                                    )
+                                return
+
+                            # 2. General admin bot commands fall through to command dispatcher
+                            elif clean_text.startswith("/") and not clean_lower.startswith(("/r ", "/reply ", "/link")):
+                                pass
+                            else:
+                                # 3. Direct Message / Media Relay to Student!
+                                user_reply_text = None
+                                if clean_lower.startswith(("/r link", "r link", "/link")):
+                                    target_grp = self.target_chat
+                                    link_url = ""
+                                    if target_grp:
+                                        try:
+                                            invite_url = f"https://api.telegram.org/bot{self.token}/createChatInviteLink"
+                                            expire_ts = int((datetime.now() + timedelta(minutes=30)).timestamp())
+                                            async with session.post(invite_url, json={"chat_id": target_grp, "member_limit": 1, "expire_date": expire_ts}, timeout=10) as resp:
+                                                if resp.status == 200:
+                                                    res_data = await resp.json()
+                                                    link_url = res_data.get("result", {}).get("invite_link")
+                                        except Exception as e:
+                                            logger.warning(f"Error creating invite link snippet: {e}")
+
+                                    if link_url:
+                                        user_reply_text = (
+                                            f"👨‍⚕️ <b>Kind Doctor:</b>\n\n"
+                                            f"Welcome! Here is your exclusive single-use invite link to the study group:\n"
+                                            f"{link_url}\n\n"
+                                            f"<i>(Note: Yeh link 30 minutes me expire ho jayega. Happy studying!)</i>"
+                                        )
+                                    else:
+                                        user_reply_text = "👨‍⚕️ <b>Kind Doctor:</b>\n\nGroup link generation is temporarily busy. Please contact admin."
+                                elif clean_lower.startswith(("/r schedule", "r schedule")):
+                                    user_reply_text = (
+                                        f"👨‍⚕️ <b>Kind Doctor:</b>\n\n"
+                                        f"📅 <b>Daily Study & Lecture Schedule:</b>\n"
+                                        f"• Morning Focus Sprint: 09:00 AM - 12:00 PM\n"
+                                        f"• Clinical Case Discussion: 03:00 PM - 05:00 PM\n"
+                                        f"• High-Yield Evening Lecture: 08:00 PM\n\n"
+                                        f"Check pinned topic indexes in the study group for latest recordings!"
+                                    )
+                                elif clean_lower.startswith(("/r verified", "r verified")):
+                                    user_reply_text = (
+                                        f"👨‍⚕️ <b>Kind Doctor:</b>\n\n"
+                                        f"✅ <b>Account Verified!</b>\n"
+                                        f"Aapka profile verify ho chuka hai. Aap ab study group me sabhi medical resources aur discussions access kar sakte hain. All the best!"
+                                    )
+
+                                deliv = None
+                                has_media = any(k in message for k in ("photo", "document", "video", "audio", "voice", "sticker"))
+                                if not has_media:
+                                    if not user_reply_text:
+                                        raw_txt = re.sub(r'^/(?:r|reply)\s+', '', clean_text, flags=re.IGNORECASE)
+                                        user_reply_text = f"👨‍⚕️ <b>Kind Doctor:</b>\n\n{html.escape(raw_txt)}"
+                                    deliv = await self._send_message(session, target_student_id, user_reply_text, parse_mode="HTML")
+                                else:
+                                    caption_txt = message.get("caption") or ""
+                                    formatted_caption = f"👨‍⚕️ <b>Kind Doctor:</b>\n\n{html.escape(caption_txt)}" if caption_txt else "👨‍⚕️ <b>Kind Doctor</b>"
+                                    deliv = await self._copy_message(
+                                        session,
+                                        target_student_id,
+                                        chat_id,
+                                        msg_id,
+                                        caption=formatted_caption,
+                                        parse_mode="HTML"
+                                    )
+
+                                if deliv:
+                                    self._increment_ticket_count(target_student_id, inbound=False)
+                                    logger.info(f"Relayed admin reply from MC topic {thread_id} to student {target_student_id}")
+                                    sent_ack = await self._send_message(session, chat_id, "✅ <i>Delivered to student</i>", message_thread_id=thread_id, parse_mode="HTML")
+                                    if sent_ack:
+                                        self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_ack, 4))
+                                else:
+                                    logger.warning(f"Failed to relay admin reply from MC topic {thread_id} to student {target_student_id}")
+                                    await self._send_message(session, chat_id, "⚠️ <i>Delivery failed (Student may have stopped/blocked the bot).</i>", message_thread_id=thread_id, parse_mode="HTML")
+                                return
 
             # Live Sangmata Identity Tracking in Group (Detects name/username shifts on every message)
             if sender and not sender.get("is_bot") and "new_chat_members" not in message:
@@ -6012,6 +6290,7 @@ class DeviTelegramBot:
 
                 g_settings = self._get_group_settings(chat_id)
                 grp_title = chat.get("title", "Study Group")
+                safe_grp_title = html.escape(grp_title)
 
                 for new_member in message["new_chat_members"]:
                     if new_member.get("is_bot"):
@@ -6130,6 +6409,9 @@ class DeviTelegramBot:
                         )
                         if sent_welcome_id:
                             self._log_welcome_message(chat_id, sent_welcome_id)
+                            w_timeout = int(g_settings.get("welcome_timeout", 86400) or 0)
+                            if w_timeout > 0:
+                                self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_welcome_id, w_timeout))
 
                     # 2. General Topic / Admin Radar: Full OSINT & SangMata Biometric Dossier
                     try:
@@ -6175,7 +6457,7 @@ class DeviTelegramBot:
 
                     # A. Post in Group
                     if g_settings.get("join_track_enabled", 1):
-                        await self._send_message(
+                        sent_osint_id = await self._send_message(
                             session,
                             chat_id,
                             full_osint_card,
@@ -6183,6 +6465,11 @@ class DeviTelegramBot:
                             reply_markup=admin_markup,
                             parse_mode="HTML"
                         )
+                        if sent_osint_id:
+                            self._log_welcome_message(chat_id, sent_osint_id)
+                            w_timeout = int(g_settings.get("welcome_timeout", 86400) or 0)
+                            if w_timeout > 0:
+                                self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_osint_id, w_timeout))
 
                     # B. Also dispatch to Master Bot Admins
                     for adm_id in self.master_admin_ids:
@@ -6426,47 +6713,6 @@ class DeviTelegramBot:
                     await self._handle_admin_command(session, chat_id, sender_id, clean_text, message=message)
                 return  # Admin commands stay silent
 
-            # Mission Control Topic Admin Direct Reply Interceptor
-            mc_conf = self._get_mission_control_config()
-            if mc_conf and chat_id == mc_conf.get("chat_id") and thread_id:
-                target_student_id = self._get_student_by_topic(thread_id)
-                if target_student_id and self.is_admin(sender_id):
-                    # Admin typed inside a student's topic!
-                    if clean_text.lower() in ("/close", "/resolve", "close", "resolve"):
-                        await self._close_forum_topic(session, chat_id, thread_id)
-                        self._update_ticket_status(target_student_id, "closed")
-                        await self._send_message(
-                            session, chat_id, 
-                            "🔒 <b>Ticket Marked as Resolved & Topic Closed</b> ✨", 
-                            message_thread_id=thread_id, 
-                            parse_mode="HTML"
-                        )
-                        return
-                    elif clean_text.startswith("/"):
-                        pass
-                    else:
-                        # Relay to student directly!
-                        if text:
-                            doctor_card = (
-                                f"👨‍⚕️ <b>Kind Doctor:</b>\n\n"
-                                f"{html.escape(text)}"
-                            )
-                            deliv = await self._send_message(session, target_student_id, doctor_card, parse_mode="HTML")
-                        else:
-                            deliv = await self._copy_message(
-                                session, 
-                                target_student_id, 
-                                chat_id, 
-                                msg_id, 
-                                caption="👨‍⚕️ <b>Kind Doctor</b> (Attachment)"
-                            )
-
-                        if deliv:
-                            self._increment_ticket_count(target_student_id, inbound=False)
-                            await self._send_message(session, chat_id, "✅ <i>Delivered to student</i>", message_thread_id=thread_id, parse_mode="HTML")
-                        else:
-                            await self._send_message(session, chat_id, "⚠️ <i>Delivery failed (User may have stopped the bot).</i>", message_thread_id=thread_id, parse_mode="HTML")
-                        return
 
             if clean_text.startswith("/"):
                 await self._handle_admin_command(session, chat_id, sender_id, clean_text, message=message)
@@ -8558,9 +8804,15 @@ class DeviTelegramBot:
         # MEMBER AUDIT, NETWORK HUB & MULTI-TENANT TRACKER
         # -------------------------------------------------------------
         elif cmd in ("/members", "/memberaudit", "/auditmembers"):
-            target_chat_id = self._resolve_study_group_id(chat_id)
+            target_chat_id = None
             if len(parts) > 1 and parts[1].lstrip("-").isdigit():
                 target_chat_id = int(parts[1])
+            else:
+                mc_c = self._get_mission_control_config()
+                if mc_c and chat_id == mc_c.get("chat_id"):
+                    target_chat_id = self.target_chat or self._resolve_study_group_id(chat_id, admin_id)
+                else:
+                    target_chat_id = self._resolve_study_group_id(chat_id, admin_id)
 
             # Multi-Tenant Access: Check if caller is Admin of this specific group (or Master Admin)
             is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
@@ -8584,6 +8836,14 @@ class DeviTelegramBot:
                         "SELECT COUNT(*) FROM member_history WHERE chat_id = ?",
                         (target_chat_id,)
                     ).fetchone()[0]
+
+                    # Fallback across all study groups if specific chat has no joins logged yet
+                    if not recent_joins:
+                        cur = conn.execute(
+                            "SELECT user_id, full_name, username, join_date FROM member_history ORDER BY join_date DESC LIMIT 15"
+                        )
+                        recent_joins = cur.fetchall()
+                        total_tracked = conn.execute("SELECT COUNT(*) FROM member_history").fetchone()[0]
 
                     cur2 = conn.execute(
                         "SELECT user_id, old_name, new_name, old_username, new_username, changed_at FROM member_name_changes ORDER BY changed_at DESC LIMIT 5"
@@ -8669,6 +8929,14 @@ class DeviTelegramBot:
                 f"👉 _Neeche buttons se kisi bhi group ke members audit ya export karein:_"
             )
             await self._send_message(session, chat_id, network_card, reply_markup={"inline_keyboard": kb_rows}, message_thread_id=thread_id)
+
+        elif cmd in ("/dailyjoins", "/dailyreport", "/joinreport"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+            await self._send_message(session, chat_id, "⏳ <i>Generating Daily Joins Report & CSV...</i>", message_thread_id=thread_id, parse_mode="HTML")
+            cnt = await self._dispatch_daily_joins_report(session)
+            await self._send_message(session, chat_id, f"✅ <b>Daily Joins Report generated & dispatched!</b>\nTotal joined today: <b>{cnt}</b> members.", message_thread_id=thread_id, parse_mode="HTML")
 
         elif cmd in ("/exportmembers", "/exportcsv"):
             target_chat_id = self._resolve_study_group_id(chat_id)

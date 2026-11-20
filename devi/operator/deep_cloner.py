@@ -352,9 +352,13 @@ async def get_or_create_target_topic(
     if bot_token:
         for attempt in range(4):
             try:
+                bot_chat_id = target_chat_id
+                s_cid = str(bot_chat_id).strip()
+                if not s_cid.startswith("-100"):
+                    bot_chat_id = int("-100" + s_cid.lstrip("-"))
                 url = f"https://api.telegram.org/bot{bot_token}/createForumTopic"
                 payload = {
-                    "chat_id": target_chat_id,
+                    "chat_id": bot_chat_id,
                     "name": clean_title,
                     "icon_color": icon_color
                 }

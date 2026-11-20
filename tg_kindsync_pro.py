@@ -111,6 +111,21 @@ from telethon.tl.types import (
 from telethon.tl.functions.messages import GetForumTopicsRequest, CreateForumTopicRequest
 from telethon.tl.functions.channels import InviteToChannelRequest
 
+def extract_topic_id_from_updates(created, default_id: int = 0) -> int:
+    """Safely extracts message_thread_id from Telethon Updates without raising AttributeError."""
+    if not created:
+        return default_id
+    for upd in getattr(created, 'updates', []):
+        msg = getattr(upd, 'message', None)
+        if msg and getattr(msg, 'id', 0) > 1:
+            return msg.id
+        if hasattr(upd, 'id') and getattr(upd, 'id', 0) > 1:
+            return upd.id
+    if hasattr(created, 'id') and getattr(created, 'id', 0) > 1:
+        return created.id
+    return default_id
+
+
 # ============================================================
 # 3. CONSTANTS & GLOBAL SETUP
 # ============================================================
@@ -7643,7 +7658,7 @@ async def run_group_cloner_tool(session_mgr):
                     icon_color=getattr(t, 'icon_color', None) or 7322096,
                     random_id=generate_random_long()
                 ))
-                tgt_t_id = created.updates[0].id if hasattr(created, 'updates') and created.updates else (getattr(created, 'id', None) or t.id)
+                tgt_t_id = extract_topic_id_from_updates(created, default_id=t.id)
                 tgt_topics_map[t_title.strip().lower()] = tgt_t_id
                 console.print(f" [bold green]➕ Created new topic in target:[/] {t_title} (ID: {tgt_t_id})")
             except Exception as e:
@@ -7787,7 +7802,7 @@ async def run_single_topic_cloner_tool(session_mgr):
                 icon_color=getattr(chosen_src_topic, 'icon_color', None) or 7322096,
                 random_id=generate_random_long()
             ))
-            tgt_t_id = created.updates[0].id if hasattr(created, 'updates') and created.updates else (getattr(created, 'id', None) or src_t_id)
+            tgt_t_id = extract_topic_id_from_updates(created, default_id=src_t_id)
             console.print(f" [bold green]➕ Created new topic in target:[/] {src_t_title} (ID: {tgt_t_id})")
     except Exception as e:
         console.print(f" [yellow]⚠️ Target topic creation note: {e} -> Defaulting to topic ID[/]")
@@ -8339,7 +8354,7 @@ async def run_selective_content_picker(session_mgr):
                         icon_color=7322096,
                         random_id=generate_random_long()
                     ))
-                    tgt_topic_id = created.updates[0].id if hasattr(created, 'updates') and created.updates else (getattr(created, 'id', None) or 0)
+                    tgt_topic_id = extract_topic_id_from_updates(created, default_id=0)
                     tgt_topic_title = new_t_name
                     console.print(f"[bold green]✔ Created new topic:[/] [yellow]{new_t_name}[/] (ID: {tgt_topic_id})")
                 except Exception as e:
