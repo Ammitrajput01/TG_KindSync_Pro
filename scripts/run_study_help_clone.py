@@ -333,7 +333,7 @@ async def main():
                     grand_total_cloned += 1
                     current_max_id = max(current_max_id, msg.id)
                     update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, inc=1)
-                    await asyncio.sleep(0.35)
+                    await asyncio.sleep(1.5)
 
             # Mark topic finished
             update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, is_finished=True)
