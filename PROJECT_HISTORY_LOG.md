@@ -2,6 +2,31 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 21 November 2026 | 12:44 AM IST
+
+### 95. Full Production Deployment, Program Forwarder Resumption & Live Cloner Launch
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"hnji saaare jgh sb update kr do and shayd program wali cloning ruki hui hai wo bhi start kro mtlb resume and bot se bhi cloning start kro"*
+* **Actions Executed & Verified**:
+  1. *Git Commit & Push to Remote (`origin/main`)*:
+     - Pushed all core updates: Anti-DMCA brand obfuscation matrix, Medical Verse stripping, Google redirect filters, and new cloner configuration (`commit b94b67f` & `commit a914069`).
+  2. *Oracle VPS System Deployment & Service Restarts*:
+     - Successfully pulled latest code via `git pull origin main`.
+     - Reloaded systemd daemon and restarted `tg-kinddoc-bot` service (`Active: active (running)`).
+  3. *Main Program Forwarder Resumed*:
+     - Cleaned previous stopped state and launched `tg_kindsync_pro.py --auto` in tmux session `kindsync`.
+     - Confirmed: `🔴 LIVE 24/7 LISTENER ACTIVE` on Rule: `The Pirate Bay Premium (-1003968310888) ➔ BE Mine (-1004300858087)`.
+  4. *Bot Cloner (`Mickey Bhaai Backup ❤️ ➔ Study Help 2.0 😉`) Launched*:
+     - Launched `scripts/run_study_help_clone.py` in dedicated tmux session `cloner_mickey`.
+     - Hardened Bot API `copyMessage` with `format_caption_to_safe_html` and entity-fallback to prevent parsing errors.
+     - Calibrated transmission pacing to 2.5s per message for smooth, uninterrupted streaming.
+     - Confirmed active message-by-message mirroring across 101 topics.
+* **Affected Files**:
+  - `scripts/run_study_help_clone.py`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Saturday, 21 November 2026 | 12:32 AM IST
 
 ### 94. Source Migration to Mickey Bhaai Backup Supergroup & Medical Verse Link Stripper Hardening
