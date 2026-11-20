@@ -2,6 +2,32 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 21 November 2026 | 12:04 AM IST
+
+### 91. Study Help Cloner Stall Resolution: Migration to Bot API `copyMessage` & Pacing Optimization
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"bhaai please chq kro bot beech me he stuck ho gya kind doc bot or cloning ruk gyi plese resume kro or problem btaao or fixes"*
+* **Root Cause & Forensic Audit**:
+  - The previous cloner worker used MTProto user session (`user_client.send_file`) exclusively.
+  - After mirroring ~1,970 messages in ~10 minutes, Telegram MTProto triggered a severe **FloodWait of 2958 seconds (~49 minutes)** on the user account (`SendMediaRequest flood wait`).
+  - The worker entered `await asyncio.sleep(2958)` to respect the floodwait, causing the appearance of being permanently stuck.
+* **Architectural Fix & Performance Hardening**:
+  1. *Bot API `copyMessage` as Primary Forwarder*:
+     - `@KindDoc_bot` is a verified administrator in both `Study Help 😉` and `Study Help 2.0 😉`.
+     - Re-architected `scripts/run_study_help_clone.py` to route all forwardable messages through Telegram Bot API `copyMessage`.
+     - Bot API operates on an independent quota pool, completely immune to MTProto user `SendMediaRequest` FloodWait.
+     - Preserves 100% original video/PDF thumbnails and media attributes.
+     - Handles short Bot API rate limits (e.g. 3-20s retry_after) gracefully, without long penalties.
+  2. *Transmission Pacing Calibration*:
+     - Adjusted pacing from 0.35s to **1.5s** per message, aligning with Telegram supergroup throughput limits (~20-40 msgs/min) and eliminating rate-limit spikes.
+  3. *Seamless Watermark Resume*:
+     - Resumed from SQLite `topic_watermarks` checkpoint at Topic #8 (`Prep X`, message #5376) without duplicating the 2,000+ already mirrored messages.
+* **Affected Files**:
+  - `scripts/run_study_help_clone.py`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Friday, 20 November 2026 | 11:42 PM IST
 
 ### 90. Google Tracking Redirect URL Sanitizer & Medical Verse Promotional Link Stripping
