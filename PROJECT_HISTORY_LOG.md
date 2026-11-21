@@ -2,6 +2,45 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 21 November 2026 | 11:30 PM IST
+
+### 97. Clickable Hyperlinked Channel & Bot Signature (Format 1) and Tier-2 RAM Streamer Thumbnail Enforcer
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"aap bss ye link add kr skte ho or https://t.me/be_as_kind @KindDoc_bot https://t.me/KindDoc_bot aap bss inn dono ko clickable link me add kr skte ho permanent har jgh fix kr skte ho fully functional hyper link text bss pehle format dikhana jo old tha usi me krna hai no changes"*
+  - *"format 1 accha hai to btaao aap kaise kya kre abhi program or bot chl rha hai to abhi usko nahi chedenge ok locally or github pe krenge"*
+* **Architectural Root Causes & Enhancements**:
+  1. *Plain Text Signature vs Clickable Hyperlinks*:
+     - Previously, signatures were plain markdown bold strings (`📚 **Kind Doctor & Team**\n💬 Group Study Help 😉`) lacking interactive hyperlinking to Dr. Amit's official channel (`https://t.me/be_as_kind`) and bot (`https://t.me/KindDoc_bot`).
+     - *Permanent Fix*: Enforced **Format 1** everywhere:
+       `📚 [**Kind Doctor & Team**](https://t.me/be_as_kind)`
+       `💬 [**Group Study Help 😉**](https://t.me/KindDoc_bot)`
+  2. *Telegram Bot API HTML Hyperlink Conversion*:
+     - `scripts/run_study_help_clone.py` converts captions to HTML for Bot API `copyMessage`. Previously, it only converted `**` to `<b>` and `_` to `<i>`, leaving markdown links `[text](url)` as raw unparsed text.
+     - *Permanent Fix*: Added regex converter transforming `\[(.*?)\]\((https?://[^\s\)]+)\)` into `<a href="\2">\1</a>` with `html.escape` ensuring `&amp;` compliance.
+  3. *Tier-1 Server-Side Media Pointer Thumbnail Invalidation*:
+     - In `tg_kindsync_pro.py`, Tier-1 MTProto direct reference copy (`send_file(..., m.media, thumb=t_path)`) caused Telegram servers to retain the source document's existing thumbnail (which carried the old channel's "YOURWISH" whiteboard slide) because Telegram ignores `thumb=` on pre-existing `InputMediaDocument` server pointers.
+     - *Permanent Fix*: Updated Tier-1 routing logic: When `THUMB_MODE == "custom"` and `t_path` is present, the pipeline bypasses Tier-1 pointer copy and routes the media through Tier-2 In-Memory RAM Streamer (`self.streamer.stream_media`), forcing Telegram MTProto server to re-encode and bind `kind_doctor_thumb.jpg` (Kind Doctor 16:9 HD Studio Cover).
+  4. *Environment Mode Synchronization*:
+     - Synchronized `.env` default to `THUMB_MODE='custom'`.
+* **Verification & Test Suite**:
+  - `tests/test_deep_cloner.py`: 7 / 7 PASSED.
+  - `tests/test_student_request_and_security.py`: 3 / 3 PASSED.
+  - `tests/test_anti_dmca_pipeline.py`: 7 / 7 PASSED.
+  - `tests/test_strip_google_url.py`: 3 / 3 PASSED.
+  - Total 20 / 20 unit tests PASSED with 100% success rate.
+  - Verified Markdown & HTML conversions:
+    - Markdown: `📚 [**Kind Doctor & Team**](https://t.me/be_as_kind)\n💬 [**Group Study Help 😉**](https://t.me/KindDoc_bot)`
+    - HTML: `📚 <a href="https://t.me/be_as_kind"><b>Kind Doctor &amp; Team</b></a>\n💬 <a href="https://t.me/KindDoc_bot"><b>Group Study Help 😉</b></a>`
+* **Affected Files**:
+  - `tg_kindsync_pro.py`
+  - `devi/operator/deep_cloner.py`
+  - `scripts/run_study_help_clone.py`
+  - `tests/test_deep_cloner.py`
+  - `.env`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Saturday, 21 November 2026 | 08:52 PM IST
 
 ### 96. Forensic Root-Cause Diagnosis & Permanent Hardening for Dynamic Forum Topics, Thumbnail Studio, All-Case Stripping Words & Unstoppable Bot Cloner

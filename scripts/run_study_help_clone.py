@@ -135,6 +135,8 @@ def format_caption_to_safe_html(caption: str) -> str:
     if not caption:
         return ""
     escaped = html.escape(caption, quote=False)
+    # Convert markdown hyperlinks [text](url) to HTML <a href="url">text</a>
+    escaped = re.sub(r'\[(.*?)\]\((https?://[^\s\)]+)\)', r'<a href="\2">\1</a>', escaped)
     escaped = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', escaped)
     escaped = re.sub(r'(?<!\w)_(.*?)_(?!\w)', r'<i>\1</i>', escaped)
     if len(escaped) > 1024:

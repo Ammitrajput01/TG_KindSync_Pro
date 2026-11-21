@@ -87,13 +87,13 @@ def test_clean_cloned_caption_rich_formatting():
     # Case 1: Raw video text
     cap1 = clean_cloned_caption("61 Electron transport chain", is_media=True)
     assert "Title: 61 Electron transport chain" in cap1
-    assert "📚 **Kind Doctor & Team**" in cap1
-    assert "Group Study Help 😉" in cap1
+    assert "📚 [**Kind Doctor & Team**](https://t.me/be_as_kind)" in cap1
+    assert "💬 [**Group Study Help 😉**](https://t.me/KindDoc_bot)" in cap1
 
     # Case 2: Empty text with filename (verifies Anti-DMCA Leet-Speak on Marrow -> M@rr0w)
     cap2 = clean_cloned_caption("", orig_filename="1._How_to_study_OBG_using_Marrow_Edition_6.mp4", is_media=True)
     assert "Title: 1. How to study OBG using M@rr0w Edition 6" in cap2
-    assert "📚 **Kind Doctor & Team**" in cap2
+    assert "📚 [**Kind Doctor & Team**](https://t.me/be_as_kind)" in cap2
 
     # Case 2b: Direct Anti-DMCA Obfuscation Matrix test across top brands
     cap_dmca = clean_cloned_caption(

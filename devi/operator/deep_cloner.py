@@ -346,8 +346,8 @@ def clean_cloned_caption(
         formatted_parts.append(f"Title: {title_val}")
 
     if body_extra:
-        body_clean = re.sub(r'(?i)📚\s*\*{0,2}Kind Doctor & Team\*{0,2}.*', '', body_extra, flags=re.DOTALL)
-        body_clean = re.sub(r'(?i)💬\s*Group Study Help.*', '', body_clean).strip()
+        body_clean = re.sub(r'(?i)📚\s*\[?\*{0,2}Kind Doctor & Team\*{0,2}\]?.*', '', body_extra, flags=re.DOTALL)
+        body_clean = re.sub(r'(?i)💬\s*\[?\*{0,2}Group Study Help.*', '', body_clean).strip()
         body_clean = re.sub(r'(?i)^[🎬📄📁🎥\s]*(?:title\s*[:\-\s]*)+', '', body_clean).strip()
         # Clean any accidental duplicate extensions inside body
         body_clean = re.sub(r'(?i)(\.(mp4|mkv|pdf|avi|mov|mp3|zip|rar|tar|apk|webm|flv|m4v|opus|wav|ogg|iso|7z)){2,}', r'\1', body_clean)
@@ -358,7 +358,7 @@ def clean_cloned_caption(
     # Append Kind Doctor Branding Signature if enabled
     enable_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
     if enable_sig:
-        formatted_parts.append("📚 **Kind Doctor & Team**\n💬 Group Study Help 😉")
+        formatted_parts.append("📚 [**Kind Doctor & Team**](https://t.me/be_as_kind)\n💬 [**Group Study Help 😉**](https://t.me/KindDoc_bot)")
 
     res_cap = "\n\n".join(p for p in formatted_parts if p).strip()
     res_cap = apply_anti_dmca_obfuscation(res_cap)

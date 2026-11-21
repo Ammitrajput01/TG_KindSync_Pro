@@ -135,6 +135,10 @@ VERSION = "TG KindSync Pro 🩺 v15.0.0 Enterprise Masterpiece"
 TERMINAL_BRAND = "Dr. Amit Singh (Kind Doctor)"
 TELEGRAM_BRAND = "**Kind Doctor & Team**"
 GROUP_BRAND = "Group Study Help 😉"
+OFFICIAL_CHANNEL_URL = "https://t.me/be_as_kind"
+OFFICIAL_BOT_URL = "https://t.me/KindDoc_bot"
+TELEGRAM_BRAND_MD = f"[**Kind Doctor & Team**]({OFFICIAL_CHANNEL_URL})"
+GROUP_BRAND_MD = f"[**Group Study Help 😉**]({OFFICIAL_BOT_URL})"
 # -----------------------------
 
 MB = 1024 * 1024
@@ -3444,7 +3448,7 @@ def customize_caption(caption, for_media=False, batch_name=""):
     custom_footer = os.getenv("CUSTOM_FOOTER", "").strip().strip("'").strip('"')
     auto_hashtags_enabled = os.getenv("AUTO_HASHTAGS", "false").strip().lower() in ("true", "1", "yes")
     enable_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
-    default_signature = f"\n\n📚 {TELEGRAM_BRAND}\n💬 {GROUP_BRAND}"
+    default_signature = f"\n\n📚 {TELEGRAM_BRAND_MD}\n💬 {GROUP_BRAND_MD}"
     if not enable_sig:
         signature = ""
     else:
@@ -3864,7 +3868,7 @@ class PipelineProcessor:
             self.log(f"[bold green]📑 Batch Index Card Posted to Topic {tgt_topic} ({total_count} items indexed)[/]")
 
     def reconstruct(self, msg):
-        signature = f"\n\n📚 **{TELEGRAM_BRAND}**\n💬 {GROUP_BRAND}"
+        signature = f"\n\n📚 {TELEGRAM_BRAND_MD}\n💬 {GROUP_BRAND_MD}"
         if getattr(msg, 'poll', None):
             q = msg.poll.poll.question
             ans = "\n".join(f"• {a.text}" for a in msg.poll.poll.answers)
@@ -4144,7 +4148,7 @@ class PipelineProcessor:
                     direct_album_sent = False
                     if media_items:
                         # Tier 1: Fast Server-Side MTProto Media Reference Copy (0.2s latency, zero bandwidth)
-                        if str(source_chat) not in self._restricted_channels:
+                        if str(source_chat) not in self._restricted_channels and (THUMB_MODE != "custom" or not t_path):
                             try:
                                 await self.rpc.execute(
                                     lambda c: c.send_file(
@@ -4201,7 +4205,7 @@ class PipelineProcessor:
                         direct_media_copied = False
 
                         # Tier 1: Instant Server-Side MTProto Media Reference Copy (0.1s latency, zero byte download/upload)
-                        if str(source_chat) not in self._restricted_channels:
+                        if str(source_chat) not in self._restricted_channels and (THUMB_MODE != "custom" or not t_path):
                             try:
                                 sent_media = await self.rpc.execute(
                                     lambda c: c.send_file(
