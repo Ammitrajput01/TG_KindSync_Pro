@@ -1,0 +1,21 @@
+[Unit]
+Description=Study Help 2.0 Autonomous Bot Cloner (Mickey Bhaai Backup to Study Help 2.0)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/TG_KindSync_Pro
+Environment="PYTHONPATH=/home/ubuntu/TG_KindSync_Pro" "PYTHONUNBUFFERED=1"
+ExecStart=/home/ubuntu/TG_KindSync_Pro/.venv/bin/python scripts/run_study_help_clone.py
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+LimitNPROC=65535
+MemoryMax=3.5G
+StandardOutput=append:/home/ubuntu/TG_KindSync_Pro/logs/study_help_clone.log
+StandardError=append:/home/ubuntu/TG_KindSync_Pro/logs/study_help_clone.log
+
+[Install]
+WantedBy=multi-user.target
+

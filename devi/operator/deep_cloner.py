@@ -224,34 +224,74 @@ def clean_cloned_caption(
     text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?:joinchat/|\+)[a-zA-Z0-9_-]+', '', text)
     text = re.sub(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/(?!c/|KindDoc)[a-zA-Z0-9_]{4,32}(?:/\d+)?', '', text)
 
-    # 4. Remove third-party @bot and @channel handles (except bot's own brand)
-    # Using negative lookbehind (?<![a-zA-Z0-9]) to ensure we never touch embedded leet-speak like M@rr0w or D@MS
-    text = re.sub(r'(?i)(?<![a-zA-Z0-9])@(?!Kinddoctor4u|KindDoc_bot|Ammitrajput1)[a-zA-Z0-9_]{4,32}\b', '', text)
-
-    # 5. Load dynamic strip_words.txt rules
+    # 4. Load dynamic strip_words.txt rules (processed BEFORE generic handles so multi-word @phrases match completely)
     strip_file = ROOT_DIR / "strip_words.txt"
     if strip_file.exists():
         try:
+            replaces = []
+            strips = []
             for line in strip_file.read_text(encoding="utf-8").splitlines():
                 rule = line.strip()
                 if not rule or (rule.startswith("#") and len(rule) > 1 and not rule.startswith("#The")):
                     continue
                 if "=>" in rule:
                     old_w, new_w = rule.split("=>", 1)
-                    text = re.sub(re.escape(old_w.strip()), new_w.strip(), text, flags=re.IGNORECASE)
+                    replaces.append((old_w.strip(), new_w.strip()))
                 elif ":" in rule and not rule.startswith("http"):
                     old_w, new_w = rule.split(":", 1)
-                    text = re.sub(re.escape(old_w.strip()), new_w.strip(), text, flags=re.IGNORECASE)
+                    replaces.append((old_w.strip(), new_w.strip()))
                 else:
-                    text = re.sub(re.escape(rule), "", text, flags=re.IGNORECASE)
+                    strips.append(rule)
+
+            # Apply replacements (longest first)
+            for old_w, new_w in sorted(replaces, key=lambda x: len(x[0]), reverse=True):
+                if not old_w:
+                    continue
+                if "@" in old_w:
+                    parts = [re.escape(p.strip()) for p in old_w.split("@")]
+                    pat = r"\s*@\s*".join(parts)
+                elif old_w.replace(" ", "").isalnum():
+                    pat = r"\b" + re.escape(old_w) + r"\b"
+                else:
+                    pat = re.escape(old_w)
+                text = re.sub(pat, new_w, text, flags=re.IGNORECASE)
+
+            # Apply strip words (longest first)
+            for w in sorted(strips, key=len, reverse=True):
+                if not w:
+                    continue
+                # Strip hashtag variants
+                if not w.startswith("#"):
+                    text = re.sub(r"(?i)#\s*" + re.escape(w), "", text)
+                    no_sp = w.replace(" ", "")
+                    if no_sp != w and len(no_sp) > 2:
+                        text = re.sub(r"(?i)#" + re.escape(no_sp) + r"\b", "", text)
+                        text = re.sub(r"(?i)#" + re.escape(w.replace(" ", "_")) + r"\b", "", text)
+
+                if "@" in w:
+                    parts = [re.escape(p.strip()) for p in w.split("@")]
+                    prefix = r"(?<![a-zA-Z0-9])"
+                    pat = prefix + r"\s*@\s*".join(parts) if parts[0] else prefix + r"@\s*" + parts[1]
+                elif any(ord(c) > 127 for c in w) or any(c in w for c in "/:.?#&=-"):
+                    pat = re.escape(w)
+                else:
+                    pat = r"\b" + re.escape(w) + r"\b"
+                text = re.sub(pat, "", text, flags=re.IGNORECASE)
         except Exception as ex_strip:
             logger.debug(f"Strip words load skipped: {ex_strip}")
+
+    # 5. Remove third-party @bot and @channel handles (except bot's own brand)
+    # Using negative lookbehind (?<![a-zA-Z0-9]) to ensure we never touch embedded leet-speak like M@rr0w or D@MS
+    text = re.sub(r'(?i)(?<![a-zA-Z0-9])@(?!Kinddoctor4u|KindDoc_bot|Ammitrajput1)[a-zA-Z0-9_]{3,32}\b', '', text)
     
     # 6. Remove common watermark brackets & stamps: (SS 6 @AnandxBotss), (_wm), [By @xyz]
     text = re.sub(r'(?i)\([^\)]*(?:@|bot|share|join|_wm|watermark|medical)[^\)]*\)', '', text)
     text = re.sub(r'(?i)\[[^\]]*(?:@|bot|share|join|_wm|watermark|medical)[^\]]*\]', '', text)
-    text = re.sub(r'(?i)\b(?:Uploaded by|Shared by|Join channel|For more lectures|Official channel|Join now|Join Medical Verse|Medical Verse)[:\s]+[^\n]*', '', text)
+    text = re.sub(r'(?i)\b(?:Uploaded by|Shared by|Join channel|For more lectures|Official channel|Join now|Join Medical Verse|Medical Verse|Join @verse medical|Join @verse_medical)[:\s]+[^\n]*', '', text)
     text = re.sub(r'(?i)\b(?:Medical Verse|Medicalverse)\b', '', text)
+    
+    # 6b. Clean stray @ symbols not part of handles or words
+    text = re.sub(r'(?<![a-zA-Z0-9])@+(?![a-zA-Z0-9])', '', text)
     
     # 7. Apply Permanent Anti-DMCA Brand Obfuscation (Leet-Speak Matrix) on clean educational content
     text = apply_anti_dmca_obfuscation(text)

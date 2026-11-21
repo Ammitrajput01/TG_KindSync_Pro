@@ -1,151 +1,689 @@
 # ==============================================================================
-# 🛡️ TELEGRAM FORWARDER PRO — PERMANENT CLEAN / REMOVE WORDS LIST
+# 🛡️ PERMANENT ANTI-DMCA OBFUSCATION & BRAND REPLACEMENTS
 # ==============================================================================
-# Ye file aapki permanent memory hai! Yahan jo bhi words/tags likhenge wo:
-# 1. Sabhi Files ke Name (PDF, Video, Docs) se automatically clean ho jayenge.
-# 2. Messages & Captions se automatically remove ho jayenge.
-# 3. Index List (Batch Table) se bhi automatically clean ho jayenge.
-#
-# 📝 KAISE USE KAREIN:
-# 1. Naya word hatane ke liye: Nayi line pe word likhein (e.g. kirmada rockstar)
-# 2. Word REPLACE karne ke liye: OldWord => NewWord (ya Old:New) likhein.
-# 3. '#' se shuru hone wali lines comment/notes hoti hain (single '#' strips hashtags).
-# ==============================================================================
-
-# --- [User Specific Watermarks & Brands] ---
-Uploaded By 👉 @Cerebellumvideosbot
-Uploaded By @Cerebellumvideosbot
-@Cerebellumvideosbot
-Cerebellumvideosbot
-#The Pirate Bay 🏴☠️
-#The Pirate Bay 🏴‍☠️
-#The Pirate Bay 🏴
-#The Pirate Bay
-#ThePirateBay
-#The_Pirate_Bay
-#PirateBay
-The Pirate Bay 🏴☠️
-The Pirate Bay 🏴‍☠️
-The Pirate Bay 🏴
-The Pirate Bay
-#DrGhost
-DrGhost
-#Kirmada
-Kirmada rockstar launcher ❤️
-Kirmada rockstar launcher
-kirmada rockstar launcher
-Kirmada rockstar kirmada
-kirmada rocket launcher
-kirmada rockstar
-kirmada
-Shimperd playbold
-Shimperd @ AnandxBotss
-Shimperd @AnandxBotss
-Shimperd
-@AnandxBotss
-AnandxBotss
-Yw @gatekeeperbasbot
-YW @gatekeeperbasbot
-yw @gatekeeperbasbot
-@gatekeeperbasbot
-gatekeeperbasbot
-yw
-Yw
-YW
-
-# --- [Spam Bots & Usernames] ---
-@YourSynapse_bot
-YourSynapse_bot
-@Dams_new_robot
-Dams_new_robot
-@medAcadpdf
-medAcadpdf
-@yourrwishh
-yourrwishh
-@yourwishhere_bot
-yourwishhere_bot
-#yourwish
-yourwish
-@Whitecoatsociety_bot
-Whitecoatsociety_bot
-@medbookeasy
-medbookeasy
-@verse_medical
-verse_medical
-
-# --- [Fancy Unicode Headers & Separators] ---
-✨ 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃 𝐁𝐘
-𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃 𝐁𝐘
-DOWNLOADED BY
-━━━━━━━✦✗✦━━━━━━━
-✦✗✦
-
-# --- [Spam / Watermark Emojis & Symbols] ---
-🏴☠️
-🏴‍☠️
-🏴
-☠️
-☠
-💀
-#
-
-# --- [Promotional Links & Text] ---
-Join [Medical Verse](https://t.me/) For more
-Join [Medical Verse](https://t.me/verse_medical) For more
-[medicalverse.in](https://www.google.com/url?sa=t&source=web&rct=j&opi=85673748&url=https://medicalverse.in/&ved=2ahUKEwiclv3k06iRAxUTlJUCHczQM0UQFnoECA4QAQ&usg=AOvVaw1mgHhHFpHrOVr-HIFqBTgP)
-[medicalverse.in](https://www.google.com/url?sa=t&source=web&rct=j&opi=97423376&url=https://medicalverse.in/&ved=2ahUKEwiclv3k06iRAxUTlJUCHczQM0UQFnoECA4QAQ&usg=AOvVaw1mgHhHFpHrOVr-HIFqBTgP)
-https://t.me/verse_medical
-https://medicalverse.in/
-Medicalverse.in
-medicalverse.in
-Medical Verse
-medical verse
-MedicalVerse
-
-# --- [Extracted By Bot Watermarks] ---
-📇 Exᴛʀᴀᴄᴛᴇᴅ Bʏ : @medicos_saviourbot 💎
-📇 ExᴛʀᴀᴄᴛET Bʏ : @medicos_saviourbot
-Exᴛʀᴀᴄᴛᴇᴅ Bʏ : @medicos_saviourbot 💎
-Exᴛʀᴀᴄᴛᴇᴅ Bʏ : @medicos_saviourbot
-Extracted By : @medicos_saviourbot 💎
-Extracted By : @medicos_saviourbot
-Extracted By @medicos_saviourbot
-@medicos_saviourbot
-medicos_saviourbot
-📇 Exᴛʀᴀᴄᴛᴇᴅ Bʏ
-Exᴛʀᴀᴄᴛᴇᴅ Bʏ
-__UNIT_TEST_SAMPLE_15196_1793101042__
-Uploaded by Krishna 💗
-🚨⚠️we are not owners or Leakers of these  lectures ...we just compressed the leaked hd files into small size ..
-🚨⚠️we are not owners or Leakers of these lectures ...we just compressed the leaked hd files into small size ..
-.▶️*
-▶️*
-@Urwellwisher_bot
-Urwellwisher_bot
-
-# --- [Anti-DMCA Medical Platform Obfuscation Matrix] ---
-DAMS => D@MS
+JOIN [MEDICAL VERSE](HTTPS => //t.me/verse_medical) For more
+Join [Medical Verse](Https => //t.me/verse_medical) For more
+Join [Medical Verse](https => //t.me/verse_medical) For more
+Join [medical verse](https => //t.me/verse_medical) For more
+join [medical verse](https => //t.me/verse_medical) For more
+[MEDICALVERSE.IN](HTTPS => //www.google.com/url?sa=t&source=web&rct=j&opi=97423376&url=https
+[Medicalverse.In](Https => //www.google.com/url?sa=t&source=web&rct=j&opi=97423376&url=https
+[medicalverse.in](https => //www.google.com/url?sa=t&source=web&rct=j&opi=97423376&url=https
+📇 EXᴛƦᴀᴄᴛET Bʏ => @medicos_saviourbot
+📇 EXᴛƦᴀᴄᴛᴇᴅ Bʏ => @medicos_saviourbot 💎
+📇 ExᴛʀᴀᴄᴛET Bʏ => @medicos_saviourbot
+📇 Exᴛʀᴀᴄᴛet Bʏ => @medicos_saviourbot
+📇 Exᴛʀᴀᴄᴛᴇᴅ Bʏ => @medicos_saviourbot 💎
+📇 exᴛʀᴀᴄᴛet bʏ => @medicos_saviourbot
+📇 exᴛʀᴀᴄᴛᴇᴅ bʏ => @medicos_saviourbot 💎
+EXTRACTED BY => @medicos_saviourbot
+EXᴛƦᴀᴄᴛᴇᴅ Bʏ => @medicos_saviourbot
+Extracted By => @medicos_saviourbot
+Extracted by => @medicos_saviourbot
+Exᴛʀᴀᴄᴛᴇᴅ Bʏ => @medicos_saviourbot
+Exᴛʀᴀᴄᴛᴇᴅ bʏ => @medicos_saviourbot
+extracted by => @medicos_saviourbot
+exᴛʀᴀᴄᴛᴇᴅ bʏ => @medicos_saviourbot
+CEREBELLUM => Cer@bellum
+Cerebellum => Cer@bellum
+DR. NAJEEB => Dr N@jeeb
+Dr. Najeeb => Dr N@jeeb
+Dr. najeeb => Dr N@jeeb
+NINJA NERD => N!nja N3rd
+Ninja Nerd => N!nja N3rd
+Ninja nerd => N!nja N3rd
+PREPLADDER => Prep L@dder
 PrepLadder => Prep L@dder
 Prepladder => Prep L@dder
-prepladder => Prep L@dder
-Marrow => M@rr0w
-marrow => M@rr0w
-Cerebellum => Cer@bellum
 cerebellum => Cer@bellum
-Bhatia => Bh@ti@
-bhatia => Bh@ti@
-DBMCI => D.B.M.C.I
-dbmci => D.B.M.C.I
-First Aid => 1st A!d
-first aid => 1st A!d
-Pathoma => P@thoma
-pathoma => P@thoma
-Sketchy => Sk3tchy
-sketchy => Sk3tchy
-Ninja Nerd => N!nja N3rd
+dr. najeeb => Dr N@jeeb
 ninja nerd => N!nja N3rd
-Dr. Najeeb => Dr N@jeeb
+prepladder => Prep L@dder
+DR NAJEEB => Dr N@jeeb
 Dr Najeeb => Dr N@jeeb
-EGurukul => E-Guruk@l
+Dr najeeb => Dr N@jeeb
+E-GURUKUL => E-Guruk@l
 E-Gurukul => E-Guruk@l
+E-gurukul => E-Guruk@l
+FIRST AID => 1st A!d
+First Aid => 1st A!d
+First aid => 1st A!d
+dr najeeb => Dr N@jeeb
+e-gurukul => E-Guruk@l
+first aid => 1st A!d
+EGURUKUL => E-Guruk@l
+EGurukul => E-Guruk@l
+Egurukul => E-Guruk@l
 egurukul => E-Guruk@l
+PATHOMA => P@thoma
+Pathoma => P@thoma
+SKETCHY => Sk3tchy
+Sketchy => Sk3tchy
+pathoma => P@thoma
+sketchy => Sk3tchy
+BHATIA => Bh@ti@
+Bhatia => Bh@ti@
+MARROW => M@rr0w
+Marrow => M@rr0w
+bhatia => Bh@ti@
+marrow => M@rr0w
+DBMCI => D.B.M.C.I
+Dbmci => D.B.M.C.I
+dbmci => D.B.M.C.I
+DAMS => D@MS
+Dams => D@MS
+dams => D@MS
+
+# ==============================================================================
+# ✂️ PERMANENT STRIPPING WORDS & WATERMARK REMOVAL (ALL CASE VARIATIONS)
+# ==============================================================================
+🚨⚠️WE ARE NOT OWNERS OR LEAKERS OF THESE  LECTURES ...WE JUST COMPRESSED THE LEAKED HD FILES INTO SMALL SIZE ..
+🚨⚠️WE_ARE_NOT_OWNERS_OR_LEAKERS_OF_THESE__LECTURES_...WE_JUST_COMPRESSED_THE_LEAKED_HD_FILES_INTO_SMALL_SIZE_..
+🚨⚠️We Are Not Owners Or Leakers Of These  Lectures ...We Just Compressed The Leaked Hd Files Into Small Size ..
+🚨⚠️We_Are_Not_Owners_Or_Leakers_Of_These__Lectures_...We_Just_Compressed_The_Leaked_Hd_Files_Into_Small_Size_..
+🚨⚠️we are not owners or Leakers of these  lectures ...we just compressed the leaked hd files into small size ..
+🚨⚠️we are not owners or leakers of these  lectures ...we just compressed the leaked hd files into small size ..
+🚨⚠️we_are_not_owners_or_Leakers_of_these__lectures_...we_just_compressed_the_leaked_hd_files_into_small_size_..
+🚨⚠️we_are_not_owners_or_leakers_of_these__lectures_...we_just_compressed_the_leaked_hd_files_into_small_size_..
+🚨⚠️WE ARE NOT OWNERS OR LEAKERS OF THESE LECTURES ...WE JUST COMPRESSED THE LEAKED HD FILES INTO SMALL SIZE ..
+🚨⚠️WE_ARE_NOT_OWNERS_OR_LEAKERS_OF_THESE_LECTURES_...WE_JUST_COMPRESSED_THE_LEAKED_HD_FILES_INTO_SMALL_SIZE_..
+🚨⚠️We Are Not Owners Or Leakers Of These Lectures ...We Just Compressed The Leaked Hd Files Into Small Size ..
+🚨⚠️We_Are_Not_Owners_Or_Leakers_Of_These_Lectures_...We_Just_Compressed_The_Leaked_Hd_Files_Into_Small_Size_..
+🚨⚠️we are not owners or Leakers of these lectures ...we just compressed the leaked hd files into small size ..
+🚨⚠️we are not owners or leakers of these lectures ...we just compressed the leaked hd files into small size ..
+🚨⚠️we_are_not_owners_or_Leakers_of_these_lectures_...we_just_compressed_the_leaked_hd_files_into_small_size_..
+🚨⚠️we_are_not_owners_or_leakers_of_these_lectures_...we_just_compressed_the_leaked_hd_files_into_small_size_..
+🚨⚠️WEARENOTOWNERSORLEAKERSOFTHESELECTURES...WEJUSTCOMPRESSEDTHELEAKEDHDFILESINTOSMALLSIZE..
+🚨⚠️Wearenotownersorleakersoftheselectures...Wejustcompressedtheleakedhdfilesintosmallsize..
+🚨⚠️wearenotownersorLeakersoftheselectures...wejustcompressedtheleakedhdfilesintosmallsize..
+🚨⚠️wearenotownersorleakersoftheselectures...wejustcompressedtheleakedhdfilesintosmallsize..
+  UNIT TEST SAMPLE 15196 1793101042  
+  Unit Test Sample 15196 1793101042  
+  unit test sample 15196 1793101042  
+__UNIT_TEST_SAMPLE_15196_1793101042__
+__Unit_Test_Sample_15196_1793101042__
+__unit_test_sample_15196_1793101042__
+UPLOADED BY 👉 @CEREBELLUMVIDEOSBOT
+UPLOADED_BY_👉_@CEREBELLUMVIDEOSBOT
+Uploaded By 👉 @Cerebellumvideosbot
+Uploaded by 👉 @cerebellumvideosbot
+Uploaded_By_👉_@Cerebellumvideosbot
+Uploaded_by_👉_@cerebellumvideosbot
+uploaded by 👉 @cerebellumvideosbot
+uploaded_by_👉_@cerebellumvideosbot
+EXTRACTED BY @MEDICOS_SAVIOURBOT
+EXTRACTED_BY_@MEDICOS_SAVIOURBOT
+Extracted By @Medicos_Saviourbot
+Extracted By @medicos_saviourbot
+Extracted by @medicos_saviourbot
+Extracted_By_@Medicos_Saviourbot
+Extracted_By_@medicos_saviourbot
+Extracted_by_@medicos_saviourbot
+UPLOADED BY @CEREBELLUMVIDEOSBOT
+UPLOADED_BY_@CEREBELLUMVIDEOSBOT
+Uploaded By @Cerebellumvideosbot
+Uploaded by @cerebellumvideosbot
+Uploaded_By_@Cerebellumvideosbot
+Uploaded_by_@cerebellumvideosbot
+extracted by @medicos_saviourbot
+extracted_by_@medicos_saviourbot
+uploaded by @cerebellumvideosbot
+uploaded_by_@cerebellumvideosbot
+UPLOADEDBY👉@CEREBELLUMVIDEOSBOT
+UploadedBy👉@Cerebellumvideosbot
+Uploadedby👉@Cerebellumvideosbot
+Uploadedby👉@cerebellumvideosbot
+uploadedby👉@cerebellumvideosbot
+EXTRACTEDBY@MEDICOS_SAVIOURBOT
+ExtractedBy@medicos_saviourbot
+Extractedby@Medicos_Saviourbot
+Extractedby@medicos_saviourbot
+UPLOADEDBY@CEREBELLUMVIDEOSBOT
+UploadedBy@Cerebellumvideosbot
+Uploadedby@Cerebellumvideosbot
+Uploadedby@cerebellumvideosbot
+extractedby@medicos_saviourbot
+uploadedby@cerebellumvideosbot
+UNITTESTSAMPLE151961793101042
+Unittestsample151961793101042
+unittestsample151961793101042
+KIRMADA ROCKSTAR LAUNCHER ❤️
+KIRMADA_ROCKSTAR_LAUNCHER_❤️
+Kirmada Rockstar Launcher ❤️
+Kirmada rockstar launcher ❤️
+Kirmada_Rockstar_Launcher_❤️
+Kirmada_rockstar_launcher_❤️
+kirmada rockstar launcher ❤️
+kirmada_rockstar_launcher_❤️
+https://t.me/verse_medical
+KIRMADA ROCKSTAR LAUNCHER
+KIRMADAROCKSTARLAUNCHER❤️
+KIRMADA_ROCKSTAR_LAUNCHER
+Kirmada Rockstar Launcher
+Kirmada rockstar launcher
+Kirmada_Rockstar_Launcher
+Kirmada_rockstar_launcher
+Kirmadarockstarlauncher❤️
+kirmada rockstar launcher
+kirmada_rockstar_launcher
+kirmadarockstarlauncher❤️
+KIRMADA ROCKSTAR KIRMADA
+KIRMADA_ROCKSTAR_KIRMADA
+Kirmada Rockstar Kirmada
+Kirmada rockstar kirmada
+Kirmada_Rockstar_Kirmada
+Kirmada_rockstar_kirmada
+https://medicalverse.in/
+kirmada rockstar kirmada
+kirmada_rockstar_kirmada
+KIRMADA ROCKET LAUNCHER
+KIRMADAROCKSTARLAUNCHER
+KIRMADA_ROCKET_LAUNCHER
+Kirmada Rocket Launcher
+Kirmada rocket launcher
+Kirmada_Rocket_Launcher
+Kirmada_rocket_launcher
+Kirmadarockstarlauncher
+kirmada rocket launcher
+kirmada_rocket_launcher
+kirmadarockstarlauncher
+KIRMADAROCKSTARKIRMADA
+Kirmadarockstarkirmada
+SHIMPERD @ ANANDXBOTSS
+SHIMPERD_@_ANANDXBOTSS
+Shimperd @ AnandxBotss
+Shimperd @ Anandxbotss
+Shimperd @ anandxbotss
+Shimperd_@_AnandxBotss
+Shimperd_@_Anandxbotss
+Shimperd_@_anandxbotss
+kirmadarockstarkirmada
+shimperd @ anandxbotss
+shimperd_@_anandxbotss
+#WHITECOATSOCIETY_BOT
+#Whitecoatsociety_Bot
+#Whitecoatsociety_bot
+#whitecoatsociety_bot
+@WHITECOATSOCIETY BOT
+@WHITECOATSOCIETY_BOT
+@Whitecoatsociety Bot
+@Whitecoatsociety bot
+@Whitecoatsociety_Bot
+@Whitecoatsociety_bot
+@whitecoatsociety bot
+@whitecoatsociety_bot
+KIRMADAROCKETLAUNCHER
+Kirmadarocketlauncher
+SHIMPERD @ANANDXBOTSS
+SHIMPERD_@ANANDXBOTSS
+Shimperd @AnandxBotss
+Shimperd @Anandxbotss
+Shimperd @anandxbotss
+Shimperd_@AnandxBotss
+Shimperd_@Anandxbotss
+Shimperd_@anandxbotss
+UPLOADED BY KRISHNA 💗
+UPLOADED_BY_KRISHNA_💗
+Uploaded By Krishna 💗
+Uploaded by Krishna 💗
+Uploaded by krishna 💗
+Uploaded_By_Krishna_💗
+Uploaded_by_Krishna_💗
+Uploaded_by_krishna_💗
+kirmadarocketlauncher
+shimperd @anandxbotss
+shimperd_@anandxbotss
+uploaded by krishna 💗
+uploaded_by_krishna_💗
+#CEREBELLUMVIDEOSBOT
+#Cerebellumvideosbot
+#cerebellumvideosbot
+@CEREBELLUMVIDEOSBOT
+@Cerebellumvideosbot
+@WHITECOATSOCIETYBOT
+@Whitecoatsocietybot
+@cerebellumvideosbot
+@whitecoatsocietybot
+SHIMPERD@ANANDXBOTSS
+Shimperd@AnandxBotss
+Shimperd@Anandxbotss
+Shimperd@anandxbotss
+WHITECOATSOCIETY BOT
+WHITECOATSOCIETY_BOT
+Whitecoatsociety Bot
+Whitecoatsociety bot
+Whitecoatsociety_Bot
+Whitecoatsociety_bot
+YW @GATEKEEPERBASBOT
+YW @gatekeeperbasbot
+YW_@GATEKEEPERBASBOT
+YW_@gatekeeperbasbot
+Yw @Gatekeeperbasbot
+Yw @gatekeeperbasbot
+Yw_@Gatekeeperbasbot
+Yw_@gatekeeperbasbot
+shimperd@anandxbotss
+whitecoatsociety bot
+whitecoatsociety_bot
+yw @gatekeeperbasbot
+yw_@gatekeeperbasbot
+#MEDICOS_SAVIOURBOT
+#Medicos_Saviourbot
+#Medicos_saviourbot
+#medicos_saviourbot
+@MEDICOS SAVIOURBOT
+@MEDICOS_SAVIOURBOT
+@Medicos Saviourbot
+@Medicos_Saviourbot
+@Medicos_saviourbot
+@medicos saviourbot
+@medicos_saviourbot
+CEREBELLUMVIDEOSBOT
+Cerebellumvideosbot
+THE PIRATE BAY 🏴‍☠️
+THE_PIRATE_BAY_🏴‍☠️
+The Pirate Bay 🏴‍☠️
+The pirate bay 🏴‍☠️
+The_Pirate_Bay_🏴‍☠️
+The_pirate_bay_🏴‍☠️
+WHITECOATSOCIETYBOT
+Whitecoatsocietybot
+YW@GATEKEEPERBASBOT
+YW@gatekeeperbasbot
+Yw@Gatekeeperbasbot
+Yw@gatekeeperbasbot
+cerebellumvideosbot
+the pirate bay 🏴‍☠️
+the_pirate_bay_🏴‍☠️
+whitecoatsocietybot
+yw@gatekeeperbasbot
+@MEDICOSSAVIOURBOT
+@Medicossaviourbot
+@medicossaviourbot
+MEDICOS SAVIOURBOT
+MEDICOS_SAVIOURBOT
+Medicos Saviourbot
+Medicos saviourbot
+Medicos_Saviourbot
+Medicos_saviourbot
+THE PIRATE BAY 🏴☠️
+THE_PIRATE_BAY_🏴☠️
+The Pirate Bay 🏴☠️
+The pirate bay 🏴☠️
+The_Pirate_Bay_🏴☠️
+The_pirate_bay_🏴☠️
+UPLOADEDBYKRISHNA💗
+UploadedbyKrishna💗
+Uploadedbykrishna💗
+medicos saviourbot
+medicos_saviourbot
+the pirate bay 🏴☠️
+the_pirate_bay_🏴☠️
+uploadedbykrishna💗
+#GATEKEEPERBASBOT
+#Gatekeeperbasbot
+#URWELLWISHER_BOT
+#Urwellwisher_Bot
+#Urwellwisher_bot
+#YOURWISHHERE_BOT
+#Yourwishhere_Bot
+#Yourwishhere_bot
+#gatekeeperbasbot
+#urwellwisher_bot
+#yourwishhere_bot
+@GATEKEEPERBASBOT
+@Gatekeeperbasbot
+@URWELLWISHER BOT
+@URWELLWISHER_BOT
+@Urwellwisher Bot
+@Urwellwisher bot
+@Urwellwisher_Bot
+@Urwellwisher_bot
+@YOURWISHHERE BOT
+@YOURWISHHERE_BOT
+@Yourwishhere Bot
+@Yourwishhere_Bot
+@Yourwishhere_bot
+@gatekeeperbasbot
+@urwellwisher bot
+@urwellwisher_bot
+@yourwishhere bot
+@yourwishhere_bot
+MEDICOSSAVIOURBOT
+Medicossaviourbot
+SHIMPERD PLAYBOLD
+SHIMPERD_PLAYBOLD
+Shimperd Playbold
+Shimperd playbold
+Shimperd_Playbold
+Shimperd_playbold
+medicossaviourbot
+shimperd playbold
+shimperd_playbold
+━━━━━━━✦✗✦━━━━━━━
+#YOURSYNAPSE_BOT
+#YourSynapse_bot
+#Yoursynapse_Bot
+#Yoursynapse_bot
+#yoursynapse_bot
+@URWELLWISHERBOT
+@Urwellwisherbot
+@YOURSYNAPSE BOT
+@YOURSYNAPSE_BOT
+@YOURWISHHEREBOT
+@YourSynapse bot
+@YourSynapse_bot
+@Yoursynapse Bot
+@Yoursynapse_Bot
+@Yoursynapse_bot
+@Yourwishherebot
+@urwellwisherbot
+@yoursynapse bot
+@yoursynapse_bot
+@yourwishherebot
+GATEKEEPERBASBOT
+Gatekeeperbasbot
+KIRMADA ROCKSTAR
+KIRMADA_ROCKSTAR
+Kirmada Rockstar
+Kirmada rockstar
+Kirmada_Rockstar
+Kirmada_rockstar
+SHIMPERDPLAYBOLD
+Shimperdplaybold
+THE PIRATE BAY 🏴
+THEPIRATEBAY🏴‍☠️
+THE_PIRATE_BAY_🏴
+The Pirate Bay 🏴
+The pirate bay 🏴
+ThePirateBay🏴‍☠️
+The_Pirate_Bay_🏴
+The_pirate_bay_🏴
+Thepiratebay🏴‍☠️
+URWELLWISHER BOT
+URWELLWISHER_BOT
+Urwellwisher Bot
+Urwellwisher bot
+Urwellwisher_Bot
+Urwellwisher_bot
+YOURWISHHERE BOT
+YOURWISHHERE_BOT
+Yourwishhere Bot
+Yourwishhere bot
+Yourwishhere_Bot
+Yourwishhere_bot
+gatekeeperbasbot
+kirmada rockstar
+kirmada_rockstar
+shimperdplaybold
+the pirate bay 🏴
+the_pirate_bay_🏴
+thepiratebay🏴‍☠️
+urwellwisher bot
+urwellwisher_bot
+yourwishhere bot
+yourwishhere_bot
+#DAMS_NEW_ROBOT
+#Dams_New_Robot
+#Dams_new_robot
+#dams_new_robot
+@DAMS NEW ROBOT
+@DAMS_NEW_ROBOT
+@Dams New Robot
+@Dams new robot
+@Dams_New_Robot
+@Dams_new_robot
+@YOURSYNAPSEBOT
+@YourSynapsebot
+@Yoursynapsebot
+@dams new robot
+@dams_new_robot
+@yoursynapsebot
+KIRMADAROCKSTAR
+Kirmadarockstar
+MEDICALVERSE.IN
+Medicalverse.In
+Medicalverse.in
+THEPIRATEBAY🏴☠️
+ThePirateBay🏴☠️
+Thepiratebay🏴☠️
+URWELLWISHERBOT
+Urwellwisherbot
+YOURSYNAPSE BOT
+YOURSYNAPSE_BOT
+YOURWISHHEREBOT
+YourSynapse bot
+YourSynapse_bot
+Yoursynapse Bot
+Yoursynapse bot
+Yoursynapse_Bot
+Yoursynapse_bot
+Yourwishherebot
+kirmadarockstar
+medicalverse.in
+thepiratebay🏴☠️
+urwellwisherbot
+yoursynapse bot
+yoursynapse_bot
+yourwishherebot
+✨ 𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃 𝐁𝐘
+✨_𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃_𝐁𝐘
+#MEDICAL_VERSE
+#Medical_Verse
+#Medical_verse
+#VERSE MEDICAL
+#VERSE_MEDICAL
+#Verse Medical
+#Verse medical
+#Verse_Medical
+#Verse_medical
+#medical_verse
+#verse medical
+#verse_medical
+@MEDICAL VERSE
+@MEDICAL_VERSE
+@Medical Verse
+@Medical_Verse
+@Medical_verse
+@VERSE MEDICAL
+@VERSE_MEDICAL
+@Verse Medical
+@Verse medical
+@Verse_Medical
+@Verse_medical
+@medical verse
+@medical_verse
+@verse medical
+@verse_medical
+DAMS NEW ROBOT
+DAMS_NEW_ROBOT
+Dams New Robot
+Dams new robot
+Dams_New_Robot
+Dams_new_robot
+THE PIRATE BAY
+THE_PIRATE_BAY
+The Pirate Bay
+The pirate bay
+The_Pirate_Bay
+The_pirate_bay
+YOURSYNAPSEBOT
+YourSynapsebot
+Yoursynapsebot
+dams new robot
+dams_new_robot
+the pirate bay
+the_pirate_bay
+yoursynapsebot
+📇 EXᴛƦᴀᴄᴛᴇᴅ Bʏ
+📇 Exᴛʀᴀᴄᴛᴇᴅ Bʏ
+📇 exᴛʀᴀᴄᴛᴇᴅ bʏ
+📇_EXᴛƦᴀᴄᴛᴇᴅ_Bʏ
+📇_Exᴛʀᴀᴄᴛᴇᴅ_Bʏ
+📇_exᴛʀᴀᴄᴛᴇᴅ_bʏ
+#MEDICALVERSE
+#MedicalVerse
+#Medicalverse
+#medicalverse
+@DAMSNEWROBOT
+@Damsnewrobot
+@MEDICALVERSE
+@MedicalVerse
+@Medicalverse
+@VERSEMEDICAL
+@VerseMedical
+@Versemedical
+@damsnewrobot
+@medicalverse
+@versemedical
+DOWNLOADED BY
+DOWNLOADED_BY
+Downloaded By
+Downloaded by
+Downloaded_By
+Downloaded_by
+MEDICAL VERSE
+MEDICAL_VERSE
+Medical Verse
+Medical verse
+Medical_Verse
+Medical_verse
+THEPIRATEBAY🏴
+ThePirateBay🏴
+Thepiratebay🏴
+VERSE MEDICAL
+VERSE_MEDICAL
+Verse Medical
+Verse medical
+Verse_Medical
+Verse_medical
+downloaded by
+downloaded_by
+medical verse
+medical_verse
+thepiratebay🏴
+verse medical
+verse_medical
+✨𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃𝐁𝐘
+𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃 𝐁𝐘
+𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃_𝐁𝐘
+#ANANDXBOTSS
+#AnandxBotss
+#Anandxbotss
+#MEDBOOKEASY
+#Medbookeasy
+#anandxbotss
+#medbookeasy
+@ANANDXBOTSS
+@AnandxBotss
+@Anandxbotss
+@MEDBOOKEASY
+@Medbookeasy
+@anandxbotss
+@medbookeasy
+DAMSNEWROBOT
+DOWNLOADEDBY
+Damsnewrobot
+Downloadedby
+EXᴛƦᴀᴄᴛᴇᴅ Bʏ
+EXᴛƦᴀᴄᴛᴇᴅ_Bʏ
+Exᴛʀᴀᴄᴛᴇᴅ Bʏ
+Exᴛʀᴀᴄᴛᴇᴅ bʏ
+Exᴛʀᴀᴄᴛᴇᴅ_Bʏ
+Exᴛʀᴀᴄᴛᴇᴅ_bʏ
+MEDICALVERSE
+MedicalVerse
+Medicalverse
+THEPIRATEBAY
+ThePirateBay
+Thepiratebay
+VERSEMEDICAL
+VerseMedical
+Versemedical
+damsnewrobot
+downloadedby
+exᴛʀᴀᴄᴛᴇᴅ bʏ
+exᴛʀᴀᴄᴛᴇᴅ_bʏ
+medicalverse
+thepiratebay
+versemedical
+𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃𝐄𝐃𝐁𝐘
+📇EXᴛƦᴀᴄᴛᴇᴅBʏ
+📇ExᴛʀᴀᴄᴛᴇᴅBʏ
+📇Exᴛʀᴀᴄᴛᴇᴅbʏ
+📇exᴛʀᴀᴄᴛᴇᴅbʏ
+#MEDACADPDF
+#Medacadpdf
+#YOURRWISHH
+#Yourrwishh
+#medAcadpdf
+#medacadpdf
+#yourrwishh
+@MEDACADPDF
+@Medacadpdf
+@YOURRWISHH
+@Yourrwishh
+@medAcadpdf
+@medacadpdf
+@yourrwishh
+ANANDXBOTSS
+AnandxBotss
+Anandxbotss
+EXᴛƦᴀᴄᴛᴇᴅBʏ
+ExᴛʀᴀᴄᴛᴇᴅBʏ
+Exᴛʀᴀᴄᴛᴇᴅbʏ
+MEDBOOKEASY
+Medbookeasy
+anandxbotss
+exᴛʀᴀᴄᴛᴇᴅbʏ
+medbookeasy
+MEDACADPDF
+Medacadpdf
+YOURRWISHH
+Yourrwishh
+medAcadpdf
+medacadpdf
+yourrwishh
+SHIMPERD
+Shimperd
+YOURWISH
+Yourwish
+shimperd
+yourwish
+DRGHOST
+DrGhost
+Drghost
+KIRMADA
+Kirmada
+drghost
+kirmada
+#VERSE
+#Verse
+#verse
+@VERSE
+@Verse
+@verse
+VERSE
+Verse
+verse
+#ATF
+#Atf
+#atf
+.▶️*
+@ATF
+@Atf
+@atf
+🏴‍☠️
+ATF
+Atf
+atf
+▶️*
+✦✗✦
+🏴☠️
+YW
+Yw
+yw
+☠️
+☠
+🏴
+💀

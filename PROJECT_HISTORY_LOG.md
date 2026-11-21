@@ -2,6 +2,50 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 21 November 2026 | 08:52 PM IST
+
+### 96. Forensic Root-Cause Diagnosis & Permanent Hardening for Dynamic Forum Topics, Thumbnail Studio, All-Case Stripping Words & Unstoppable Bot Cloner
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"bhaai jitne striping wrds add hai sbhi ke liye bol rha hu or haan ye bhi btaao baar baar Bot se cloning rukk q jaati hai iska fix nahi hai kya or saari cheeje aap chq q nahi krte ho koi na koi error aahe jata hai"*
+* **Forensic Root Causes Identified & Eliminated**:
+  1. *Why Topics Went to General (`target_topic=0`)*:
+     - When `tg_kindsync_pro.py` was launched in God Mode (`--auto`), `routing_mode` was set to `"god"` (string) instead of `2`.
+     - In `PipelineProcessor.execute`, the condition `if self.cfg.routing_mode == 2 and self.cfg.forwarding_rules:` evaluated to `False`, forcing the pipeline into the `else:` branch.
+     - In the `else:` branch, `target_topic` defaulted to `self.cfg.target_topic or None` (which is `0` / None), causing all forwarded media to be sent without `reply_to`, dumping exactly 664 messages (`#79142` to `#79810`) into the General topic of the target supergroup.
+     - *Permanent Fix*: In `PipelineProcessor.execute`, implemented automatic dynamic forum topic detection. Every incoming message's MTProto `reply_to.reply_to_top_id` is inspected and mapped to the matching rule in `self.cfg.forwarding_rules`, ensuring messages are always routed to their correct destination forum topic even in Single/God mode.
+  2. *Why Thumbnails Stopped Attaching on Restricted Content*:
+     - `THUMB_MODE='original'` was configured in `.env`, which disabled Pillow's branded 16:9 thumbnail generator.
+     - In the restricted source channel (`-1003968310888`), files lacked embedded thumbnails, causing `extract_original_thumb` to return `None`, leaving files without any thumbnail.
+     - *Permanent Fix*: Added a hybrid thumbnail fallback in `PipelineProcessor.execute`. If `extract_original_thumb` returns `None` or is missing, the system automatically falls back to Pillow's branded Kind Doctor 16:9 studio thumbnail (`kind_doctor_thumb.jpg`). No media item is ever sent without a thumbnail.
+  3. *Why Bot Cloning Stalled Repeatedly*:
+     - `scripts/run_study_help_clone.py` ran as a one-shot script inside an unmonitored tmux session.
+     - When Telegram MTProto reset the TCP connection during `iter_messages`, the script caught `ex_topic`, logged the error, and moved to the next topic or exited without reconnecting.
+     - Manual process kills (`sudo pkill -9 -f tg_kindsync`) or SSH timeouts terminated the tmux session without auto-restarting.
+     - *Permanent Fix*:
+       - Added 5-attempt exponential retry and auto-reconnection loop around `iter_messages` for every single topic.
+       - Wrapped `main()` in an outer resilient `run_with_watchdog` loop that auto-recovers from any uncaught connection error in 5 seconds.
+       - Created dedicated systemd service unit `deploy/tg-study-cloner.service` (`Restart=always`, `RestartSec=5`) so Linux automatically restarts the cloner if memory spikes, the process crashes, or the server reboots.
+  4. *Complete Expansion of All Stripping Words Across All Case Variations*:
+     - User requested all stripping words to be added in every possible form (lowercase, UPPERCASE, Title Case, capitalized, with `@`, without `@`, with `#`, with spaces, and with underscores).
+     - Expanded `strip_words.txt` from 110 entries to **610 unique stripping words** and **72 replacement pairs**, sorted by length descending to prevent sub-token collisions.
+     - Hardened both `devi/operator/deep_cloner.py` and `tg_kindsync_pro.py` to process dynamic rules with word boundaries (`\b`) and length-descending order.
+* **Database & Safe Rewind Tooling**:
+  - Developed `scripts/rewind_general_misrouted_messages.py` to audit and purge the 664 records in `forwarded` where `target_topic=0 AND msg_id >= 79142`, restoring watermarks so the batch can be cleanly re-forwarded to correct forum topics.
+* **Verification & Test Suite**:
+  - All unit tests in `tests/test_strip_google_url.py` and `tests/test_anti_dmca_pipeline.py` pass 100% (10 out of 10 tests passed in 1.86s).
+  - All modified scripts compiled cleanly with `python -m py_compile`.
+* **Affected Files**:
+  - `strip_words.txt`
+  - `devi/operator/deep_cloner.py`
+  - `tg_kindsync_pro.py`
+  - `scripts/run_study_help_clone.py`
+  - `scripts/rewind_general_misrouted_messages.py`
+  - `deploy/tg-study-cloner.service`
+  - `tests/test_strip_google_url.py`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Saturday, 21 November 2026 | 12:44 AM IST
 
 ### 95. Full Production Deployment, Program Forwarder Resumption & Live Cloner Launch
@@ -4487,3 +4531,53 @@ This log permanently documents root causes, architectural patterns, historical b
 
 
 
+
+
+---
+
+## 📅 Log Entry: Saturday, 21 November 2026 | 09:25 PM
+
+### 57. Group-Wise Student Request Routing, Invite Link Security Lockdown & Cloner Resurrection
+* **User Directive & Problem Report (Dr. Amit Singh)**:
+  1. *Massive Stripping Word Expansion*: Generate all stripping words across every case form (lower, UPPER, Title, with `@`, without `@`, with `#`, with spaces/underscores).
+  2. *Bot Cloner Stalling*: Bot cloning repeatedly stopping mid-way; diagnose root cause and provide permanent unbreakable auto-restart fix.
+  3. *Program Cloner Topic & Thumbnail Bug*: Cloning program dumping messages into General topic instead of Sub-Topics and omitting thumbnails since last night; need safe rollback/restart from prior checkpoint.
+  4. *Unsolicited Invite Links*: Prevent bot from ever automatically sending group invite links to students without explicit admin approval.
+  5. *Group-Wise Request Routing*: Route student requests from every group where `@KindDoc_bot` is present into dedicated forum topics in the Admin Hub named after each group (e.g. `📂 [Mickey Bhaai Backup] Requests`, `📂 [Study Help 2.0] Requests`).
+* **Root Cause Forensic Analysis**:
+  1. **Stripping Word Incompleteness**: `strip_words.txt` had 110 entries lacking case variants and full brand replacements.
+  2. **Bot Cloner Network Dropout**: `run_study_help_clone.py` ran directly in tmux without backoff retries on MTProto TCP disconnects (`Server closed connection: 0 bytes read`), exiting permanently on unhandled exception.
+  3. **Program Topic Misrouting**: God mode set `routing_mode = "god"`, causing `if self.cfg.routing_mode == 2:` to evaluate to `False`, forcing `TARGET_TOPIC = 0` (General). Furthermore, Telethon's `forward_messages` lacks forum thread `reply_to` parameter.
+  4. **Thumbnail Missing on Restricted Media**: `.env` had `THUMB_MODE='original'`, bypassing Pillow's branded generator. When source channel files lacked embedded thumbnails, `None` was returned.
+  5. **Unsolicited Link Vulnerability**: `STUDENT_ALLOWED_COMMANDS` mirrored `PUBLIC_ALLOWED_COMMANDS`, and `/invitelink` & `/sendlink` lacked strict `is_admin` guards at entry, allowing unauthorized students to execute invite link commands.
+* **Applied Engineering Actions**:
+  1. **Massive Stripping Expansion**: Expanded `strip_words.txt` to **610 unique keywords** and **72 brand replacement pairs** sorted by length descending; hardened regex word boundary matching in `devi/operator/deep_cloner.py`.
+  2. **Bot Cloner Hardening & Systemd Service**: Added 5-attempt exponential retry loop for every topic, wrapped script in a 50-cycle supervisor watchdog in `scripts/run_study_help_clone.py`, and authored dedicated auto-restarting systemd unit `deploy/tg-study-cloner.service`.
+  3. **Dynamic Topic Routing & Hybrid Thumbnails in `tg_kindsync_pro.py`**: Added dynamic source topic extraction from MTProto `reply_to`, forced direct stream transmission for forum threads, and added automatic high-res 16:9 Pillow thumbnail fallback if original thumb is missing.
+  4. **Safe Watermark Rewind Utility**: Created `scripts/rewind_general_misrouted_messages.py` to audit and rollback the 664 General records in `forwarded` from message `#79142` back to `#79141`.
+  5. **Invite Link Security Lockdown**: Strictly confined `STUDENT_ALLOWED_COMMANDS` to educational, index, search, and support tools. Added strict non-admin rejection at the top of `_handle_admin_command` and inside `/invitelink`, `/sendlink`, `/send`, `/say`, `/panel`, etc.
+  6. **Group-Wise Request Routing Engine**:
+     - Added SQLite tables `telegram_group_request_topics` and `telegram_group_requests`.
+     - Added `_is_student_request` detecting hashtags (`#request`, `#req`), commands (`/request`, `/req`), and natural Hindi/English student queries (`notes chahiye`, `lecture upload kardo`, etc.).
+     - Automatically creates and resolves dedicated Forum Topics in Admin Hub (`📂 [Group Name] Requests`).
+     - Dispatches actionable Request Cards with `[✅ Mark Fulfilled]` and `[🔍 Student Dossier]` buttons.
+     - Added bidirectional reply relay: Admins replying inside the topic automatically dispatch responses back into the originating group replying to the student.
+     - Sends 45-second auto-deleting confirmation to students in the source group.
+* **Verification & Results**:
+  - `tests/test_student_request_and_security.py`: **3 / 3 PASSED**.
+  - `tests/test_strip_google_url.py`: **3 / 3 PASSED**.
+  - `tests/test_anti_dmca_pipeline.py`: **7 / 7 PASSED**.
+  - **13 / 13 tests passed with 100% success rate**.
+  - All modified files compiled cleanly via `py_compile`.
+  - Deployment policy adhered to: All edits verified locally; zero automatic push/deploy.
+* **Affected Files**:
+  - `devi/operator/telegram_bot.py`
+  - `devi/operator/deep_cloner.py`
+  - `tg_kindsync_pro.py`
+  - `strip_words.txt`
+  - `scripts/run_study_help_clone.py`
+  - `scripts/rewind_general_misrouted_messages.py`
+  - `deploy/tg-study-cloner.service`
+  - `tests/test_student_request_and_security.py`
+  - `tests/test_strip_google_url.py`
+  - `PROJECT_HISTORY_LOG.md`

@@ -162,7 +162,17 @@ PUBLIC_ALLOWED_COMMANDS = (
     "/ytdl", "/yt", "/upload", "/playlist", "/leech", "/mediahelp", "/dl",
     "/setgroup", "/selectgroup", "/mygroup", "/activegroup", "/newtopic", "/createtopic"
 )
-STUDENT_ALLOWED_COMMANDS = PUBLIC_ALLOWED_COMMANDS
+
+# STRICT Student Security Barrier: Students & non-admins can only run safe educational, index, search & support commands
+STUDENT_ALLOWED_COMMANDS = (
+    "/start", "/help", "/topics", "/mainindex", "/index", "/topicindex", "/indexmaster",
+    "/find", "/search", "/faq", "/faqs", "/support", "/contact", "/id", "/myid", "/info",
+    "/about", "/rules", "/stats", "/manual", "/fullhelp",
+    "/calc", "/dose", "/formula", "/score",
+    "/bmi", "/bsa", "/gfr", "/pedia", "/burns", "/uop", "/edd", "/psm",
+    "/drip", "/infusion", "/map", "/abg", "/sodium", "/gcs", "/curb65", "/wells",
+    "/mcq", "/pearl", "/pomodoro", "/ask", "/request", "/req"
+)
 
 class DeviTelegramBot:
     def __init__(self, bot_token: str = None):
@@ -603,6 +613,40 @@ class DeviTelegramBot:
                     )
                 """)
 
+                # 4. Group Request Topics Table (1-to-1 Mapping: Group -> Dedicated Forum Topic in Admin Hub)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS telegram_group_request_topics (
+                        source_chat_id BIGINT PRIMARY KEY,
+                        admin_chat_id BIGINT NOT NULL,
+                        topic_id INTEGER NOT NULL,
+                        group_title TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_request_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_req_topic ON telegram_group_request_topics(topic_id);")
+
+                # 5. Group Requests Audit Log & Routing Table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS telegram_group_requests (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source_chat_id BIGINT NOT NULL,
+                        source_msg_id INTEGER NOT NULL,
+                        student_user_id BIGINT NOT NULL,
+                        student_name TEXT,
+                        student_username TEXT,
+                        admin_chat_id BIGINT NOT NULL,
+                        admin_topic_id INTEGER NOT NULL,
+                        admin_msg_id INTEGER,
+                        request_text TEXT,
+                        status TEXT DEFAULT 'pending',
+                        fulfilled_by_id BIGINT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_req_admin_msg ON telegram_group_requests(admin_msg_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_req_src ON telegram_group_requests(source_chat_id, source_msg_id);")
+
                 # Explicitly commit all tables to disk
                 conn.commit()
 
@@ -781,6 +825,260 @@ class DeviTelegramBot:
         except Exception as e:
             logger.warning(f"Error fetching open tickets: {e}")
         return tickets
+
+    # ============================================================
+    # GROUP-WISE REQUEST ROUTING ENGINE & TOPIC MAPPING
+    # ============================================================
+    def _get_request_group_by_topic(self, topic_id: int) -> Optional[dict]:
+        """Find source group mapped to a forum request topic in Admin Hub."""
+        try:
+            with get_db_conn() as conn:
+                row = conn.execute(
+                    "SELECT source_chat_id, admin_chat_id, topic_id, group_title FROM telegram_group_request_topics WHERE topic_id = ?",
+                    (topic_id,)
+                ).fetchone()
+                if row:
+                    return {
+                        "source_chat_id": row[0],
+                        "admin_chat_id": row[1],
+                        "topic_id": row[2],
+                        "group_title": row[3]
+                    }
+        except Exception as e:
+            logger.debug(f"Error resolving request group by topic: {e}")
+        return None
+
+    def _get_request_topic_by_group(self, source_chat_id: int) -> Optional[dict]:
+        """Find request topic mapped to a source group."""
+        try:
+            with get_db_conn() as conn:
+                row = conn.execute(
+                    "SELECT source_chat_id, admin_chat_id, topic_id, group_title FROM telegram_group_request_topics WHERE source_chat_id = ?",
+                    (source_chat_id,)
+                ).fetchone()
+                if row:
+                    return {
+                        "source_chat_id": row[0],
+                        "admin_chat_id": row[1],
+                        "topic_id": row[2],
+                        "group_title": row[3]
+                    }
+        except Exception as e:
+            logger.debug(f"Error resolving request topic by group: {e}")
+        return None
+
+    async def _get_or_create_group_request_topic(
+        self, session: aiohttp.ClientSession, mc_chat_id: int, source_chat_id: int, group_title: str
+    ) -> Optional[int]:
+        """Gets or dynamically creates dedicated Forum Topic in Admin Hub for a group's requests."""
+        try:
+            existing = self._get_request_topic_by_group(source_chat_id)
+            if existing and existing.get("topic_id"):
+                return existing["topic_id"]
+
+            clean_title = re.sub(r'[\r\n\t]+', ' ', group_title or f"Group {source_chat_id}").strip()
+            top_title = f"📂 [{clean_title[:30]}] Requests"[:64]
+            topic_id = await self._create_forum_topic(session, mc_chat_id, top_title, icon_color=0xFFAC33)
+            if topic_id:
+                with get_db_conn() as conn:
+                    conn.execute("""
+                        INSERT INTO telegram_group_request_topics (source_chat_id, admin_chat_id, topic_id, group_title, last_request_at)
+                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        ON CONFLICT(source_chat_id) DO UPDATE SET
+                            topic_id = excluded.topic_id,
+                            admin_chat_id = excluded.admin_chat_id,
+                            group_title = excluded.group_title,
+                            last_request_at = CURRENT_TIMESTAMP
+                    """, (source_chat_id, mc_chat_id, topic_id, clean_title))
+
+                intro = (
+                    f"📂 <b>REQUEST HUB: {html.escape(clean_title)}</b> 🩺\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"👥 <b>Source Group ID:</b> <code>{source_chat_id}</code>\n"
+                    f"🎯 <b>Purpose:</b> All student study requests, book/lecture needs, and doubts from <b>{html.escape(clean_title)}</b> are automatically routed here!\n\n"
+                    f"💡 <i>Admins can reply directly in this topic — the bot will relay your reply into the student group!</i>"
+                )
+                await self._send_message(session, mc_chat_id, intro, message_thread_id=topic_id, parse_mode="HTML")
+                return topic_id
+        except Exception as e:
+            logger.warning(f"Error in _get_or_create_group_request_topic: {e}")
+        return None
+
+    def _is_student_request(self, text: str) -> bool:
+        """Determines if a message is an academic/lecture/notes request from a student."""
+        if not text:
+            return False
+        lt = text.lower().strip()
+        if any(lt.startswith(prefix) for prefix in (
+            "#request", "/request", "#req", "/req", "request:", "request -", "req:", "req -",
+            "plz send", "please send", "plz upload", "please upload", "kripya upload", "kripya send"
+        )):
+            return True
+        if "#request" in lt or "#req" in lt:
+            return True
+        items = ("notes", "lecture", "video", "pdf", "batch", "class", "revision", "chapter", "marrow", "prepladder", "dams", "cerebellum", "bhatia", "egurukul")
+        wants = ("chahiye", "upload kar do", "upload kardo", "bhej do", "send kar do", "send kardo", "any link", "anyone have", "kisi ke paas hai", "provide kar")
+        if any(item in lt for item in items) and any(want in lt for want in wants):
+            return True
+        return False
+
+    def _record_group_request(
+        self, source_chat_id: int, source_msg_id: int, student_user_id: int,
+        student_name: str, student_username: str, admin_chat_id: int, admin_topic_id: int,
+        request_text: str
+    ) -> Optional[int]:
+        """Save student group request in database."""
+        try:
+            with get_db_conn() as conn:
+                cur = conn.execute("""
+                    INSERT INTO telegram_group_requests (
+                        source_chat_id, source_msg_id, student_user_id, student_name, student_username,
+                        admin_chat_id, admin_topic_id, request_text, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                """, (source_chat_id, source_msg_id, student_user_id, student_name, student_username, admin_chat_id, admin_topic_id, request_text))
+                return cur.lastrowid
+        except Exception as e:
+            logger.warning(f"Error recording group request: {e}")
+        return None
+
+    def _get_request_by_admin_msg(self, admin_msg_id: int) -> Optional[dict]:
+        """Fetch request details by admin topic message ID."""
+        try:
+            with get_db_conn() as conn:
+                row = conn.execute(
+                    "SELECT id, source_chat_id, source_msg_id, student_user_id, student_name, student_username, request_text, status FROM telegram_group_requests WHERE admin_msg_id = ?",
+                    (admin_msg_id,)
+                ).fetchone()
+                if row:
+                    return {
+                        "id": row[0], "source_chat_id": row[1], "source_msg_id": row[2],
+                        "student_user_id": row[3], "student_name": row[4], "student_username": row[5],
+                        "request_text": row[6], "status": row[7]
+                    }
+        except Exception as e:
+            logger.debug(f"Error in _get_request_by_admin_msg: {e}")
+        return None
+
+    def _get_latest_pending_request(self, source_chat_id: int) -> Optional[dict]:
+        """Fetch the latest pending request for a source group."""
+        try:
+            with get_db_conn() as conn:
+                row = conn.execute(
+                    "SELECT id, source_chat_id, source_msg_id, student_user_id, student_name, student_username, request_text, status FROM telegram_group_requests WHERE source_chat_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1",
+                    (source_chat_id,)
+                ).fetchone()
+                if row:
+                    return {
+                        "id": row[0], "source_chat_id": row[1], "source_msg_id": row[2],
+                        "student_user_id": row[3], "student_name": row[4], "student_username": row[5],
+                        "request_text": row[6], "status": row[7]
+                    }
+        except Exception as e:
+            logger.debug(f"Error in _get_latest_pending_request: {e}")
+        return None
+
+    def _mark_request_fulfilled(self, req_id: int, admin_id: int):
+        """Mark request as fulfilled by admin."""
+        try:
+            with get_db_conn() as conn:
+                conn.execute(
+                    "UPDATE telegram_group_requests SET status = 'fulfilled', fulfilled_by_id = ? WHERE id = ?",
+                    (admin_id, req_id)
+                )
+        except Exception as e:
+            logger.warning(f"Error marking request fulfilled: {e}")
+
+    async def _handle_group_student_request(
+        self, session: aiohttp.ClientSession, message: dict, chat: dict, sender: dict, text: str
+    ):
+        """Processes and dynamically routes a group student request into dedicated Admin Hub topic."""
+        try:
+            chat_id = chat.get("id")
+            sender_id = sender.get("id")
+            msg_id = message.get("message_id")
+            chat_title = chat.get("title", f"Group {chat_id}")
+            full_name = f"{sender.get('first_name', '')} {sender.get('last_name', '')}".strip() or "Student"
+            username = sender.get("username") or ""
+
+            # Check Mission Control Admin Chat
+            mc_conf = self._get_mission_control_config()
+            mc_chat_id = mc_conf.get("chat_id") if mc_conf else None
+            if not mc_chat_id:
+                mc_chat_id = self.target_chat  # Fallback
+
+            if not mc_chat_id:
+                logger.warning("No Admin Hub / Mission Control configured for group request routing.")
+                return
+
+            req_topic_id = await self._get_or_create_group_request_topic(session, mc_chat_id, chat_id, chat_title)
+            if not req_topic_id:
+                logger.warning(f"Failed to resolve/create request topic for group {chat_title} ({chat_id})")
+                return
+
+            safe_grp_title = html.escape(chat_title)
+            safe_full_name = html.escape(full_name)
+            user_tag = f"<b>@{html.escape(username)}</b>" if username else f'<a href="tg://user?id={sender_id}"><b>{safe_full_name}</b></a>'
+            clean_cid = str(chat_id).replace("-100", "").replace("-", "")
+            msg_link = f"https://t.me/c/{clean_cid}/{msg_id}"
+
+            # Save in DB
+            req_id = self._record_group_request(
+                source_chat_id=chat_id,
+                source_msg_id=msg_id,
+                student_user_id=sender_id,
+                student_name=full_name,
+                student_username=username,
+                admin_chat_id=mc_chat_id,
+                admin_topic_id=req_topic_id,
+                request_text=text
+            )
+
+            # Build Request Intelligence Card
+            req_card = (
+                f"📥 <b>NEW STUDENT REQUEST</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"👥 <b>Group:</b> <code>{safe_grp_title}</code>\n"
+                f"👤 <b>Student:</b> {user_tag} (<code>{sender_id}</code>)\n"
+                f"🔗 <b>Message Link:</b> <a href=\"{msg_link}\">View Message in Group</a>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📝 <b>Requested Item:</b>\n"
+                f"<i>\"{html.escape(text)}\"</i>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 <i>Aap is topic me direct reply de sakte hain — student ko unke group me deliver ho jayega!</i>"
+            )
+
+            req_markup = {
+                "inline_keyboard": [
+                    [
+                        {"text": "✅ Mark Fulfilled", "callback_data": f"req_done_{req_id}"},
+                        {"text": "🔍 Student Dossier", "callback_data": f"osint_user_{sender_id}"}
+                    ]
+                ]
+            }
+
+            admin_msg_id = await self._send_message(
+                session, mc_chat_id, req_card,
+                reply_markup=req_markup,
+                message_thread_id=req_topic_id,
+                parse_mode="HTML"
+            )
+
+            if admin_msg_id and req_id:
+                with get_db_conn() as conn:
+                    conn.execute("UPDATE telegram_group_requests SET admin_msg_id = ? WHERE id = ?", (admin_msg_id, req_id))
+
+            # Polite confirmation in group (with auto-delete after 45s)
+            ack_text = (
+                f"🙏 {user_tag}, aapki request securely **Kind Doctor Desk** tak pahunch gayi hai! "
+                f"Jaise hi study material available hoga, yahan group me update kar diya jayega. 🩺✨\n"
+                f"⏱️ <i>(Chat clean rakhne ke liye yeh notice 45 sec me auto-delete ho jayega).</i>"
+            )
+            sent_ack = await self._send_message(session, chat_id, ack_text, reply_to=msg_id, parse_mode="HTML")
+            if sent_ack:
+                self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_ack, 45))
+
+        except Exception as e:
+            logger.warning(f"Error handling group student request: {e}")
 
     async def _create_forum_topic(self, session: aiohttp.ClientSession, chat_id: int, name: str, icon_color: int = 0x6FB9F0) -> Optional[int]:
         """Calls Telegram Bot API createForumTopic and returns message_thread_id."""
@@ -5515,7 +5813,21 @@ class DeviTelegramBot:
                 except Exception as e:
                     await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": f"Error: {e}"})
 
-        # 5. Mission Control Ticket Closure Callback
+        # 5. Group Request Callbacks: Mark Fulfilled
+        elif data.startswith("req_done_"):
+            try:
+                req_id = int(data.replace("req_done_", ""))
+                self._mark_request_fulfilled(req_id, admin_id)
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "✅ Marked Request as Fulfilled!"})
+                if cb_msg.get("message_id"):
+                    cur_t = cb_msg.get("text", "")
+                    fulfilled_banner = f"\n\n✅ <b>[FULFILLED & CLOSED]</b> by Admin @{cb_from.get('username') or admin_id} ✨"
+                    await self._edit_message(session, chat_id, cb_msg["message_id"], cur_t + fulfilled_banner, parse_mode="HTML")
+            except Exception as e:
+                logger.warning(f"Error in req_done callback: {e}")
+            return
+
+        # 6. Mission Control Ticket Closure Callback
         elif data.startswith("close_ticket_"):
             raw = data[len("close_ticket_"):]
             if "_" in raw:
@@ -6273,6 +6585,51 @@ class DeviTelegramBot:
                                     await self._send_message(session, chat_id, "⚠️ <i>Delivery failed (Student may have stopped/blocked the bot).</i>", message_thread_id=thread_id, parse_mode="HTML")
                                 return
 
+                    # Check if thread_id is a dedicated Group Request Topic in Admin Hub
+                    req_group = self._get_request_group_by_topic(thread_id)
+                    if req_group:
+                        is_sender_admin = (
+                            (sender_id in self.master_admin_ids)
+                            or (sender_id in self.co_admins)
+                            or (await self.is_admin_for_chat(session, chat_id, sender_id, message=message))
+                        )
+                        if is_sender_admin:
+                            clean_text = (text or "").strip()
+                            clean_lower = clean_text.lower()
+                            if clean_text.startswith("/") and not clean_lower.startswith(("/r ", "/reply ", "/say ")):
+                                pass
+                            else:
+                                reply_to = message.get("reply_to_message")
+                                target_req = None
+                                if reply_to and reply_to.get("message_id"):
+                                    target_req = self._get_request_by_admin_msg(reply_to.get("message_id"))
+                                if not target_req:
+                                    target_req = self._get_latest_pending_request(req_group["source_chat_id"])
+
+                                src_chat = req_group["source_chat_id"]
+                                src_msg_id = target_req["source_msg_id"] if target_req else None
+                                reply_body = clean_text
+                                if clean_lower.startswith(("/r ", "r ", "/reply ", "/say ")):
+                                    reply_body = clean_text.split(maxsplit=1)[1] if len(clean_text.split()) > 1 else ""
+
+                                if reply_body:
+                                    user_reply_text = f"👨‍⚕️ <b>Kind Doctor:</b>\n\n{html.escape(reply_body)}"
+                                    sent_id = await self._send_message(
+                                        session, src_chat, user_reply_text,
+                                        reply_to=src_msg_id,
+                                        parse_mode="HTML"
+                                    )
+                                    if sent_id:
+                                        if target_req:
+                                            self._mark_request_fulfilled(target_req["id"], sender_id)
+                                        await self._send_message(
+                                            session, chat_id,
+                                            f"✅ <b>Delivered to {html.escape(req_group.get('group_title', 'Group'))}</b> (Reply to #{src_msg_id or 'General'}) 🩺",
+                                            message_thread_id=thread_id,
+                                            parse_mode="HTML"
+                                        )
+                                        return
+
             # Live Sangmata Identity Tracking in Group (Detects name/username shifts on every message)
             if sender and not sender.get("is_bot") and "new_chat_members" not in message:
                 user_dossier = self._track_user_dossier(sender)
@@ -6667,10 +7024,15 @@ class DeviTelegramBot:
                         self._log_welcome_message(chat_id, sent_warn_id)
                     return
 
-            # C. Group Commands, Smart FAQs or Tags
+            # C. Group Commands, Smart FAQs, Requests or Tags
             cur_bot_tag = f"@{self.bot_username}".lower() if getattr(self, "bot_username", None) else "@kinddoc_bot"
             is_tagged = (cur_bot_tag in text.lower()) or ("@kinddoc" in text.lower()) or ("@kinddoctor" in text.lower())
             is_command = text.startswith("/")
+
+            # Intercept and route student study requests by group into dedicated Admin Topics!
+            if self._is_student_request(text):
+                await self._handle_group_student_request(session, message, chat, sender, text)
+                return
 
             if not (is_tagged or is_command):
                 # Smart FAQ trigger: Check if any keyword matches a saved FAQ
@@ -6940,6 +7302,10 @@ class DeviTelegramBot:
             # Allow all admin commands for admins, and student commands for everyone in private DM
             if self.is_admin(sender_id) or custom_cmd_key in STUDENT_ALLOWED_COMMANDS:
                 await self._handle_admin_command(session, chat_id, sender_id, clean_prompt, message=message)
+                return
+            else:
+                logger.warning(f"Blocked unauthorized command '{custom_cmd_key}' from student {sender_id}")
+                await self._send_message(session, chat_id, "🔒 Yeh administrative command sirf Kind Doctor Admins ke liye reserved hai. Aap /menu ya /help se available student tools explore kar sakte hain! 🩺✨")
                 return
 
         # Build Rich Intel Dossier Banner for Admins
@@ -7353,6 +7719,11 @@ class DeviTelegramBot:
         reply_to = message.get("reply_to_message") if message else None
         msg_id = message.get("message_id", 0) if message else 0
         clean_chat_id = str(chat_id).replace("-100", "").replace("-", "").lstrip("@")
+
+        # Strict Security Barrier: Non-admins cannot execute sensitive admin commands
+        if not self.is_admin(admin_id) and cmd not in STUDENT_ALLOWED_COMMANDS:
+            logger.warning(f"Unauthorized command '{cmd}' blocked for non-admin {admin_id} in {chat_id}")
+            return
 
         # ⚡ O(1) Command Router Fast-Path Dispatch
         if hasattr(self, "command_router") and self.command_router.has_command(cmd):
@@ -10499,6 +10870,8 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, f"❌ Failed resetting jobs: {ex_rst}", message_thread_id=thread_id)
 
         elif cmd in ("/send", "/pm", "/msg", "/sendlink", "/reply", "/say", "/dr"):
+            if not self.is_admin(admin_id):
+                return
             # 1. Admin speaking through bot in Group or DM: /say <msg> or /dr <msg>
             if cmd in ("/say", "/dr") or (cmd == "/reply" and len(parts) > 1 and not (parts[1].isdigit() or parts[1].startswith("@"))):
                 msg_body = text.split(maxsplit=1)[1] if len(parts) > 1 else ""
@@ -12228,6 +12601,8 @@ class DeviTelegramBot:
                 await self._send_message(session, chat_id, "🔒 **Emergency Lockdown Activated!**\n\n• Group entry is sealed.\n• No new links will be generated.\n• All onboarding requests are held in safety queue.", message_thread_id=thread_id)
 
         elif cmd == "/invitelink":
+            if not self.is_admin(admin_id):
+                return
             if getattr(self, "is_lockdown", False):
                 await self._send_message(session, chat_id, "🔒 Group is currently under **Emergency Lockdown**. Use `/lockdown off` before generating new links.", message_thread_id=thread_id)
                 return

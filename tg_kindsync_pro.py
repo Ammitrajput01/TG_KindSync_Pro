@@ -3981,17 +3981,36 @@ class PipelineProcessor:
         return f"Topic {topic_id}"
 
     async def execute(self, item: WorkItem, stop_event: asyncio.Event):
-        if self.cfg.routing_mode == 2 and self.cfg.forwarding_rules:
-            rule = self.cfg.forwarding_rules[item.rule_index]
-            target_chat = rule["target_chat"]
-            target_topic = rule.get("target_topic", 0) or None
-            source_chat = rule["source_chat"]
-            source_topic = rule.get("source_topic", 0) or 0
-        else:
-            target_chat = self.cfg.target_chat
-            target_topic = self.cfg.target_topic or None
-            source_chat = self.cfg.source_chat
-            source_topic = self.cfg.source_topic or 0
+        target_chat = self.cfg.target_chat
+        target_topic = self.cfg.target_topic or None
+        source_chat = self.cfg.source_chat
+        source_topic = self.cfg.source_topic or 0
+
+        # Dynamic Forum Topic Routing: Match topic from item's rule_index OR directly from message headers
+        if self.cfg.forwarding_rules:
+            matched_rule = None
+            if item.rule_index < len(self.cfg.forwarding_rules):
+                matched_rule = self.cfg.forwarding_rules[item.rule_index]
+            
+            # Inspect first message to extract true source topic ID from MTProto reply_to
+            if item.messages:
+                m_lead = item.messages[0]
+                m_top_id = (
+                    getattr(getattr(m_lead, "reply_to", None), "reply_to_top_id", None)
+                    or getattr(getattr(m_lead, "reply_to", None), "reply_to_msg_id", None)
+                    or 0
+                )
+                if m_top_id and int(m_top_id) > 1:
+                    for r in self.cfg.forwarding_rules:
+                        if int(r.get("source_topic", 0)) == int(m_top_id):
+                            matched_rule = r
+                            break
+
+            if matched_rule:
+                target_chat = matched_rule["target_chat"]
+                target_topic = matched_rule.get("target_topic", 0) or None
+                source_chat = matched_rule["source_chat"]
+                source_topic = matched_rule.get("source_topic", 0) or 0
 
         client = self.session_mgr.get_client()
         primary_client = self.session_mgr.clients[self.session_mgr.active_index] if (self.session_mgr and getattr(self.session_mgr, "clients", None)) else client
@@ -4025,6 +4044,9 @@ class PipelineProcessor:
                 t_path = await self.thumb.extract_original_thumb(client, m_first)
                 if t_path:
                     is_temp_extracted_thumb = True
+            # HYBRID FALLBACK: If original thumb was missing/blank, attach custom branded thumb
+            if not t_path and sig_enabled:
+                t_path = await self.thumb.get_input_file(client)
 
         resolved_topic = await self.resolve_topic_id(target_chat, target_topic, client)
 
@@ -4038,7 +4060,8 @@ class PipelineProcessor:
 
         success_flag = False
         direct_forward_success = False
-        attempt_direct = getattr(self.cfg, "direct_forward", False) and str(source_chat) not in self._restricted_channels
+        # Direct forward bypass for forum topics: Telethon forward_messages lacks topic thread support
+        attempt_direct = getattr(self.cfg, "direct_forward", False) and str(source_chat) not in self._restricted_channels and not resolved_topic
 
         if attempt_direct and client != primary_client:
             try:

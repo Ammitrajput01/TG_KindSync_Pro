@@ -297,72 +297,89 @@ async def main():
 
         topic_cloned = 0
         current_max_id = min_msg_id
+        topic_fully_finished = False
 
-        try:
-            async for msg in user_client.iter_messages(src_peer, reply_to=src_top_id, min_id=min_msg_id, reverse=True):
-                if getattr(msg, 'action', None) or not (msg.text or msg.media):
-                    continue
+        for topic_attempt in range(1, 6):
+            try:
+                if not user_client.is_connected():
+                    logger.info(f"🔄 Reconnecting Telethon client for Topic '{src_top_title}'...")
+                    await user_client.connect()
 
-                orig_filename = getattr(msg.file, 'name', None)
-                raw_text = (msg.text or "").strip()
-                cleaned_caption = clean_cloned_caption(
-                    raw_text=raw_text,
-                    orig_filename=orig_filename,
-                    topic_title=src_top_title,
-                    is_media=bool(msg.media)
-                )
+                async for msg in user_client.iter_messages(src_peer, reply_to=src_top_id, min_id=current_max_id, reverse=True):
+                    if getattr(msg, 'action', None) or not (msg.text or msg.media):
+                        continue
 
-                sent = False
-                logger.info(f"📨 [{topic_cloned+1}] Topic '{src_top_title}' copying msg #{msg.id}...")
-                for retry in range(3):
-                    ok, (err, retry_after) = await bot_copy_message(
-                        http_session, BOT_TOKEN, SOURCE_CHAT_ID, TARGET_CHAT_ID, target_topic_id, msg.id, cleaned_caption
+                    orig_filename = getattr(msg.file, 'name', None)
+                    raw_text = (msg.text or "").strip()
+                    cleaned_caption = clean_cloned_caption(
+                        raw_text=raw_text,
+                        orig_filename=orig_filename,
+                        topic_title=src_top_title,
+                        is_media=bool(msg.media)
                     )
-                    if ok:
-                        sent = True
-                        break
-                    elif retry_after and retry_after > 0:
-                        logger.warning(f"⏳ Bot API Rate Limit: Sleeping {retry_after + 2}s")
-                        await asyncio.sleep(retry_after + 2)
-                    else:
-                        logger.info(f"Bot copy notice on msg #{msg.id} ({err}) -> Trying MTProto pointer fallback...")
-                        try:
-                            if msg.media:
-                                await user_client.send_file(
-                                    tgt_peer,
-                                    file=msg.media,
-                                    caption=cleaned_caption,
-                                    reply_to=reply_hdr
-                                )
-                            elif msg.text:
-                                await user_client.send_message(
-                                    tgt_peer,
-                                    cleaned_caption,
-                                    reply_to=reply_hdr
-                                )
+
+                    sent = False
+                    logger.info(f"📨 [{topic_cloned+1}] Topic '{src_top_title}' copying msg #{msg.id}...")
+                    for retry in range(3):
+                        ok, (err, retry_after) = await bot_copy_message(
+                            http_session, BOT_TOKEN, SOURCE_CHAT_ID, TARGET_CHAT_ID, target_topic_id, msg.id, cleaned_caption
+                        )
+                        if ok:
                             sent = True
                             break
-                        except FloodWaitError as fe:
-                            logger.warning(f"⏳ MTProto FloodWait {fe.seconds + 2}s")
-                            await asyncio.sleep(min(fe.seconds + 2, 60))
-                        except Exception as e_send:
-                            logger.warning(f"Error copying msg #{msg.id} (attempt {retry+1}): {e_send}")
-                            await asyncio.sleep(0.5)
+                        elif retry_after and retry_after > 0:
+                            logger.warning(f"⏳ Bot API Rate Limit: Sleeping {retry_after + 2}s")
+                            await asyncio.sleep(retry_after + 2)
+                        else:
+                            logger.info(f"Bot copy notice on msg #{msg.id} ({err}) -> Trying MTProto pointer fallback...")
+                            try:
+                                if msg.media:
+                                    await user_client.send_file(
+                                        tgt_peer,
+                                        file=msg.media,
+                                        caption=cleaned_caption,
+                                        reply_to=reply_hdr
+                                    )
+                                elif msg.text:
+                                    await user_client.send_message(
+                                        tgt_peer,
+                                        cleaned_caption,
+                                        reply_to=reply_hdr
+                                    )
+                                sent = True
+                                break
+                            except FloodWaitError as fe:
+                                logger.warning(f"⏳ MTProto FloodWait {fe.seconds + 2}s")
+                                await asyncio.sleep(min(fe.seconds + 2, 60))
+                            except Exception as e_send:
+                                logger.warning(f"Error copying msg #{msg.id} (attempt {retry+1}): {e_send}")
+                                await asyncio.sleep(0.5)
 
-                if sent:
-                    topic_cloned += 1
-                    grand_total_cloned += 1
-                    current_max_id = max(current_max_id, msg.id)
-                    update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, inc=1)
-                    await asyncio.sleep(2.5)
+                    if sent:
+                        topic_cloned += 1
+                        grand_total_cloned += 1
+                        current_max_id = max(current_max_id, msg.id)
+                        update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, inc=1)
+                        await asyncio.sleep(2.5)
 
-            # Mark topic finished
-            update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, is_finished=True)
-            completed_topics_count += 1
-            logger.info(f"✅ Finished Topic #{idx}/{total_topics}: '{src_top_title}' ({topic_cloned} messages cloned).")
+                # Mark topic finished
+                update_topic_watermark(str(SOURCE_CHAT_ID), src_top_id, str(TARGET_CHAT_ID), target_topic_id, current_max_id, is_finished=True)
+                completed_topics_count += 1
+                topic_fully_finished = True
+                logger.info(f"✅ Finished Topic #{idx}/{total_topics}: '{src_top_title}' ({topic_cloned} messages cloned).")
+                break
 
-            # Dispatch periodic milestone card every 5 topics or if topic had content
-            if topic_cloned > 0 or completed_topics_count % 5 == 0:
+            except (ConnectionError, asyncio.TimeoutError, Exception) as ex_topic:
+                logger.warning(f"⚠️ Topic '{src_top_title}' attempt {topic_attempt}/5 error: {ex_topic}")
+                if topic_attempt < 5:
+                    wait_s = topic_attempt * 4
+                    logger.info(f"⏳ Auto-recovering in {wait_s}s...")
+                    await asyncio.sleep(wait_s)
+                else:
+                    logger.error(f"❌ Topic '{src_top_title}' exhausted 5 retries. Progress saved at msg #{current_max_id}.")
+
+        # Dispatch periodic milestone card every 5 topics or if topic had content
+        if topic_cloned > 0 or completed_topics_count % 5 == 0:
                 milestone_card = (
                     f"📑 <b>TOPIC CLONED SUCCESSFULLY</b> 🩺\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -374,10 +391,6 @@ async def main():
                     f"🕒 <code>{datetime.now().strftime('%I:%M:%S %p')}</code>"
                 )
                 await send_telemetry_card(user_client, milestone_card)
-
-        except Exception as ex_topic:
-            logger.error(f"Error processing topic '{src_top_title}': {ex_topic}")
-            await asyncio.sleep(1.0)
 
     final_card = (
         f"🎉 <b>STUDY HELP 2.0 FULL CLONE COMPLETED!</b> 🩺\n"
@@ -394,5 +407,24 @@ async def main():
     await http_session.close()
 
 
+async def run_with_watchdog():
+    max_restarts = 50
+    for restart_count in range(1, max_restarts + 1):
+        try:
+            await main()
+            logger.info("🏁 Cloner completed all topics cleanly. Exiting watchdog.")
+            break
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            logger.info("🛑 Cloner received stop signal by operator. Exiting.")
+            break
+        except Exception as e:
+            logger.error(f"💥 Cloner encountered uncaught error (Restart {restart_count}/{max_restarts}): {e}")
+            logger.info("🔄 Watchdog auto-restarting cloner in 5 seconds...")
+            await asyncio.sleep(5)
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(run_with_watchdog())
+    except KeyboardInterrupt:
+        logger.info("🛑 Process terminated by operator.")
