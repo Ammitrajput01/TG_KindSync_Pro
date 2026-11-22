@@ -60,20 +60,18 @@ def main():
     print(f"  • Misrouted Messages Count : {count}")
     print(f"  • Message ID Range         : #{min_id} to #{max_id}")
 
-    if count == 0:
-        print("✔ No misrouted messages found in General topic. Database is clean!")
-        conn.close()
-        return
-
-    # 2. Delete misrouted records
-    print(f"\n🗑️  Purging {count} misrouted records from 'forwarded' table...")
-    cursor.execute("""
-        DELETE FROM forwarded
-        WHERE target_chat = ? AND (target_topic = 1 OR target_topic = 0) AND msg_id >= 79141
-    """, (target_chat,))
-    deleted = cursor.rowcount
-    conn.commit()
-    print(f"  ✔ Successfully purged {deleted} records.")
+    if count > 0:
+        # 2. Delete misrouted records
+        print(f"\n🗑️  Purging {count} misrouted records from 'forwarded' table...")
+        cursor.execute("""
+            DELETE FROM forwarded
+            WHERE target_chat = ? AND (target_topic = 1 OR target_topic = 0) AND msg_id >= 79141
+        """, (target_chat,))
+        deleted = cursor.rowcount
+        conn.commit()
+        print(f"  ✔ Successfully purged {deleted} records.")
+    else:
+        print("✔ No misrouted messages in General topic (already clean).")
 
     # 3. Check and restore watermark
     safe_watermark = 79326
