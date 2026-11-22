@@ -647,6 +647,18 @@ class DeviTelegramBot:
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_req_admin_msg ON telegram_group_requests(admin_msg_id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_req_src ON telegram_group_requests(source_chat_id, source_msg_id);")
 
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS high_risk_strike_watchlist (
+                        user_id BIGINT PRIMARY KEY,
+                        source_chat_id BIGINT,
+                        username TEXT,
+                        full_name TEXT,
+                        join_date TEXT,
+                        reason TEXT,
+                        quarantined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
                 # Explicitly commit all tables to disk
                 conn.commit()
 
@@ -2699,17 +2711,21 @@ class DeviTelegramBot:
             if t_handle:
                 t_handle.close()
 
-    async def _export_members_csv_file(self, session: aiohttp.ClientSession, send_to_chat: int, group_id: int, message_thread_id: Optional[int] = None):
+    async def _export_members_csv_file(self, session: aiohttp.ClientSession, send_to_chat: int, group_id: int, message_thread_id: Optional[int] = None, limit: Optional[int] = None):
         """Generates and sends an audit CSV with member details and join timestamps."""
         try:
             with get_db_conn() as conn:
                 conn.row_factory = sqlite3.Row
-                cur = conn.execute(
+                query = (
                     "SELECT m.user_id, m.full_name, m.username, m.join_date, d.last_seen, d.total_messages, d.changes_count "
                     "FROM member_history m LEFT JOIN telegram_users_dossier d ON m.user_id = d.user_id "
-                    "WHERE m.chat_id = ? ORDER BY m.join_date DESC",
-                    (group_id,)
+                    "WHERE m.chat_id = ? ORDER BY m.join_date DESC"
                 )
+                params = [group_id]
+                if limit and limit > 0:
+                    query += " LIMIT ?"
+                    params.append(limit)
+                cur = conn.execute(query, tuple(params))
                 rows = cur.fetchall()
 
             csv_buf = io.StringIO()
@@ -2732,7 +2748,8 @@ class DeviTelegramBot:
             date_str = now.strftime("%d-%B-%Y")
             time_str = now.strftime("%I-%M%p")
             display_ts = now.strftime("%A, %d %B %Y | %I:%M %p")
-            fname = f"members_audit_{abs(group_id)}_{day_str}_{date_str}_{time_str}.csv"
+            lim_suffix = f"_last{limit}" if limit else ""
+            fname = f"members_audit{lim_suffix}_{abs(group_id)}_{day_str}_{date_str}_{time_str}.csv"
             caption = (
                 f"📊 <b>Member Audit CSV Export</b> 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2745,6 +2762,175 @@ class DeviTelegramBot:
         except Exception as e:
             logger.warning(f"Error exporting member CSV: {e}")
             await self._send_message(session, send_to_chat, f"❌ Failed to export CSV: {e}", message_thread_id=message_thread_id)
+
+    async def _dispatch_group_member_strike_backup(
+        self,
+        session: aiohttp.ClientSession,
+        group_id: int,
+        trigger_reason: str = "Copyright Strike / Emergency Audit",
+        limit: int = 100
+    ) -> int:
+        """
+        Creates and dispatches a high-priority 100-member emergency strike backup CSV & JSON.
+        Delivers to:
+        1. Master Admin 1 (@Kinddoctor4u - 1553619403)
+        2. Master Admin 2 (@Ammitrajput1 - 759038032)
+        3. Fresh / Active group administrators of that specific group
+        4. Kind Doctor HQ Supergroup (-1003942399840) -> 🚨 High-Risk Quarantine Radar topic
+        
+        Also locks all these 100 members permanently into high_risk_strike_watchlist table and cache.
+        """
+        try:
+            with get_db_conn() as conn:
+                conn.row_factory = sqlite3.Row
+                cur = conn.execute("""
+                    SELECT m.user_id, m.full_name, m.username, m.join_date, m.chat_id,
+                           d.total_messages, d.changes_count, d.phone_number AS phone, d.last_seen
+                    FROM member_history m
+                    LEFT JOIN telegram_users_dossier d ON m.user_id = d.user_id
+                    WHERE m.chat_id = ?
+                    ORDER BY m.join_date DESC
+                    LIMIT ?
+                """, (group_id, limit))
+                rows = cur.fetchall()
+
+                # Fallback across all groups if specific chat has no rows logged
+                if not rows:
+                    cur = conn.execute("""
+                        SELECT m.user_id, m.full_name, m.username, m.join_date, m.chat_id,
+                               d.total_messages, d.changes_count, d.phone_number AS phone, d.last_seen
+                        FROM member_history m
+                        LEFT JOIN telegram_users_dossier d ON m.user_id = d.user_id
+                        ORDER BY m.join_date DESC
+                        LIMIT ?
+                    """, (limit,))
+                    rows = cur.fetchall()
+
+            if not rows:
+                logger.warning(f"No members found to backup for group {group_id}")
+                return 0
+
+            # 1. Build CSV & JSON data
+            csv_buf = io.StringIO()
+            writer = csv.writer(csv_buf)
+            writer.writerow(["Index", "User ID", "Full Name", "Username", "Join Timestamp", "Last Seen", "Messages Count", "Name Shifts", "Group ID"])
+            json_members = []
+            wl_records = []
+            
+            now = datetime.now()
+            day_str = now.strftime("%A")
+            date_str = now.strftime("%d-%B-%Y")
+            time_str = now.strftime("%I-%M%p")
+            display_ts = now.strftime("%A, %d %B %Y | %I:%M %p")
+            grp_clean = abs(group_id)
+
+            for idx, r in enumerate(rows, 1):
+                u_id = int(r["user_id"])
+                u_name = r["username"] or ""
+                f_name = r["full_name"] or "User"
+                j_date = r["join_date"] or ""
+                writer.writerow([
+                    idx,
+                    u_id,
+                    f_name,
+                    f"@{u_name}" if u_name else "None",
+                    j_date,
+                    r["last_seen"] or "",
+                    r["total_messages"] or 0,
+                    r["changes_count"] or 0,
+                    r["chat_id"]
+                ])
+                json_members.append({
+                    "id": u_id,
+                    "first_name": f_name,
+                    "username": u_name,
+                    "join_date": j_date,
+                    "chat_id": r["chat_id"]
+                })
+                wl_records.append((u_id, group_id, u_name, f_name, j_date, trigger_reason))
+
+            csv_bytes = csv_buf.getvalue().encode("utf-8")
+            json_bytes = json.dumps({"group_id": group_id, "snapshot_time": display_ts, "members": json_members}, indent=2).encode("utf-8")
+
+            # 2. Lock into high_risk_strike_watchlist table & cache
+            with get_db_conn() as conn:
+                conn.executemany("""
+                    INSERT OR REPLACE INTO high_risk_strike_watchlist 
+                    (user_id, source_chat_id, username, full_name, join_date, reason)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, wl_records)
+                conn.commit()
+
+            # Refresh in-memory watchlist cache
+            if hasattr(self, "_watchlist_cache") and self._watchlist_cache:
+                for rec in wl_records:
+                    self._watchlist_cache[rec[0]] = {
+                        "id": rec[0], "username": rec[2], "name": rec[3], "join_date": rec[4]
+                    }
+
+            # File names strictly complying with Dr. Amit's permanent backup naming rule:
+            # [prefix]_[Day]_[Date]-[Month]-[Year]_[Time-12hAM-PM].[ext]
+            fname_csv = f"member_strike_backup_last{len(rows)}_{grp_clean}_{day_str}_{date_str}_{time_str}.csv"
+            fname_json = f"member_strike_backup_last{len(rows)}_{grp_clean}_{day_str}_{date_str}_{time_str}.json"
+
+            caption = (
+                f"🚨 <b>HIGH-RISK STRIKE RADAR — EMERGENCY MEMBER BACKUP</b> 🩺\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🕒 <b>Snapshot Time:</b> <code>{display_ts}</code>\n"
+                f"🏛️ <b>Group ID:</b> <code>{group_id}</code>\n"
+                f"👥 <b>Last Tracked Members Secured:</b> <b>{len(rows)}</b>\n"
+                f"⚠️ <b>Trigger Reason:</b> <i>{html.escape(trigger_reason)}</i>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🔒 <i>All {len(rows)} members are now permanently locked in Quarantine Watchlist.</i>"
+            )
+
+            # 3. Deliver to Master Admins
+            for m_id in self.master_admin_ids:
+                try:
+                    await self._send_document(session, m_id, csv_bytes, fname_csv, caption=caption, parse_mode="HTML")
+                except Exception as ex_adm:
+                    logger.warning(f"Error sending strike backup CSV to master admin {m_id}: {ex_adm}")
+
+            # 4. Deliver to Kind Doctor HQ (High-Risk Quarantine Radar topic)
+            mc_conf = self._get_mission_control_config()
+            if mc_conf and mc_conf.get("chat_id") and mc_conf.get("topic_radar_id"):
+                try:
+                    await self._send_document(
+                        session,
+                        mc_conf["chat_id"],
+                        csv_bytes,
+                        fname_csv,
+                        caption=caption,
+                        message_thread_id=mc_conf["topic_radar_id"],
+                        parse_mode="HTML"
+                    )
+                except Exception as ex_mc:
+                    logger.warning(f"Error sending strike backup to HQ Quarantine Radar: {ex_mc}")
+
+            # 5. Deliver to Fresh / Current Group Administrators
+            try:
+                async with session.get(f"https://api.telegram.org/bot{self.token}/getChatAdministrators?chat_id={group_id}") as resp:
+                    if resp.status == 200:
+                        res_json = await resp.json()
+                        if res_json.get("ok"):
+                            for adm in res_json.get("result", []):
+                                u = adm.get("user", {})
+                                adm_uid = int(u.get("id", 0))
+                                if adm_uid and not u.get("is_bot") and adm_uid not in self.master_admin_ids:
+                                    try:
+                                        await self._send_document(
+                                            session, adm_uid, csv_bytes, fname_csv, caption=caption, parse_mode="HTML"
+                                        )
+                                    except Exception as ex_gadm:
+                                        logger.debug(f"Could not PM group admin {adm_uid}: {ex_gadm}")
+            except Exception as ex_gadm_fetch:
+                logger.debug(f"Error fetching fresh group admins: {ex_gadm_fetch}")
+
+            logger.info(f"✅ High-risk member strike backup successfully created and dispatched for {len(rows)} members.")
+            return len(rows)
+        except Exception as e:
+            logger.error(f"Error in _dispatch_group_member_strike_backup: {e}")
+            return 0
 
     def _generate_daily_joins_report(self, group_id: Optional[int] = None, target_date: Optional[str] = None):
         """
@@ -2896,7 +3082,7 @@ class DeviTelegramBot:
                         is_active = excluded.is_active
                 """, (chat_id, title, uname, added_by, is_active))
 
-            if status == "administrator":
+            if status in ("administrator", "member"):
                 admin_alert = (
                     f"👑 **[BOT NETWORK ALERT] Bot Added to New Group!**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2906,6 +3092,14 @@ class DeviTelegramBot:
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"👉 Use `/network` or `/members` to view audit."
                 )
+
+                # Auto-create dedicated group topic in Kind Doctor HQ and dispatch alert
+                mc_conf = self._get_mission_control_config()
+                if mc_conf and mc_conf.get("chat_id"):
+                    mc_topic = await self._get_or_create_group_request_topic(session, mc_conf["chat_id"], chat_id, title)
+                    if mc_topic:
+                        await self._send_message(session, mc_conf["chat_id"], admin_alert, message_thread_id=mc_topic)
+
                 for m_id in self.master_admin_ids:
                     await self._send_message(session, m_id, admin_alert)
 
@@ -2928,16 +3122,32 @@ class DeviTelegramBot:
             logger.warning(f"Error in _handle_my_chat_member: {e}")
 
     def _get_highlight_watchlist(self) -> dict:
-        """Loads chronological 50 highlight members who joined immediately before the copyright strike."""
+        """Loads chronological 50/100 highlight members who joined immediately before copyright strikes or emergencies."""
         if hasattr(self, "_watchlist_cache") and self._watchlist_cache:
             return self._watchlist_cache
 
         wl = {}
+        # 1. Load from DB high_risk_strike_watchlist table
+        try:
+            with get_db_conn() as conn:
+                conn.row_factory = sqlite3.Row
+                for r in conn.execute("SELECT user_id, username, full_name, join_date FROM high_risk_strike_watchlist"):
+                    uid = int(r["user_id"])
+                    wl[uid] = {
+                        "id": uid,
+                        "username": r["username"] or "",
+                        "name": r["full_name"] or "",
+                        "join_date": r["join_date"] or ""
+                    }
+        except Exception as ex:
+            logger.debug(f"DB watchlist load error: {ex}")
+
+        # 2. Load from JSON files in exports
         try:
             cand_files = [
                 BASE_PROJECT_DIR / "exports" / "study_help_blacklisted_last50_ACCURATE_Friday_20-November-2026_12-10PM.json",
             ]
-            for f in (BASE_PROJECT_DIR / "exports").glob("study_help_blacklisted_last50_ACCURATE_*.json"):
+            for f in (BASE_PROJECT_DIR / "exports").glob("*_last*.json"):
                 if f not in cand_files:
                     cand_files.append(f)
 
@@ -2946,16 +3156,16 @@ class DeviTelegramBot:
                     with open(cand, "r", encoding="utf-8") as jf:
                         data = json.load(jf)
                         for m in data.get("members", []):
-                            uid = m.get("id")
+                            uid = m.get("id") or m.get("user_id")
                             if uid:
-                                wl[int(uid)] = {
-                                    "id": int(uid),
-                                    "username": m.get("username", ""),
-                                    "name": f"{m.get('first_name', '')} {m.get('last_name', '')}".strip(),
-                                    "join_date": m.get("join_date", "")
-                                }
-                    if wl:
-                        break
+                                uid_int = int(uid)
+                                if uid_int not in wl:
+                                    wl[uid_int] = {
+                                        "id": uid_int,
+                                        "username": m.get("username", ""),
+                                        "name": f"{m.get('first_name', '')} {m.get('last_name', '')}".strip() or m.get("name", ""),
+                                        "join_date": m.get("join_date", "")
+                                    }
         except Exception as e:
             logger.debug(f"Watchlist load skipped: {e}")
 
@@ -3059,7 +3269,13 @@ class DeviTelegramBot:
             # Route to Dedicated Mission Control Topic if active
             mc_conf = self._get_mission_control_config()
             if mc_conf and mc_conf.get("chat_id"):
-                dest_topic = mc_conf.get("topic_radar_id") if is_watchlist else mc_conf.get("topic_joins_id")
+                if is_watchlist:
+                    dest_topic = mc_conf.get("topic_radar_id")
+                else:
+                    dest_topic = await self._get_or_create_group_request_topic(
+                        session, mc_conf["chat_id"], chat_id, chat_title
+                    ) or mc_conf.get("topic_joins_id")
+
                 if dest_topic:
                     await self._send_message(
                         session,
@@ -5367,6 +5583,27 @@ class DeviTelegramBot:
             elif action in ("unlink_account", "disconnect", "logout"):
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Disconnecting Account..."})
                 await self._handle_admin_command(session, chat_id, admin_id, "/disconnect", message=msg_obj)
+            elif action.startswith("act_exp_members_") or (data and data.startswith("act_exp_members_")):
+                raw_d = action if action.startswith("act_exp_members_") else data
+                parts_d = raw_d.replace("act_exp_members_", "").split("_")
+                t_grp = int(parts_d[0])
+                lim_d = int(parts_d[1]) if len(parts_d) > 1 and parts_d[1].isdigit() else None
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Exporting Members CSV..."})
+                await self._export_members_csv_file(session, chat_id, t_grp, message_thread_id=thread_id, limit=lim_d)
+                return
+            elif action.startswith("act_view_members_") or (data and data.startswith("act_view_members_")):
+                raw_d = action if action.startswith("act_view_members_") else data
+                t_grp = int(raw_d.replace("act_view_members_", ""))
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Loading Member Audit..."})
+                await self._handle_admin_command(session, chat_id, admin_id, f"/members {t_grp}", message=msg_obj)
+                return
+            elif action.startswith("act_strike_backup_") or (data and data.startswith("act_strike_backup_")):
+                raw_d = action if action.startswith("act_strike_backup_") else data
+                t_grp = int(raw_d.replace("act_strike_backup_", ""))
+                await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Initiating 100-Member Strike Backup... 🚨", "show_alert": True})
+                await self._dispatch_group_member_strike_backup(session, t_grp, trigger_reason="Manual Emergency Strike Backup Triggered", limit=100)
+                await self._send_message(session, chat_id, f"✅ <b>Emergency Strike Backup for group <code>{t_grp}</code> completed and dispatched!</b>", message_thread_id=thread_id, parse_mode="HTML")
+                return
             # --- 10 FEATURE CARDS & HELP GUIDES (In-Place Edit) ---
             elif action in ("striphelp", "help_strip", "stripwordshelp", "watermarkhelp"):
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id})
@@ -9199,7 +9436,7 @@ class DeviTelegramBot:
                 with get_db_conn() as conn:
                     conn.row_factory = sqlite3.Row
                     cur = conn.execute(
-                        "SELECT user_id, full_name, username, join_date FROM member_history WHERE chat_id = ? ORDER BY join_date DESC LIMIT 15",
+                        "SELECT user_id, full_name, username, join_date FROM member_history WHERE chat_id = ? ORDER BY join_date DESC LIMIT 100",
                         (target_chat_id,)
                     )
                     recent_joins = cur.fetchall()
@@ -9211,7 +9448,7 @@ class DeviTelegramBot:
                     # Fallback across all study groups if specific chat has no joins logged yet
                     if not recent_joins:
                         cur = conn.execute(
-                            "SELECT user_id, full_name, username, join_date FROM member_history ORDER BY join_date DESC LIMIT 15"
+                            "SELECT user_id, full_name, username, join_date FROM member_history ORDER BY join_date DESC LIMIT 100"
                         )
                         recent_joins = cur.fetchall()
                         total_tracked = conn.execute("SELECT COUNT(*) FROM member_history").fetchone()[0]
@@ -9225,7 +9462,7 @@ class DeviTelegramBot:
                 recent_joins, total_tracked, recent_changes = [], 0, []
 
             join_lines = []
-            for j in recent_joins:
+            for j in recent_joins[:15]:
                 uname = f"@{j['username']}" if j['username'] else "No Username"
                 date_str = str(j['join_date'])[:16]
                 join_lines.append(f"• `{date_str}`: **{j['full_name']}** ({uname}) - ID: `{j['user_id']}`")
@@ -9242,24 +9479,56 @@ class DeviTelegramBot:
             changes_block = "\n".join(changes_lines) if changes_lines else "_No name changes detected._"
 
             audit_card = (
-                f"👥 **GROUP MEMBER AUDIT & TIME-TRACKER** 🩺\n"
+                f"👥 **GROUP MEMBER AUDIT & TIME-TRACKER (Last 100 Scan)** 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"🏛️ **Target Group**: `{target_chat_id}`\n"
-                f"📊 **Tracked Members**: `{total_tracked}`\n\n"
-                f"🕒 **Recent Joins (Last 15):**\n"
+                f"📊 **Tracked Members**: `{total_tracked}` (Scanned Last: `{len(recent_joins)}`)\n\n"
+                f"🕒 **Recent Joins (Top 15 Preview):**\n"
                 f"{join_block}\n\n"
                 f"🔄 **Recent Identity & Username Shifts:**\n"
                 f"{changes_block}\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💡 _Tap below to export full member dataset as CSV file._"
+                f"💡 _Neeche buttons se Last 100 CSV ya Emergency Strike Backup le sakte hain:_"
             )
 
             btn_markup = {
                 "inline_keyboard": [
-                    [{"text": "📥 Export Full Members CSV", "callback_data": f"act_exp_members_{target_chat_id}"}]
+                    [
+                        {"text": "📥 Export Last 100 CSV", "callback_data": f"act_exp_members_{target_chat_id}_100"},
+                        {"text": "📥 Export All CSV", "callback_data": f"act_exp_members_{target_chat_id}"}
+                    ],
+                    [
+                        {"text": "🚨 Emergency Strike Backup (Last 100)", "callback_data": f"act_strike_backup_{target_chat_id}"}
+                    ]
                 ]
             }
             await self._send_message(session, chat_id, audit_card, reply_markup=btn_markup, message_thread_id=thread_id)
+
+        elif cmd in ("/strikebackup", "/strike", "/quarantine100", "/emergencyscan"):
+            target_chat_id = self._resolve_study_group_id(chat_id)
+            if len(parts) > 1 and parts[1].lstrip("-").isdigit():
+                target_chat_id = int(parts[1])
+
+            is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
+            if not is_caller_admin and admin_id not in self.master_admin_ids:
+                await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
+                return
+
+            await self._send_message(
+                session, chat_id,
+                f"🚨 <b>Initiating Last 100 Member Strike Backup for Group <code>{target_chat_id}</code>...</b>\n"
+                f"Securing CSV & JSON to Quarantine Radar, locking members into Watchlist, and notifying Admins...",
+                message_thread_id=thread_id,
+                parse_mode="HTML"
+            )
+            count = await self._dispatch_group_member_strike_backup(session, target_chat_id, limit=100)
+            await self._send_message(
+                session, chat_id,
+                f"✅ <b>Strike Backup Complete!</b>\n"
+                f"Secured <b>{count}</b> members to Quarantine Radar & dispatched emergency files to Admins.",
+                message_thread_id=thread_id,
+                parse_mode="HTML"
+            )
 
         elif cmd in ("/allgroups", "/network", "/mygroups"):
             # Master Admin Exclusive (@Kinddoctor4u: 1553619403, @Ammitrajput1: 759038032)
@@ -9311,15 +9580,18 @@ class DeviTelegramBot:
 
         elif cmd in ("/exportmembers", "/exportcsv"):
             target_chat_id = self._resolve_study_group_id(chat_id)
+            limit_val = None
             if len(parts) > 1 and parts[1].lstrip("-").isdigit():
                 target_chat_id = int(parts[1])
+            if len(parts) > 2 and parts[2].isdigit():
+                limit_val = int(parts[2])
 
             is_caller_admin = await self.is_admin_for_chat(session, target_chat_id, admin_id, message)
             if not is_caller_admin:
                 await self._send_message(session, chat_id, "⚠️ Access Denied: Admin rights required.", message_thread_id=thread_id)
                 return
 
-            await self._export_members_csv_file(session, chat_id, target_chat_id, message_thread_id=thread_id)
+            await self._export_members_csv_file(session, chat_id, target_chat_id, message_thread_id=thread_id, limit=limit_val)
 
         elif cmd in ("/backup", "/dbbackup", "/snapshot"):
             if admin_id not in self.master_admin_ids:

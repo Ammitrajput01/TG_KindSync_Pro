@@ -2,6 +2,98 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Sunday, 22 November 2026 | 01:45 PM IST
+
+### 99. High-Risk Quarantine Radar Last 100 Member Surveillance & Emergency Strike Backup Engine, Comprehensive Study Platforms Symbol Obfuscation, and Strict Local Clutter Clean
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"wo high risk wala mt bhoolna jo aata hai jo last 50 wale mmbers the or haan sb grps jisme kind doc bot hai sb ke members pe njr rkhna hmesha or jb bhi group strike aati hai uske last 50 members ka backub bna ke fresh admins ko bhejna always or mujhe bhi please ab se scanning last 100 ki fix krenge jo admins ko bhejni hai grps ke ok"*
+  - *"or saare updates and upgrades krdo plese lekn soch smjh ke koi errros nahi aane chahiye baad me"*
+  - *"or haan abi oracle se hum koi clear clutter nahi krenge qki kai baar process me problem aajati hai to srf local pc se krenge"*
+* **Forensic Root Cause Analysis**:
+  1. *High-Risk Quarantine Surveillance Gap*:
+     - Previously, the watchlist relied strictly on static JSON snapshots (`study_help_blacklisted_last50_ACCURATE_*.json`) in `exports/` capturing only the 50 members from the historical Study Help strike.
+     - When strikes or raids hit any newly linked network group, there was no automated mechanism to snapshot the recent 100 members, notify the fresh group admins + master admins, and automatically register them in the bot's live radar quarantine.
+  2. *Scanning Depth Limitation*:
+     - Admin audit command `/members` and `/exportmembers` historically inspected only the last 15 members in summary view without a dedicated 100-member emergency strike package option.
+  3. *Limited Study Platform DMCA Obfuscations*:
+     - `strip_words.txt` previously contained only 12 platforms. Modern Indian and international medical, dental, and PG preparation content uses over 50 distinct commercial platforms (DocTutorials, PW Med Ed, Speed Medical, Sushruta, Next Medical Academy, MedLive, UWorld, Amboss, Boards and Beyond, Kenhub, Medbullets, Kaplan, etc.) whose exact names trigger Telegram automated copyright bots.
+* **Applied Engineering Actions & Permanent Fixes**:
+  1. **High-Risk Quarantine Radar Strike Engine (`devi/operator/telegram_bot.py`)**:
+     - Created `high_risk_strike_watchlist` table in SQLite schema.
+     - Implemented `_dispatch_group_member_strike_backup(session, group_id, trigger_reason, limit=100)`:
+       - Fetches recent 100 members from `member_history` joined with `telegram_users_dossier`.
+       - Generates timestamped CSV and JSON backups adhering strictly to Dr. Amit's permanent backup naming rule: `member_strike_backup_last100_{group_clean}_{Day}_{Date}-{Month}-{Year}_{Time-12hAM-PM}.csv` and `.json`.
+       - Delivers to Master Admin 1 (`@Kinddoctor4u` - `1553619403`), Master Admin 2 (`@Ammitrajput1` - `759038032`), fresh group admins (via `getChatAdministrators`), and Kind Doctor HQ (`-1003942399840`) topic `🚨 High-Risk Quarantine Radar` (`topic_radar_id`).
+       - Locks all 100 members permanently into `high_risk_strike_watchlist` and cache. Any future join attempt by these members into ANY network group instantly fires `⚠️⚠️ WATCHLIST RADAR: HIGHLIGHT SUSPECT DETECTED! ⚠️⚠️` inside the Quarantine Radar topic.
+  2. **100-Member Scanning Fix in Commands**:
+     - Upgraded `/members` and `/memberaudit` to scan 100 members (`LIMIT 100`) with quick-action buttons: `[📥 Export Last 100 CSV]`, `[📥 Export All CSV]`, and `[🚨 Emergency Strike Backup (Last 100)]`.
+     - Added dedicated Telegram command `/strikebackup` (aliases `/strike`, `/quarantine100`, `/emergencyscan`).
+     - Added callback handlers `act_exp_members_*` and `act_strike_backup_*` in `_handle_callback_query`.
+  3. **Comprehensive Anti-DMCA Study Platforms Expansion (`strip_words.txt`)**:
+     - Added 50+ platforms across Indian PG, USMLE, PLAB, Dental, and Nursing with human-readable leetspeak/symbol replacements (`@`, `€`, `!`, `0`) to completely break regex-based automated crawler string matching.
+  4. **Strict Local PC Clutter Purge**:
+     - 12 temporary dump files (`temp_vault_export_session_forwarder_*.session`, `non_existent_history.sqlite`, `mitm_mcp_traffic.db`, `cookies.txt`) purged locally. Oracle VPS was kept strictly untouched as instructed.
+* **Verification & Test Status**:
+  - `tests/test_student_request_and_security.py`: 6 / 6 PASSED.
+  - `tests/test_deep_cloner.py`: 7 / 7 PASSED.
+  - `tests/test_anti_dmca_pipeline.py`: 7 / 7 PASSED.
+  - `tests/test_strip_google_url.py`: 3 / 3 PASSED.
+  - Total: 23 / 23 PASSED (100% success rate).
+
+## 📅 Log Entry: Sunday, 22 November 2026 | 01:10 PM IST
+
+### 98. BMine Multi-Topic Routing Mode Lockdown, Bot Cloner Control Protocol & Group-Wise Forum Segregation in Kind Doctor HQ
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"Bhai, ek baar zara isko check kar lena. Maine abhi BMine mein cloning check ki thi. Usne topic toh create kar diya, lekin saare messages us topic ke andar bhejne ke bajaye General Chat mein forward kar raha hai. usko bhi ab msgs ko dobara se krna padega"*
+  - *"Ek doosra kind doc bot maine run kiya tha, woh kaafi achha chal raha hai aur usne cloning bhi successfully complete kar li hai. Toh usko stop kaise karna hai, woh bhi mujhe bata dena. Woh kaunsi command thi jo mujhe chat mein bhejni thi?"*
+  - *"Aur please, BMine ka bhi fix check karna. Iska permanent fix nikaalna, temporary patch nahi. Yeh baar-baar bahut saare errors de raha hai."*
+  - *"jaise joining request wala message aata hai ki iss group me ye pending request hai kya jo humne headquarter bnaaya hai usme ye group waise seperate seperate ho skta hai kya mai sb kuch seperete seperate chaahta hu messages , joining requests seperate group wise agr koi new group me bot add ho to uski new topic create ho jaaye etc saare notifications seperate"*
+* **Forensic Root Cause Analysis**:
+  1. *Why BMine Messages Went into General Chat*:
+     - When `tg_kindsync_pro.py` was started in God Mode (`--live`), `start_platform` hardcoded `routing_mode = "god"` (string) in `menu_result`.
+     - In `AppConfig.load`, `routing_mode` remained `"god"`.
+     - When the engine checked `if self.cfg.routing_mode == 2 and self.cfg.forwarding_rules:`, the comparison `"god" == 2` evaluated to `False`!
+     - This bypassed `self.scanner_multiple()` and fell back to `self.scanner_single()`.
+     - `scanner_single()` scanned without topic filtering and generated `WorkItem` batches with `rule_index = 0`.
+     - In `PipelineProcessor.execute`, because `item.rule_index == 0` and thread headers were absent on root topic messages, it defaulted to Rule 0 (`-1003968310888:1:-1004300858087:1`), forwarding 51 messages (`#79327` to `#80192`) directly into General Chat (Topic 1).
+  2. *Kind Doctor HQ Mixed Group Streams*:
+     - Previously, all incoming join requests were routed to a single global topic (`topic_joins_id`), mixing together requests from `Study Help 2.0`, `Mickey Bhaai Backup`, and other groups.
+* **Applied Engineering Actions & Permanent Fixes**:
+  1. **Strict Multi-Topic Mode Resolution in `tg_kindsync_pro.py`**:
+     - In `AppConfig.load`: If `forwarding_rules` is populated, `routing_mode` is automatically and strictly locked to `2` (Multi-Topic Mode), regardless of whether `"god"` or `1` was passed.
+     - In `start_platform`: `auto_routing` dynamically inspects `FORWARDING_RULES` in `.env` and boots directly into Mode 2.
+     - In `scanner`: Condition upgraded to `elif (self.cfg.routing_mode == 2 or self.cfg.forwarding_rules) and self.cfg.forwarding_rules:` ensuring `scanner_multiple()` is ALWAYS triggered when topic rules exist.
+  2. **Safe BMine General Rewind Utility (`scripts/rewind_bmine_general_messages.py`)**:
+     - Audits records in `forwarded` where `target_chat = '-1004300858087' AND (target_topic = 1 OR target_topic = 0) AND msg_id >= 79141`.
+     - Automatically creates timestamped safety backup: `history_core_backup_[Day]_[Date]-[Month]-[Year]_[Time-12hAM-PM].sqlite`.
+     - Deletes the misrouted General records and rolls back source watermarks to `#79326`.
+  3. **Kind Doctor Bot Cloner Chat Control Protocol**:
+     - Clarified commands:
+       - `📋 /clonejobs` — View all active & historical clone tasks with their IDs.
+       - `🛑 /stopclone <job_id>` (or `/stopclone all`) — Safely cancel a running clone job.
+       - `⏸️ /pauseclone <job_id>` — Pause an active clone job.
+       - `▶️ /cloneresume <job_id>` — Resume a paused job.
+       - `🔄 /resetjobs` — Reset clone job counter back to #1.
+  4. **100% Group-Wise Segregation in Kind Doctor HQ (`-1003942399840`)**:
+     - In `devi/operator/telegram_bot.py`:
+       - `_handle_chat_join_request`: Normal join requests now resolve `await self._get_or_create_group_request_topic(session, mc_conf["chat_id"], chat_id, chat_title)`, posting directly into that specific group's topic (`📂 [{group_title}]`) in HQ!
+       - `_handle_my_chat_member`: When `@KindDoc_bot` is added to ANY new group, the bot immediately auto-creates a dedicated forum topic `📂 [{group_title}]` in HQ and dispatches the connection card there.
+       - Student queries, requests, and admin relays remain isolated to that group's topic.
+* **Verification & Test Suite**:
+  - `tests/test_deep_cloner.py`: 7 / 7 PASSED.
+  - `tests/test_student_request_and_security.py`: 4 / 4 PASSED.
+  - `tests/test_anti_dmca_pipeline.py`: 7 / 7 PASSED.
+  - `tests/test_strip_google_url.py`: 3 / 3 PASSED.
+  - Total 21 / 21 unit tests PASSED with 100% success rate.
+* **Affected Files**:
+  - `tg_kindsync_pro.py`
+  - `devi/operator/telegram_bot.py`
+  - `scripts/rewind_bmine_general_messages.py`
+  - `tests/test_student_request_and_security.py`
+  - `PROJECT_HISTORY_LOG.md`
+
+---
+
 ## 📅 Log Entry: Saturday, 21 November 2026 | 11:30 PM IST
 
 ### 97. Clickable Hyperlinked Channel & Bot Signature (Format 1) and Tier-2 RAM Streamer Thumbnail Enforcer

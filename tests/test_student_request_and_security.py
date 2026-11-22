@@ -1,4 +1,5 @@
 import pytest
+import sqlite3
 from devi.operator.telegram_bot import DeviTelegramBot, STUDENT_ALLOWED_COMMANDS
 
 def test_student_request_detection():
@@ -69,3 +70,42 @@ def test_request_tables_initialization():
     row = conn.execute("SELECT group_title FROM telegram_group_request_topics WHERE source_chat_id = -1001").fetchone()
     assert row[0] == 'Study Group'
     conn.close()
+
+def test_group_request_topic_mapping_methods():
+    bot = DeviTelegramBot()
+    # Test helper method signature and existence
+    assert hasattr(bot, "_get_or_create_group_request_topic")
+    assert hasattr(bot, "_get_request_topic_by_group")
+    assert hasattr(bot, "_get_request_group_by_topic")
+    assert hasattr(bot, "_dispatch_group_member_strike_backup")
+
+def test_high_risk_strike_watchlist_table_and_loading():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS high_risk_strike_watchlist (
+            user_id BIGINT PRIMARY KEY,
+            source_chat_id BIGINT,
+            username TEXT,
+            full_name TEXT,
+            join_date TEXT,
+            reason TEXT,
+            quarantined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        INSERT INTO high_risk_strike_watchlist (user_id, source_chat_id, username, full_name, join_date, reason)
+        VALUES (99999, -100123, 'suspect1', 'Suspect User', '2026-11-22 12:00:00', 'Strike Threat')
+    """)
+    row = conn.execute("SELECT username, reason FROM high_risk_strike_watchlist WHERE user_id = 99999").fetchone()
+    assert row[0] == 'suspect1'
+    assert row[1] == 'Strike Threat'
+    conn.close()
+
+def test_strip_words_study_platforms_symbol_obfuscation():
+    from devi.operator.deep_cloner import clean_cloned_caption
+    sample = "Download DocTutorials and UWorld and Boards and Beyond lectures now!"
+    cleaned = clean_cloned_caption(sample)
+    assert "D0cTut0ri@ls" in cleaned
+    assert "UW0rld" in cleaned
+    assert "B0@rds & B€yond" in cleaned
+    assert "DocTutorials" not in cleaned

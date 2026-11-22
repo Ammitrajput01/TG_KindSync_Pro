@@ -1338,6 +1338,9 @@ class AppConfig:
                             "target_topic": int(parts[3]) if parts[3].isdigit() else 0
                         })
 
+        # Resolve effective routing_mode: if forwarding_rules are present, force Multi-Topic mode (2)
+        effective_routing = 2 if parsed_rules else (1 if routing_mode in ("god", 1) else routing_mode)
+
         return cls(
             api_id=api_id,
             api_hash=raw_api_hash,
@@ -1352,7 +1355,7 @@ class AppConfig:
             auto_subject_headers=auto_subj,
             auto_sort_subjects=auto_sort,
             auto_shutdown=final_shutdown,
-            routing_mode=routing_mode,
+            routing_mode=effective_routing,
             direct_forward=direct_forward,
             live_mode=final_live_mode,
             run_dlq=run_dlq,
@@ -5162,7 +5165,7 @@ class TerminalPlatform:
     async def scanner(self):
         if self.cfg.run_dlq:
             await self.scanner_dlq()
-        elif self.cfg.routing_mode == 2 and self.cfg.forwarding_rules:
+        elif (self.cfg.routing_mode == 2 or self.cfg.forwarding_rules) and self.cfg.forwarding_rules:
             await self.scanner_multiple()
         else:
             await self.scanner_single()
@@ -10088,8 +10091,10 @@ async def start_platform(auto_start: bool = False):
         try:
             if is_auto and first_run:
                 first_run = False
-                console.print("\n[bold green]🚀 AUTO-START:[/] [cyan]Launching Real-Time Live Forwarding in God Mode (High Speed - 40 Sockets, Strict Sequence)...[/]")
-                menu_result = (1, 40, True, None, "god", False, True)
+                cur_rules = os.getenv("FORWARDING_RULES", "").strip()
+                auto_routing = 2 if (cur_rules and ":" in cur_rules) else 1
+                console.print(f"\n[bold green]🚀 AUTO-START:[/] [cyan]Launching Real-Time Forwarding (Mode {auto_routing} - 40 Sockets, Strict Sequence)...[/]")
+                menu_result = (1, 40, True, None, auto_routing, False, True)
             else:
                 menu_result = await run_menu(session_mgr)
             if menu_result is None:
