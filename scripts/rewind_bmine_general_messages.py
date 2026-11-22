@@ -77,22 +77,29 @@ def main():
 
     # 3. Check and restore watermark
     safe_watermark = 79326
-    cursor.execute("""
-        SELECT max_id FROM source_watermarks WHERE target_chat = ?
-    """, (target_chat,))
-    wm_row = cursor.fetchone()
-    current_wm = wm_row[0] if wm_row else 0
-    print(f"\n🏷️  Source Watermark Status:")
-    print(f"  • Current Watermark : #{current_wm}")
-    print(f"  • Target Safe Point : #{safe_watermark}")
+    source_chat_id = "-1003968310888"
+    print(f"\n🏷️  Watermark Status & Restoration:")
 
-    if current_wm > safe_watermark:
-        cursor.execute("""
-            UPDATE source_watermarks
-            SET max_id = ?, updated_at = ?
-            WHERE target_chat = ?
-        """, (safe_watermark, time.time(), target_chat))
-        conn.commit()
+    # Check source_watermarks
+    cursor.execute("SELECT chat_id, max_id FROM source_watermarks")
+    for r in cursor.fetchall():
+        c_id, m_id = str(r[0]), r[1]
+        if source_chat_id in c_id or c_id.replace("-100", "") in source_chat_id:
+            print(f"  • Source Watermark (Chat {c_id}) : #{m_id}")
+            if m_id > safe_watermark:
+                cursor.execute("UPDATE source_watermarks SET max_id = ? WHERE chat_id = ?", (safe_watermark, r[0]))
+                print(f"  ✔ Rolled back source watermark to #{safe_watermark}")
+
+    # Check topic_watermarks
+    cursor.execute("SELECT target_chat, target_topic, max_id FROM topic_watermarks WHERE target_chat = ?", (target_chat,))
+    for tw in cursor.fetchall():
+        t_topic, t_max = tw[1], tw[2]
+        print(f"  • Topic Watermark (Topic {t_topic}) : #{t_max}")
+        if t_topic in (0, 1) and t_max > safe_watermark:
+            cursor.execute("UPDATE topic_watermarks SET max_id = ? WHERE target_chat = ? AND target_topic = ?", (safe_watermark, target_chat, t_topic))
+            print(f"  ✔ Rolled back Topic {t_topic} watermark to #{safe_watermark}")
+
+    conn.commit()
         print(f"  ✔ Reset source watermark for {target_chat} to #{safe_watermark}.")
 
     conn.close()
