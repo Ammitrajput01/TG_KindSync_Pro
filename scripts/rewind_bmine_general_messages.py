@@ -100,8 +100,6 @@ def main():
             print(f"  ✔ Rolled back Topic {t_topic} watermark to #{safe_watermark}")
 
     conn.commit()
-        print(f"  ✔ Reset source watermark for {target_chat} to #{safe_watermark}.")
-
     conn.close()
     print("\n" + "=" * 70)
     print(f"🎉 AUDIT & REWIND COMPLETE! Next cloner run will cleanly clone from #{safe_watermark + 1}.")
