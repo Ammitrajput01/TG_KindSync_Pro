@@ -2310,6 +2310,62 @@
         }
 
         // --- COLLAPSIBLE SIDEBAR & RESPONSIVE HEADER CONTROLS ---
+        function toggleSidebarMobile(forceState) {
+            const sidebar = document.getElementById('app-sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            if (!sidebar) return;
+            const willOpen = typeof forceState === 'boolean' ? forceState : !sidebar.classList.contains('mobile-open');
+            sidebar.classList.toggle('mobile-open', willOpen);
+            if (backdrop) backdrop.classList.toggle('active', willOpen);
+        }
+
+        async function loadCloneJobs() {
+            const box = document.getElementById('clone-jobs-container');
+            if (!box) return;
+            try {
+                const res = await fetch('/api/clone/jobs', { headers: getAuthHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                const jobs = data.jobs || [];
+                if (!jobs.length) {
+                    box.innerHTML = '<div style="color: var(--text-tertiary); padding: 4px 0;">No active or recent clone jobs found.</div>';
+                    return;
+                }
+                box.innerHTML = jobs.slice(0, 6).map(j => {
+                    const tot = Math.max(1, Number(j.total_items || 0));
+                    const done = Number(j.cloned_items || 0);
+                    const pct = Math.min(100, Math.round((done / tot) * 100));
+                    const st = String(j.status || 'unknown').toLowerCase();
+                    const isPaused = st === 'paused';
+                    const isActive = st === 'running' || isPaused;
+                    const btns = isActive
+                        ? `<button type="button" class="btn btn-secondary btn-sm" onclick="controlCloneJob(${j.id}, '${isPaused ? 'resume' : 'pause'}')" style="padding:2px 8px;font-size:11px;">${isPaused ? '▶ Resume' : '⏸ Pause'}</button>
+                           <button type="button" class="btn btn-secondary btn-sm" onclick="controlCloneJob(${j.id}, 'stop')" style="padding:2px 8px;font-size:11px;color:#F87171;">⏹ Stop</button>`
+                        : '';
+                    return `<div style="background:rgba(2,6,23,0.45);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <div><strong>#${j.id}</strong> ${j.source_title || j.source_chat} ➔ ${j.target_title || j.target_chat} <span style="opacity:0.7;">(${j.current_topic || j.job_type || 'group'})</span></div>
+                            <div style="display:flex;align-items:center;gap:6px;"><span class="pill" style="font-size:10px;padding:1px 6px;">${st.toUpperCase()}</span>${btns}</div>
+                        </div>
+                        <div style="margin-top:6px;height:5px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#38BDF8,#34D399);"></div></div>
+                    </div>`;
+                }).join('');
+            } catch (e) {}
+        }
+
+        async function controlCloneJob(jobId, action) {
+            try {
+                await fetch('/api/clone/control', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ job_id: jobId, action })
+                });
+                loadCloneJobs();
+            } catch (e) {}
+        }
+        setInterval(loadCloneJobs, 6000);
+        setTimeout(loadCloneJobs, 1200);
+
         function toggleSidebarCollapse() {
             const sidebar = document.getElementById('app-sidebar');
             if (!sidebar) return;
@@ -3969,7 +4025,7 @@
                         }).then(r => r.json()).then(res => {
                             if (res.success && res.session) {
                                 sessionToken = res.session.token;
-                                localStorage.setItem("tg_auth_token", sessionToken);
+                                localStorage.setItem("ks_session_token", sessionToken);
                                 localStorage.setItem("tg_auth_user", JSON.stringify(res.session));
                                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
                                 showToast("✨ Telegram Mini App: Biometric Auto-Auth Verified!", "success");

@@ -22,7 +22,7 @@
 
 ---
 
-[🚀 Quick Start](#-quick-start--step-by-step-installation) · [🏗️ Architecture](#%EF%B8%8F-system-architecture--data-flow) · [⚡ Speed & VROB](#-telegram-premium-4gb-uploads--40-socket-mtproto-wire-speed) · [🖥️ Web Cockpit](#%EF%B8%8F-obsidian-cyber-glass-web-command-center--tma-20-port-8080) · [🤖 Bot Commands](#-kind-doctor-telegram-operator-bot-kinddoc_bot) · [🩺 Clinical CDSS](#-clinical-decision-support-system-cdss-studio) · [🔧 Troubleshooting](#-troubleshooting--common-fixes)
+[🚀 Quick Start](#-quick-start--step-by-step-installation) · [🏗️ Architecture](#-system-architecture--data-flow) · [⚡ Speed & VROB](#-telegram-premium-4gb-uploads--40-socket-mtproto-wire-speed) · [🖥️ Web Cockpit](#-obsidian-cyber-glass-web-command-center--tma-20-port-8080) · [🤖 Bot Commands](#-kind-doctor-telegram-operator-bot-kinddoc_bot) · [🩺 Clinical CDSS](#-clinical-decision-support-system-cdss-studio) · [🔧 Troubleshooting](#-troubleshooting--common-fixes)
 
 </div>
 
@@ -70,7 +70,7 @@ Double-click **`1_START_PRO.bat`** in the folder:
 When launched, choose any login method directly in the wizard:
 1. **⚡ Method 1: Instant QR Code Scan (Fastest)** — Scan the terminal QR code via `Telegram App ➔ Settings ➔ Devices ➔ Link Desktop Device`.
 2. **📱 Method 2: Phone OTP & 2FA** — Enter your phone number (`+91...`), Telegram login code, and 2FA password.
-3. **🌐 Method 3: Browser Web Login** — Open `http://127.0.0.1:8080` and connect your Telegram account visually.
+3. **🌐 Method 3: Browser Web Login (`:5005`) & Cockpit (`:8080`)** — Use the Web Login portal (`http://127.0.0.1:5005`) to link your Telegram account, and monitor transfers in the Obsidian Web Cockpit (`http://127.0.0.1:8080`).
 
 #### Step 5: Update to Latest GitHub Version Anytime
 ```powershell
@@ -160,6 +160,8 @@ sudo systemctl start tg-forwarder tg-kinddoc-bot tg-dashboard tg-sentinel
 sudo systemctl status tg-forwarder tg-kinddoc-bot --no-pager
 ```
 
+> *Optional 1-Command Deploy / Docker*: Run `bash deploy/deploy.sh` for automated `systemd` provisioning, or `docker compose up -d` using the included [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml).
+
 ---
 
 ## 🏗️ System Architecture & Data Flow
@@ -219,8 +221,8 @@ flowchart TD
 3. **Deterministic Sequence Locking (VROB)**: Monotonic Sequence Barrier guarantees lecture series and PDFs always arrive in strict chronological order even at `MESSAGE_DELAY=0.0s`.
 4. **Restricted Content Streaming**: Streams media from copy-protected channels, private groups, and forum topics directly through RAM.
 5. **Smart Old-Index Filtering**: Automatically skips stale source index/table-of-contents cards during cloning so your target topics stay clean.
-6. **Obsidian Cyber-Glass Web Cockpit (`:8080`)**: Real-time speedometer gauge, live terminal stream, route manager, and 1-click SQLite snapshots.
-7. **Kind Doctor Bot (`@KindDoc_bot`)**: Interactive menu (`/menu`), deep channel/forum cloner (`/clone`), auto-indexer (`/mainindex`, `/topicindex`), YouTube/Instagram uploader (`/ytdl`, `/upload`), and SangMata OSINT (`/whois`).
+6. **Obsidian Cyber-Glass Web Cockpit (`:8080`)**: Real-time speedometer gauge, live terminal stream, **Live Cloner Jobs Pause/Resume/Stop**, mobile drawer, and 1-click SQLite snapshots.
+7. **Kind Doctor Bot (`@KindDoc_bot`) & DEVI AI Sentinel**: Interactive menu (`/menu`), live auto-indexing during `/clone`, in-place pinned index updates (`/mainindex`, `/topicindex`), YouTube/Instagram uploader (`/ytdl`, `/upload`), SangMata OSINT (`/whois`), and `sentinel_observer.py` self-healing alerts.
 8. **Permanent Vault Architecture (Zero Deletion Sync)**: Source deletions or takedowns never propagate to your target backup group.
 9. **Anti-DMCA Symbol Obfuscation (`strip_words.txt`)**: Built-in replacement engine for 50+ study platforms plus custom watermark/promo removal.
 
@@ -233,7 +235,7 @@ flowchart TD
 | **Max File Upload Size** | 2,000 MB (2.0 GB) | **4,096 MB (4.0 GB)** | Complete 4K lectures stream without truncation. |
 | **Chunk Upload Parallelism** | 12 Concurrent Sockets | **40 Concurrent Sockets** | Parallel chunk upload sockets saturate fiber/VPS pipes. |
 | **Transmission Pacing Delay** | 0.2s Safe Delay | **0.0s (Uncapped)** | Zero artificial sleep between packets when in God Mode. |
-| **Dead-Letter Guard** | Files > 2GB routed to DLQ | **Auto-Bypasses 2GB Ceiling** | Uploaded seamlessly via `upload.saveBigFilePart`. |
+| **Dead-Letter Guard** | Files > 2GB routed to DLQ | **Auto-Bypasses 2GB Ceiling** | `tg_kindsync_pro.py` streams in-RAM up to 2GB; `deep_cloner.py` uses Tier 1 (<100MB RAM) & Tier 2 (temp chunked cache for >100MB) + `upload.saveBigFilePart`. |
 
 ### Virtual Reorder Buffer (VROB) In-Order Guarantee
 ```
@@ -288,13 +290,13 @@ VROB Barrier:      Holds #102 & #103 until #101 commits ──► Releases #101 
 | `/upload [url]` | Public | Universal uploader for Instagram Reels, Twitter/X, TikTok, and web files. |
 | `/clone [src] [tgt]` | Admin | 1-Click Deep Cloner for forum groups, topics, or message ranges. |
 | `/clonestatus` / `/stopclone` | Admin | Live cloning progress, pause/resume, and stop controls. |
-| `/autoforward` | Admin | Live account status, active routes, and pipeline controls. |
+| `/connect` / `/autoforward` | Admin | Link your Telegram account in DM, view live routes, and control pipeline. |
 | `/pacing` | Admin | 1-Click delay presets (`0.0s` Supersonic to `2.0s` Stealth). |
-| `/stripwords` / `/striphelp` | Admin | View/manage Anti-DMCA word replacements and watermark rules. |
+| `/stripwords` / `/syncstrip` | Admin | View/manage Anti-DMCA word replacements and sync `strip_words.txt` to SQLite. |
 | `/userinfo [id/@user]` | Admin | SangMata OSINT radar: name/username history and risk score. |
-| `/members` / `/strikebackup` | Admin | Last-100 member audit & emergency strike CSV/JSON backup. |
-| `/newtopic [name]` / `/setgroup` | Admin | Create forum topics or switch active target group from DM. |
-| `/status` / `/backup` | Admin | System health vitals and timestamped SQLite snapshot export. |
+| `/members` / `/dailymembers` / `/strikebackup` | Admin | Member audit, IST daily joins report, and emergency strike CSV/JSON backup. |
+| `/cleandeleted` / `/newtopic [name]` | Admin | Purge deleted ghost accounts, create forum topics, or switch target group (`/setgroup`). |
+| `/status` / `/engine` / `/polyglot` / `/backup` | Admin | System vitals, Polyglot native acceleration matrix, and timestamped SQLite snapshot. |
 
 ---
 
@@ -313,14 +315,14 @@ VROB Barrier:      Holds #102 & #103 until #101 commits ──► Releases #101 
 
 ---
 
-## 📋 19-Option CLI Menu Matrix
+## 📋 21-Option CLI Menu Matrix
 
 | Quadrant | Options | Key Capabilities |
 |:---|:---:|:---|
 | **1. Transmission** | `1–4` | Safe Mode (4 sockets), Balanced (12), God Mode (40), Live 24/7 Listener |
 | **2. Routing & Index** | `5–8` | Quick Link Extractor, Multi-Route Manager, Content Cloner, Topic Indexer |
 | **3. Media Studio** | `9–12` | Folder 4GB Uploader, Caption & Strip Studio, 16:9 Cover Enforcer, DLQ Recovery |
-| **4. System & Tools** | `13–19` | Diagnostics, Reset History, Cleaner, Safe Exit, Mode Toggles, Updater, Multi-Account |
+| **4. System & Tools** | `13–21` | Diagnostics, Reset History, Cleaner, Safe Exit, Mode Toggles, Updater, Multi-Account, Polyglot Matrix, DEVI AI |
 
 ---
 

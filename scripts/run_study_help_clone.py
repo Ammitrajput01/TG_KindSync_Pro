@@ -72,7 +72,7 @@ TARGET_CHAT_ID = -1004467980132  # Study Help 2.0 😉
 ADMIN_USER_ID = 1553619403
 MISSION_CONTROL_CHAT = -1003942399840
 CLONER_TOPIC_ID = 9
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8749455751:AAFT6BEMH1O5OW4-yM3gFJn9gsCI-6J3S9k")
+BOT_TOKEN = os.getenv("BOT_TOKEN") or os.getenv("DEVI_TELEGRAM_BOT_TOKEN", "")
 
 # Ensure original thumbnails are preserved
 os.environ["THUMB_MODE"] = "original"

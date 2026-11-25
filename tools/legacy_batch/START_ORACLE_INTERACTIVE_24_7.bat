@@ -10,7 +10,7 @@ echo       IP: 130.210.1.32 (Oracle Mumbai Always-Free VPS)
 echo ==============================================================================
 echo.
 
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 set "ROOT_DIR=C:\TG_KindSync_Pro"
 if not exist "!ROOT_DIR!" set "ROOT_DIR=%~dp0"

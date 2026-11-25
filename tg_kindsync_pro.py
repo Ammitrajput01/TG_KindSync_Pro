@@ -62,11 +62,13 @@ except Exception:
     UVLOOP = False
 
 try:
+    import cryptg  # noqa: F401
     CRYPTG = True
 except Exception:
     CRYPTG = False
 
 try:
+    import orjson  # noqa: F401
     ORJSON = True
 except Exception:
     ORJSON = False
@@ -180,18 +182,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 ADMIN_HANDLES = ["Ammitrajput1", "Kinddoctor4u"]
 
+_MALLOC_TRIM_FN = None
+if sys.platform.startswith("linux"):
+    with suppress(Exception):
+        import ctypes
+        _libc = ctypes.CDLL("libc.so.6")
+        if hasattr(_libc, "malloc_trim"):
+            _MALLOC_TRIM_FN = _libc.malloc_trim
+
 def clean_memory_after_transfer():
     """
     ZERO-MEMORY-LEAK GUARANTEE:
     Forces immediate garbage collection and trims unmapped memory pages
-    back to the OS kernel via libc malloc_trim.
+    back to the OS kernel via libc malloc_trim (when available).
     """
     with suppress(Exception):
         gc.collect()
-        if sys.platform.startswith("linux"):
-            import ctypes
-            libc = ctypes.CDLL("libc.so.6")
-            libc.malloc_trim(0)
+        if _MALLOC_TRIM_FN is not None:
+            _MALLOC_TRIM_FN(0)
 
 
 class AdminTelemetry:
@@ -2633,6 +2641,7 @@ async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, *
             logger.warning(f"Telegram FloodWait hit ({e.seconds}s). Auto-sleeping {wait_time}s before retry (Attempt {attempt})...")
             if e.seconds > 600 or attempt >= 25:
                 raise
+            await asyncio.sleep(wait_time)
         except (ChatForwardsRestrictedError, ChannelPrivateError, ChatAdminRequiredError):
             # Fatal authorization or content protection errors: immediately raise without sleeping or retrying!
             # Eliminates 181s (10 exponential retry delays) on protected channels.
@@ -3388,10 +3397,14 @@ def is_old_index_message(msg) -> bool:
     """Returns True for text-only old directory / table-of-contents / multi-link index cards so cloning skips them."""
     if getattr(msg, "video", None) or getattr(msg, "document", None) or getattr(msg, "photo", None) or getattr(msg, "audio", None) or getattr(msg, "voice", None):
         return False
-    raw_text = (getattr(msg, "raw_text", None) or getattr(msg, "message", None) or getattr(msg, "text", None) or "").strip()
+    raw_text = (getattr(msg, "text", None) or getattr(msg, "raw_text", None) or getattr(msg, "message", None) or "").strip()
     if not raw_text:
         return False
     link_count = len(re.findall(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/', raw_text, flags=re.IGNORECASE))
+    for ent in (getattr(msg, "entities", None) or []):
+        ent_url = getattr(ent, "url", None) or ""
+        if re.search(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/', ent_url, flags=re.IGNORECASE):
+            link_count += 1
     if link_count >= 3:
         return True
     low = raw_text.lower()
@@ -3400,6 +3413,11 @@ def is_old_index_message(msg) -> bool:
         "topic study index",
         "table of contents",
         "master index",
+        "master directory",
+        "master roadmap",
+        "batch index",
+        "lecture roadmap",
+        "all forum topics directory",
         "topic index (part",
         "indexed topics:",
         "tap any subject title",
@@ -3971,7 +3989,7 @@ class PipelineProcessor:
         if not topic_id or str(topic_id).strip() in ("0", "None", ""): return None
         try:
             res = await self.rpc.execute(
-                lambda c: c(GetForumTopicsRequest(channel=_parse_chat_id(chat_id), offset_date=None, offset_id=0, offset_topic=0, limit=500)),
+                lambda c: c(GetForumTopicsRequest(peer=_parse_chat_id(chat_id), offset_date=None, offset_id=0, offset_topic=0, limit=500)),
                 client=client, timeout=60.0
             )
             topic_map = {t.id: t.title for t in res.topics}
@@ -3989,7 +4007,7 @@ class PipelineProcessor:
         try:
             res = await self.rpc.execute(
                 lambda c: c(GetForumTopicsRequest(
-                    channel=_parse_chat_id(chat_id),
+                    peer=_parse_chat_id(chat_id),
                     offset_date=None,
                     offset_id=0,
                     offset_topic=0,
@@ -4922,10 +4940,11 @@ class TerminalPlatform:
                     
             await push_rule()
             if not self.stop_evt.is_set() and rule.get("source_topic"):
-                with suppress(Exception):
-                    if hasattr(self.state, 'mark_clone_topic_completed'):
-                        await self.state.mark_clone_topic_completed(rule["source_chat"], rule["source_topic"], rule["target_chat"], tgt_topic)
-                        self.log(f"[bold green]✔ Topic {rule['source_topic']} fully scanned & marked COMPLETED in SQLite![/]")
+                if not hasattr(self, "_pending_clone_completions"):
+                    self._pending_clone_completions = []
+                self._pending_clone_completions.append(
+                    (rule["source_chat"], rule["source_topic"], rule["target_chat"], tgt_topic)
+                )
         except Exception as e:
             self.log(f"[bold red]❌ Scanner Rule {idx+1} Error:[/] {e}")
 
@@ -5374,9 +5393,11 @@ class TerminalPlatform:
         else:
             compact_src = src_raw
 
+        from rich.markup import escape as rich_escape
+        panel_pad = (0, 1) if w < 95 else (1, 2)
         routing_panel = Panel(
             Text.from_markup(f"{live_badge}[bold cyan]🛰️ ROUTING & NODES[/]\n{sub_div}\n{compact_src}\n\n{self.tgt_info}"),
-            border_style="red" if self.cfg.live_mode else "blue", box=box.ROUNDED, padding=(1, 2)
+            border_style="red" if self.cfg.live_mode else "blue", box=box.ROUNDED, padding=panel_pad
         )
 
         v_found = self.metrics.get('found_videos', 0)
@@ -5401,10 +5422,10 @@ class TerminalPlatform:
                 f"Sent Out : {sent_breakdown}\n"
                 f"Albums   : [cyan]{self.metrics['albums_forwarded']}[/]  |  Errors: [red]{self.metrics['errors_count']}[/]"
             ),
-            border_style="green", box=box.ROUNDED, padding=(1, 2)
+            border_style="green", box=box.ROUNDED, padding=panel_pad
         )
 
-        filename = shorten_middle(self.active_file_name, 32)
+        filename = rich_escape(shorten_middle(self.active_file_name, 32))
         file_panel = Panel(
             Text.from_markup(
                 f"[bold cyan]🚀 ACTIVE FILE STREAM[/]\n{sub_div}\n"
@@ -5413,10 +5434,10 @@ class TerminalPlatform:
                 f"Transferred: [cyan]{self.active_file_transferred}[/] / {self.active_file_total}\n"
                 f"Time Left  : [magenta]{self.active_file_eta}[/]"
             ),
-            border_style="magenta", box=box.ROUNDED, padding=(1, 2)
+            border_style="magenta", box=box.ROUNDED, padding=panel_pad
         )
 
-        kw_display = ", ".join(self.cfg.perf.keywords) if self.cfg.perf.keywords else "All Messages"
+        kw_display = rich_escape(", ".join(self.cfg.perf.keywords) if self.cfg.perf.keywords else "All Messages")
 
         performance_panel = Panel(
             Text.from_markup(
@@ -5426,7 +5447,7 @@ class TerminalPlatform:
                 f"Uploaded : [magenta]{data_str}[/]\n"
                 f"Uptime   : [yellow]{uptime_str}[/]"
             ),
-            border_style="yellow", box=box.ROUNDED, padding=(1, 2)
+            border_style="yellow", box=box.ROUNDED, padding=panel_pad
         )
 
         if w < 95:
@@ -5448,8 +5469,9 @@ class TerminalPlatform:
             border_style="cyan", box=box.ROUNDED, padding=(0, 2)
         )
 
-        log_lines = list(self.logs)[-7:]
-        while len(log_lines) < 7: log_lines.append("[dim]...[/]")
+        max_logs = 4 if w < 95 else 7
+        log_lines = list(self.logs)[-max_logs:]
+        while len(log_lines) < max_logs: log_lines.append("[dim]...[/]")
         log_text = "\n".join(log_lines)
         log_panel = Panel(
             Text.from_markup(f"[bold cyan]📜 LIVE ACTIVITY STREAM[/]\n{full_div}\n{log_text}"),
@@ -5599,10 +5621,10 @@ class TerminalPlatform:
             scan_task = asyncio.create_task(self.scanner())
 
             self.detached = False
-            with Live(self.render_dashboard(), console=console, refresh_per_second=1, screen=False, transient=False) as live:
+            with Live(self.render_dashboard(), console=console, refresh_per_second=1, screen=False, transient=False, auto_refresh=False) as live:
                 self._current_live = live
                 while not self.stop_evt.is_set():
-                    live.update(self.render_dashboard())
+                    live.update(self.render_dashboard(), refresh=True)
                     if not self.cfg.live_mode and scan_task.done() and self.queue.empty(): break
                     if sys.platform == "win32":
                         try:
@@ -5634,6 +5656,15 @@ class TerminalPlatform:
                     await asyncio.wait_for(self.queue.join(), timeout=30.0)
                 except asyncio.TimeoutError:
                     self.log("[yellow]⚠ Queue join timed out; shutting down gracefully.[/]")
+
+                # Mark completed clone topics only after all queued uploads finish
+                if not self.stop_evt.is_set() and getattr(self, "_pending_clone_completions", None):
+                    for sc, st, tc, tt in self._pending_clone_completions:
+                        with suppress(Exception):
+                            if hasattr(self.state, 'mark_clone_topic_completed'):
+                                await self.state.mark_clone_topic_completed(sc, st, tc, tt)
+                                self.log(f"[bold green]✔ Topic {st} fully uploaded & marked COMPLETED in SQLite![/]")
+                    self._pending_clone_completions.clear()
 
                 # 📑 Trigger Clickable Batch Index Card if enabled
                 if self.cfg.generate_batch_index and proc.batch_index_records:

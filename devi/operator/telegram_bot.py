@@ -3030,7 +3030,7 @@ class DeviTelegramBot:
                        d.total_messages, d.changes_count, d.phone_number AS phone
                 FROM member_history m
                 LEFT JOIN telegram_users_dossier d ON m.user_id = d.user_id
-                WHERE DATE(m.join_date) = DATE(?)
+                WHERE DATE(DATETIME(m.join_date, '+5 hours', '30 minutes')) = DATE(?)
             """
             params = [filter_date]
             if group_id:
@@ -5262,6 +5262,9 @@ class DeviTelegramBot:
 
             # --- DEEP CLONER HUB & RESET ACTIONS ---
             if action == "cloner_pause_all":
+                if not self.is_admin(admin_id):
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⛔ Admin only", "show_alert": True})
+                    return
                 from devi.operator.deep_cloner import _job_pause_flags
                 is_master = admin_id in self.master_admin_ids
                 _job_pause_flags[-1] = True
@@ -5281,6 +5284,9 @@ class DeviTelegramBot:
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⏸️ All clone jobs paused!"})
                 return
             elif action == "cloner_resume_all":
+                if not self.is_admin(admin_id):
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⛔ Admin only", "show_alert": True})
+                    return
                 from devi.operator.deep_cloner import _job_pause_flags
                 is_master = admin_id in self.master_admin_ids
                 _job_pause_flags[-1] = False
@@ -5661,6 +5667,9 @@ class DeviTelegramBot:
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Disconnecting Account..."})
                 await self._handle_admin_command(session, chat_id, admin_id, "/disconnect", message=msg_obj)
             elif action.startswith("act_exp_members_") or (data and data.startswith("act_exp_members_")):
+                if not self.is_admin(admin_id):
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⛔ Admin only", "show_alert": True})
+                    return
                 raw_d = action if action.startswith("act_exp_members_") else data
                 parts_d = raw_d.replace("act_exp_members_", "").split("_")
                 t_grp = int(parts_d[0])
@@ -5669,12 +5678,18 @@ class DeviTelegramBot:
                 await self._export_members_csv_file(session, chat_id, t_grp, message_thread_id=thread_id, limit=lim_d)
                 return
             elif action.startswith("act_view_members_") or (data and data.startswith("act_view_members_")):
+                if not self.is_admin(admin_id):
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⛔ Admin only", "show_alert": True})
+                    return
                 raw_d = action if action.startswith("act_view_members_") else data
                 t_grp = int(raw_d.replace("act_view_members_", ""))
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Loading Member Audit..."})
                 await self._handle_admin_command(session, chat_id, admin_id, f"/members {t_grp}", message=msg_obj)
                 return
             elif action.startswith("act_strike_backup_") or (data and data.startswith("act_strike_backup_")):
+                if not self.is_admin(admin_id):
+                    await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "⛔ Admin only", "show_alert": True})
+                    return
                 raw_d = action if action.startswith("act_strike_backup_") else data
                 t_grp = int(raw_d.replace("act_strike_backup_", ""))
                 await session.post(f"https://api.telegram.org/bot{self.token}/answerCallbackQuery", json={"callback_query_id": cb_id, "text": "Initiating 100-Member Strike Backup... 🚨", "show_alert": True})
@@ -8727,7 +8742,8 @@ class DeviTelegramBot:
                 "• <code>/map &lt;sbp&gt; &lt;dbp&gt;</code> — Mean Arterial Pressure\n"
                 "• <code>/parkland &lt;wt_kg&gt; &lt;tbsa_percent&gt;</code> — Burn resuscitation fluids"
             )
-            sent_m = await self._send_message(session, chat_id, help_text, reply_markup=markup, message_thread_id=thread_id)
+            calc_markup = {"inline_keyboard": [[{"text": "🔙 Main Help Menu", "callback_data": "act_menu"}]]}
+            sent_m = await self._send_message(session, chat_id, help_text, reply_markup=calc_markup, message_thread_id=thread_id)
             if sent_m and chat_id < 0:
                 self.create_tracked_task(self._auto_delete_message(session, chat_id, sent_m, 120))
 
@@ -13130,9 +13146,9 @@ class DeviTelegramBot:
                 with get_db_conn() as conn:
                     conn.row_factory = sqlite3.Row
                     deleted_users = conn.execute("""
-                        SELECT DISTINCT user_id FROM telegram_users_dossier WHERE first_name LIKE '%Deleted%' OR first_name = ''
+                        SELECT DISTINCT user_id FROM telegram_users_dossier WHERE full_name LIKE '%Deleted%' OR full_name = ''
                         UNION
-                        SELECT DISTINCT user_id FROM member_history WHERE first_name LIKE '%Deleted%' OR first_name = ''
+                        SELECT DISTINCT user_id FROM member_history WHERE full_name LIKE '%Deleted%' OR full_name = ''
                     """).fetchall()
                     for du in deleted_users:
                         u_id = du["user_id"]
@@ -13275,8 +13291,8 @@ class DeviTelegramBot:
             if not self.is_admin(admin_id):
                 await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
                 return
-            from devi.operator.strip_sync import sync_from_file_to_db
-            synced_cnt = sync_from_file_to_db()
+            from devi.operator.strip_sync import sync_strip_words_file_to_db
+            synced_cnt = sync_strip_words_file_to_db()
             await self._send_message(
                 session, chat_id,
                 f"🔄 <b>Strip Rules Synchronized!</b> 🛡️\n\n"
@@ -13345,25 +13361,37 @@ class DeviTelegramBot:
                     total_items = conn.execute("SELECT COUNT(*) FROM telegram_topic_items").fetchone()[0]
                     total_mapped = conn.execute("SELECT COUNT(*) FROM forwarded").fetchone()[0]
 
-            import psutil
-            ram = psutil.virtual_memory()
-            ram_used_mb = (ram.total - ram.available) / (1024 * 1024)
-            ram_free_mb = ram.available / (1024 * 1024)
-            ram_pct = ram.percent
+            import psutil, shutil
+            try:
+                ram = psutil.virtual_memory()
+                ram_used_mb = (ram.total - ram.available) / (1024 * 1024)
+                ram_free_mb = ram.available / (1024 * 1024)
+                ram_pct = ram.percent
+            except Exception:
+                ram_used_mb, ram_free_mb, ram_pct = 0.0, 0.0, 0.0
 
             root_m = "C:\\" if sys.platform == "win32" else "/"
-            du = psutil.disk_usage(root_m)
+            try:
+                du = psutil.disk_usage(root_m)
+            except Exception:
+                du = shutil.disk_usage(root_m)
             disk_total_gb = du.total / (1024**3)
             disk_used_gb = du.used / (1024**3)
             disk_free_gb = du.free / (1024**3)
-            disk_pct = du.percent
+            disk_pct = getattr(du, "percent", round((du.used / max(1, du.total)) * 100, 1))
 
-            cpu_p = psutil.cpu_percent(interval=None) or 0.0
+            try:
+                cpu_p = psutil.cpu_percent(interval=None) or 0.0
+            except Exception:
+                cpu_p = 0.0
             cpu_cores = psutil.cpu_count(logical=True) or 1
 
-            boot_t = psutil.boot_time()
-            up_s = int(time.time() - boot_t)
-            up_str = f"{up_s // 86400}d {(up_s % 86400) // 3600}h {(up_s % 3600) // 60}m"
+            try:
+                boot_t = psutil.boot_time()
+                up_s = int(time.time() - boot_t)
+                up_str = f"{up_s // 86400}d {(up_s % 86400) // 3600}h {(up_s % 3600) // 60}m"
+            except Exception:
+                up_str = "N/A"
 
             # Live Engine Batch Telemetry
             telem_data = {}

@@ -153,6 +153,7 @@
     </div>
 
     <div class="app-shell" id="main-app-shell">
+        <div id="sidebar-backdrop" class="sidebar-backdrop" onclick="toggleSidebarMobile(false)"></div>
         <!-- Modernized Professional Sidebar Navigation -->
         <aside class="sidebar" id="app-sidebar">
             <div class="sidebar-brand">
@@ -305,7 +306,8 @@
             <!-- Top Application Header with Single Clean Architecture & Zero-Glitch Telemetry -->
             <header class="app-header">
                 <!-- Left: Clean Breadcrumbs (Sidebar toggle is handled natively via the brand chevron) -->
-                <div class="header-left-cluster">
+                <div class="header-left-cluster" style="display: flex; align-items: center;">
+                    <button type="button" id="mobile-toggle-btn" class="mobile-toggle-btn" onclick="toggleSidebarMobile()" aria-label="Open Navigation">☰</button>
                     <div class="header-breadcrumbs">
                         <span class="breadcrumb-root">Dashboard</span>
                         <span class="breadcrumb-sep">/</span>
@@ -555,6 +557,17 @@
                                 <div id="poly-socket-val" style="font-size: 12px; font-weight: 700; color: #38BDF8; margin-top: 3px; font-family: 'JetBrains Mono', monospace;">TCP_NOTSENT_LOWAT + NODELAY</div>
                                 <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Zero bufferbloat streaming</div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Cloner Jobs Panel -->
+                    <div class="card" id="clone-jobs-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div style="font-size: 13.5px; font-weight: 800; color: #FFFFFF;">🛰️ Live Cloner Jobs</div>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="loadCloneJobs()" style="font-size: 11px; padding: 4px 10px;">🔄 Refresh Jobs</button>
+                        </div>
+                        <div id="clone-jobs-container" style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-secondary);">
+                            Loading active clone jobs...
                         </div>
                     </div>
 

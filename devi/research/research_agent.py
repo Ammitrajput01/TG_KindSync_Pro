@@ -41,5 +41,6 @@ class ResearchAgent:
             "topic": topic,
             "provider": res["provider"],
             "elapsed_ms": res["elapsed_ms"],
-            "report": res["content"]
+            "report": res["content"],
+            "summary": res["content"],
         }

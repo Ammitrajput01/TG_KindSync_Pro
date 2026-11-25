@@ -105,8 +105,8 @@ async def handle_clinical_commands(bot, session, chat_id: int, admin_id: int, te
                 f"📐 **Clinical Calculator: Body Surface Area (BSA)** 🩺\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"• **Height**: `{ht:.0f} cm` | **Weight**: `{wt:.1f} kg`\n"
-                f"• **BSA (Mosteller Formula)**: `{res['bsa_mosteller']} m²`\n"
-                f"• **BSA (DuBois Formula)**: `{res['bsa_dubois']} m²`\n\n"
+                f"• **BSA (Mosteller Formula)**: `{res['mosteller_m2']} m²`\n"
+                f"• **BSA (DuBois Formula)**: `{res['dubois_m2']} m²`\n\n"
                 f"💡 *Clinical Pearl: Mosteller is standard for chemotherapy and renal drug dosing clearance.*"
             )
             await bot._send_message(session, chat_id, card, message_thread_id=thread_id)

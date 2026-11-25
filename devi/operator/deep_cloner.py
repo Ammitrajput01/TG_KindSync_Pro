@@ -160,6 +160,37 @@ def get_active_clone_jobs(user_id: Optional[int] = None) -> List[dict]:
 _job_cancel_flags: Dict[int, bool] = {}
 _job_pause_flags: Dict[int, bool] = {}
 
+def pause_clone_job(job_id: int):
+    _job_pause_flags[job_id] = True
+
+def resume_clone_job(job_id: int):
+    _job_pause_flags[job_id] = False
+    if -1 in _job_pause_flags:
+        _job_pause_flags[-1] = False
+
+def cancel_clone_job(job_id: int):
+    _job_cancel_flags[job_id] = True
+    _job_pause_flags[job_id] = False
+
+def _sync_job_control_from_db(job_id: int):
+    """Syncs cross-process pause/stop status from SQLite into in-memory flags."""
+    if not job_id or job_id <= 0:
+        return
+    try:
+        with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
+            row = conn.execute("SELECT status FROM telegram_clone_jobs WHERE id = ?", (job_id,)).fetchone()
+            if row and row[0]:
+                st = str(row[0]).lower().strip()
+                if st in ("cancelled", "stopped"):
+                    _job_cancel_flags[job_id] = True
+                    _job_pause_flags[job_id] = False
+                elif st == "paused":
+                    _job_pause_flags[job_id] = True
+                elif st == "running":
+                    _job_pause_flags[job_id] = False
+    except Exception:
+        pass
+
 # ---------------------------------------------------------------------------
 # Caption & Watermark Sanitizer & Anti-DMCA Obfuscation Matrix
 # ---------------------------------------------------------------------------
@@ -692,11 +723,16 @@ class DeepClonerEngine:
                     with suppress(Exception): sf.unlink()
 
         try:
+            _poll_idx = 0
             async for msg in user_client.iter_messages(src_peer, reply_to=reply_to_filter, reverse=True):
+                _poll_idx += 1
+                if _poll_idx % 5 == 1:
+                    _sync_job_control_from_db(job_id)
                 while _job_pause_flags.get(job_id) or _job_pause_flags.get(-1):
                     if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                         break
-                    await asyncio.sleep(1.0)
+                    await asyncio.sleep(1.5)
+                    _sync_job_control_from_db(job_id)
                 if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                     logger.info(f"🛑 Job #{job_id} cancelled by user.")
                     break
@@ -1046,10 +1082,12 @@ class DeepClonerEngine:
 
         grand_total_cloned = 0
         for topic_idx, (src_top_id, src_top_title) in enumerate(discovered_topics, start=1):
+            _sync_job_control_from_db(job_id)
             while _job_pause_flags.get(job_id) or _job_pause_flags.get(-1):
                 if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                     break
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(1.5)
+                _sync_job_control_from_db(job_id)
             if _job_cancel_flags.get(job_id) or _job_cancel_flags.get(-1):
                 update_clone_job_progress(job_id, status="stopped", error_msg="User stopped the job.")
                 logger.info(f"🛑 Deep clone job #{job_id} stopped.")

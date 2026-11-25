@@ -2,6 +2,30 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Wednesday, 25 November 2026 | 07:55 PM IST
+
+### 104. Full 5-Phase Cross-OS, Security, Core Engine, DEVI Bot, Web Dashboard & GitHub Docs Audit Upgrade
+* **User Directive & Context (Dr. Amit Singh)**:
+  - Conducted a comprehensive 5-agent audit across every file, launcher, core engine, DEVI bot, web cockpit, and `README.md`, then executed all 5 phases locally before pausing VPS services for deployment and `@KindDoc_bot` token rotation.
+* **Applied Engineering Actions**:
+  1. **Phase 1 — Security & Hygiene (`.gitignore`, `.env.example`, `scripts/run_study_help_clone.py`, `web_dashboard.py`)**:
+     - Rotated `DEVI_TELEGRAM_BOT_TOKEN` to the new `@KindDoc_bot` token and removed the hardcoded fallback token in `scripts/run_study_help_clone.py`.
+     - Untracked `data/telegram_accounts_cache.json` and 7 `exports/study_help_*.{csv,json}` PII files and hardened `.gitignore` (`*.pem`, `*.ppk`, `data/sessions/`, `data/keys/`, `exports/`, WAL/SHM/temp files).
+     - Synced `.env.example` with active keys (`REMOVE_LINKS`, `REPLACE_LINK`, `STRIP_HASHTAGS`, `STRIP_WORDS`, `REPLACE_WORDS`, etc.) and cleared `NTFY_TOPIC`.
+     - Restored the missing `ENGINE_TELEMETRY_FILE` parser block in `web_dashboard.py` (fixing `IndentationError`).
+  2. **Phase 2 — Cross-OS Launchers & Packaging (`.gitattributes`, `*.sh`, `*.bat`, `requirements*.txt`)**:
+     - Added `.gitattributes`, normalized all 14 `.sh` scripts to LF + `#!/usr/bin/env bash` + `+x`, fixed `tools/**/*.bat` root `cd` paths + CRLF, added `cryptography`/`pytest-asyncio` to `requirements.txt`, and switched `requirements-termux.txt` to `qrcode>=7.4.2` to avoid Pillow source builds on Android.
+  3. **Phase 3 — Core Engine, Transfer, Sentinel & DEVI Bot (`tg_kindsync_pro.py`, `fast_transfer.py`, `sentinel_observer.py`, `devi/`)**:
+     - `tg_kindsync_pro.py`: Real `cryptg`/`orjson` detection, cached `_MALLOC_TRIM_FN`, `await asyncio.sleep(wait_time)` on `FloodWaitError`, hyperlink entity check in `is_old_index_message()`, `GetForumTopicsRequest(peer=...)`, deferred `mark_clone_topic_completed` until after `queue.join()`, Rich markup escaping & compact Termux layout in `render_dashboard()`, and `Live(..., auto_refresh=False)`.
+     - `fast_transfer.py`: Fixed outer `while part < part_count` exit on empty chunk and 0-byte photo fallback (`size <= 0`).
+     - `sentinel_observer.py` & `devi/research/research_agent.py`: Fixed `ORDER BY created_at DESC LIMIT 1` and added `"summary"` key.
+     - `devi/operator/telegram_bot.py`, `clinical.py`, `group_scanner.py`, `system_tools.py`: Fixed `/cleandeleted` (`full_name`), `/syncstrip` (`sync_strip_words_file_to_db`), `/calchelp` (`calc_markup`), `/bsa` (`mosteller_m2`/`dubois_m2`), admin checks on member/cloner callbacks, IST date alignment in `_generate_daily_joins_report`, Termux `psutil` `PermissionError` fallbacks, and removed `topic_id = 1` overwrite from `group_scanner.init_tables()`.
+  4. **Phase 4 — Web Dashboard, Cross-Process Cloner Control, Mobile Drawer & RBAC (`web_dashboard.py`, `devi/operator/deep_cloner.py`, `web/`)**:
+     - Removed `"Amit@123"` hardcoded auth bypass, added `_auth_middleware` RBAC guard on `/api/*` & `/ws/*`, fixed `_get_dlq_errors_list()` return, fixed `/api/notifications/test` (`MultiChannelNotifier.send_all`), registered `/api/telegram/set_active`, fixed `/api/clone/jobs` SQL columns, and added cross-process SQLite pause/stop polling in `deep_cloner.py`.
+     - Closed `.table-search-box svg` CSS brace, added mobile sidebar drawer (`#mobile-toggle-btn`, `#sidebar-backdrop`, `toggleSidebarMobile()`), ported Live Cloner Jobs UI into `web/templates/index.html` + `dashboard.js`, and fixed TMA `ks_session_token` key.
+  5. **Phase 5 — Docs & Tests (`README.md`, `tests/test_user_fixes_verification.py`)**:
+     - Fixed broken `#%EF%B8%8F` anchor links, updated 21-option CLI matrix, `:5005` vs `:8080`, `deep_cloner` Tier 1/2 RAM model, Docker/`deploy.sh`, and bot command table; wrapped `test_user_fixes_verification.py` in `pytest` functions with `monkeypatch`.
+
 ## 📅 Log Entry: Wednesday, 25 November 2026 | 06:36 PM IST
 
 ### 103. Live Auto-Indexing During Cloning, In-Place Pinned Index Updates & Web Dashboard Live Cloner Control

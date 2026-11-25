@@ -224,10 +224,6 @@ class DashboardAuthManager:
                 user["password_hash"] = self._hash_pbkdf2(password, new_salt)
                 user["algo"] = "pbkdf2_sha256_100k"
 
-        # Explicit official login fallback for primary account Amit / Amit@123
-        if not is_valid and user.get("username", "").lower() == "amit" and password == "Amit@123":
-            is_valid = True
-
         if is_valid:
             self.purge_expired_tokens()
             token = secrets.token_hex(24)
@@ -2965,6 +2961,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             left: 10px;
             color: var(--text-tertiary);
             pointer-events: none;
+        }
         /* Rotating animation for refresh icon */
         @keyframes spin360 {
             from { transform: rotate(0deg); }
@@ -9437,16 +9434,15 @@ class DashboardServer:
                     if t_peak > peak_speed:
                         peak_speed = t_peak
 
-                    # Always preserve cumulative batch counts
                     if t_data.get("total_files"): total_files = max(int(t_data["total_files"]), files_completed)
                     elif t_data.get("discovered"): total_files = max(int(t_data["discovered"]), files_completed)
-                    
+
                     if t_data.get("files_completed") is not None: files_completed = max(int(t_data["files_completed"]), real_db_count)
                     elif t_data.get("messages_forwarded") is not None: files_completed = max(int(t_data["messages_forwarded"]), real_db_count)
-                    
+
                     if t_data.get("files_remaining") is not None: files_remaining = int(t_data["files_remaining"])
                     elif total_files > 0: files_remaining = max(0, total_files - files_completed)
-                    
+
                     if t_data.get("batch_progress_pct") is not None: batch_progress_pct = min(100.0, float(t_data["batch_progress_pct"]))
                     elif total_files > 0: batch_progress_pct = min(100.0, round((files_completed / total_files) * 100.0, 1))
 
@@ -9467,19 +9463,16 @@ class DashboardServer:
                         cur_speed = 0.0
                         is_transferring = False
 
-        # Storage Payload Calculations (in GB)
         avg_video_mb = 184.5
         avg_doc_mb = 14.8
         avg_photo_mb = 3.6
         avg_audio_mb = 22.4
         eta_seconds = 0
 
-        # Calculate persistent channel volume
         total_data_gb = round((total_files * avg_video_mb) / 1024, 1) if total_files > 0 else 0.0
         transferred_data_gb = round((files_completed * avg_video_mb) / 1024, 1) if files_completed > 0 else 0.0
         remaining_data_gb = round(max(0.0, total_data_gb - transferred_data_gb), 1)
 
-        # Real Dynamic Category Breakdown (always preserved)
         tot_videos = max(videos_sent, int(total_files * 0.75)) if total_files > files_completed else max(videos_sent, 0)
         v_sent = videos_sent
         v_pending = max(0, tot_videos - v_sent)
@@ -9494,7 +9487,6 @@ class DashboardServer:
         p_sent = photos_sent
         p_pending = max(0, tot_photos - p_sent)
 
-        # Dynamic Batch ETA & Finish Forecast
         calc_speed = cur_speed if cur_speed > 0.05 else (peak_speed * 0.7 if (is_transferring and peak_speed > 0.5) else 0.0)
         if calc_speed > 0.05 and remaining_data_gb > 0:
             remaining_mb = remaining_data_gb * 1024
@@ -9518,7 +9510,6 @@ class DashboardServer:
         finish_dt = datetime.now() + timedelta(seconds=eta_seconds)
         est_finish_time = finish_dt.strftime("%I:%M %p, %d %b") if calc_speed > 0 else "--:--"
 
-        # Extract live telemetry route names if available
         live_src_info = ""
         live_tgt_info = ""
         if ENGINE_TELEMETRY_FILE.exists():
@@ -9528,12 +9519,10 @@ class DashboardServer:
                     live_src_info = str(t_data_raw.get("src_info", "")).strip()
                     live_tgt_info = str(t_data_raw.get("tgt_info", "")).strip()
 
-        # Route Topology Mapping
         source_chat_id = os.getenv("SOURCE_CHAT", "").strip("'\"")
         source_topic_id = os.getenv("SOURCE_TOPIC", "").strip("'\"")
         target_chat_id = os.getenv("TARGET_CHAT", "").strip("'\"")
         target_topic_id = os.getenv("TARGET_TOPIC", "").strip("'\"")
-
         src_chat_name = "Source Channel Stream"
         src_topic_name = "General / All Topics"
         if live_src_info:
@@ -9825,6 +9814,7 @@ class DashboardServer:
                         })
             except Exception:
                 pass
+        return errors
 
     @staticmethod
     def _classify_topic_subject(title: str) -> str:
@@ -10191,7 +10181,40 @@ class DashboardServer:
         auth_hdr = request.headers.get("Authorization", "")
         if auth_hdr.startswith("Bearer "):
             return auth_hdr.split("Bearer ", 1)[1].strip()
+        sess_hdr = request.headers.get("X-Session-Token", "").strip()
+        if sess_hdr:
+            return sess_hdr
         return request.query.get("token", "")
+
+    @web.middleware
+    async def _auth_middleware(self, request, handler):
+        path = request.path
+        if request.method == "OPTIONS":
+            return await handler(request)
+        public_paths = {
+            "/", "/index.html", "/manifest.json",
+            "/api/auth/login", "/api/auth/local_unlock", "/api/auth/logout",
+            "/api/auth/me", "/api/auth/telegram_webapp",
+            "/api/status", "/api/system/telemetry", "/api/polyglot/status",
+        }
+        if path in public_paths or path.startswith("/static/"):
+            return await handler(request)
+        if path.startswith("/api/") or path.startswith("/ws/"):
+            token = self._extract_token_from_request(request)
+            session_user = self.auth_mgr.verify_token(token) if token else None
+            if not session_user:
+                return web.json_response({"success": False, "error": "Unauthorized"}, status=401)
+            admin_only_prefixes = (
+                "/api/auth/users", "/api/auth/create_user", "/api/auth/delete_user",
+                "/api/pause", "/api/clone/control", "/api/stats/reset", "/api/clear_dlq",
+                "/api/routes/create", "/api/routes/toggle", "/api/routes/delete",
+                "/api/telegram/", "/api/strip_words/add", "/api/strip_words/delete",
+                "/api/stash/flush", "/api/backup",
+            )
+            if any(path.startswith(p) for p in admin_only_prefixes) and session_user.get("role") != "admin":
+                return web.json_response({"success": False, "error": "Forbidden: admin role required"}, status=403)
+            request["user"] = session_user
+        return await handler(request)
 
     # AIOHTTP ROUTE HANDLERS
     async def handle_index(self, request):
@@ -10299,17 +10322,20 @@ class DashboardServer:
 
     async def handle_api_notifications_test(self, request):
         try:
-            from devi.operator.notifier import dispatch_completion_notification
+            from devi.operator.notifier import MultiChannelNotifier
             stats = {
-                "duration": "1.2s",
-                "total_items": 42,
-                "bandwidth_gb": "1.45",
-                "avg_speed": "18.4 MB/s",
-                "status": "Verified 100% Success"
+                "Duration": "1.2s",
+                "Total Items": 42,
+                "Bandwidth": "1.45 GB",
+                "Avg Speed": "18.4 MB/s",
+                "Status": "Verified 100% Success"
             }
-            results = await dispatch_completion_notification(
-                job_name="Version X Live Alert Diagnostic Test",
-                stats_summary=stats
+            notifier = MultiChannelNotifier()
+            results = await notifier.send_all(
+                title="Version X Live Alert Diagnostic Test",
+                message="All notification channels verified cleanly.",
+                stats=stats,
+                job_type="Diagnostic Test",
             )
             await self.broadcast_terminal_log("SUCCESS", f"Test alert dispatched: {results}", source="notifier")
             return web.json_response({"success": True, "channels": results})
@@ -10547,10 +10573,18 @@ class DashboardServer:
                 ).fetchone()
                 if has_tbl:
                     rows = conn.execute(
-                        "SELECT id, source_chat, target_chat, source_title, target_title, status, total_items, cloned_items, current_topic, updated_at "
+                        "SELECT id, source_chat, target_chat, job_type, current_topic_title, "
+                        "total_topics, completed_topics, total_messages, cloned_messages, status, updated_at "
                         "FROM telegram_clone_jobs ORDER BY id DESC LIMIT 12"
                     ).fetchall()
-                    jobs = [dict(r) for r in rows]
+                    for r in rows:
+                        d = dict(r)
+                        d["source_title"] = d.get("source_chat") or ""
+                        d["target_title"] = d.get("target_chat") or ""
+                        d["current_topic"] = d.get("current_topic_title") or ""
+                        d["total_items"] = d.get("total_messages") or d.get("total_topics") or 0
+                        d["cloned_items"] = d.get("cloned_messages") or d.get("completed_topics") or 0
+                        jobs.append(d)
                 conn.close()
             except Exception as e:
                 return web.json_response({"success": False, "jobs": [], "error": str(e)})
@@ -11249,7 +11283,7 @@ class DashboardServer:
         print(f" [★] Authentication: PBKDF2-HMAC-SHA256 (100k rounds)\n")
 
         if HAS_AIOHTTP:
-            self.app = web.Application()
+            self.app = web.Application(middlewares=[self._auth_middleware])
             # Register static assets folder for decoupled CSS, JS & media
             static_dir = BASE_DIR / "web" / "static"
             if static_dir.exists():
@@ -11272,6 +11306,7 @@ class DashboardServer:
             self.app.router.add_get("/api/telegram/accounts", self.handle_api_telegram_accounts)
             self.app.router.add_post("/api/telegram/send_code", self.handle_api_telegram_send_code)
             self.app.router.add_post("/api/telegram/verify_code", self.handle_api_telegram_verify_code)
+            self.app.router.add_post("/api/telegram/set_active", self.handle_api_telegram_set_active)
             self.app.router.add_post("/api/telegram/import_string", self.handle_api_telegram_import_string)
             self.app.router.add_get("/api/routes", self.handle_api_routes)
             self.app.router.add_post("/api/routes/create", self.handle_api_create_route)

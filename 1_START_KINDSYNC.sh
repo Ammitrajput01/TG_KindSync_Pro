@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # 📱 1. START TG KINDSYNC PRO ENGINE (INTERACTIVE / FOREGROUND)
 # ==============================================================================

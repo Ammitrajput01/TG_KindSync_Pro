@@ -94,7 +94,7 @@ ssh -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32 "mkdir -p /h
 
 echo.
 echo [*] Step 2/3: Uploading your 100%% logged-in session_forwarder.session ^& updated engine...
-scp -o StrictHostKeyChecking=no -i "!KEY_PATH!" -r session_forwarder.session .env tg_kindsync_pro.py web_dashboard.py main.py requirements.txt tools ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/
+scp -o StrictHostKeyChecking=no -i "!KEY_PATH!" -r session_forwarder.session .env tg_kindsync_pro.py web_dashboard.py sentinel_observer.py fast_transfer.py polyglot_accelerator.py strip_words.txt main.py requirements.txt devi web tools ubuntu@130.210.1.32:/home/ubuntu/TG_KindSync_Pro/
 
 echo.
 echo [*] Step 3/3: Restarting 24/7 background services on Oracle VPS...

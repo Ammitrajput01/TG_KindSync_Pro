@@ -183,11 +183,32 @@ devi/memory/*.sqlite-shm
 
 # Security & Scratch Files
 *.key
+*.pem
+*.ppk
 data/session_string.txt
+data/telegram_accounts_cache.json
+data/sessions/
+data/sessions_backup/
+data/keys/
 *.session_string
 scratch/
 cookies.txt
 *cookies*.txt
+!.env.example
+
+# Runtime Exports, Member Audits, DLQ & WAL Artifacts
+exports/
+member_backups/
+observer_reports/
+dead_letter.jsonl
+dlq_report.json
+mitm_mcp_traffic.db
+*.sqlite3-wal
+*.sqlite3-shm
+*.db-wal
+*.db-shm
+*.tmp
+*.bak
 
 # Strip Words Backups
 archives/strip_words_backups/*.txt

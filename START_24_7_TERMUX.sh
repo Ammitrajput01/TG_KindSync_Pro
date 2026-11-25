@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # 📱 TG KINDSYNC PRO — 24/7 ALWAYS-ONLINE BACKGROUND AUTOPILOT (ANDROID TERMUX)
 # ==============================================================================

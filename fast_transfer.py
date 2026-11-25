@@ -310,7 +310,8 @@ class ParallelTransferrer:
         try:
             await self._init_download(conn_count, file, part_count, part_size)
             part = 0
-            while part < part_count:
+            done = False
+            while part < part_count and not done:
                 tasks = [
                     self.loop.create_task(s.next())
                     for s in self.senders
@@ -319,6 +320,7 @@ class ParallelTransferrer:
                 for task in tasks:
                     chunk = await task
                     if not chunk:
+                        done = True
                         break
                     yield chunk
                     part += 1
@@ -424,8 +426,8 @@ async def fast_download(
     else:
         size = 0
 
-    # Auto fallback for small files (< 2 MB) where socket setup isn't worth the overhead
-    if size > 0 and size < 2 * 1024 * 1024:
+    # Auto fallback for small files (< 2 MB) or unknown-size media (e.g. photos)
+    if size <= 0 or size < 2 * 1024 * 1024:
         return await client.download_media(
             location,
             file=destination,

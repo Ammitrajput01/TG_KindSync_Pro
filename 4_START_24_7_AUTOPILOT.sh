@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # 🔋 4. START 24/7 BACKGROUND AUTOPILOT (SCREEN-OFF MOBILE CLONING)
 # ==============================================================================

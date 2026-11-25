@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # 📱 TG KINDSYNC PRO — 100% AUTOMATED ZERO-PROMPT TERMUX INSTALLER (ANDROID)
 # ==============================================================================

@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
 # 🚀 5. 1-CLICK AUTO-UPDATER & SYSTEM UPGRADE FOR ANDROID TERMUX
 # ==============================================================================
@@ -28,15 +28,21 @@ fi
 export PIP_DISABLE_PIP_VERSION_CHECK=1
 export PIP_NO_CACHE_DIR=1
 
-# Ensure native Termux packages are installed first (avoids /proc/stat & wheel build errors)
-pkg install -y python-psutil python-pillow python-cryptography 2>/dev/null || true
+# Ensure native Termux packages are installed if running inside Termux
+if [ -n "${TERMUX_VERSION:-}" ] || [ -d "/data/data/com.termux" ]; then
+    pkg install -y python-psutil python-pillow python-cryptography 2>/dev/null || true
+    REQ_FILE="requirements-termux.txt"
+else
+    REQ_FILE="requirements.txt"
+fi
 
-python -m pip install --upgrade -r requirements-termux.txt 2>/dev/null || \
-pip install --break-system-packages --upgrade -r requirements-termux.txt 2>/dev/null || \
+PY_BIN="$(command -v python3 || command -v python || true)"
+"$PY_BIN" -m pip install --upgrade -r "$REQ_FILE" 2>/dev/null || \
+"$PY_BIN" -m pip install --break-system-packages --upgrade -r "$REQ_FILE" 2>/dev/null || \
 echo "[WARN] Some optional packages skipped; checking core imports..."
 
 # 3. Instant verification
-python -c "
+"$PY_BIN" -c "
 import telethon, aiosqlite, dotenv, rich, aiohttp
 print('  ✅ All Core Streaming Modules Verified 100% Healthy!')
 " || echo "  ⚠️ Run: pip install --break-system-packages telethon aiosqlite python-dotenv rich aiohttp"

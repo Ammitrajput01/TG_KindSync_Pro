@@ -662,7 +662,7 @@ class TelegramReporter:
             with suppress(Exception):
                 conn = sqlite3.connect(DB_FILE, timeout=10.0)
                 row = conn.execute(
-                    "SELECT chat_id, topic_briefings_id FROM telegram_admin_forum_config WHERE is_active = 1 ORDER BY id DESC LIMIT 1"
+                    "SELECT chat_id, topic_briefings_id FROM telegram_admin_forum_config WHERE is_active = 1 ORDER BY created_at DESC LIMIT 1"
                 ).fetchone()
                 conn.close()
                 if row and row[0]:

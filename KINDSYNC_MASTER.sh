@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ============================================================
 # TG KINDSYNC PRO - ULTIMATE TERMUX MASTER INSTALLER
 # Fresh Install | Repair | Update | Dependency Check | Launch

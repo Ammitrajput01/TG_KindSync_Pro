@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 title TG KindSync Pro - Sync Single Active Session to Oracle (24/7 Autopilot)
 color 0b
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 :SYNC_STEP
 cls

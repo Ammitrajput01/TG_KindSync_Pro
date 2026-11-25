@@ -14,13 +14,24 @@ class SystemTools:
         """
         Gathers memory, CPU, disk, and operating environment metrics.
         """
-        vm = psutil.virtual_memory()
-        disk = psutil.disk_usage(os.path.abspath(os.sep))
-        cpu_pct = psutil.cpu_percent(interval=0.1)
+        import shutil
+        try:
+            vm = psutil.virtual_memory()
+            total_ram_gb = vm.total / (1024 ** 3)
+            available_ram_gb = vm.available / (1024 ** 3)
+            used_ram_pct = vm.percent
+        except Exception:
+            total_ram_gb, available_ram_gb, used_ram_pct = 0.0, 0.0, 0.0
 
-        total_ram_gb = vm.total / (1024 ** 3)
-        available_ram_gb = vm.available / (1024 ** 3)
-        used_ram_pct = vm.percent
+        try:
+            disk = psutil.disk_usage(os.path.abspath(os.sep))
+        except Exception:
+            disk = shutil.disk_usage(os.path.abspath(os.sep))
+
+        try:
+            cpu_pct = psutil.cpu_percent(interval=0.1)
+        except Exception:
+            cpu_pct = 0.0
 
         # Health status determination
         status = "HEALTHY"
