@@ -2,6 +2,19 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Wednesday, 25 November 2026 | 06:21 PM IST
+
+### 102. Fixed `group_scanner.py` Harvesting 0 Items on Kind Doctor Branded / Bot-Uploaded Topics
+* **User Directive & Context (Dr. Amit Singh)**:
+  - Screenshot in `Study Help 2.0` -> `Cer@bellum 3.0` (`#10246`, 256 messages) showed `/topicindex` and `/index@KindDoc_bot` scanning and still reporting: `⚠️ Is Topic ('Cer@bellum 3.0') ke liye koi items/lectures registered nahi hain.`
+* **Forensic Root Cause Analysis**:
+  - Live diagnostic of `python3 -m devi.operator.group_scanner -1004467980132 10246` on VPS returned `Harvested 0 media items in Topic #10246`.
+  - `devi/operator/group_scanner.py` (`scan_single_topic` and `harvest_all_messages`) had two fatal filters:
+    1. `BOT_IGNORE_MARKERS` included `"kind doctor"`, which matched the `Kind Doctor & Team` footer on EVERY cloned video and PDF!
+    2. `if getattr(msg.sender, 'bot', False): continue` skipped ALL media uploaded/cloned by `@KindDoc_bot` itself!
+* **Applied Engineering Action**:
+  - Removed `"kind doctor"` from `BOT_IGNORE_MARKERS` (added `"module / topic:"` for empty header cards), and ensured real study media (`msg.video`, `msg.document`, `msg.audio`) is NEVER skipped by bot-sender or text-marker filters.
+
 ## 📅 Log Entry: Wednesday, 25 November 2026 | 04:20 PM IST
 
 ### 101. Cross-Platform Friend-Ready Hardening (Android Termux `/proc/stat` Fix, Updater Fix, Skipped Stub Counter Fix, Local Dashboard Fallback & GitHub Quick-Start Guide)

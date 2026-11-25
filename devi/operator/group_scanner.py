@@ -186,21 +186,22 @@ async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, to
 
                 topic_items_count = 0
                 BOT_IGNORE_MARKERS = (
-                    "auto-scan", "auto-pinned", "kind doctor", "topic study index", 
+                    "auto-scan", "auto-pinned", "topic study index", 
                     "topic index (part", "table of contents", "master topic directory", 
                     "index items add", "study index card", "auto-pin", "1-click auto-scan",
-                    "topic #", "ke media files auto-scan"
+                    "topic #", "ke media files auto-scan", "module / topic:"
                 )
                 try:
                     iter_kwargs = {"limit": None}
                     if topic_id and topic_id > 1:
                         iter_kwargs["reply_to"] = topic_id
                     async for msg in client.iter_messages(peer, **iter_kwargs):
-                        if getattr(msg.sender, 'bot', False) or getattr(msg, 'via_bot_id', None):
+                        has_study_media = bool(getattr(msg, 'video', None) or getattr(msg, 'document', None) or getattr(msg, 'audio', None))
+                        if (getattr(msg.sender, 'bot', False) or getattr(msg, 'via_bot_id', None)) and not has_study_media:
                             continue
 
                         msg_text = (msg.message or "").strip()
-                        if any(m in msg_text.lower() for m in BOT_IGNORE_MARKERS):
+                        if not has_study_media and any(m in msg_text.lower() for m in BOT_IGNORE_MARKERS):
                             continue
 
                         title = None
@@ -260,10 +261,10 @@ async def harvest_all_messages(client, peer, target_chat_id: int) -> int:
     """Universally harvests all topics and media messages in a single continuous stream."""
     from telethon.tl.types import MessageActionTopicCreate, MessageActionTopicEdit
     BOT_IGNORE_MARKERS = (
-        "auto-scan", "auto-pinned", "kind doctor", "topic study index", 
+        "auto-scan", "auto-pinned", "topic study index", 
         "topic index (part", "table of contents", "master topic directory", 
         "index items add", "study index card", "auto-pin", "1-click auto-scan",
-        "topic #", "ke media files auto-scan"
+        "topic #", "ke media files auto-scan", "module / topic:"
     )
     harvested_count = 0
     known_topics = {}
@@ -342,12 +343,13 @@ async def harvest_all_messages(client, peer, target_chat_id: int) -> int:
                             """, (t_title, get_topic_icon(t_title), target_chat_id, msg.id))
                             conn.commit()
 
-            # Skip bot messages or status notifications
-            if getattr(msg.sender, 'bot', False) or getattr(msg, 'via_bot_id', None):
+            # Skip bot text messages or status notifications (but NEVER skip study videos/PDFs uploaded by @KindDoc_bot!)
+            has_study_media = bool(getattr(msg, 'video', None) or getattr(msg, 'document', None) or getattr(msg, 'audio', None))
+            if (getattr(msg.sender, 'bot', False) or getattr(msg, 'via_bot_id', None)) and not has_study_media:
                 continue
 
             msg_text = (msg.message or "").strip()
-            if any(m in msg_text.lower() for m in BOT_IGNORE_MARKERS):
+            if not has_study_media and any(m in msg_text.lower() for m in BOT_IGNORE_MARKERS):
                 continue
 
             title = None
