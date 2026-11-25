@@ -3384,6 +3384,34 @@ def check_media_filter(msg, media_filter: str) -> bool:
         return bool(getattr(msg, "text", None) and not getattr(msg, "media", None))
     return True
 
+def is_old_index_message(msg) -> bool:
+    """Returns True for text-only old directory / table-of-contents / multi-link index cards so cloning skips them."""
+    if getattr(msg, "video", None) or getattr(msg, "document", None) or getattr(msg, "photo", None) or getattr(msg, "audio", None) or getattr(msg, "voice", None):
+        return False
+    raw_text = (getattr(msg, "raw_text", None) or getattr(msg, "message", None) or getattr(msg, "text", None) or "").strip()
+    if not raw_text:
+        return False
+    link_count = len(re.findall(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/', raw_text, flags=re.IGNORECASE))
+    if link_count >= 3:
+        return True
+    low = raw_text.lower()
+    index_markers = (
+        "master topic directory",
+        "topic study index",
+        "table of contents",
+        "master index",
+        "topic index (part",
+        "indexed topics:",
+        "tap any subject title",
+        "tap any lecture title",
+        "click here for index",
+        "all subjects index",
+        "lecture index",
+    )
+    if any(m in low for m in index_markers) and (link_count >= 1 or "━━" in raw_text or len(raw_text.splitlines()) >= 4):
+        return True
+    return False
+
 def _canonical_line_key(text: str) -> str:
     """Normalizes text for fuzzy deduplication: lowercases, removes markdown/emojis/punctuation."""
     t = re.sub(r"[\*\_`~#>•\-–—:;\|\(\)\[\]]", " ", str(text))
@@ -4727,7 +4755,7 @@ class TerminalPlatform:
                         await push()
                     continue
                 
-                if not check_media_filter(msg, self.cfg.perf.media_filter):
+                if not check_media_filter(msg, self.cfg.perf.media_filter) or is_old_index_message(msg):
                     continue
                 
                 curr_gid = getattr(msg, "grouped_id", None)
@@ -4851,7 +4879,7 @@ class TerminalPlatform:
                         await push_rule()
                     continue
                 
-                if not check_media_filter(msg, self.cfg.perf.media_filter):
+                if not check_media_filter(msg, self.cfg.perf.media_filter) or is_old_index_message(msg):
                     continue
                 
                 curr_gid = getattr(msg, "grouped_id", None)
@@ -4953,7 +4981,7 @@ class TerminalPlatform:
                                 is_match = True
                         if not is_match: return
                     
-                    if not check_media_filter(msg, self.cfg.perf.media_filter):
+                    if not check_media_filter(msg, self.cfg.perf.media_filter) or is_old_index_message(msg):
                         return
                     
                     if not self.cfg.perf.keywords or self.matches_keywords(msg):
@@ -4976,7 +5004,7 @@ class TerminalPlatform:
                             is_match = True
                     if not is_match: return
                 
-                if not check_media_filter(msg, self.cfg.perf.media_filter):
+                if not check_media_filter(msg, self.cfg.perf.media_filter) or is_old_index_message(msg):
                     return
                 
                 if not self.cfg.perf.keywords or self.matches_keywords(msg):

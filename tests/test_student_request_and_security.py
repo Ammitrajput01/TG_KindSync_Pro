@@ -109,3 +109,33 @@ def test_strip_words_study_platforms_symbol_obfuscation():
     assert "UW0rld" in cleaned
     assert "B0@rds & B€yond" in cleaned
     assert "DocTutorials" not in cleaned
+
+def test_indexer_router_does_not_shadow_full_index_commands():
+    from devi.operator.handlers import build_master_router
+    router = build_master_router()
+    assert router.has_command("/topics")
+    assert not router.has_command("/mainindex")
+    assert not router.has_command("/topicindex")
+    assert not router.has_command("/index")
+
+def test_is_old_index_message_skips_index_preserves_media():
+    from types import SimpleNamespace
+    from tg_kindsync_pro import is_old_index_message
+
+    old_idx = SimpleNamespace(
+        video=None, document=None, photo=None, audio=None, voice=None,
+        raw_text="✨ MASTER TOPIC DIRECTORY 📑\n━━━━━━━━━━━━━━━━━━\n[01] https://t.me/c/123/10\n[02] https://t.me/c/123/20\n[03] https://t.me/c/123/30"
+    )
+    assert is_old_index_message(old_idx) is True
+
+    real_video = SimpleNamespace(
+        video=object(), document=None, photo=None, audio=None, voice=None,
+        raw_text="MASTER TOPIC DIRECTORY https://t.me/c/123/10 https://t.me/c/123/20 https://t.me/c/123/30"
+    )
+    assert is_old_index_message(real_video) is False
+
+    normal_note = SimpleNamespace(
+        video=None, document=None, photo=None, audio=None, voice=None,
+        raw_text="Important high-yield cardiology pearl for NEET PG 2026."
+    )
+    assert is_old_index_message(normal_note) is False

@@ -554,17 +554,28 @@ async def scan_group(target_input, target_topic_id: Optional[int] = None, scan_m
             topic_title = None
             if client_type == "user":
                 with suppress(Exception):
-                    res = await client(GetForumTopicsRequest(
-                        peer=peer,
-                        offset_date=None,
-                        offset_id=0,
-                        offset_topic=0,
-                        limit=100
-                    ))
-                    for t in getattr(res, 'topics', []):
-                        if getattr(t, 'id', 0) == target_topic_id:
-                            topic_title = getattr(t, 'title', None)
+                    off_date, off_id, off_topic = None, 0, 0
+                    while not topic_title:
+                        res = await client(GetForumTopicsRequest(
+                            peer=peer,
+                            offset_date=off_date,
+                            offset_id=off_id,
+                            offset_topic=off_topic,
+                            limit=100
+                        ))
+                        t_list = getattr(res, 'topics', [])
+                        if not t_list:
                             break
+                        for t in t_list:
+                            if getattr(t, 'id', 0) == target_topic_id:
+                                topic_title = getattr(t, 'title', None)
+                                break
+                        if len(t_list) < 100:
+                            break
+                        last_t = t_list[-1]
+                        off_topic = getattr(last_t, 'id', 0)
+                        off_id = getattr(last_t, 'top_message', 0)
+                        off_date = getattr(last_t, 'date', None)
             count = await scan_single_topic(client, peer, target_chat_id, target_topic_id, topic_title=topic_title)
             print(f"SUCCESS: Scanned topic #{target_topic_id} ({count} items found)")
             return

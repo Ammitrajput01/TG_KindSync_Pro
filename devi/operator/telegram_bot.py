@@ -35,7 +35,7 @@ import struct
 import hashlib
 import uuid
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Set, Dict, Any, Optional, Tuple, List
 from contextlib import suppress
@@ -2743,7 +2743,7 @@ class DeviTelegramBot:
                 ])
 
             csv_bytes = csv_buf.getvalue().encode("utf-8")
-            now = datetime.now()
+            now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
             day_str = now.strftime("%A")
             date_str = now.strftime("%d-%B-%Y")
             time_str = now.strftime("%I-%M%p")
@@ -2817,7 +2817,7 @@ class DeviTelegramBot:
             json_members = []
             wl_records = []
             
-            now = datetime.now()
+            now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
             day_str = now.strftime("%A")
             date_str = now.strftime("%d-%B-%Y")
             time_str = now.strftime("%I-%M%p")
@@ -2938,7 +2938,7 @@ class DeviTelegramBot:
         Complies with Dr. Amit's permanent naming rule:
         [prefix]_[Day]_[Date]-[Month]-[Year]_[Time-12hAM-PM].[ext]
         """
-        now = datetime.now()
+        now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
         day_str = now.strftime("%A")
         date_str = now.strftime("%d-%B-%Y")
         time_str = now.strftime("%I-%M%p")
@@ -3045,7 +3045,7 @@ class DeviTelegramBot:
         last_dispatched_date = None
         while self.is_running:
             try:
-                now = datetime.now()
+                now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
                 today_str = now.strftime("%Y-%m-%d")
                 # Trigger at 23:55 local time once per day
                 if now.hour == 23 and now.minute >= 50 and last_dispatched_date != today_str:
@@ -9600,7 +9600,7 @@ class DeviTelegramBot:
 
             await self._send_message(session, chat_id, "⏳ **Generating live encrypted SQLite snapshot backup...**", message_thread_id=thread_id)
             try:
-                now = datetime.now()
+                now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
                 day_str = now.strftime("%A")
                 date_str = now.strftime("%d-%B-%Y")
                 time_str = now.strftime("%I-%M%p")
@@ -13624,7 +13624,7 @@ class DeviTelegramBot:
 
             notify_id = await self._send_message(session, chat_id, "⏳ **Generating secure zero-downtime SQLite backup snapshot...**", message_thread_id=thread_id)
             try:
-                now = datetime.now()
+                now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
                 day_name = now.strftime("%A")
                 date_str = now.strftime("%d-%B-%Y")
                 time_str = now.strftime("%I-%M%p") # e.g. 10-25AM
@@ -13733,7 +13733,7 @@ class DeviTelegramBot:
             notify_id = await self._send_message(session, chat_id, "⏳ **Backing up database before history wipe...**", message_thread_id=thread_id)
             try:
                 # 1. Take safety snapshot
-                now = datetime.now()
+                now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
                 stamp = now.strftime("%A_%d-%B-%Y_%I-%M%p")
                 backup_filename = f"history_core_backup_{stamp}.sqlite"
                 backup_dir = BASE_PROJECT_DIR / "db_backups"

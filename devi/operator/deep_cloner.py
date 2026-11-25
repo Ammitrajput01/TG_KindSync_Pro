@@ -705,6 +705,19 @@ class DeepClonerEngine:
                     continue
                 if not (msg.text or msg.media):
                     continue
+                # Skip old source index / directory / TOC link-list messages (never skip actual media files)
+                if not (getattr(msg, "video", None) or getattr(msg, "document", None) or getattr(msg, "photo", None) or getattr(msg, "audio", None) or getattr(msg, "voice", None)):
+                    _chk_txt = (msg.text or "").strip()
+                    _link_cnt = len(re.findall(r'https?://(?:t(?:elegram)?\.me|telegram\.dog)/', _chk_txt, flags=re.IGNORECASE))
+                    _low_txt = _chk_txt.lower()
+                    _idx_markers = (
+                        "master topic directory", "topic study index", "table of contents",
+                        "master index", "topic index (part", "indexed topics:",
+                        "tap any subject title", "tap any lecture title", "click here for index",
+                        "all subjects index", "lecture index"
+                    )
+                    if _link_cnt >= 3 or (any(m in _low_txt for m in _idx_markers) and (_link_cnt >= 1 or "━━" in _chk_txt or len(_chk_txt.splitlines()) >= 4)):
+                        continue
 
                 total_count += 1
                 success = False

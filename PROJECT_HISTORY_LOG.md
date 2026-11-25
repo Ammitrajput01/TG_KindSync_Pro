@@ -2,6 +2,40 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Wednesday, 25 November 2026 | 03:45 PM IST
+
+### 100. KindDoc Indexer Recovery, Old Index Skip Filter During Cloning, Devi Ji Daily Report IST & HQ Routing Fix, and BE Mine Arise Topics Recovery
+* **User Directive & Context (Dr. Amit Singh)**:
+  - *"kindoc bot jo tha wo ab index nahi bna rha hai esa q"*
+  - *"jb hum clonning kr rahe hai tb ye poorane index ko bhi q clone kr rhaa hai"*
+  - *"humne jo clonning program se lgaai thi BE Mine me usme jo last tym errors aye the ye folders usne bna diye the to yaad se isko bhi fix krna hai"*
+  - *"ab devi ji bhi daily report nahi bahej rahi hai esa q ye bhi btaana or fix bhi"*
+  - *"theek hai sb kr do pause kr ke update fix and upgrade and resume bhi kr dena"*
+* **Forensic Root Cause Analysis**:
+  1. *KindDoc Bot Not Creating Index*:
+     - `devi/operator/handlers/indexer.py` was registered on `self.command_router`, shadowing `DeviTelegramBot`'s full `/mainindex`, `/topicindex`, `/index` handlers (`telegram_bot.py:9010-9275`).
+     - `handle_main_index` unpacked `_build_main_index_cards(...)` with `for card_text, kb in chunks:`, crashing with `ValueError: not enough values to unpack (expected 2, got 0)` because `_build_main_index_cards` returns `(cards_list, reply_markup)`.
+     - `handle_topic_index` rejected `/topicindex` inside topics whenever `<topic_id>` wasn't typed manually, ignoring `message_thread_id` and skipping auto-scan.
+     - `devi/operator/group_scanner.py` (`scan_single_topic`) queried `GetForumTopicsRequest` with `limit=100` without pagination on `>100`-topic supergroups.
+  2. *Cloning Copying Old Index Messages*:
+     - Neither `tg_kindsync_pro.py` nor `devi/operator/deep_cloner.py` filtered out text-only old directory / table-of-contents / multi-link index cards during scanning/cloning.
+  3. *Devi Ji Daily Reports Missing / Wrong Timing*:
+     - Oracle VPS runs in `Etc/UTC`, so `datetime.now()` caused `sentinel_observer.py` (9 AM / 9 PM) to fire at `2:30 PM IST` / `2:30 AM IST`, and `telegram_bot.py` (`_periodic_daily_joins_loop` at `23:50`) to fire at `05:20 AM IST`.
+     - `sentinel_observer.py` (`TelegramReporter.send_report`) only targeted `"me"` (Saved Messages), never dispatching to Kind Doctor HQ (`🌅 Daily Briefings & Vitals`) or Master Admins (`1553619403`, `759038032`).
+  4. *BE Mine Empty Arise Folders (`10290`–`10298`)*:
+     - `history_core.sqlite` held old `forwarded` records from Nov 14–15 for `10290`–`10298`, causing the Sunday restart to post `📂 Module / Topic:` headers while skipping the media payloads.
+* **Applied Engineering Actions & Permanent Fixes**:
+  1. **Indexer & Scanner Fix (`devi/operator/handlers/indexer.py`, `devi/operator/group_scanner.py`)**:
+     - Fixed `handle_main_index` unpacking & `handle_topic_index` `thread_id` support; scoped `register_indexer_handlers` to `/topics` so `/mainindex`, `/topicindex`, `/index` use `DeviTelegramBot`'s full auto-scan + auto-pin + pagination handlers.
+     - Added full pagination loop to `scan_single_topic` in `group_scanner.py`.
+  2. **Old Index Skip Filter (`tg_kindsync_pro.py`, `devi/operator/deep_cloner.py`)**:
+     - Added `is_old_index_message(msg)` (and equivalent check in `deep_cloner.py`) to skip text-only index/directory cards (`3+ t.me/` links or explicit index headers) while preserving all real study videos, PDFs, photos, and audio.
+  3. **Devi Ji IST & Multi-Destination Dispatch (`sentinel_observer.py`, `devi/operator/telegram_bot.py`)**:
+     - Locked all daily briefing & report schedules to strict **IST (`UTC+05:30`)**: `9:00 AM IST` Morning Briefing, `9:00 PM IST` Night Briefing, `11:50 PM IST` Daily Joins CSV.
+     - Added Bot API fallback dispatch in `sentinel_observer.py` (`_send_bot_api_report`) to Kind Doctor HQ `🌅 Daily Briefings & Vitals` topic and Master Admins (`1553619403`, `759038032`).
+  4. **BE Mine Arise Topics Recovery & Resume**:
+     - Cleared `forwarded` & `topic_watermarks` ONLY for Arise topics `10290`–`10298` on VPS after creating a timestamped backup, leaving all other completed/in-progress topics (`10316`–`10326`+) untouched so forwarding resumes seamlessly.
+
 ## 📅 Log Entry: Sunday, 22 November 2026 | 01:45 PM IST
 
 ### 99. High-Risk Quarantine Radar Last 100 Member Surveillance & Emergency Strike Backup Engine, Comprehensive Study Platforms Symbol Obfuscation, and Strict Local Clutter Clean

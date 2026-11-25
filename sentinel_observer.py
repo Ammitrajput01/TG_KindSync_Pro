@@ -25,8 +25,10 @@ import sqlite3
 import platform
 import asyncio
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from contextlib import suppress
+
+IST_TZ = timezone(timedelta(hours=5, minutes=30))
 
 # Fix Windows console UTF-8 & cp1252 character map issues
 if hasattr(sys.stdout, "reconfigure"):
@@ -640,29 +642,73 @@ class TelegramReporter:
                     parse_mode="md"
                 )
 
-    async def send_report(self, message_text: str):
-        if not self.client or not await self.client.is_user_authorized():
+    async def _send_bot_api_report(self, message_text: str) -> bool:
+        """Dispatches report via @KindDoc_bot to Kind Doctor HQ Briefings topic and Master Admins."""
+        bot_token = os.getenv("DEVI_TELEGRAM_BOT_TOKEN", "").strip().strip("'").strip('"')
+        if not bot_token:
             return False
+        targets = []
+        # 1. Lookup Kind Doctor HQ Daily Briefings topic
+        if DB_FILE.exists():
+            with suppress(Exception):
+                conn = sqlite3.connect(DB_FILE, timeout=10.0)
+                row = conn.execute(
+                    "SELECT chat_id, topic_briefings_id FROM telegram_admin_forum_config WHERE is_active = 1 ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+                conn.close()
+                if row and row[0]:
+                    targets.append((int(row[0]), int(row[1]) if row[1] else None))
+        # 2. Permanent Master Admin Accounts
+        for adm_id in (1553619403, 759038032):
+            targets.append((adm_id, None))
+
+        sent_any = False
         try:
-            await self.client.send_message(
-                self.target_peer,
-                message_text,
-                parse_mode="md",
-                link_preview=False
-            )
-            return True
-        except Exception:
+            import aiohttp
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            async with aiohttp.ClientSession() as http_sess:
+                for t_chat, t_thread in targets:
+                    payload = {"chat_id": t_chat, "text": message_text[:4000], "disable_web_page_preview": True}
+                    if t_thread:
+                        payload["message_thread_id"] = t_thread
+                    try:
+                        async with http_sess.post(url, json=payload, timeout=15) as resp:
+                            if resp.status == 200:
+                                sent_any = True
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[SENTINEL] Bot API report dispatch warning: {e}", flush=True)
+        return sent_any
+
+    async def send_report(self, message_text: str):
+        sent_ok = False
+        if self.client and await self.client.is_user_authorized():
             try:
                 await self.client.send_message(
                     self.target_peer,
                     message_text,
-                    parse_mode=None,
+                    parse_mode="md",
                     link_preview=False
                 )
-                return True
-            except Exception as e:
-                STATE.add_event(f"[yellow]Reporter send error: {str(e)[:40]}[/]")
-                return False
+                sent_ok = True
+            except Exception:
+                try:
+                    await self.client.send_message(
+                        self.target_peer,
+                        message_text,
+                        parse_mode=None,
+                        link_preview=False
+                    )
+                    sent_ok = True
+                except Exception as e:
+                    STATE.add_event(f"[yellow]Reporter send error: {str(e)[:40]}[/]")
+                    print(f"[SENTINEL] Saved Messages send error: {e}", flush=True)
+
+        # Always also deliver to Kind Doctor HQ Briefings & Master Admins via Bot API
+        if await self._send_bot_api_report(message_text):
+            sent_ok = True
+        return sent_ok
 
     async def send_database_backup(self, reply_event=None):
         if not self.client or not await self.client.is_user_authorized():
@@ -680,7 +726,7 @@ class TelegramReporter:
             db_stats = read_db_metrics()
             size_kb = snap_path.stat().st_size / 1024
             # Format: Sunday, 13 September 2026 | 05:22 AM
-            date_str = datetime.now().strftime("%A, %d %B %Y | %I:%M %p")
+            date_str = datetime.now(IST_TZ).strftime("%A, %d %B %Y | %I:%M %p")
 
             caption_card = (
                 f"📦 **[{DEVI_NAME.upper()} CLOUD DATABASE BACKUP]**\n"
@@ -1034,8 +1080,8 @@ async def main():
             db_stats = read_db_metrics()
             STATE.db_forwarded_count = db_stats.get("total_forwarded", 0)
 
-            # Check 9:00 AM Morning Briefing & DB Backup
-            now_dt = datetime.now()
+            # Check 9:00 AM IST Morning Briefing & DB Backup
+            now_dt = datetime.now(IST_TZ)
             today_str = now_dt.strftime("%Y-%m-%d")
             if now_dt.hour == 9 and 0 <= now_dt.minute < 15 and last_morning_date != today_str:
                 last_morning_date = today_str
@@ -1047,12 +1093,14 @@ async def main():
                         card = ADVISOR.build_good_morning_digest(STATE, _stats, topic, summary)
                         await reporter.send_report(card)
                         await reporter.send_database_backup()
-                        STATE.add_event("[bold green]🌅 9:00 AM Good Morning Digest & DB Backup dispatched![/]")
+                        STATE.add_event("[bold green]🌅 9:00 AM IST Good Morning Digest & DB Backup dispatched![/]")
+                        print("[SENTINEL] 9:00 AM IST Good Morning Digest dispatched!", flush=True)
                     except Exception as gm_err:
                         STATE.add_event(f"[yellow]Morning dispatch note: {gm_err}[/]")
+                        print(f"[SENTINEL] Morning dispatch error: {gm_err}", flush=True)
                 asyncio.create_task(_dispatch_morning())
 
-            # Check 9:00 PM Night Briefing & DB Backup
+            # Check 9:00 PM IST Night Briefing & DB Backup
             if now_dt.hour == 21 and 0 <= now_dt.minute < 15 and last_night_date != today_str:
                 last_night_date = today_str
                 async def _dispatch_night(_stats=db_stats):
@@ -1063,9 +1111,11 @@ async def main():
                         card = ADVISOR.build_good_night_digest(STATE, _stats, topic, summary)
                         await reporter.send_report(card)
                         await reporter.send_database_backup()
-                        STATE.add_event("[bold green]🌙 9:00 PM Good Night Digest & DB Backup dispatched![/]")
+                        STATE.add_event("[bold green]🌙 9:00 PM IST Good Night Digest & DB Backup dispatched![/]")
+                        print("[SENTINEL] 9:00 PM IST Good Night Digest dispatched!", flush=True)
                     except Exception as gn_err:
                         STATE.add_event(f"[yellow]Night dispatch note: {gn_err}[/]")
+                        print(f"[SENTINEL] Night dispatch error: {gn_err}", flush=True)
                 asyncio.create_task(_dispatch_night())
 
             # Check if 12 hours elapsed for Autonomous Evolution Digest & Cloud Backup (fallback cycle)
