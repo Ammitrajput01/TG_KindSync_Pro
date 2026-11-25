@@ -40,13 +40,32 @@ goto MAIN_MENU
 
 :RUN_LOCAL
 cls
-echo [*] Launching TG KindSync Pro Engine locally...
-if exist ".venv\Scripts\activate.bat" (
-    call .venv\Scripts\activate.bat
-    python main.py
-) else (
-    python main.py
+echo [*] Checking Python & Environment...
+where python >nul 2>nul
+if errorlevel 1 (
+    echo [!] Python not found! Attempting 1-click install via winget...
+    winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements
+    echo [!] Please restart this window after Python installation finishes.
+    pause
+    goto MAIN_MENU
 )
+if not exist ".env" (
+    if exist ".env.example" (
+        copy /Y ".env.example" ".env" >nul
+        echo [+] Created default .env from .env.example
+    )
+)
+if not exist ".venv\Scripts\python.exe" (
+    echo [*] First-time setup: Creating virtual environment and installing dependencies...
+    python -m venv .venv
+    call .venv\Scripts\activate.bat
+    python -m pip install --upgrade pip >nul 2>nul
+    python -m pip install -r requirements.txt
+) else (
+    call .venv\Scripts\activate.bat
+)
+echo [*] Launching TG KindSync Pro Engine locally...
+python main.py
 pause
 goto MAIN_MENU
 
@@ -96,12 +115,27 @@ set "KEY_PATH=%~dp0oracle_key_latest.key"
 if not exist "!KEY_PATH!" set "KEY_PATH=C:\oracle_key_latest.key"
 if not exist "!KEY_PATH!" set "KEY_PATH=%USERPROFILE%\Downloads\oracle_key_latest.key"
 
-echo [*] Opening Dashboard in default browser: http://127.0.0.1:8080
-start http://127.0.0.1:8080
-echo [*] Login Credentials: Amit / Amit@123
-echo [*] Keep this window open while using the dashboard.
-echo.
-ssh -N -L 8080:127.0.0.1:8080 -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32
+if exist "!KEY_PATH!" (
+    echo   [1] Start Local PC Web Dashboard ^(http://127.0.0.1:8080^)
+    echo   [2] Connect Secure Tunnel to Oracle Cloud VPS ^(130.210.1.32^)
+    set /p "DCHOICE=Choose Dashboard Mode [1 or 2, Default=1]: "
+    if "!DCHOICE!"=="2" (
+        echo [*] Opening Oracle VPS Dashboard: http://127.0.0.1:8080
+        start http://127.0.0.1:8080
+        ssh -N -L 8080:127.0.0.1:8080 -o StrictHostKeyChecking=no -i "!KEY_PATH!" ubuntu@130.210.1.32
+        pause
+        goto MAIN_MENU
+    )
+)
+
+echo [*] Starting Local Web Dashboard on http://127.0.0.1:8080 ...
+echo [*] Default Login: Amit / Amit@123
+start "" http://127.0.0.1:8080
+if exist ".venv\Scripts\python.exe" (
+    .venv\Scripts\python.exe web_dashboard.py
+) else (
+    python web_dashboard.py
+)
 pause
 goto MAIN_MENU
 

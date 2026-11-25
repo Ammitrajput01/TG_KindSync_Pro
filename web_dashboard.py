@@ -66,6 +66,40 @@ AUTH_DB_FILE = BASE_DIR / "data" / "dashboard_users.json"
 TG_CACHE_FILE = BASE_DIR / "data" / "telegram_accounts_cache.json"
 
 
+def _safe_disk_stat(attr: str, default: float, divide_gb: bool = True) -> float:
+    if not psutil:
+        return default
+    try:
+        du = psutil.disk_usage("C:\\" if sys.platform == "win32" else "/")
+        val = getattr(du, attr, default)
+        return round(val / (1024**3), 1) if divide_gb else round(float(val), 1)
+    except Exception:
+        return default
+
+
+def _safe_ram_stat(attr: str, default: float, divide_gb: bool = True) -> float:
+    if not psutil:
+        return default
+    try:
+        vm = psutil.virtual_memory()
+        if attr == "used":
+            val = vm.total - vm.available
+        else:
+            val = getattr(vm, attr, default)
+        return round(val / (1024**3), 1) if divide_gb else round(float(val), 1)
+    except Exception:
+        return default
+
+
+def _safe_cpu_stat(default: float = 0.0) -> float:
+    if not psutil:
+        return default
+    try:
+        return round(float(psutil.cpu_percent(interval=None) or 0.0), 1)
+    except Exception:
+        return default
+
+
 def get_local_lan_ip() -> str:
     """Returns real local Wi-Fi/Ethernet IP address (ignoring VPNs & virtual adapters) for mobile browser connection."""
     candidates = []
@@ -9531,15 +9565,15 @@ class DashboardServer:
             "server_nic_mbps": round(cur_speed * 8.35, 1) if cur_speed > 0 else 0.0,
             "server_nic_link_mbps": 1000,
             "wire_saturation_pct": round(min(100.0, (cur_speed * 8.35 / 1000.0) * 100.0), 1) if cur_speed > 0 else 0.0,
-            "disk_total_gb": round(psutil.disk_usage("C:\\" if sys.platform == "win32" else "/").total / (1024**3), 1) if psutil else 120.0,
-            "disk_used_gb": round(psutil.disk_usage("C:\\" if sys.platform == "win32" else "/").used / (1024**3), 1) if psutil else 24.5,
-            "disk_free_gb": round(psutil.disk_usage("C:\\" if sys.platform == "win32" else "/").free / (1024**3), 1) if psutil else 95.5,
-            "disk_percent": psutil.disk_usage("C:\\" if sys.platform == "win32" else "/").percent if psutil else 20.4,
-            "ram_total_gb": round(psutil.virtual_memory().total / (1024**3), 1) if psutil else 24.0,
-            "ram_used_gb": round((psutil.virtual_memory().total - psutil.virtual_memory().available) / (1024**3), 1) if psutil else 4.8,
-            "ram_free_gb": round(psutil.virtual_memory().available / (1024**3), 1) if psutil else 19.2,
-            "ram_percent": psutil.virtual_memory().percent if psutil else 20.0,
-            "cpu_percent": psutil.cpu_percent(interval=None) if psutil else 14.8,
+            "disk_total_gb": _safe_disk_stat("total", 120.0),
+            "disk_used_gb": _safe_disk_stat("used", 24.5),
+            "disk_free_gb": _safe_disk_stat("free", 95.5),
+            "disk_percent": _safe_disk_stat("percent", 20.4, divide_gb=False),
+            "ram_total_gb": _safe_ram_stat("total", 24.0),
+            "ram_used_gb": _safe_ram_stat("used", 4.8),
+            "ram_free_gb": _safe_ram_stat("available", 19.2),
+            "ram_percent": _safe_ram_stat("percent", 20.0, divide_gb=False),
+            "cpu_percent": _safe_cpu_stat(0.0),
             "current_speed_formatted": cur_speed_formatted,
             "current_speed_primary": cur_speed_primary,
             "current_speed_secondary": cur_speed_secondary,

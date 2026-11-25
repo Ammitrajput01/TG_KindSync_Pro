@@ -2,6 +2,27 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Wednesday, 25 November 2026 | 04:20 PM IST
+
+### 101. Cross-Platform Friend-Ready Hardening (Android Termux `/proc/stat` Fix, Updater Fix, Skipped Stub Counter Fix, Local Dashboard Fallback & GitHub Quick-Start Guide)
+* **User Directive & Context (Dr. Amit Singh)**:
+  - Fresh setup on a friend's Windows laptop & Android tablet hit:
+    1. Android Termux crash: `PermissionError: [Errno 13] Permission denied: '/proc/stat'` in `tg_kindsync_pro.py:get_system_health()`.
+    2. Android updater crash (`5_UPDATE_KINDSYNC.sh` `--only-binary=:all:` + `set -e` on Python 3.14).
+    3. Windows PC showing `630 / 781` forwarded while `Found In: 0 | Sent Out: 0` (skipped service/stub messages inflating `messages_forwarded`).
+    4. `1_START_PRO.bat` Option `[4]` failing on friend PCs because it attempted SSH to private Oracle VPS without `oracle_key_latest.key` instead of starting local `web_dashboard.py`.
+    5. Missing clear 2-minute Windows + Android Termux setup steps in `README.md`.
+* **Applied Engineering Actions & Permanent Fixes**:
+  1. **Android/Termux `psutil` Safety (`tg_kindsync_pro.py`, `web_dashboard.py`, `sentinel_observer.py`)**:
+     - Wrapped all `psutil.cpu_percent()`, `psutil.Process().memory_info()`, `psutil.virtual_memory()`, `psutil.disk_usage()` calls in exception-safe helpers (`get_system_health`, `_safe_disk_stat`, `_safe_ram_stat`, `_safe_cpu_stat`) so restricted Android `/proc/stat` never crashes the engine or dashboard.
+  2. **Resilient Termux Updater (`5_UPDATE_KINDSYNC.sh`)**:
+     - Removed fatal `set -e` + `--only-binary=:all:` crash trap; added `git config --global --add safe.directory` and native Termux `pkg install` before `pip`.
+  3. **Accurate Forward vs Skip Metrics (`tg_kindsync_pro.py`)**:
+     - Added `was_skipped` tracking in `PipelineProcessor.execute` so skipped service/stub/empty messages increment `skipped_count` instead of misleadingly inflating `messages_forwarded`.
+  4. **Zero-Friction Friend Launcher & Local Dashboard (`1_START_PRO.bat`, `README.md`)**:
+     - Updated `1_START_PRO.bat`: auto-checks Python (offers 1-click `winget`), auto-creates `.venv` + `.env` from `.env.example`, and launches local `web_dashboard.py` directly when `oracle_key_latest.key` is absent.
+     - Added a 2-Minute Quick Start Guide (Windows PC + Android Termux) to `README.md` with zero personal keys/files exposed.
+
 ## 📅 Log Entry: Wednesday, 25 November 2026 | 03:45 PM IST
 
 ### 100. KindDoc Indexer Recovery, Old Index Skip Filter During Cloning, Devi Ji Daily Report IST & HQ Routing Fix, and BE Mine Arise Topics Recovery

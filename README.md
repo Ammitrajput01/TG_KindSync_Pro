@@ -24,6 +24,44 @@
 
 ---
 
+## 🚀 2-Minute Quick Start (Windows PC & Android Termux)
+
+> [!TIP]
+> **New User / Friend Setup**: Everything below runs 100% locally on your own device with your own Telegram account — no private cloud keys required!
+
+### 💻 Option A: Windows 10 / 11 PC
+1. **Install Prerequisites** *(only if not already installed — open PowerShell & run)*:
+   ```powershell
+   winget install -e --id Git.Git
+   winget install -e --id Python.Python.3.12
+   ```
+   *(Close & reopen terminal after installing.)*
+2. **Clone Repository**:
+   ```powershell
+   git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git
+   cd TG_KindSync_Pro
+   ```
+3. **1-Click Launch & Auto-Setup**:
+   - Double-click **`1_START_PRO.bat`**
+   - Press **`1`** to auto-create `.venv`, install packages, copy `.env.example` ➔ `.env`, and launch the engine!
+   - Press **`4`** anytime to launch the **Local Web Dashboard** at `http://127.0.0.1:8080` *(Default Login: `Amit` / `Amit@123`)*.
+
+### 📱 Option B: Android / Tablet (Termux — No Root Needed)
+1. Install **Termux** from F-Droid / GitHub Releases *(avoid outdated Play Store build)*.
+2. Run this 1-line setup inside Termux:
+   ```bash
+   pkg update -y && pkg upgrade -y && pkg install -y git python python-psutil python-pillow python-cryptography && git clone https://github.com/Ammitrajput01/TG_KindSync_Pro.git && cd TG_KindSync_Pro && cp -n .env.example .env && pip install --break-system-packages -r requirements-termux.txt
+   ```
+3. **Start Engine / Dashboard / Updater**:
+   - **Start Cloner / Forwarder**: `bash 1_START_KINDSYNC.sh`
+   - **Start Web Dashboard (`127.0.0.1:8080`)**: `bash 3_START_WEB_DASHBOARD.sh`
+   - **1-Click GitHub Update**: `bash 5_UPDATE_KINDSYNC.sh`
+
+> [!NOTE]
+> **Need Help or Community Access?** Join [**Kind Doctor & Team**](https://t.me/be_as_kind) or message [**@KindDoc_bot**](https://t.me/KindDoc_bot) on Telegram!
+
+---
+
 ## 🛡️ Standalone Architecture & Independence Declaration
 
 > [!IMPORTANT]

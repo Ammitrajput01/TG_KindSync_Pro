@@ -366,10 +366,19 @@ class TelegramReporter:
                 await event.reply(f"⚠️ Error updating speed: {ex}")
 
         elif cmd in ("/system", "/vitals", "/server"):
-            import psutil
-            cpu_pct = psutil.cpu_percent(interval=0.2)
-            ram = psutil.virtual_memory()
-            disk = psutil.disk_usage(str(BASE_DIR))
+            cpu_pct = 0.0
+            ram = type("R", (), {"used": 0, "total": 1, "percent": 0.0})()
+            disk = type("D", (), {"used": 0, "total": 1, "percent": 0.0})()
+            try:
+                import psutil
+                with suppress(Exception):
+                    cpu_pct = psutil.cpu_percent(interval=0.2)
+                with suppress(Exception):
+                    ram = psutil.virtual_memory()
+                with suppress(Exception):
+                    disk = psutil.disk_usage(str(BASE_DIR))
+            except Exception:
+                pass
             uptime_sec = int(time.monotonic() - STATE.start_time)
             hours, rem = divmod(uptime_sec, 3600)
             mins, _ = divmod(rem, 60)

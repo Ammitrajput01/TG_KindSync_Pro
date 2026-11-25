@@ -4165,6 +4165,7 @@ class PipelineProcessor:
             except Exception as e:
                 self.log(f"[yellow]ℹ Direct Forward bypass -> Streamer: {str(e)[:60]}[/]")
 
+        was_skipped = False
         if not direct_forward_success:
             try:
                 if len(active_messages) > 1:
@@ -4360,6 +4361,7 @@ class PipelineProcessor:
                         else:
                             self.log(f"[dim]⏩ Skipped watermark/empty message (ID: #{m.id})[/]")
                             success_flag = True
+                            was_skipped = True
                     elif getattr(m, 'poll', None):
                         reconstructed_text = self.reconstruct(m)
                         if reconstructed_text and reconstructed_text.strip():
@@ -4371,9 +4373,11 @@ class PipelineProcessor:
                             success_flag = True
                         else:
                             success_flag = True
+                            was_skipped = True
                     else:
                         self.log(f"[dim]⏩ Skipped service action/stub message (ID: #{m.id})[/]")
                         success_flag = True
+                        was_skipped = True
 
             except (KeyboardInterrupt, asyncio.CancelledError):
                 raise
@@ -4421,15 +4425,19 @@ class PipelineProcessor:
         if success_flag:
             for m in active_messages:
                 await self.state.mark_completed(source_chat, m.id, target_chat, target_topic or 0, source_topic=source_topic or 0)
-                if getattr(m, "video", None):
-                    self.metrics["videos_sent"] = self.metrics.get("videos_sent", 0) + 1
-                elif getattr(m, "document", None):
-                    self.metrics["docs_sent"] = self.metrics.get("docs_sent", 0) + 1
-                elif getattr(m, "photo", None):
-                    self.metrics["photos_sent"] = self.metrics.get("photos_sent", 0) + 1
-                elif getattr(m, "text", None):
-                    self.metrics["text_sent"] = self.metrics.get("text_sent", 0) + 1
-            self.metrics["messages_forwarded"] += len(active_messages)
+                if not was_skipped:
+                    if getattr(m, "video", None):
+                        self.metrics["videos_sent"] = self.metrics.get("videos_sent", 0) + 1
+                    elif getattr(m, "document", None):
+                        self.metrics["docs_sent"] = self.metrics.get("docs_sent", 0) + 1
+                    elif getattr(m, "photo", None):
+                        self.metrics["photos_sent"] = self.metrics.get("photos_sent", 0) + 1
+                    elif getattr(m, "text", None):
+                        self.metrics["text_sent"] = self.metrics.get("text_sent", 0) + 1
+            if was_skipped:
+                self.metrics["skipped_count"] = self.metrics.get("skipped_count", 0) + len(active_messages)
+            else:
+                self.metrics["messages_forwarded"] += len(active_messages)
             with suppress(Exception):
                 self._write_engine_telemetry()
 
@@ -5264,9 +5272,19 @@ class TerminalPlatform:
 
     def get_system_health(self):
         if not PSUTIL: return "N/A"
-        ram = psutil.Process().memory_info().rss / MB
-        cpu = psutil.cpu_percent()
-        return f"{ram:.1f} MB | CPU: {cpu}%"
+        ram_str = "N/A"
+        cpu_str = "N/A"
+        try:
+            ram = psutil.Process().memory_info().rss / MB
+            ram_str = f"{ram:.1f} MB"
+        except Exception:
+            pass
+        try:
+            cpu = psutil.cpu_percent()
+            cpu_str = f"{cpu}%"
+        except Exception:
+            cpu_str = "Termux/Restricted"
+        return f"{ram_str} | CPU: {cpu_str}"
 
     def update_live_metrics(self):
         now = time.monotonic()
