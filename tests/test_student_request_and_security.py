@@ -139,3 +139,9 @@ def test_is_old_index_message_skips_index_preserves_media():
         raw_text="Important high-yield cardiology pearl for NEET PG 2026."
     )
     assert is_old_index_message(normal_note) is False
+
+def test_live_auto_indexing_and_in_place_pin_methods():
+    from devi.operator.group_scanner import register_cloned_index_item
+    assert callable(register_cloned_index_item)
+    bot = DeviTelegramBot()
+    assert hasattr(bot, "_publish_or_edit_pinned_index")

@@ -4451,6 +4451,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>
                     </div>
 
+                    <!-- Live Cloner Jobs & 1-Click Control Panel -->
+                    <div class="panel-section" style="margin-bottom: var(--space-6);">
+                        <div class="panel-header">
+                            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                                <span style="font-size: 20px;">🧬</span>
+                                <div>
+                                    <span class="panel-title">Live Cloner Jobs &amp; Remote Controls</span>
+                                    <div style="font-size: 12px; color: var(--text-tertiary);">Monitor active /clone jobs in real time with 1-click Pause, Resume &amp; Stop controls</div>
+                                </div>
+                            </div>
+                            <button class="btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="loadCloneJobs()">🔄 Refresh Jobs</button>
+                        </div>
+                        <div id="clone-jobs-container" style="display: flex; flex-direction: column; gap: 10px; padding: var(--space-3) 0;">
+                            <div style="color: var(--text-tertiary); font-size: 13px;">Loading active clone jobs...</div>
+                        </div>
+                    </div>
+
                     <!-- Live Sent Files Delivery Ledger Table -->
                     <div class="panel-section" style="margin-bottom: var(--space-6);">
                         <div class="panel-header">
@@ -8776,6 +8793,76 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        async function loadCloneJobs() {
+            const container = document.getElementById('clone-jobs-container');
+            if (!container) return;
+            try {
+                const res = await fetch('/api/clone/jobs', { headers: getAuthHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                const jobs = data.jobs || [];
+                if (!jobs.length) {
+                    container.innerHTML = '<div style="color: var(--text-tertiary); font-size: 13px; padding: 8px;">No /clone jobs recorded yet. Start one in Telegram with <code>/clone</code>.</div>';
+                    return;
+                }
+                container.innerHTML = jobs.map(j => {
+                    const tot = Math.max(1, Number(j.total_items || 0));
+                    const cur = Number(j.cloned_items || 0);
+                    const pct = j.total_items > 0 ? Math.min(100, Math.round((cur / tot) * 100)) : 0;
+                    const st = String(j.status || 'unknown').toLowerCase();
+                    const isActive = st === 'running' || st === 'paused';
+                    const badgeCls = st === 'running' ? 'pill-success' : (st === 'paused' ? 'pill-warning' : 'pill-neutral');
+                    return `
+                        <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(148, 163, 184, 0.16); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div>
+                                    <div style="font-size: 13px; font-weight: 700; color: #fff;">Job #${j.id} · ${escapeHtml(j.source_title || j.source_chat || 'Source')} ➔ ${escapeHtml(j.target_title || j.target_chat || 'Target')}</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary);">Topic: ${escapeHtml(j.current_topic || 'All Topics')} · Progress: ${cur} / ${j.total_items || '?'} (${pct}%)</div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="pill ${badgeCls} tabular">${escapeHtml(st.toUpperCase())}</span>
+                                    ${isActive ? `
+                                        ${st === 'paused'
+                                            ? `<button class="btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="controlCloneJob(${j.id}, 'resume')">▶️ Resume</button>`
+                                            : `<button class="btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="controlCloneJob(${j.id}, 'pause')">⏸️ Pause</button>`
+                                        }
+                                        <button class="btn-outline" style="padding: 4px 10px; font-size: 11px; border-color: rgba(239,68,68,0.5); color: #f87171;" onclick="controlCloneJob(${j.id}, 'stop')">🛑 Stop</button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden;">
+                                <div style="height: 100%; width: ${pct}%; background: linear-gradient(90deg, #00F0FF, #6366F1); transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                // Keep UI quiet on background refresh errors
+            }
+        }
+
+        async function controlCloneJob(jobId, action) {
+            try {
+                const res = await fetch('/api/clone/control', {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_id: jobId, action })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Clone Job #${jobId}: ${action.toUpperCase()} applied`);
+                    await loadCloneJobs();
+                } else {
+                    showToast(data.error || 'Action failed', 'error');
+                }
+            } catch (e) {
+                showToast('Network error controlling job', 'error');
+            }
+        }
+
+        setInterval(() => { if (document.getElementById('clone-jobs-container')) loadCloneJobs(); }, 6000);
+        setTimeout(() => { if (document.getElementById('clone-jobs-container')) loadCloneJobs(); }, 800);
+
         function handleRouteSearch(val) {
             currentRouteSearch = (val || '').toLowerCase().trim();
             renderRouteMatrix();
@@ -10448,6 +10535,58 @@ class DashboardServer:
     async def handle_api_pause(self, request):
         return web.json_response(self._toggle_pause())
 
+    async def handle_api_clone_jobs(self, request):
+        db_file = BASE_DIR / "history_core.sqlite"
+        jobs = []
+        if db_file.exists():
+            try:
+                conn = sqlite3.connect(db_file, timeout=10.0)
+                conn.row_factory = sqlite3.Row
+                has_tbl = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='telegram_clone_jobs'"
+                ).fetchone()
+                if has_tbl:
+                    rows = conn.execute(
+                        "SELECT id, source_chat, target_chat, source_title, target_title, status, total_items, cloned_items, current_topic, updated_at "
+                        "FROM telegram_clone_jobs ORDER BY id DESC LIMIT 12"
+                    ).fetchall()
+                    jobs = [dict(r) for r in rows]
+                conn.close()
+            except Exception as e:
+                return web.json_response({"success": False, "jobs": [], "error": str(e)})
+        return web.json_response({"success": True, "jobs": jobs})
+
+    async def handle_api_clone_control(self, request):
+        try:
+            body = await request.json()
+            job_id = int(body.get("job_id", 0))
+            action = str(body.get("action", "")).lower().strip()
+            if action not in ("pause", "resume", "stop"):
+                return web.json_response({"success": False, "error": "Invalid action"}, status=400)
+
+            with suppress(Exception):
+                from devi.operator.deep_cloner import pause_clone_job, resume_clone_job, cancel_clone_job
+                if action == "pause":
+                    pause_clone_job(job_id)
+                elif action == "resume":
+                    resume_clone_job(job_id)
+                elif action == "stop":
+                    cancel_clone_job(job_id)
+
+            new_status = "paused" if action == "pause" else ("running" if action == "resume" else "cancelled")
+            db_file = BASE_DIR / "history_core.sqlite"
+            if db_file.exists() and job_id > 0:
+                conn = sqlite3.connect(db_file, timeout=10.0)
+                conn.execute(
+                    "UPDATE telegram_clone_jobs SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (new_status, job_id),
+                )
+                conn.commit()
+                conn.close()
+            return web.json_response({"success": True, "job_id": job_id, "status": new_status})
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=400)
+
     async def handle_api_stats_reset(self, request):
         try:
             if hasattr(self.state, "total_transfers"): self.state.total_transfers = 0
@@ -11141,6 +11280,8 @@ class DashboardServer:
             self.app.router.add_post("/api/backup", self.handle_api_backup)
 
             self.app.router.add_post("/api/pause", self.handle_api_pause)
+            self.app.router.add_get("/api/clone/jobs", self.handle_api_clone_jobs)
+            self.app.router.add_post("/api/clone/control", self.handle_api_clone_control)
             self.app.router.add_post("/api/stats/reset", self.handle_api_stats_reset)
             self.app.router.add_post("/api/clear_dlq", self.handle_api_clear_dlq)
             self.app.router.add_get("/api/errors", self.handle_api_errors)

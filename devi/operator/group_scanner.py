@@ -168,6 +168,50 @@ def get_topic_icon(title: str) -> str:
         return "👁️"
     return "📖"
 
+def register_cloned_index_item(
+    chat_id: Any,
+    topic_id: Optional[int],
+    msg_id: Optional[int],
+    title: str,
+    topic_title: Optional[str] = None,
+    item_type: str = "video",
+    icon: str = "🎬",
+) -> bool:
+    """Safely registers a newly cloned/forwarded lecture into SQLite index in real time (WAL lock-free)."""
+    if not chat_id or not msg_id:
+        return False
+    try:
+        norm_chat = normalize_supergroup_chat_id(chat_id)
+        if not norm_chat:
+            return False
+        norm_topic = int(topic_id or 1) or 1
+        clean_title = clean_lecture_title(title)[:120]
+        if not clean_title:
+            return False
+        with get_db_conn() as conn:
+            init_tables(conn)
+            if topic_title and norm_topic > 1:
+                t_clean = str(topic_title).strip()
+                if t_clean and not t_clean.startswith("Topic #"):
+                    conn.execute(
+                        """
+                        INSERT OR IGNORE INTO telegram_group_topics (chat_id, topic_id, topic_title, topic_icon, updated_at)
+                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        (norm_chat, norm_topic, t_clean, get_topic_icon(t_clean)),
+                    )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO telegram_topic_items (chat_id, topic_id, msg_id, title, icon, item_type)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (norm_chat, norm_topic, int(msg_id), clean_title, icon, item_type),
+            )
+            conn.commit()
+        return True
+    except Exception:
+        return False
+
 async def scan_single_topic(client, peer, target_chat_id: int, topic_id: int, topic_title: Optional[str] = None) -> int:
     """Fast-harvests all media and notes under a single specific topic."""
     for attempt in range(5):

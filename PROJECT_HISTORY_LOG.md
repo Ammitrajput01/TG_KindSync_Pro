@@ -2,6 +2,24 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Wednesday, 25 November 2026 | 06:36 PM IST
+
+### 103. Live Auto-Indexing During Cloning, In-Place Pinned Index Updates & Web Dashboard Live Cloner Control
+* **User Directive & Context (Dr. Amit Singh)**:
+  - Approved 3 upgrades without interrupting active `tg-forwarder.service` cloning:
+    1. Live auto-indexing during cloning (`tg_kindsync_pro.py` & `deep_cloner.py`) into `telegram_topic_items` / `telegram_group_topics`.
+    2. In-place pinned index card updates for `/topicindex` and `/mainindex` to eliminate duplicate pinned cards.
+    3. Web Dashboard (`:8080`) live `/clone` job progress & 1-click Pause/Resume/Stop controls.
+* **Applied Engineering Actions**:
+  1. **Live Auto-Indexing (`devi/operator/group_scanner.py`, `tg_kindsync_pro.py`, `devi/operator/deep_cloner.py`)**:
+     - Added lock-free SQLite WAL helper `register_cloned_index_item(...)` and wired it directly into media send completions in both `tg_kindsync_pro.py` and `devi/operator/deep_cloner.py`.
+  2. **In-Place Pinned Index (`devi/operator/telegram_bot.py`)**:
+     - Added `telegram_pinned_index_cards` table and `_publish_or_edit_pinned_index(...)` helper so single-card `/mainindex` and `/topicindex` updates edit the existing pinned message in-place via `editMessageText`.
+  3. **Web Dashboard Cloner Control (`web_dashboard.py`)**:
+     - Added `/api/clone/jobs` (`GET`) and `/api/clone/control` (`POST`) endpoints plus the live UI card with progress bar and Pause/Resume/Stop buttons.
+* **Zero-Downtime Deployment**:
+  - Verified all unit tests + `py_compile`, pushed to GitHub, and restarted ONLY `tg-kinddoc-bot.service` and `tg-dashboard.service` on VPS while leaving `tg-forwarder.service` untouched.
+
 ## 📅 Log Entry: Wednesday, 25 November 2026 | 06:21 PM IST
 
 ### 102. Fixed `group_scanner.py` Harvesting 0 Items on Kind Doctor Branded / Bot-Uploaded Topics

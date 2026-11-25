@@ -405,6 +405,15 @@ class DeviTelegramBot:
                 conn.execute("""
                     CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_items_chat_topic_msg ON telegram_topic_items(chat_id, topic_id, msg_id) WHERE msg_id IS NOT NULL
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS telegram_pinned_index_cards (
+                        chat_id INTEGER,
+                        topic_id INTEGER,
+                        msg_id INTEGER,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY(chat_id, topic_id)
+                    )
+                """)
                 # Rose Style Group Notes Table
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS telegram_group_notes (
@@ -1811,6 +1820,74 @@ class DeviTelegramBot:
 
         reply_markup = None
         return cards, reply_markup
+
+    async def _publish_or_edit_pinned_index(
+        self,
+        session: aiohttp.ClientSession,
+        chat_id: int,
+        target_index_chat: int,
+        topic_id: int,
+        thread_id: Optional[int],
+        cards: list,
+        reply_markup: Optional[dict] = None,
+    ) -> tuple:
+        """
+        Updates an existing pinned index card in-place when len(cards)==1 to avoid chat clutter.
+        Falls back to sending & pinning a new card if no prior card exists or edit fails.
+        Returns (first_msg_id, pinned_bool, edited_in_place_bool).
+        """
+        if len(cards) == 1 and chat_id < 0:
+            existing_msg_id = None
+            with suppress(Exception):
+                with get_db_conn() as conn:
+                    row = conn.execute(
+                        "SELECT msg_id FROM telegram_pinned_index_cards WHERE chat_id = ? AND topic_id = ?",
+                        (target_index_chat, int(topic_id or 0)),
+                    ).fetchone()
+                    if row and row[0]:
+                        existing_msg_id = int(row[0])
+            if existing_msg_id:
+                edited = await self._edit_message(
+                    session,
+                    chat_id,
+                    existing_msg_id,
+                    cards[0],
+                    reply_markup=reply_markup,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+                if edited:
+                    return existing_msg_id, True, True
+
+        first_msg_id = None
+        for idx, card in enumerate(cards):
+            m_markup = reply_markup if (reply_markup and (idx == len(cards) - 1 or idx == 0)) else None
+            m_id = await self._send_message(
+                session,
+                chat_id,
+                card,
+                reply_markup=m_markup,
+                message_thread_id=thread_id,
+                disable_web_page_preview=True,
+            )
+            if idx == 0 and m_id:
+                first_msg_id = m_id
+            await asyncio.sleep(0.5)
+
+        pinned = False
+        if first_msg_id and chat_id < 0:
+            pinned = await self._pin_message(session, chat_id, first_msg_id, silent=True)
+            with suppress(Exception):
+                with get_db_conn() as conn:
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO telegram_pinned_index_cards (chat_id, topic_id, msg_id, updated_at)
+                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        (target_index_chat, int(topic_id or 0), int(first_msg_id)),
+                    )
+                    conn.commit()
+        return first_msg_id, pinned, False
 
     def _delete_topic(self, chat_id: int, topic_id: int) -> bool:
         """Removes a topic and its items from the group index."""
@@ -9109,28 +9186,19 @@ class DeviTelegramBot:
                 return
 
             cards, reply_markup = self._build_main_index_cards(target_index_chat, sort_mode=sort_mode)
-            first_msg_id = None
-            for idx, card in enumerate(cards):
-                m_markup = reply_markup if idx == len(cards) - 1 or idx == 0 else None
-                m_id = await self._send_message(
-                    session,
-                    chat_id,
-                    card,
-                    reply_markup=m_markup,
-                    message_thread_id=thread_id,
-                    disable_web_page_preview=True
-                )
-                if idx == 0 and m_id:
-                    first_msg_id = m_id
-                await asyncio.sleep(0.5)
+            first_msg_id, pinned, edited_in_place = await self._publish_or_edit_pinned_index(
+                session, chat_id, target_index_chat, 0, thread_id, cards, reply_markup=reply_markup
+            )
 
             if first_msg_id and chat_id < 0:
-                pinned = await self._pin_message(session, chat_id, first_msg_id, silent=True)
-                pin_status = "📌 Auto-pinned successfully!" if pinned else "(Tip: Group settings me bot ko 'Pin Messages' right dein to auto-pin ho sake)."
+                if edited_in_place:
+                    pin_status = "📌 Updated existing pinned card in-place!"
+                else:
+                    pin_status = "📌 Auto-pinned successfully!" if pinned else "(Tip: Group settings me bot ko 'Pin Messages' right dein to auto-pin ho sake)."
                 conf = await self._send_message(
                     session,
                     chat_id,
-                    f"✅ <b>Master Hub Index Published!</b> ({'Alphabetical A–Z' if sort_mode == 'az' else 'Forum Sequence'}) {pin_status}",
+                    f"✅ <b>Master Hub Index {'Updated' if edited_in_place else 'Published'}!</b> ({'Alphabetical A–Z' if sort_mode == 'az' else 'Forum Sequence'}) {pin_status}",
                     message_thread_id=thread_id
                 )
                 if conf and os.getenv("ENABLE_AUTO_DELETE", "false").lower() == "true":
@@ -9257,26 +9325,19 @@ class DeviTelegramBot:
             ])
             cards.append("\n".join(current_card_lines))
 
-            first_msg_id = None
-            for idx, card in enumerate(cards):
-                m_id = await self._send_message(
-                    session,
-                    chat_id,
-                    card,
-                    message_thread_id=thread_id,
-                    disable_web_page_preview=True
-                )
-                if idx == 0 and m_id:
-                    first_msg_id = m_id
-                await asyncio.sleep(0.5)
+            first_msg_id, pinned, edited_in_place = await self._publish_or_edit_pinned_index(
+                session, chat_id, target_index_chat, target_t_id or 0, thread_id, cards
+            )
 
             if first_msg_id:
-                pinned = await self._pin_message(session, chat_id, first_msg_id, silent=True)
-                pin_status = "📌 Auto-pinned at top of topic!" if pinned else ""
+                if edited_in_place:
+                    pin_status = "📌 Updated existing pinned card in-place!"
+                else:
+                    pin_status = "📌 Auto-pinned at top of topic!" if pinned else ""
                 conf = await self._send_message(
                     session,
                     chat_id,
-                    f"✅ **Topic Index Card Posted!** {pin_status}",
+                    f"✅ **Topic Index Card {'Updated' if edited_in_place else 'Posted'}!** {pin_status}",
                     message_thread_id=thread_id
                 )
                 if conf and os.getenv("ENABLE_AUTO_DELETE", "false").lower() == "true":

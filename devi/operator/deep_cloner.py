@@ -742,6 +742,7 @@ class DeepClonerEngine:
                         dest_thread = target_topic_id if target_topic_id and target_topic_id > 1 else None
                         reply_hdr = dest_thread
 
+                        sent_media_msg = None
                         if msg.media:
                             thumb_to_attach = None
                             thumb_mode = os.getenv("THUMB_MODE", "custom").strip().lower()
@@ -753,7 +754,7 @@ class DeepClonerEngine:
                             tier1_success = False
                             try:
                                 # Tier 1: Instant Server-Side Cloud Pointer Copy (0.15s, 0 bytes bandwidth, 0 disk/RAM)
-                                await user_client.send_file(
+                                sent_media_msg = await user_client.send_file(
                                     tgt_peer,
                                     file=msg.media,
                                     caption=cleaned_caption,
@@ -878,7 +879,7 @@ class DeepClonerEngine:
                                                 progress_callback=_make_stream_cb("⚡ ⬆️ Fast DC Upload"),
                                                 max_connections=12,
                                             )
-                                            await user_client.send_file(
+                                            sent_media_msg = await user_client.send_file(
                                                 tgt_peer,
                                                 file=uploaded_handle,
                                                 caption=cleaned_caption,
@@ -888,7 +889,7 @@ class DeepClonerEngine:
                                             )
                                         except Exception as fe_up:
                                             logger.warning("Fast upload encountered %s, falling back to standard send_file", fe_up)
-                                            await user_client.send_file(
+                                            sent_media_msg = await user_client.send_file(
                                                 tgt_peer,
                                                 file=str(dl_res),
                                                 caption=cleaned_caption,
@@ -917,6 +918,20 @@ class DeepClonerEngine:
                                 reply_to=reply_hdr
                             )
                         
+                        if sent_media_msg and getattr(sent_media_msg, "id", None):
+                            with suppress(Exception):
+                                from devi.operator.group_scanner import register_cloned_index_item
+                                _itype = "video" if getattr(msg, "video", None) else ("document" if getattr(msg, "document", None) else "photo")
+                                register_cloned_index_item(
+                                    chat_id=target_chat_id,
+                                    topic_id=target_topic_id or 1,
+                                    msg_id=sent_media_msg.id,
+                                    title=orig_filename or (raw_text.split("\n")[0] if raw_text else f"Lecture #{sent_media_msg.id}"),
+                                    topic_title=topic_title,
+                                    item_type=_itype,
+                                    icon="🎬" if _itype == "video" else ("📑" if _itype == "document" else "🖼️"),
+                                )
+
                         cloned_count += 1
                         success = True
                         break

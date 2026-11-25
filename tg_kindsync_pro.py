@@ -4330,6 +4330,17 @@ class PipelineProcessor:
                                     "title": clean_index_title(title_clean, max_len=60),
                                     "icon": icon_m
                                 })
+                                with suppress(Exception):
+                                    from devi.operator.group_scanner import register_cloned_index_item
+                                    _itype = "video" if getattr(m, "video", None) else ("document" if getattr(m, "document", None) else "photo")
+                                    register_cloned_index_item(
+                                        chat_id=target_chat,
+                                        topic_id=resolved_topic or target_topic or 1,
+                                        msg_id=s_id,
+                                        title=title_clean,
+                                        item_type=_itype,
+                                        icon="🎬" if _itype == "video" else ("📑" if _itype == "document" else "🖼️"),
+                                    )
                             # Multi-target instant mirror
                             if self.cfg.mirror_targets and getattr(sent_media, "media", None):
                                 for m_tgt in self.cfg.mirror_targets:
