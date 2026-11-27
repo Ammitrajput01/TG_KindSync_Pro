@@ -805,7 +805,7 @@ def get_deep_system_telemetry(force_refresh: bool = False) -> dict:
                     cmd_list = p.info.get('cmdline') or []
                     cmd_str = ' '.join(cmd_list)
                     for prog in programs:
-                        if prog["script"] in cmd_str:
+                        if prog["script"] in cmd_str or (prog["id"] == "tg_kindsync_pro" and "main.py" in cmd_str):
                             rss_mb = round((p.info['memory_info'].rss if p.info.get('memory_info') else 0) / (1024*1024), 1)
                             cpu_p = p.info.get('cpu_percent') or 0.0
                             status_val = p.info.get('status') or 'running'
@@ -10247,7 +10247,7 @@ class DashboardServer:
             try:
                 await asyncio.sleep(1.0)
                 if self.ws_telemetry_clients:
-                    payload = self._build_status_dict()
+                    payload = await asyncio.to_thread(self._build_status_dict)
                     msg = json.dumps(payload)
                     dead = []
                     for ws in list(self.ws_telemetry_clients):
@@ -10289,7 +10289,8 @@ class DashboardServer:
         await ws.prepare(request)
         self.ws_telemetry_clients.add(ws)
         try:
-            await ws.send_str(json.dumps(self._build_status_dict()))
+            payload = await asyncio.to_thread(self._build_status_dict)
+            await ws.send_str(json.dumps(payload))
             async for msg in ws:
                 if msg.type == web.WSMsgType.TEXT:
                     if msg.data == "ping":
@@ -10529,7 +10530,8 @@ class DashboardServer:
             return web.json_response({"success": False, "ok": False, "error": str(e)}, status=400)
 
     async def handle_api_status(self, request):
-        return web.json_response(self._build_status_dict())
+        payload = await asyncio.to_thread(self._build_status_dict)
+        return web.json_response(payload)
 
     async def handle_api_system_telemetry(self, request):
         force_flag = request.query.get("refresh", "0") in ("1", "true")

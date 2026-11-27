@@ -21,6 +21,9 @@ class MemoryStore:
         """Creates tables from schema if not exists."""
         schema_sql = SCHEMA_FILE.read_text(encoding="utf-8")
         async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("PRAGMA journal_mode=WAL;")
+            await db.execute("PRAGMA synchronous=NORMAL;")
+            await db.execute("PRAGMA busy_timeout=60000;")
             await db.executescript(schema_sql)
             await db.commit()
             

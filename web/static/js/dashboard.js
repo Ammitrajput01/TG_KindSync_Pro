@@ -491,8 +491,8 @@
                 if (e.preventDefault) e.preventDefault();
                 if (e.stopPropagation) e.stopPropagation();
             }
-            const u = (document.getElementById('gate-username')?.value || 'Amit').trim();
-            const p = (document.getElementById('gate-password')?.value || 'Amit@123').trim();
+            const u = (document.getElementById('gate-username')?.value || '').trim();
+            const p = (document.getElementById('gate-password')?.value || '').trim();
             const errEl = document.getElementById('gate-error-banner');
             const btn = document.getElementById('gate-submit-btn');
             if (errEl) errEl.style.display = 'none';
@@ -945,18 +945,19 @@
                     }
                 }
 
-                // 4. Hardware Vitals
-                const cpuVal = (Math.min(95, Math.max(4.2, curSpeed * 1.8 + 5.0))).toFixed(1);
+                // 4. Hardware Vitals (Real psutil metrics with graceful fallback)
+                const cpuVal = (d.cpu_percent !== undefined ? Number(d.cpu_percent) : Math.min(95, Math.max(4.2, curSpeed * 1.8 + 5.0))).toFixed(1);
                 const cpuPctEl = document.getElementById('vital-cpu-pct');
                 if (cpuPctEl) cpuPctEl.textContent = cpuVal + '%';
                 const cpuBarEl = document.getElementById('vital-cpu-bar');
-                if (cpuBarEl) cpuBarEl.style.width = cpuVal + '%';
+                if (cpuBarEl) cpuBarEl.style.width = Math.min(100, Number(cpuVal)) + '%';
 
-                const ramVal = (48.4 + ((d.total_transfers || 0) % 10) * 0.4).toFixed(1);
+                const ramText = d.ram_used_gb !== undefined ? `${Number(d.ram_used_gb).toFixed(2)} GB` : `${(48.4 + ((d.total_transfers || 0) % 10) * 0.4).toFixed(1)} MB`;
+                const ramPct = d.ram_percent !== undefined ? Number(d.ram_percent) : Math.min(100, Math.round((48.4 + ((d.total_transfers || 0) % 10) * 0.4) / 1.5));
                 const ramValEl = document.getElementById('vital-ram-val');
-                if (ramValEl) ramValEl.textContent = ramVal + ' MB';
+                if (ramValEl) ramValEl.textContent = ramText;
                 const ramBarEl = document.getElementById('vital-ram-bar');
-                if (ramBarEl) ramBarEl.style.width = Math.min(100, Math.round(ramVal / 1.5)) + '%';
+                if (ramBarEl) ramBarEl.style.width = Math.min(100, ramPct) + '%';
 
                 if (d.flood_waits_detected !== undefined) {
                     const flCount = document.getElementById('flood-count');
@@ -2342,9 +2343,10 @@
                         ? `<button type="button" class="btn btn-secondary btn-sm" onclick="controlCloneJob(${j.id}, '${isPaused ? 'resume' : 'pause'}')" style="padding:2px 8px;font-size:11px;">${isPaused ? '▶ Resume' : '⏸ Pause'}</button>
                            <button type="button" class="btn btn-secondary btn-sm" onclick="controlCloneJob(${j.id}, 'stop')" style="padding:2px 8px;font-size:11px;color:#F87171;">⏹ Stop</button>`
                         : '';
+                    const esc = typeof escapeHtml === 'function' ? escapeHtml : (v => String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
                     return `<div style="background:rgba(2,6,23,0.45);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                            <div><strong>#${j.id}</strong> ${j.source_title || j.source_chat} ➔ ${j.target_title || j.target_chat} <span style="opacity:0.7;">(${j.current_topic || j.job_type || 'group'})</span></div>
+                            <div><strong>#${j.id}</strong> ${esc(j.source_title || j.source_chat)} ➔ ${esc(j.target_title || j.target_chat)} <span style="opacity:0.7;">(${esc(j.current_topic || j.job_type || 'group')})</span></div>
                             <div style="display:flex;align-items:center;gap:6px;"><span class="pill" style="font-size:10px;padding:1px 6px;">${st.toUpperCase()}</span>${btns}</div>
                         </div>
                         <div style="margin-top:6px;height:5px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#38BDF8,#34D399);"></div></div>
@@ -3513,10 +3515,12 @@
         let terminalSearchQuery = '';
 
         // --- WebSocket Telemetry (Sub-millisecond Real-Time Push) ---
+        let telemetryPingTimer = null;
         function initTelemetryWebSocket() {
             try {
                 const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${proto}//${window.location.host}/ws/telemetry`;
+                const tok = localStorage.getItem('ks_session_token') || '';
+                const wsUrl = `${proto}//${window.location.host}/ws/telemetry${tok ? '?token=' + encodeURIComponent(tok) : ''}`;
                 telemetryWs = new WebSocket(wsUrl);
 
                 telemetryWs.onopen = () => {
@@ -3527,6 +3531,12 @@
                         pill.style.background = 'rgba(16, 185, 129, 0.2)';
                         pill.style.color = '#34D399';
                     }
+                    if (telemetryPingTimer) clearInterval(telemetryPingTimer);
+                    telemetryPingTimer = setInterval(() => {
+                        if (telemetryWs && telemetryWs.readyState === WebSocket.OPEN) {
+                            telemetryWs.send('ping');
+                        }
+                    }, 15000);
                 };
 
                 telemetryWs.onmessage = (event) => {
@@ -3540,18 +3550,13 @@
                 };
 
                 telemetryWs.onclose = () => {
+                    if (telemetryPingTimer) { clearInterval(telemetryPingTimer); telemetryPingTimer = null; }
                     setTimeout(initTelemetryWebSocket, 3000);
                 };
 
                 telemetryWs.onerror = () => {
                     telemetryWs.close();
                 };
-
-                setInterval(() => {
-                    if (telemetryWs && telemetryWs.readyState === WebSocket.OPEN) {
-                        telemetryWs.send('ping');
-                    }
-                }, 15000);
             } catch(e) {
                 console.warn("WebSocket init error:", e);
             }
@@ -3571,7 +3576,7 @@
 
             const echSpeedBadge = document.getElementById('echart-speed-badge');
             if (echSpeedBadge) echSpeedBadge.textContent = curSpeedObj.combined;
-            updateMiniHUDTelemetry(curSpeedObj.combined, d.active_file || d.current_file || "Monitoring Telegram Stream...", d.progress_pct || 0);
+            updateMiniHUDTelemetry(curSpeedObj.combined, d.active_file_name || d.active_file || d.current_file || "Monitoring Telegram Stream...", d.active_file_progress || d.progress_pct || 0);
             const echPeakBadge = document.getElementById('echart-peak-badge');
             if (echPeakBadge) echPeakBadge.textContent = `Peak: ${peakSpeedObj.formatted}`;
 
@@ -3586,12 +3591,14 @@
             if (ledTotFiles) ledTotFiles.textContent = totFiles.toLocaleString();
 
             const ledUpGb = document.getElementById('ledger-uploaded-gb');
-            if (ledUpGb && d.uploaded_gb !== undefined) ledUpGb.textContent = d.uploaded_gb + ' GB';
+            const upGbVal = d.transferred_data_gb !== undefined ? d.transferred_data_gb : d.uploaded_gb;
+            if (ledUpGb && upGbVal !== undefined) ledUpGb.textContent = upGbVal + ' GB';
             const ledFilesSent = document.getElementById('ledger-files-sent');
             if (ledFilesSent) ledFilesSent.textContent = filesSent.toLocaleString();
 
             const ledRemGb = document.getElementById('ledger-remaining-gb');
-            if (ledRemGb && d.remaining_gb !== undefined) ledRemGb.textContent = d.remaining_gb + ' GB';
+            const remGbVal = d.remaining_data_gb !== undefined ? d.remaining_data_gb : d.remaining_gb;
+            if (ledRemGb && remGbVal !== undefined) ledRemGb.textContent = remGbVal + ' GB';
             const ledFilesRem = document.getElementById('ledger-files-remaining');
             if (ledFilesRem) ledFilesRem.textContent = filesRem.toLocaleString();
 
@@ -3606,7 +3613,8 @@
             if (terminalWs && terminalWs.readyState === WebSocket.OPEN) return;
             try {
                 const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${proto}//${window.location.host}/ws/terminal_logs`;
+                const tok = localStorage.getItem('ks_session_token') || '';
+                const wsUrl = `${proto}//${window.location.host}/ws/terminal_logs${tok ? '?token=' + encodeURIComponent(tok) : ''}`;
                 terminalWs = new WebSocket(wsUrl);
 
                 terminalWs.onopen = () => {

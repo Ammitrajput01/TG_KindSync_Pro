@@ -2,6 +2,22 @@
 
 This log permanently documents root causes, architectural patterns, historical bugs, and applied fixes across all systems.
 
+## 📅 Log Entry: Saturday, 28 November 2026 | 12:45 AM IST
+
+### 105. A-to-Z Upgrade: Bold Footer, Topic Auto-Close, Per-Topic Real-Time Summary/Index, YouTube MP4/Auto-Update/HLS/`curl_cffi`, Rich IST Briefing, Log/Backup Rotation & Web Dashboard Optimization
+* **Applied Engineering Actions**:
+  1. **Phase A (`devi/operator/telegram_bot.py`)**: Repaired uncommitted syntax errors at line 1 and lines 8786–8791 (`/webhelp`, `/autoforward`, `/connect`).
+  2. **Phase B (`tg_kindsync_pro.py`, `devi/operator/deep_cloner.py`, `devi/operator/telegram_bot.py`, `.env.example`)**:
+     - Fixed literal `**` stars in `TELEGRAM_BRAND_MD` / `GROUP_BRAND_MD` (`**[...](url)**`) and `send_session_headers` (`f"👨‍⚕️ {TELEGRAM_BRAND} 🤍"`).
+     - Added `AUTO_CLOSE_TOPICS` (`EditForumTopicRequest(closed=True)` / `set_forum_topic_closed`), `/closetopic` & `/opentopic` commands, `TOPIC_CLOSED` fast-raise + `primary_client` failover, and `AUTO_TOPIC_DONE_BADGE`.
+     - Added real-time per-topic `TopicCompletionTracker` (`_check_topic_complete`) + shared `publish_topic_summary_and_index()` posting per-topic `✅ TOPIC COMPLETED` cards and updating in-place pinned `/topicindex` cards immediately per topic; gated `Rich.Live` on `sys.stdout.isatty()` and removed premature 30s `queue.join()` timeout.
+  3. **Phase C (`devi/operator/media_downloader.py`, `devi/operator/telegram_bot.py`)**:
+     - Isolated `yt-dlp` from `yt-dlp-youtube-oauth2` (`YTDLP_NO_PLUGINS=1` + `_isolate_yt_dlp_plugins()`), added 24h `maybe_update_yt_dlp()`, ordered `player_client` fallback, real error surfacing instead of `0/0`, H.264/MP4 `-movflags +faststart`, `DocumentAttributeVideo(supports_streaming=True)`, `resolve_upload_thumbnail()` (`kind_doctor_thumb.jpg`), strict `1→N` playlist ordering, HLS `.m3u8` FFmpeg remux, and `curl_cffi` direct-link fallback.
+  4. **Phase D (`devi/sentinel/telemetry_bridge.py`, `devi/sentinel/ai_advisor.py`, `sentinel_observer.py`, `tg_kindsync_pro.py`)**:
+     - Unified `IST_TZ` timestamps across `ai_advisor.py` & `telemetry_bridge.py`, upgraded `_send_bot_api_report()` to safe Markdown→HTML (`parse_mode="HTML"`) with plain-text fallback, added `collect_briefing_telemetry()` (reading `engine_telemetry.json`, `?mode=ro` SQLite handling mixed float/text `completed_at`, and `psutil` vitals), and added `rotate_logs_and_backups()` (`copytruncate` >20MB logs, min 3/max 5/7-day `db_backups` retention).
+  5. **Phase E (`web_dashboard.py`, `web/static/js/dashboard.js`, `fast_transfer.py`, `devi/memory/memory_store.py`)**:
+     - Fixed VPS `main.py --live` process detection, offloaded `_build_status_dict()` to `asyncio.to_thread()`, passed `?token=` to WebSockets + cleared ping timer leak, fixed WS/CPU/RAM keys, `escapeHtml()` in `loadCloneJobs`, aligned `fast_transfer.py` `>= 10MB` + task cancellation, and enabled WAL mode on `devi_memory.sqlite`.
+
 ## 📅 Log Entry: Wednesday, 25 November 2026 | 07:55 PM IST
 
 ### 104. Full 5-Phase Cross-OS, Security, Core Engine, DEVI Bot, Web Dashboard & GitHub Docs Audit Upgrade

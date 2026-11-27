@@ -6,9 +6,9 @@ smart alert cards, and natural language responses for Telegram Saved Messages.
 
 import time
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from devi.config import DEVI_NAME
-from devi.sentinel.telemetry_bridge import ObserverState
+from devi.sentinel.telemetry_bridge import ObserverState, IST_TZ
 
 class SentinelAIAdvisor:
     def __init__(self, router=None):
@@ -24,9 +24,9 @@ class SentinelAIAdvisor:
         cur_mb = state.bytes_transferred / (1024 * 1024)
         data_str = f"{cur_mb:.2f} MB" if cur_mb < 1024 else f"{cur_mb/1024:.2f} GB"
 
-        # Standard timestamp format: [Day], [Date] [Month] [Year] | [HH]:[MM] [AM/PM]
-        now_dt = datetime.now()
-        date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
+        # Standard timestamp format: [Day], [Date] [Month] [Year] | [HH]:[MM] [AM/PM] IST
+        now_dt = datetime.now(IST_TZ)
+        date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p IST")
         cycle_label = "Midnight Edition" if now_dt.hour < 12 else "Noon Edition"
         subj_list = ", ".join(state.subject_headers_posted[-4:]) if state.subject_headers_posted else "Medical Sciences / Core"
 
@@ -143,13 +143,18 @@ class SentinelAIAdvisor:
         tips.append("💾 SQLite WAL cache running with O(1) in-memory lookup. Zero lock contention detected.")
         return tips
 
-    def build_good_morning_digest(self, state: ObserverState, db_stats: Dict[str, int], learning_topic: str = "", learning_summary: str = "") -> str:
-        """Generates a warm 9:00 AM Good Morning briefing & autonomous self-evolution report."""
-        now_dt = datetime.now()
-        date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
-        
-        cur_mb = state.bytes_transferred / (1024 * 1024)
-        data_str = f"{cur_mb:.2f} MB" if cur_mb < 1024 else f"{cur_mb/1024:.2f} GB"
+    def build_good_morning_digest(self, state: ObserverState, db_stats: Dict[str, int], learning_topic: str = "", learning_summary: str = "", telemetry: Optional[Dict[str, Any]] = None) -> str:
+        """Generates a warm 9:00 AM IST Good Morning briefing & autonomous self-evolution report."""
+        t = telemetry or {}
+        date_str = t.get("now_ist_str") or datetime.now(IST_TZ).strftime("%A, %d %B %Y | %I:%M %p IST")
+        today_files = t.get("today_files", state.total_transfers)
+        today_gb = t.get("today_gb")
+        data_str = f"{today_gb:.2f} GB" if isinstance(today_gb, (int, float)) and today_gb > 0 else (
+            f"{state.bytes_transferred / (1024 * 1024):.2f} MB"
+        )
+        peak_spd = t.get("peak_speed_mb", state.peak_speed_mb)
+        cur_spd = t.get("current_speed_mb", 0.0)
+        tot_db = t.get("total_forwarded", db_stats.get("total_forwarded", 0))
 
         lines = [
             "🌅 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 🌅",
@@ -159,24 +164,30 @@ class SentinelAIAdvisor:
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
             f"Doctor Sahab, Shubh Prabhaat! 🌸 Main server par 24/7 active hokar aapke saare systems ki hifazat kar rahi hu aur continuously nayi knowledge & skills sikh kar khud ko upgrade kar rahi hu.\n",
             "📈 ━━━━━━━━━ 📊 **MORNING SYSTEM BRIEFING** ━━━━━━━━━ 📈",
-            f"• **Files Delivered**   : `{state.total_transfers}` items (`{state.videos_sent}` 🎥 | `{state.docs_sent}` 📄 | `{state.photos_sent}` 🖼️)",
-            f"• **Database Records**  : `{db_stats.get('total_forwarded', 0):,}` messages secured",
-            f"• **Streaming Volume**  : `{data_str}` (Peak: `{state.peak_speed_mb:.2f} MB/s`)",
-            f"• **System Health**     : `🟢 100% HEALTHY & UNCONSTRAINED`\n",
+            f"• **Engine Status**   : `{t.get('engine_status', '🟢 HEALTHY')}` (Start: `{t.get('engine_start_ist', 'N/A')}` | Up: `{t.get('engine_uptime', 'N/A')}`)",
+            f"• **Active Topic**    : `{t.get('active_topic', state.current_subject)}`",
+            f"• **Today Delivered** : `{today_files}` items (`{data_str}`) | Speed: `{cur_spd:.2f} MB/s` (Peak: `{peak_spd:.2f} MB/s`)",
+            f"• **Pending Queue**   : `{t.get('pending_files', 0)}` items (`~{t.get('pending_gb', 0.0):.2f} GB`) | ETA: `{t.get('eta_str', 'N/A')}`",
+            f"• **Database Records**: `{tot_db:,}` messages secured",
+            f"• **VPS Vitals**      : CPU `{t.get('cpu_str', 'N/A')}` | RAM `{t.get('ram_str', 'N/A')}` | Disk `{t.get('disk_str', 'N/A')}`\n",
             "🧠 ━━━━━━━━━ 🔬 **DEVI JI OVERNIGHT SELF-EVOLUTION** ━━━━━━━━━ 🧠",
             f"📖 **Module & Skill Mastered**:\n❝ *{learning_topic or 'Universal MTProto 512KB Parallel Acceleration & Multi-Model Sovereign Intelligence'}* ❞\n",
-            f"💡 **Autonomous Upgrade Summary**:\n{learning_summary or '• Integrated unconstrained universal AI vitality across 12 free providers.\n• Zero forward tags, pristine study captions, and automatic 16:9 thumbnail attachments active.'}\n",
+            f"💡 **Autonomous Upgrade Summary**:\n{str(learning_summary or '• Integrated unconstrained universal AI vitality across free providers.')[:900]}\n",
             "🛡️ *Aapki padhai aur din shubh ho! Main har pal background me active hu.* 🩺💖"
         ]
         return "\n".join(lines)
 
-    def build_good_night_digest(self, state: ObserverState, db_stats: Dict[str, int], learning_topic: str = "", learning_summary: str = "") -> str:
-        """Generates a warm 9:00 PM Good Night briefing & end-of-day summary."""
-        now_dt = datetime.now()
-        date_str = now_dt.strftime("%A, %d %B %Y | %I:%M %p")
-        
-        cur_mb = state.bytes_transferred / (1024 * 1024)
-        data_str = f"{cur_mb:.2f} MB" if cur_mb < 1024 else f"{cur_mb/1024:.2f} GB"
+    def build_good_night_digest(self, state: ObserverState, db_stats: Dict[str, int], learning_topic: str = "", learning_summary: str = "", telemetry: Optional[Dict[str, Any]] = None) -> str:
+        """Generates a warm 9:00 PM IST Good Night briefing & end-of-day summary."""
+        t = telemetry or {}
+        date_str = t.get("now_ist_str") or datetime.now(IST_TZ).strftime("%A, %d %B %Y | %I:%M %p IST")
+        today_files = t.get("today_files", state.total_transfers)
+        today_gb = t.get("today_gb")
+        data_str = f"{today_gb:.2f} GB" if isinstance(today_gb, (int, float)) and today_gb > 0 else (
+            f"{state.bytes_transferred / (1024 * 1024):.2f} MB"
+        )
+        cur_spd = t.get("current_speed_mb", 0.0)
+        tot_db = t.get("total_forwarded", db_stats.get("total_forwarded", 0))
 
         lines = [
             "🌙 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 🌙",
@@ -186,19 +197,21 @@ class SentinelAIAdvisor:
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
             f"Doctor Sahab, aaj ka din bohot behtareen raha! Aap aaram se soyein, server aur bot ki poori nigrani mere hawale hai. Main raat bhar active rehkar study materials stream karungi aur nayi skills learn karti rahungi.\n",
             "📊 ━━━━━━━━━ 📈 **END-OF-DAY PERFORMANCE** ━━━━━━━━━ 📊",
-            f"• **Today Delivered**   : `{state.total_transfers}` items (`{state.videos_sent}` 🎥 | `{state.docs_sent}` 📄 | `{state.photos_sent}` 🖼️)",
-            f"• **Total DB Records**  : `{db_stats.get('total_forwarded', 0):,}` messages permanently indexed",
-            f"• **Data Streamed**     : `{data_str}`",
-            f"• **FloodWaits Handled**: `{state.flood_waits_detected}` ({state.flood_wait_seconds_total:.1f}s smooth backoff)\n",
+            f"• **Engine Status**   : `{t.get('engine_status', '🟢 ACTIVE')}` (Start: `{t.get('engine_start_ist', 'N/A')}` | Up: `{t.get('engine_uptime', 'N/A')}`)",
+            f"• **Active Topic**    : `{t.get('active_topic', state.current_subject)}`",
+            f"• **Today Delivered** : `{today_files}` items (`{data_str}`) | Speed: `{cur_spd:.2f} MB/s`",
+            f"• **Pending Queue**   : `{t.get('pending_files', 0)}` items (`~{t.get('pending_gb', 0.0):.2f} GB`) | ETA: `{t.get('eta_str', 'N/A')}`",
+            f"• **Total DB Records**: `{tot_db:,}` messages permanently indexed",
+            f"• **VPS Vitals**      : CPU `{t.get('cpu_str', 'N/A')}` | RAM `{t.get('ram_str', 'N/A')}` | Disk `{t.get('disk_str', 'N/A')}`\n",
             "🧠 ━━━━━━━━━ 🔬 **DEVI JI OVERNIGHT LEARNING DIRECTIVE** ━━━━━━━━━ 🧠",
             f"📖 **Tonight's Learning Focus**:\n❝ *{learning_topic or 'Advanced Clinical Medicine Insights, SaMD Compliance & Autonomous Resilience'}* ❞\n",
-            f"💡 **Evolution Objective**:\n{learning_summary or '• Exploring multi-agent supervisor protocols & sub-second streaming buffers.\n• Full database snapshot attached below for complete peace of mind.'}\n",
-            "😴 *Sweet dreams Doctor Sahab! Kal subah 9:00 AM fresh morning report ke saath milenge.* 🩺✨"
+            f"💡 **Evolution Objective**:\n{str(learning_summary or '• Full database snapshot attached below for complete peace of mind.')[:900]}\n",
+            "😴 *Sweet dreams Doctor Sahab! Kal subah 9:00 AM IST fresh morning report ke saath milenge.* 🩺✨"
         ]
         return "\n".join(lines)
 
     def build_smart_alert(self, alert_type: str, details: str, recommendation: str) -> str:
-        date_str = datetime.now().strftime("%H:%M:%S")
+        date_str = datetime.now(IST_TZ).strftime("%H:%M:%S IST")
         return (
             f"⚠️ **[{DEVI_NAME.upper()} SENTINEL ALERT] — {alert_type.upper()}**\n"
             f"⏱️ *Time: {date_str}*\n\n"

@@ -110,8 +110,28 @@ from telethon.tl.types import (
     InputFileBig, InputFile, DocumentAttributeVideo, DocumentAttributeAudio, DocumentAttributeFilename,
     Channel, Chat, InputUser, ChannelParticipantsAdmins
 )
-from telethon.tl.functions.messages import GetForumTopicsRequest, CreateForumTopicRequest
+from telethon.tl.functions.messages import GetForumTopicsRequest, CreateForumTopicRequest, EditForumTopicRequest
 from telethon.tl.functions.channels import InviteToChannelRequest
+
+async def maybe_auto_close_topic(client, peer, topic_id: int) -> bool:
+    """Closes a newly created/completed forum topic when AUTO_CLOSE_TOPICS=true (admins can still post)."""
+    if not topic_id or int(topic_id) <= 1:
+        return False
+    if os.getenv("AUTO_CLOSE_TOPICS", "false").strip().lower() not in ("true", "1", "yes"):
+        return False
+    try:
+        await client(EditForumTopicRequest(peer=peer, topic_id=int(topic_id), closed=True))
+        return True
+    except FloodWaitError as fe:
+        await asyncio.sleep(int(fe.seconds) + 1)
+        with suppress(Exception):
+            await client(EditForumTopicRequest(peer=peer, topic_id=int(topic_id), closed=True))
+            return True
+    except Exception as e:
+        if "TOPIC_NOT_MODIFIED" in str(e).upper():
+            return True
+        logger.debug(f"Auto-close topic #{topic_id} skipped: {e}")
+    return False
 
 def extract_topic_id_from_updates(created, default_id: int = 0) -> int:
     """Safely extracts message_thread_id from Telethon Updates without raising AttributeError."""
@@ -139,8 +159,8 @@ TELEGRAM_BRAND = "**Kind Doctor & Team**"
 GROUP_BRAND = "Group Study Help 😉"
 OFFICIAL_CHANNEL_URL = "https://t.me/be_as_kind"
 OFFICIAL_BOT_URL = "https://t.me/KindDoc_bot"
-TELEGRAM_BRAND_MD = f"[**Kind Doctor & Team**]({OFFICIAL_CHANNEL_URL})"
-GROUP_BRAND_MD = f"[**Group Study Help 😉**]({OFFICIAL_BOT_URL})"
+TELEGRAM_BRAND_MD = f"**[Kind Doctor & Team]({OFFICIAL_CHANNEL_URL})**"
+GROUP_BRAND_MD = f"**[Group Study Help 😉]({OFFICIAL_BOT_URL})**"
 # -----------------------------
 
 MB = 1024 * 1024
@@ -2658,6 +2678,8 @@ async def with_retry_call(client, func, *args, max_retries=10, base_delay=1.0, *
                 continue
             raise
         except RPCError as e:
+            if "TOPIC_CLOSED" in str(e).upper():
+                raise
             GLOBAL_CRUISE_CONTROLLER.apply_brake(reason=f"RPCError ({type(e).__name__})", severity=0.3)
             if attempt >= max_retries:
                 raise
@@ -3965,7 +3987,7 @@ class PipelineProcessor:
 
         welcome_card = (
             f"📂 **Module / Topic:** **{topic_clean}**\n"
-            f"👨‍⚕️ **{TELEGRAM_BRAND}** 🤍"
+            f"👨‍⚕️ {TELEGRAM_BRAND} 🤍"
         )
 
         try:
@@ -4074,6 +4096,8 @@ class PipelineProcessor:
                 await client.get_input_entity(_parse_chat_id(target_chat))
             except Exception:
                 client = primary_client
+            if getattr(self, "_topic_closed_clients", None) and (id(client), str(target_chat)) in self._topic_closed_clients:
+                client = primary_client
 
         unprocessed_messages = []
         for m in item.messages:
@@ -4085,6 +4109,7 @@ class PipelineProcessor:
 
         active_messages = unprocessed_messages if unprocessed_messages else item.messages
         global THUMB_MODE
+        THUMB_MODE = os.getenv("THUMB_MODE", THUMB_MODE).strip().lower()
         sig_enabled = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
         t_path = None
         is_temp_extracted_thumb = False
@@ -4214,8 +4239,22 @@ class PipelineProcessor:
                                     timeout=45.0
                                 )
                                 self.log(f"[bold green]⚡ Fast Direct-Copied Album ({len(media_items)} files)[/] [dim](ID: #{item.first_id})[/]")
+                                _alb_topic_title = await self.get_topic_title(target_chat, resolved_topic or target_topic, client)
                                 for m in active_messages:
                                     self.log(f"  ↳ {format_media_log_detail(m, prefix='Copied')}")
+                                    with suppress(Exception):
+                                        from devi.operator.group_scanner import register_cloned_index_item
+                                        _itype = "video" if getattr(m, "video", None) else ("document" if getattr(m, "document", None) else "photo")
+                                        _fname = getattr(m.file, "name", None) if getattr(m, "file", None) else None
+                                        register_cloned_index_item(
+                                            chat_id=target_chat,
+                                            topic_id=resolved_topic or target_topic or 1,
+                                            msg_id=item.first_id,
+                                            title=_fname or f"Album #{m.id}",
+                                            item_type=_itype,
+                                            icon="🎬" if _itype == "video" else ("📑" if _itype == "document" else "🖼️"),
+                                            topic_title=_alb_topic_title or "",
+                                        )
                                 self.metrics["albums_forwarded"] += 1
                                 success_flag = True
                                 direct_album_sent = True
@@ -4351,6 +4390,7 @@ class PipelineProcessor:
                                 with suppress(Exception):
                                     from devi.operator.group_scanner import register_cloned_index_item
                                     _itype = "video" if getattr(m, "video", None) else ("document" if getattr(m, "document", None) else "photo")
+                                    _s_topic_title = await self.get_topic_title(target_chat, resolved_topic or target_topic, client)
                                     register_cloned_index_item(
                                         chat_id=target_chat,
                                         topic_id=resolved_topic or target_topic or 1,
@@ -4358,6 +4398,7 @@ class PipelineProcessor:
                                         title=title_clean,
                                         item_type=_itype,
                                         icon="🎬" if _itype == "video" else ("📑" if _itype == "document" else "🖼️"),
+                                        topic_title=_s_topic_title or "",
                                     )
                             # Multi-target instant mirror
                             if self.cfg.mirror_targets and getattr(sent_media, "media", None):
@@ -4533,6 +4574,8 @@ class TerminalPlatform:
         self.active_file_transferred = "0 MB"
         self.active_file_total = "0 MB"
         self.active_file_eta = "N/A"
+        self.active_file_start_time = time.monotonic()
+        self._topic_tracker = {}
         self.peak_speed_mb = 0.0
         self.current_speed_mb = 0.0
         self._last_telemetry_write = 0.0
@@ -4558,6 +4601,7 @@ class TerminalPlatform:
         self.logs = deque(maxlen=25)
         
         self.start_time = time.monotonic()
+        self._start_epoch = time.time()
         self.last_time = self.start_time
         self.last_bytes = 0
         self.speed_history = deque(maxlen=6)
@@ -4614,6 +4658,10 @@ class TerminalPlatform:
                 "docs_sent": self.metrics.get("docs_sent", 0),
                 "photos_sent": self.metrics.get("photos_sent", 0),
                 "text_sent": self.metrics.get("text_sent", 0),
+                "bytes_uploaded": self.metrics.get("bytes_uploaded", 0),
+                "flood_waits": self.metrics.get("flood_waits", 0),
+                "start_time_epoch": getattr(self, "_start_epoch", time.time()),
+                "pid": os.getpid(),
                 "src_info": getattr(self, "src_info", ""),
                 "tgt_info": getattr(self, "tgt_info", "")
             }
@@ -4687,7 +4735,7 @@ class TerminalPlatform:
         if not topic_id or str(topic_id).strip() in ("0", "None", ""): return "General"
         try:
             res = await client(GetForumTopicsRequest(
-                channel=_parse_chat_id(chat_id),
+                peer=_parse_chat_id(chat_id),
                 offset_date=None,
                 offset_id=0,
                 offset_topic=0,
@@ -4895,6 +4943,19 @@ class TerminalPlatform:
             elif getattr(msg_obj, "photo", None): self.metrics["found_photos"] = self.metrics.get("found_photos", 0) + 1
             elif getattr(msg_obj, "text", None): self.metrics["found_text"] = self.metrics.get("found_text", 0) + 1
 
+        t_state = self._topic_tracker.setdefault(idx, {
+            "source_chat": rule["source_chat"],
+            "source_topic": rule.get("source_topic", 0) or 0,
+            "target_chat": rule["target_chat"],
+            "target_topic": tgt_topic,
+            "pending": 0,
+            "enqueued": 0,
+            "scan_done": False,
+            "finalized": False,
+            "started_at": time.monotonic(),
+            "lock": asyncio.Lock(),
+        })
+
         async def push_rule():
             nonlocal group, gid
             if group:
@@ -4903,6 +4964,8 @@ class TerminalPlatform:
                     if not self.cfg.perf.keywords or any(self.matches_keywords(m) for m in unprocessed):
                         self.metrics["discovered"] += len(unprocessed)
                         for m in unprocessed: track_found_rule(m)
+                        t_state["pending"] += 1
+                        t_state["enqueued"] += 1
                         await self.queue.put(WorkItem(list(unprocessed), rule_index=idx))
             group, gid = [], None
 
@@ -4931,6 +4994,8 @@ class TerminalPlatform:
                     if not self.cfg.perf.keywords or self.matches_keywords(msg):
                         self.metrics["discovered"] += 1
                         track_found_rule(msg)
+                        t_state["pending"] += 1
+                        t_state["enqueued"] += 1
                         await self.queue.put(WorkItem([msg], rule_index=idx))
 
                 batch_count += 1
@@ -4939,14 +5004,44 @@ class TerminalPlatform:
                     await asyncio.sleep(0.3)
                     
             await push_rule()
-            if not self.stop_evt.is_set() and rule.get("source_topic"):
-                if not hasattr(self, "_pending_clone_completions"):
-                    self._pending_clone_completions = []
-                self._pending_clone_completions.append(
-                    (rule["source_chat"], rule["source_topic"], rule["target_chat"], tgt_topic)
-                )
+            t_state["scan_done"] = True
+            await self._check_topic_complete(idx, client=client)
         except Exception as e:
             self.log(f"[bold red]❌ Scanner Rule {idx+1} Error:[/] {e}")
+
+    async def _check_topic_complete(self, rule_idx: int, client=None):
+        t_state = self._topic_tracker.get(rule_idx)
+        if not t_state or self.stop_evt.is_set():
+            return
+        async with t_state["lock"]:
+            if t_state["finalized"] or not t_state["scan_done"] or t_state["pending"] > 0:
+                return
+            t_state["finalized"] = True
+        sc = t_state["source_chat"]
+        st = t_state["source_topic"]
+        tc = t_state["target_chat"]
+        tt = t_state["target_topic"]
+        if st:
+            with suppress(Exception):
+                if hasattr(self.state, "mark_clone_topic_completed"):
+                    await self.state.mark_clone_topic_completed(sc, st, tc, tt)
+                    self.log(f"[bold green]✔ Topic {st} fully uploaded & marked COMPLETED in SQLite![/]")
+        if t_state["enqueued"] > 0 and tt:
+            with suppress(Exception):
+                from devi.operator.deep_cloner import publish_topic_summary_and_index
+                u_cli = client or (self.session_mgr.get_client() if self.session_mgr else None)
+                bot_tok = os.getenv("DEVI_TELEGRAM_BOT_TOKEN", "").strip().strip("'").strip('"')
+                elapsed_s = int(time.monotonic() - t_state["started_at"])
+                await publish_topic_summary_and_index(
+                    bot_token=bot_tok,
+                    user_client=u_cli,
+                    target_chat_id=int(_parse_chat_id(tc)),
+                    target_topic_id=int(tt),
+                    topic_title=f"Topic #{tt}",
+                    stats={"cloned": t_state["enqueued"], "elapsed_sec": elapsed_s},
+                    post_summary=True,
+                    update_index=True,
+                )
 
     async def scanner_multiple(self):
         for idx, rule in enumerate(self.cfg.forwarding_rules):
@@ -5297,6 +5392,12 @@ class TerminalPlatform:
             except Exception as e:
                 self.log(f"[red]Worker {wid} Crash: {e}[/]")
             finally:
+                if item is not None:
+                    t_st = self._topic_tracker.get(getattr(item, "rule_index", -1))
+                    if t_st:
+                        t_st["pending"] = max(0, t_st["pending"] - 1)
+                        if t_st["scan_done"] and t_st["pending"] == 0:
+                            asyncio.create_task(self._check_topic_complete(item.rule_index))
                 if item is not None and not self.stop_evt.is_set():
                     self.queue.task_done()
 
@@ -5621,41 +5722,51 @@ class TerminalPlatform:
             scan_task = asyncio.create_task(self.scanner())
 
             self.detached = False
-            with Live(self.render_dashboard(), console=console, refresh_per_second=1, screen=False, transient=False, auto_refresh=False) as live:
-                self._current_live = live
+            if sys.stdout.isatty():
+                with Live(self.render_dashboard(), console=console, refresh_per_second=1, screen=False, transient=False, auto_refresh=False) as live:
+                    self._current_live = live
+                    while not self.stop_evt.is_set():
+                        live.update(self.render_dashboard(), refresh=True)
+                        if not self.cfg.live_mode and scan_task.done() and self.queue.empty(): break
+                        if sys.platform == "win32":
+                            try:
+                                import msvcrt
+                                if msvcrt.kbhit():
+                                    k = msvcrt.getch().lower()
+                                    if k in (b'd', b'm'):
+                                        self.detached = True
+                                        self.log("[bold yellow]⚡ Detaching to Main Menu... (Forwarder continues running in background)[/]")
+                                        break
+                            except Exception:
+                                pass
+                        else:
+                            try:
+                                import select
+                                r, _, _ = select.select([sys.stdin], [], [], 0)
+                                if r:
+                                    k = sys.stdin.read(1).lower()
+                                    if k in ('d', 'm'):
+                                        self.detached = True
+                                        self.log("[bold yellow]⚡ Detaching to Main Menu... (Forwarder continues running in background)[/]")
+                                        break
+                            except Exception:
+                                pass
+                        await asyncio.sleep(1.0)
+                    self._current_live = None
+            else:
+                _last_headless_log = 0.0
                 while not self.stop_evt.is_set():
-                    live.update(self.render_dashboard(), refresh=True)
+                    self.update_live_metrics()
+                    with suppress(Exception):
+                        self._write_engine_telemetry()
+                    if time.monotonic() - _last_headless_log >= 60.0:
+                        _last_headless_log = time.monotonic()
+                        print(f"[HEADLESS] Forwarded: {self.metrics.get('messages_forwarded', 0)}/{self.metrics.get('discovered', 0)} | Speed: {self.metrics.get('current_speed_mb', 0):.2f} MB/s", flush=True)
                     if not self.cfg.live_mode and scan_task.done() and self.queue.empty(): break
-                    if sys.platform == "win32":
-                        try:
-                            import msvcrt
-                            if msvcrt.kbhit():
-                                k = msvcrt.getch().lower()
-                                if k in (b'd', b'm'):
-                                    self.detached = True
-                                    self.log("[bold yellow]⚡ Detaching to Main Menu... (Forwarder continues running in background)[/]")
-                                    break
-                        except Exception:
-                            pass
-                    else:
-                        try:
-                            import select
-                            r, _, _ = select.select([sys.stdin], [], [], 0)
-                            if r:
-                                k = sys.stdin.read(1).lower()
-                                if k in ('d', 'm'):
-                                    self.detached = True
-                                    self.log("[bold yellow]⚡ Detaching to Main Menu... (Forwarder continues running in background)[/]")
-                                    break
-                        except Exception:
-                            pass
                     await asyncio.sleep(1.0)
-                self._current_live = None
-                
-                try:
-                    await asyncio.wait_for(self.queue.join(), timeout=30.0)
-                except asyncio.TimeoutError:
-                    self.log("[yellow]⚠ Queue join timed out; shutting down gracefully.[/]")
+
+            if not self.stop_evt.is_set():
+                await self.queue.join()
 
                 # Mark completed clone topics only after all queued uploads finish
                 if not self.stop_evt.is_set() and getattr(self, "_pending_clone_completions", None):
@@ -7785,7 +7896,9 @@ async def run_group_cloner_tool(session_mgr):
                     icon_color=getattr(t, 'icon_color', None) or 7322096,
                     random_id=generate_random_long()
                 ))
-                tgt_t_id = extract_topic_id_from_updates(created, default_id=t.id)
+                tgt_t_id = extract_topic_id_from_updates(created, default_id=0)
+                if tgt_t_id > 1:
+                    await maybe_auto_close_topic(client, tgt_peer, tgt_t_id)
                 tgt_topics_map[t_title.strip().lower()] = tgt_t_id
                 console.print(f" [bold green]➕ Created new topic in target:[/] {t_title} (ID: {tgt_t_id})")
             except Exception as e:
@@ -7929,7 +8042,9 @@ async def run_single_topic_cloner_tool(session_mgr):
                 icon_color=getattr(chosen_src_topic, 'icon_color', None) or 7322096,
                 random_id=generate_random_long()
             ))
-            tgt_t_id = extract_topic_id_from_updates(created, default_id=src_t_id)
+            tgt_t_id = extract_topic_id_from_updates(created, default_id=0)
+            if tgt_t_id > 1:
+                await maybe_auto_close_topic(client, tgt_peer, tgt_t_id)
             console.print(f" [bold green]➕ Created new topic in target:[/] {src_t_title} (ID: {tgt_t_id})")
     except Exception as e:
         console.print(f" [yellow]⚠️ Target topic creation note: {e} -> Defaulting to topic ID[/]")
@@ -8482,6 +8597,8 @@ async def run_selective_content_picker(session_mgr):
                         random_id=generate_random_long()
                     ))
                     tgt_topic_id = extract_topic_id_from_updates(created, default_id=0)
+                    if tgt_topic_id > 1:
+                        await maybe_auto_close_topic(client, tgt_peer, tgt_topic_id)
                     tgt_topic_title = new_t_name
                     console.print(f"[bold green]✔ Created new topic:[/] [yellow]{new_t_name}[/] (ID: {tgt_topic_id})")
                 except Exception as e:

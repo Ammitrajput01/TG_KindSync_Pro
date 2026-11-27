@@ -7873,7 +7873,7 @@ class DeviTelegramBot:
 
             # 3. Handle Playlist
             if info.get("is_playlist") or is_playlist_cmd:
-                entries = info.get("entries", [])
+                entries = sorted(info.get("entries", []), key=lambda e: int(e.get("index", 999999)))
                 total_items = len(entries)
                 pl_title = custom_topic_name or info.get("title", "Lecture Series")
 
@@ -7881,9 +7881,9 @@ class DeviTelegramBot:
                     await self._edit_message(
                         session, chat_id, status_msg_id,
                         f"📥 <b>Playlist Detected ({total_items} Lectures)</b>\n"
-                        f"📚 <b>Series:</b> <b>{pl_title}</b>\n"
+                        f"📚 <b>Series:</b> <b>{html.escape(pl_title)}</b>\n"
                         f"⏱️ <b>Total Runtime:</b> <code>{info.get('total_duration_str')}</code>\n"
-                        f"🚀 <i>Processing sequential uploads to target topic...</i>"
+                        f"🚀 <i>Processing sequential uploads (1 → {total_items}) to target topic...</i>"
                     )
 
                 success_count = 0
@@ -7921,13 +7921,26 @@ class DeviTelegramBot:
                                 )
                         else:
                             from devi.operator.session_vault import get_vault_client_for_target
+                            from telethon.tl.types import DocumentAttributeVideo, DocumentAttributeFilename
                             user_cli, _ = await get_vault_client_for_target(user_id)
                             if user_cli:
-                                await user_cli.send_file(
-                                    target_upload_chat, v_path, caption=cap, thumb=t_path,
-                                    reply_to=active_topic_id, supports_streaming=not is_audio,
-                                    parse_mode="html"
-                                )
+                                try:
+                                    attrs = [DocumentAttributeFilename(file_name=Path(v_path).name)]
+                                    if not is_audio:
+                                        attrs.insert(0, DocumentAttributeVideo(
+                                            duration=int(v_dur or 0),
+                                            w=int(dl_res.get("width") or 1280),
+                                            h=int(dl_res.get("height") or 720),
+                                            supports_streaming=True,
+                                        ))
+                                    await user_cli.send_file(
+                                        target_upload_chat, v_path, caption=cap, thumb=t_path,
+                                        attributes=attrs, reply_to=active_topic_id,
+                                        supports_streaming=not is_audio, parse_mode="html",
+                                    )
+                                finally:
+                                    with suppress(Exception):
+                                        await user_cli.disconnect()
                         cleanup_files(v_path, t_path)
                         success_count += 1
                         await asyncio.sleep(1.5)
@@ -13286,6 +13299,38 @@ class DeviTelegramBot:
                 f"• Active Rules: <code>strip_words.txt</code> &amp; SQLite fully synchronized.",
                 message_thread_id=thread_id
             )
+
+        elif cmd in ("/closetopic", "/archivetopic", "/locktopic", "/opentopic", "/reopentopic", "/unlocktopic"):
+            if not self.is_admin(admin_id):
+                await self._send_message(session, chat_id, "⛔ Restricted to Master Admins.", message_thread_id=thread_id)
+                return
+            is_close = cmd in ("/closetopic", "/archivetopic", "/locktopic")
+            if len(parts) >= 3 and parts[1].lower() == "auto":
+                val = "true" if parts[2].lower() in ("on", "true", "1", "yes") else "false"
+                set_key(str(ENV_PATH), "AUTO_CLOSE_TOPICS", val)
+                os.environ["AUTO_CLOSE_TOPICS"] = val
+                await self._send_message(session, chat_id, f"🔒 <b>AUTO_CLOSE_TOPICS</b> set to <code>{val}</code>!", message_thread_id=thread_id)
+                return
+            target_tid = thread_id
+            if len(parts) >= 2 and parts[1].lstrip("-").isdigit():
+                target_tid = int(parts[1])
+            if not target_tid or int(target_tid) <= 1:
+                await self._send_message(session, chat_id, "⚠️ Kisi Forum Topic ke andar `/closetopic` ya `/opentopic` bhejein (ya `/closetopic <topic_id>` / `/closetopic auto on`).", message_thread_id=thread_id)
+                return
+            from devi.operator.deep_cloner import set_forum_topic_closed
+            ok = await set_forum_topic_closed(self.token, None, chat_id, int(target_tid), closed=is_close)
+            if not ok:
+                from devi.operator.session_vault import get_vault_client_for_target
+                u_cli, _ = await get_vault_client_for_target(admin_id)
+                if u_cli:
+                    try:
+                        ok = await set_forum_topic_closed(self.token, u_cli, chat_id, int(target_tid), closed=is_close)
+                    finally:
+                        with suppress(Exception):
+                            await u_cli.disconnect()
+            lbl = "🔒 Topic Closed (Only Admins can post)" if is_close else "🔓 Topic Reopened"
+            await self._send_message(session, chat_id, f"{lbl} — Topic <code>#{target_tid}</code>." if ok else f"❌ Failed to update topic <code>#{target_tid}</code>. Ensure bot/account has Manage Topics permission.", message_thread_id=thread_id)
+            return
 
         elif cmd in ("/syncstrip",):
             if not self.is_admin(admin_id):

@@ -321,6 +321,9 @@ class ParallelTransferrer:
                     chunk = await task
                     if not chunk:
                         done = True
+                        for rem in tasks:
+                            if not rem.done():
+                                rem.cancel()
                         break
                     yield chunk
                     part += 1
@@ -380,7 +383,7 @@ class ParallelTransferrer:
         conn_count = connection_count or self.get_optimal_connections(file_size)
         part_size = part_size_kb * 1024
         part_count = (file_size + part_size - 1) // part_size
-        is_large = file_size > 10 * 1024 * 1024
+        is_large = file_size >= 10 * 1024 * 1024
         await self._init_upload(conn_count, file_id, part_count, is_large)
         return part_size, part_count, is_large
 

@@ -17,7 +17,7 @@ import asyncio
 import logging
 import sqlite3
 from datetime import datetime, timezone
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple, Any
 from contextlib import suppress
 from pathlib import Path
 
@@ -25,7 +25,7 @@ import random
 from telethon import TelegramClient
 from telethon.helpers import generate_random_long
 from telethon.tl.types import InputPeerChannel, MessageActionTopicCreate, MessageActionTopicEdit
-from telethon.tl.functions.messages import GetForumTopicsRequest, CreateForumTopicRequest
+from telethon.tl.functions.messages import GetForumTopicsRequest, CreateForumTopicRequest, EditForumTopicRequest
 from telethon.errors import FloodWaitError, ChannelPrivateError, ChatAdminRequiredError
 
 import aiohttp
@@ -389,7 +389,7 @@ def clean_cloned_caption(
     # Append Kind Doctor Branding Signature if enabled
     enable_sig = os.getenv("ENABLE_SIGNATURE", "true").strip().lower() in ("true", "1", "yes")
     if enable_sig:
-        formatted_parts.append("📚 [**Kind Doctor & Team**](https://t.me/be_as_kind)\n💬 [**Group Study Help 😉**](https://t.me/KindDoc_bot)")
+        formatted_parts.append("📚 **[Kind Doctor & Team](https://t.me/be_as_kind)**\n💬 **[Group Study Help 😉](https://t.me/KindDoc_bot)**")
 
     res_cap = "\n\n".join(p for p in formatted_parts if p).strip()
     res_cap = apply_anti_dmca_obfuscation(res_cap)
@@ -542,6 +542,8 @@ async def get_or_create_target_topic(
                         )
                         conn.commit()
                     logger.info(f"✅ Created topic '{clean_title}' (#{created_msg_id}) in {target_chat_id} via MTProto")
+                    if os.getenv("AUTO_CLOSE_TOPICS", "false").strip().lower() in ("true", "1", "yes"):
+                        await set_forum_topic_closed(bot_token, user_client, target_chat_id, created_msg_id, closed=True)
                     await asyncio.sleep(1.5)  # Safe MTProto delay
                     return created_msg_id
             except FloodWaitError as ex_flood:
@@ -554,6 +556,192 @@ async def get_or_create_target_topic(
     # Default to general chat topic 1 if forum creation unavailable
     logger.warning(f"⚠️ Topic creation fell back to General (#1) for '{clean_title}' in {target_chat_id}. Ensure Bot/User has 'Manage Topics' rights!")
     return 1
+
+async def set_forum_topic_closed(
+    bot_token: str,
+    user_client: Optional[TelegramClient],
+    chat_id: int,
+    topic_id: int,
+    closed: bool = True,
+) -> bool:
+    """Locks (closed=True) or reopens (closed=False) a Telegram forum topic (admins can still post)."""
+    if not topic_id or int(topic_id) <= 1:
+        return False
+    tid = int(topic_id)
+    if bot_token:
+        method = "closeForumTopic" if closed else "reopenForumTopic"
+        try:
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post(
+                    f"https://api.telegram.org/bot{bot_token}/{method}",
+                    json={"chat_id": int(chat_id), "message_thread_id": tid},
+                    timeout=aiohttp.ClientTimeout(total=15),
+                ) as resp:
+                    data = await resp.json()
+                    if data.get("ok") or "TOPIC_NOT_MODIFIED" in str(data.get("description", "")):
+                        return True
+        except Exception:
+            pass
+    if user_client:
+        try:
+            peer = await _safe_resolve_entity(user_client, chat_id)
+            await user_client(EditForumTopicRequest(peer=peer, topic_id=tid, closed=closed))
+            return True
+        except Exception as ex:
+            if "TOPIC_NOT_MODIFIED" in str(ex):
+                return True
+            logger.warning(f"⚠️ EditForumTopicRequest(closed={closed}) note for topic #{tid}: {ex}")
+    return False
+
+
+async def publish_topic_summary_and_index(
+    bot_token: str,
+    user_client: Optional[TelegramClient],
+    target_chat_id: int,
+    target_topic_id: int,
+    topic_title: str,
+    stats: Optional[Dict[str, Any]] = None,
+    post_summary: bool = True,
+    update_index: bool = True,
+) -> None:
+    """Posts per-topic completion summary, updates in-place pinned /topicindex, and optionally closes/badges topic."""
+    tid = int(target_topic_id or 0)
+    clean_title = (topic_title or f"Topic #{tid}").strip()
+    stats = stats or {}
+    videos = int(stats.get("videos", 0))
+    docs = int(stats.get("documents", stats.get("docs", 0)))
+    photos = int(stats.get("photos", 0))
+    total_cloned = int(stats.get("cloned", videos + docs + photos))
+    elapsed_s = int(stats.get("elapsed_sec", 0))
+    dur_str = f"{elapsed_s // 60}m {elapsed_s % 60}s" if elapsed_s >= 60 else f"{elapsed_s}s"
+    size_mb = float(stats.get("bytes", 0)) / (1024 * 1024)
+    size_str = f"{size_mb / 1024:.2f} GB" if size_mb >= 1024 else f"{size_mb:.1f} MB"
+
+    async def _bot_post(method: str, payload: dict) -> Optional[dict]:
+        if not bot_token:
+            return None
+        try:
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post(
+                    f"https://api.telegram.org/bot{bot_token}/{method}",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=20),
+                ) as resp:
+                    return await resp.json()
+        except Exception:
+            return None
+
+    pinned_msg_id = None
+    if update_index and tid > 0:
+        try:
+            with sqlite3.connect(DB_PATH, timeout=15.0) as conn:
+                conn.row_factory = sqlite3.Row
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS telegram_pinned_index_cards "
+                    "(chat_id INTEGER NOT NULL, topic_id INTEGER NOT NULL, msg_id INTEGER NOT NULL, "
+                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (chat_id, topic_id))"
+                )
+                rows = conn.execute(
+                    "SELECT msg_id, title, item_type, icon, custom_link FROM telegram_topic_items "
+                    "WHERE chat_id = ? AND topic_id = ? ORDER BY item_order ASC, msg_id ASC, id ASC LIMIT 90",
+                    (int(target_chat_id), tid),
+                ).fetchall()
+                pin_row = conn.execute(
+                    "SELECT msg_id FROM telegram_pinned_index_cards WHERE chat_id = ? AND topic_id = ?",
+                    (int(target_chat_id), tid),
+                ).fetchone()
+                existing_pin_id = int(pin_row["msg_id"]) if pin_row else None
+
+            if rows:
+                clean_cid = str(target_chat_id).replace("-100", "", 1)
+                lines = [
+                    f"📑 <b>INDEX: {html.escape(clean_title)}</b>",
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                ]
+                for idx, r in enumerate(rows, 1):
+                    ic = r["icon"] or ("🎬" if r["item_type"] == "video" else "📑")
+                    t_lbl = html.escape(str(r["title"] or f"Lecture {idx}")[:55])
+                    lnk = r["custom_link"] or (f"https://t.me/c/{clean_cid}/{tid}/{r['msg_id']}" if tid > 1 else f"https://t.me/c/{clean_cid}/{r['msg_id']}")
+                    lines.append(f"{idx}. {ic} <a href=\"{lnk}\">{t_lbl}</a>")
+                lines.extend([
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                    f"📚 <a href=\"https://t.me/be_as_kind\"><b>Kind Doctor &amp; Team</b></a> · 💬 <a href=\"https://t.me/KindDoc_bot\"><b>Group Study Help 😉</b></a>",
+                ])
+                card_html = "\n".join(lines)[:4000]
+                if existing_pin_id and bot_token:
+                    res = await _bot_post("editMessageText", {
+                        "chat_id": int(target_chat_id),
+                        "message_id": existing_pin_id,
+                        "text": card_html,
+                        "parse_mode": "HTML",
+                        "disable_web_page_preview": True,
+                    })
+                    if res and (res.get("ok") or "message is not modified" in str(res.get("description", "")).lower()):
+                        pinned_msg_id = existing_pin_id
+                if not pinned_msg_id and bot_token:
+                    payload = {
+                        "chat_id": int(target_chat_id),
+                        "text": card_html,
+                        "parse_mode": "HTML",
+                        "disable_web_page_preview": True,
+                    }
+                    if tid > 1:
+                        payload["message_thread_id"] = tid
+                    res = await _bot_post("sendMessage", payload)
+                    if res and res.get("ok"):
+                        pinned_msg_id = int(res["result"]["message_id"])
+                        await _bot_post("pinChatMessage", {
+                            "chat_id": int(target_chat_id),
+                            "message_id": pinned_msg_id,
+                            "disable_notification": True,
+                        })
+                        with sqlite3.connect(DB_PATH, timeout=15.0) as conn:
+                            conn.execute(
+                                "INSERT OR REPLACE INTO telegram_pinned_index_cards (chat_id, topic_id, msg_id, updated_at) "
+                                "VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                                (int(target_chat_id), tid, pinned_msg_id),
+                            )
+                            conn.commit()
+        except Exception as idx_err:
+            logger.warning(f"⚠️ Per-topic pinned index update note: {idx_err}")
+
+    if post_summary and total_cloned > 0:
+        jump_line = ""
+        if pinned_msg_id:
+            clean_cid = str(target_chat_id).replace("-100", "", 1)
+            j_url = f"https://t.me/c/{clean_cid}/{tid}/{pinned_msg_id}" if tid > 1 else f"https://t.me/c/{clean_cid}/{pinned_msg_id}"
+            jump_line = f"\n📌 <a href=\"{j_url}\"><b>Open Pinned Topic Index</b></a>"
+        vol_line = f" | 💾 <b>Volume:</b> <code>{size_str}</code>" if size_mb > 0.1 else ""
+        summary_html = (
+            f"✅ <b>TOPIC COMPLETED: {html.escape(clean_title)}</b> 🎉\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Total Delivered:</b> <code>{total_cloned}</code> items (🎬 {videos} | 📑 {docs} | 🖼️ {photos})\n"
+            f"⏱️ <b>Elapsed:</b> <code>{dur_str}</code>{vol_line}"
+            f"{jump_line}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📚 <a href=\"https://t.me/be_as_kind\"><b>Kind Doctor &amp; Team</b></a> · 💬 <a href=\"https://t.me/KindDoc_bot\"><b>Group Study Help 😉</b></a>"
+        )
+        sent_sum = False
+        if bot_token:
+            p = {"chat_id": int(target_chat_id), "text": summary_html, "parse_mode": "HTML", "disable_web_page_preview": True}
+            if tid > 1:
+                p["message_thread_id"] = tid
+            res = await _bot_post("sendMessage", p)
+            sent_sum = bool(res and res.get("ok"))
+        if not sent_sum and user_client:
+            with suppress(Exception):
+                peer = await _safe_resolve_entity(user_client, target_chat_id)
+                await user_client.send_message(peer, summary_html, reply_to=(tid if tid > 1 else None), parse_mode="html", link_preview=False)
+
+    if tid > 1 and os.getenv("AUTO_TOPIC_DONE_BADGE", "false").strip().lower() in ("true", "1", "yes"):
+        if not clean_title.startswith("✅") and user_client:
+            with suppress(Exception):
+                peer = await _safe_resolve_entity(user_client, target_chat_id)
+                await user_client(EditForumTopicRequest(peer=peer, topic_id=tid, title=f"✅ {clean_title}"[:128]))
+
+    if tid > 1 and os.getenv("AUTO_CLOSE_TOPICS", "false").strip().lower() in ("true", "1", "yes"):
+        await set_forum_topic_closed(bot_token, user_client, target_chat_id, tid, closed=True)
+
 
 async def _safe_resolve_entity(client: TelegramClient, target):
     """Safely resolves an input peer entity for an ID or username, with full dialog scanning fallback."""
@@ -783,22 +971,24 @@ class DeepClonerEngine:
                             thumb_to_attach = None
                             thumb_mode = os.getenv("THUMB_MODE", "custom").strip().lower()
                             if thumb_mode == "custom":
-                                for cand in [ROOT_DIR / "tg_thumb_cached.jpg", ROOT_DIR / "assets" / "thumb.jpg", ROOT_DIR / "thumb.jpg"]:
+                                for cand in [ROOT_DIR / "tg_thumb_cached.jpg", ROOT_DIR / "kind_doctor_thumb.jpg", ROOT_DIR / "assets" / "thumb.jpg", ROOT_DIR / "thumb.jpg"]:
                                     if cand.exists():
                                         thumb_to_attach = str(cand)
                                         break
                             tier1_success = False
-                            try:
-                                # Tier 1: Instant Server-Side Cloud Pointer Copy (0.15s, 0 bytes bandwidth, 0 disk/RAM)
-                                sent_media_msg = await user_client.send_file(
-                                    tgt_peer,
-                                    file=msg.media,
-                                    caption=cleaned_caption,
-                                    reply_to=reply_hdr
-                                )
-                                tier1_success = True
-                            except Exception as ex_fwd:
-                                logger.info(f"Tier 1 copy failed for msg #{msg.id} ({ex_fwd}). Falling back to Tier 2 Protected Content Streamer...")
+                            if thumb_mode != "custom" or not thumb_to_attach:
+                                try:
+                                    # Tier 1: Instant Server-Side Cloud Pointer Copy (0.15s, 0 bytes bandwidth, 0 disk/RAM)
+                                    sent_media_msg = await user_client.send_file(
+                                        tgt_peer,
+                                        file=msg.media,
+                                        caption=cleaned_caption,
+                                        reply_to=reply_hdr,
+                                        parse_mode="md",
+                                    )
+                                    tier1_success = True
+                                except Exception as ex_fwd:
+                                    logger.info(f"Tier 1 copy failed for msg #{msg.id} ({ex_fwd}). Falling back to Tier 2 Protected Content Streamer...")
 
                             if not tier1_success:
                                 # Guard against Non-Premium 2GB limit on Protected/Restricted Content
@@ -1145,6 +1335,17 @@ class DeepClonerEngine:
                 target_topic_id=target_topic_id,
                 topic_title=src_top_title,
                 progress_callback=_topic_prog_cb
+            )
+
+            await publish_topic_summary_and_index(
+                bot_token=self.bot_token,
+                user_client=user_client,
+                target_chat_id=target_chat_id,
+                target_topic_id=target_topic_id,
+                topic_title=src_top_title,
+                stats={"cloned": cloned_in_topic},
+                post_summary=(cloned_in_topic > 0),
+                update_index=True,
             )
 
             grand_total_cloned += cloned_in_topic

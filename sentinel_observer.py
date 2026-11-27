@@ -674,16 +674,33 @@ class TelegramReporter:
         sent_any = False
         try:
             import aiohttp
+            import html as _html
+            import re as _re
+            def _md_to_html(src: str) -> str:
+                s = _html.escape(src, quote=False)
+                s = _re.sub(r'\[([^\]]+)\]\((https?://[^\s)]+)\)', r'<a href="\2">\1</a>', s)
+                s = _re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', s)
+                s = _re.sub(r'`([^`]+)`', r'<code>\1</code>', s)
+                s = _re.sub(r'(?<!\*)\*([^\*\n]+)\*(?!\*)', r'<i>\1</i>', s)
+                return s
+            html_text = _md_to_html(message_text[:3800])
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
             async with aiohttp.ClientSession() as http_sess:
                 for t_chat, t_thread in targets:
-                    payload = {"chat_id": t_chat, "text": message_text[:4000], "disable_web_page_preview": True}
+                    payload = {"chat_id": t_chat, "text": html_text, "parse_mode": "HTML", "disable_web_page_preview": True}
                     if t_thread:
                         payload["message_thread_id"] = t_thread
                     try:
                         async with http_sess.post(url, json=payload, timeout=15) as resp:
                             if resp.status == 200:
                                 sent_any = True
+                            elif resp.status != 200:
+                                plain_p = {"chat_id": t_chat, "text": message_text[:4000].replace("**", ""), "disable_web_page_preview": True}
+                                if t_thread:
+                                    plain_p["message_thread_id"] = t_thread
+                                async with http_sess.post(url, json=plain_p, timeout=15) as r2:
+                                    if r2.status == 200:
+                                        sent_any = True
                     except Exception:
                         pass
         except Exception as e:
@@ -1070,12 +1087,15 @@ async def main():
         last_night_date = ""
         last_cleanup_monotonic = time.monotonic()
         while True:
-            # Hourly temp sessions TTL cleanup
+            # Hourly temp sessions TTL cleanup + log/backup rotation
             if time.monotonic() - last_cleanup_monotonic >= 3600:
                 last_cleanup_monotonic = time.monotonic()
                 purged = cleanup_stale_temp_sessions()
                 if purged > 0:
                     STATE.add_event(f"[dim green]🧹 Purged {purged} stale temp session file(s).[/]")
+                with suppress(Exception):
+                    from devi.sentinel.telemetry_bridge import rotate_logs_and_backups
+                    await asyncio.to_thread(rotate_logs_and_backups)
 
             events = BRIDGE.poll_logs()
             for ev in events:
@@ -1096,10 +1116,12 @@ async def main():
                 last_morning_date = today_str
                 async def _dispatch_morning(_stats=db_stats):
                     try:
+                        from devi.sentinel.telemetry_bridge import collect_briefing_telemetry
+                        telem = await asyncio.to_thread(collect_briefing_telemetry)
                         res = await RESEARCHER.research_topic("Clinical Medicine Pearls, High-Yield Cardiology & High-Speed Telegram Streaming")
                         topic = res.get("topic") or "Universal MTProto 512KB Parallel Acceleration & Multi-Model Sovereign Intelligence"
                         summary = res.get("summary") or "• Integrated unconstrained universal AI vitality across 12 free providers.\n• Zero forward tags, pristine study captions, and automatic 16:9 thumbnail attachments active."
-                        card = ADVISOR.build_good_morning_digest(STATE, _stats, topic, summary)
+                        card = ADVISOR.build_good_morning_digest(STATE, _stats, topic, summary, telemetry=telem)
                         await reporter.send_report(card)
                         await reporter.send_database_backup()
                         STATE.add_event("[bold green]🌅 9:00 AM IST Good Morning Digest & DB Backup dispatched![/]")
@@ -1114,10 +1136,12 @@ async def main():
                 last_night_date = today_str
                 async def _dispatch_night(_stats=db_stats):
                     try:
+                        from devi.sentinel.telemetry_bridge import collect_briefing_telemetry
+                        telem = await asyncio.to_thread(collect_briefing_telemetry)
                         res = await RESEARCHER.research_topic("Autonomous AI Evolution, SaMD Compliance & Overnight Pipeline Maintenance")
                         topic = res.get("topic") or "Advanced Clinical Medicine Insights, SaMD Compliance & Autonomous Resilience"
                         summary = res.get("summary") or "• Exploring multi-agent supervisor protocols & sub-second streaming buffers.\n• Full database snapshot attached below for complete peace of mind."
-                        card = ADVISOR.build_good_night_digest(STATE, _stats, topic, summary)
+                        card = ADVISOR.build_good_night_digest(STATE, _stats, topic, summary, telemetry=telem)
                         await reporter.send_report(card)
                         await reporter.send_database_backup()
                         STATE.add_event("[bold green]🌙 9:00 PM IST Good Night Digest & DB Backup dispatched![/]")
